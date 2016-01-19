@@ -1,6 +1,6 @@
 import check;
 
-// After goto, return statements, etc, "what cells are live" is faked -- the set of cells that are live (or soon, active) should be identical to that before the goto/return statement.  Once we control flow into something reachable, we'll have a consistent liveness state.
+// After goto, return statements, etc, "what cells are live" is faked -- the set of cells that are live (or soon, active) should be identical to that before the goto/return statement.  Once we control flow into something reachable, we'll have a consistent liveness state.  (That is, the liveness state is bogus (in a sense) for unreachable nodes.  Any liveness state would be bogus, ours is consistent.)  We also bogusly declare the return cell to be "active" after falling off the end of a fullbody.
 
 struct frame_graph {
   informal_name sym;
@@ -104,6 +104,8 @@ enum gr_xop {
   GrAssertLive gr_assert_live;
   GrDead gr_dead;
   GrVirtualDead gr_virtual_dead;
+  GrActiveXop gr_active_xop;
+  GrManyActiveXop gr_many_active_xop;
   // A debugging xop for compiler devs.
 }
 
@@ -151,11 +153,25 @@ func addx(gs gr_statep, op gr_xop) gr_num {
   case &GrApply(a gr_apply):
     gr_expect_live(gs, a.retcell);
 
-    gr_deaden(gs, a.funcell);
     nparams size = count(&a.params);
+
+    switch a.act {
+    case TwoActiveOps(ops gr_two_active_ops):
+      gr_track_active_op(gs, ops.one);
+      gr_track_active_op(gs, ops.two);
+    case StandardApply:
+      gr_deactivate(gs, a.funcell);
+      for i size = 0; i < nparams; i = i + 1 {
+        gr_deactivate(gs, get(&a.params, i));
+      }
+      gr_activate(gs, a.retcell);
+    }
+
+    gr_deaden(gs, a.funcell);
     for i size = 0; i < nparams; i = i + 1 {
       gr_deaden(gs, get(&a.params, i));
     }
+
   case &GrPrimApply(a gr_prim_apply):
     gr_expect_live(gs, a.retcell);
 
@@ -163,6 +179,7 @@ func addx(gs gr_statep, op gr_xop) gr_num {
     for i size = 0; i < nparams; i = i + 1 {
       gr_deaden(gs, get(&a.params, i));
     }
+
   case &GrMemCopy(a gr_memcopy):
     gr_expect_live(gs, a.dest);
     gr_expect_live(gs, a.src);
@@ -184,9 +201,18 @@ func addx(gs gr_statep, op gr_xop) gr_num {
   case &GrAssertLive(a gr_assert_live):
     gr_expect_live(gs, a.cell);
   case &GrDead(a gr_dead):
+    gr_expect_inactive(gs, a.cell);
     gr_deaden(gs, a.cell);
   case &GrVirtualDead(a gr_virtual_dead):
     gr_deaden(gs, a.cell);
+  case &GrActiveXop(a gr_active_xop):
+    gr_track_active_op(gs, a.op1);
+    gr_track_active_op(gs, a.op2);
+  case &GrManyActiveXop(a gr_many_active_xop):
+    nops size = count(&a.ops);
+    for i size = 0; i < nops; i = i + 1 {
+      gr_track_active_op(gs, get(&a.ops, i));
+    }
   }
 
   return untracked_addx(gs.gr, op);
@@ -316,10 +342,28 @@ inline func ref_node(gr *frame_graph, gn gr_num) *gr_node {
   return ref(&gr->ops, gn.x);
 }
 
+enum gr_active_op {
+  // A legit value, used when we have less than two ops in gr_two_active_ops.
+  Nothing void;
+  Activate cell_num;
+  Deactivate cell_num;
+}
+
+struct gr_two_active_ops {
+  one gr_active_op;
+  two gr_active_op;
+}
+
+enum gr_apply_active_change {
+  TwoActiveOps gr_two_active_ops;
+  StandardApply void;
+}
+
 struct gr_apply {
   funcell cell_num;
   params shray[cell_num];
   retcell cell_num;
+  act gr_apply_active_change;
 }
 
 struct gr_prim_apply {
@@ -358,6 +402,17 @@ struct gr_subcell {
 enum gr_offset {
   OffsetConst u32;
   OffsetComputed tup[u32, cell_num];
+}
+
+struct gr_active_xop {
+  // These happen simultaneously -- there's no ordering.  If there's just one op, the other one will be Nothing.
+  op1 gr_active_op;
+  op2 gr_active_op;
+}
+
+struct gr_many_active_xop {
+  // Same as gr_active_xop, but with a pointer dereference.
+  ops shray[gr_active_op];
 }
 
 struct gr_branch {
@@ -401,11 +456,24 @@ enum gr_const {
 
 struct gr_celltrack {
   liveset cellset;
+  // Cells that need to be destructed, specifically.
+  activeset cellset;
 }
+
 
 func mk_celltrack() gr_celltrack {
   liveset cellset;
-  return {liveset};
+  activeset cellset;
+  return {liveset, activeset};
+}
+
+func gr_check_empty(celltrack *gr_celltrack) void {
+  if count(&celltrack->liveset.all) != 0 {
+    ice(_u8("celltrack has leftover live cells"));
+  }
+  if count(&celltrack->activeset.all) != 0 {
+    ice(_u8("celltrack has leftover active cells"));
+  }
 }
 
 struct gr_statep {
@@ -452,6 +520,9 @@ func note_celltrack(targ *noted_celltrack, current *gr_celltrack) void {
     if !matches_checksum(&ct.liveset, &current->liveset) {
       ice(_u8("Inconsistent liveness state, liveset="), current->liveset);
     }
+    if !matches_checksum(&ct.activeset, &current->activeset) {
+      ice(_u8("Inconsistent activeness state, activeset="), current->activeset);
+    }
   } else {
     targ->celltrack = Has(*current);
   }
@@ -490,6 +561,9 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   }
   add(&bu, parameter_unwinding);
 
+  // We artifically activate the return cell after falling off the end of a fullbody.
+  // TODO: This is crazy nonsense.  Detect reachability in a conservative fashion (e.g. everything after a label is reachable, everything after a break/continue/return is not).
+  gr_activate(gs, info->return_cell);
   gn sq_num = mut_connect(gs, &bu, &fb.final_node);
 
   *out = gn.x;
@@ -1109,7 +1183,12 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
     if case Printed(pm) = gr_expr_consume(gs, oo(&b), bu) {
       return Printed(pm);
     }
+    add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(subcell)}));
     add(bu, @[gr_xop]GrVirtualDead({subcell}));
+  } else {
+    // Write _some_ void value... out of politeness?  Keeping these void 0 ops for now on the assumption some sort of constant value optimization logic might use it later.
+    add(bu, @[gr_xop]GrWriteConst({fb->return_cell, ConstInt(bigu(0))}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Nothing}));
   }
   info *ast_return_statement_info = un(&a->info);
   uw_op gr_num;
@@ -1145,7 +1224,7 @@ func gr_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_nu
     gn gr_num;
     switch get(destructions, i) {
     case VarSelfContainedDestruction(da destroy_action):
-      if case Printed(pm) = gr_destroy_action(gs, &da, DeadAfterDestroyYes, &gn) {
+      if case Printed(pm) = gr_destroy_action(gs, &da, DeadactAfterDestroyYes, &gn) {
         return Printed(pm);
       }
     case VarVirtualCellDead(c cell_num):
@@ -1158,13 +1237,17 @@ func gr_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_nu
 }
 
 func gr_expr_discard(gs gr_statep, x *ast_expr_discard, bu *sq_builder) np {
-  if case Printed(pm) = gr_expr_after_discard_before(gs, &x->expr, un(&x->after), bu) {
+  return gr_expr_and_discard(gs, &x->expr, un(&x->after), bu);
+}
+
+func gr_expr_and_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
+  if case Printed(pm) = gr_expr_after_discard_before(gs, x, aft, bu) {
     return Printed(pm);
   }
-  if case Printed(pm) = gr_expr(gs, &x->expr, bu) {
+  if case Printed(pm) = gr_expr(gs, x, bu) {
     return Printed(pm);
   }
-  if case Printed(pm) = gr_expr_after_discard(gs, &x->expr, un(&x->after), bu) {
+  if case Printed(pm) = gr_expr_after_discard(gs, x, aft, bu) {
     return Printed(pm);
   }
   return NoFail;
@@ -1187,7 +1270,7 @@ func gr_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
       add(bu, @[gr_xop]GrVirtualDead({partial_cell(x)}));
     }
     gn gr_num;
-    if case Printed(pm) = gr_destroy_action(gs, &da, DeadAfterDestroyYes, &gn) {
+    if case Printed(pm) = gr_destroy_action(gs, &da, DeadactAfterDestroyYes, &gn) {
       return Printed(pm);
     }
     add(bu, gn);
@@ -1198,7 +1281,9 @@ func gr_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
   return NoFail;
 }
 
+// Callees of this have to deactivate the result_cell later, of course.
 func gr_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
+  // TODO: We could certainly assert that result_cell is the only one made live or active.  (If that remains a valid assertion.)
   add(bu, @[gr_xop]GrLive({result_cell(x)}));
   if case Printed(pm) = gr_expr_consume(gs, x, bu) {
     return Printed(pm);
@@ -1225,6 +1310,7 @@ func gr_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume,
 }
 
 func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
+  // TODO: Honestly we could have some general assertions about what cells are made live or active, based on lval/rval info.
   cs *checkstate = gs.clq->cs;
   switch &x->u {
   case &NameExpr(a ast_name_expr):
@@ -1308,6 +1394,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   if case Printed(pm) = gr_expr_consume(gs, oo(&a->then_clause), &then_bu) {
     return Printed(pm);
   }
+  add(&then_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->then_clause)))}));
   add(&then_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->then_clause))}));
   then_sn sq_num = mut_connect(gs, &then_bu, &join_target);
 
@@ -1318,6 +1405,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   if case Printed(pm) = gr_expr_consume(gs, oo(&a->else_clause), &else_bu) {
     return Printed(pm);
   }
+  add(&else_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->else_clause)))}));
   add(&else_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->else_clause))}));
   else_sn sq_num = mut_connect(gs, &else_bu, &join_target);
 
@@ -1336,6 +1424,8 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
 }
 
 func gr_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np {
+  activation_ops array[gr_active_op];
+  push(&activation_ops, Activate(rval_cell(x)));
   nparams size = count(&a->exprs);
   for i size = 0; i < nparams; i = i + 1 {
     param *ast_strinit_param = ref(&a->exprs, i);
@@ -1343,7 +1433,11 @@ func gr_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np
     if case Printed(pm) = gr_expr_consume(gs, &param->ec, bu) {
       return Printed(pm);
     }
+    push(&activation_ops, Deactivate(result_cell(&param->ec)));
   }
+  // Now switch activations over to the whole thing.
+  add(bu, @[gr_xop]GrManyActiveXop({freeze(&activation_ops)}));
+
   // We declare the virtual cells dead after we're done the whole thing -- because we'll need them for unwinding.
   for i size = nparams; i > 0; {
     i = i - 1;
@@ -1361,6 +1455,7 @@ func gr_deref_field(gs gr_statep, x *ast_expr, a *ast_deref_field, bu *sq_builde
   switch info {
   case &DerefArrayLength(count u32):
     add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~count)}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   case &DerefFieldName(offset u32):
     name cell_num = ellval_cell(x);
     add(bu, @[gr_xop]GrDeref({name, result_cell(oo(&a->lhs)), OffsetConst(offset)}));
@@ -1378,19 +1473,12 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
 
   switch info {
     case &ArrayLength(alinfo ast_arraylength_info): {
-      if case Printed(pm) = gr_expr_after_discard_before(gs, oo(&a->lhs), &alinfo.after, bu) {
-        return Printed(pm);
-      }
-
-      if case Printed(pm) = gr_expr(gs, oo(&a->lhs), bu) {
-        return Printed(pm);
-      }
-
-      if case Printed(pm) = gr_expr_after_discard(gs, oo(&a->lhs), &alinfo.after, bu) {
+      if case Printed(pm) = gr_expr_and_discard(gs, oo(&a->lhs), &alinfo.after, bu) {
         return Printed(pm);
       }
 
       add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)}));
+      add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
       return NoFail;
     }
     case &FieldName(offset u32): {
@@ -1425,6 +1513,48 @@ func gr_expect_live(gs gr_statep, c cell_num) void {
   expect_live(&gs.celltrack->liveset, c);
 }
 
+func gr_activate(gs gr_statep, c cell_num) void {
+  liveset *cellset = &gs.celltrack->activeset;
+  if !try_insert(&liveset->all, c) {
+    ice(_u8("activate on active cell "), c);
+  }
+  liveset->xored = liveset->xored ^ ~c.x;
+  liveset->summed = liveset->summed + ~c.x;
+}
+
+func gr_deactivate(gs gr_statep, c cell_num) void {
+  liveset *cellset = &gs.celltrack->activeset;
+  if !try_remove(&liveset->all, c) {
+    ice(_u8("deactivate on inactive cell "), c);
+  }
+  liveset->xored = liveset->xored ^ ~c.x;
+  liveset->summed = liveset->summed - ~c.x;
+}
+
+func gr_expect_active(gs gr_statep, c cell_num) void {
+  liveset *cellset = &gs.celltrack->activeset;
+  if case None = lookup(&liveset->all, c) {
+    ice(_u8("expect_active on inactive cell "), c);
+  }
+}
+
+func gr_expect_inactive(gs gr_statep, c cell_num) void {
+  // TODO: This is an inefficient assertion to make.  (Liveness asserts can or will be able to search from the end with practical O(1) cost thanks to the generally fifo nature of cell lifetimes.)  Remove this function.
+  if case Has(ix size) = lookup(&gs.celltrack->activeset.all, c) {
+    ice(_u8("expected inactive cell"));
+  }
+}
+
+func gr_track_active_op(gs gr_statep, op gr_active_op) void {
+  switch op {
+  case Nothing: { }
+  case Activate(c cell_num):
+    gr_activate(gs, c);
+  case Deactivate(c cell_num):
+    gr_deactivate(gs, c);
+  }
+}
+
 func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
@@ -1434,7 +1564,9 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   gr_create(lambda_gs, info->return_cell);
   nargs size = count(&info->arg_cells);
   for i size = 0; i < nargs; i = i + 1 {
-    gr_create(lambda_gs, get(&info->arg_cells, i));
+    ac cell_num = get(&info->arg_cells, i);
+    gr_create(lambda_gs, ac);
+    gr_activate(lambda_gs, ac);
   }
 
   fullbody_gn gr_num;
@@ -1442,14 +1574,16 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
     return Printed(pm);
   }
 
+  gr_deactivate(lambda_gs, info->return_cell);
   gr_deaden(lambda_gs, info->return_cell);
-  if count(&lambda_celltrack.liveset.all) != 0 {
-    ice(_u8("gr_lambda_expr sees leftover live cells"));
-  }
+  gr_check_empty(&lambda_celltrack);
 
   id fn_body_id = add_fn_body(gs.clq->cs, {gs.gr->informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, info->return_cell}, info->arg_cells, parsed_inline_to_state_inline(a->is_inline), NotComputed})});
-  gn var = addx(gs, @[gr_xop]GrWriteConst({rval_cell(x), ConstFnBody(id)}));
-  *out = gn;
+  bu sq_builder = mk_builder(gs);
+  add(&bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstFnBody(id)}));
+  add(&bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
+
+  *out = done(&bu);
   return NoFail;
 }
 
@@ -1467,15 +1601,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
     name cell_num = ellval_cell(x);
     flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
     add(bu, @[gr_xop]GrLive({result_cell(&aft.car)}));
-    if case Printed(pm) = gr_consume_actions_before(gs, oo(&a->lhs), &aft.car, bu) {
-      return Printed(pm);
-    }
-
-    if case Printed(pm) = gr_expr(gs, oo(&a->lhs), bu) {
-      return Printed(pm);
-    }
-
-    if case Printed(pm) = gr_consume_actions(gs, oo(&a->lhs), &aft.car, bu) {
+    if case Printed(pm) = gr_expr_and_consume(gs, oo(&a->lhs), &aft.car, bu) {
       return Printed(pm);
     }
     if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), bu) {
@@ -1523,7 +1649,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
 
 func gr_later_discard(gs gr_statep, a *ast_later_discard_info, out *gr_num) np {
   da *destroy_action = un(&a->action);
-  return gr_destroy_action(gs, da, DeadAfterDestroyYes, out);
+  return gr_destroy_action(gs, da, DeadactAfterDestroyYes, out);
 }
 
 func gr_mk_deref(gs gr_statep, x *ast_expr, a *ast_deref, bu *sq_builder) np {
@@ -1546,6 +1672,7 @@ func gr_mk_addressof(gs gr_statep, x *ast_expr, a *ast_addressof, bu *sq_builder
   }
   desc *lval_description = ellval_desc(oo(&a->rhs));
   add(bu, @[gr_xop]GrAddressof({rval_cell(x), desc->num}));
+  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   if case DeadMe = desc->deadme {
     add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->rhs))}));
   }
@@ -1559,6 +1686,7 @@ func gr_mk_refof(gs gr_statep, x *ast_expr, a *ast_refof, bu *sq_builder) np {
   }
   desc *lval_description = ellval_desc(oo(&a->rhs));
   add(bu, @[gr_xop]GrAddressof({rval_cell(x), desc->num}));
+  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   if case DeadMe = desc->deadme {
     add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->rhs))}));
   }
@@ -1595,42 +1723,42 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
     case &SimpleMoveAssignment(smi ast_simple_move_assignment_info): {
       // rhs is an rvalue.
       dgn gr_num;
-      if case Printed(pm) = gr_destroy_action(gs, &smi.target_destroy, DeadAfterDestroyNo, &dgn) {
+      if case Printed(pm) = gr_destroy_action(gs, &smi.target_destroy, DeadactAfterDestroyNo, &dgn) {
         return Printed(pm);
       }
       add(bu, dgn);
       mgn gr_num;
-      if case Printed(pm) = gr_move_action(gs, &smi.rhs_move, &mgn) {
+      if case Printed(pm) = gr_move_action(gs, &smi.rhs_move, BiDeactivateSrc, &mgn) {
         return Printed(pm);
       }
       add(bu, mgn);
     }
     case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info): {
       dgn gr_num;
-      if case Printed(pm) = gr_destroy_action(gs, &scdi.target_destroy, DeadAfterDestroyNo, &dgn) {
+      if case Printed(pm) = gr_destroy_action(gs, &scdi.target_destroy, DeadactAfterDestroyNo, &dgn) {
         return Printed(pm);
       }
       add(bu, dgn);
       mgn1 gr_num;
-      if case Printed(pm) = gr_copy_action(gs, &scdi.rhs_copy, &mgn1) {
+      if case Printed(pm) = gr_copy_action(gs, &scdi.rhs_copy, BiNothing, &mgn1) {
         return Printed(pm);
       }
       add(bu, mgn1);
       addo(bu, gr_maybe_virtualdead(gs, scdi.rhs_copy.x.src));
       drgn gr_num;
-      if case Printed(pm) = gr_destroy_action(gs, &scdi.rhs_cleanup, DeadAfterDestroyYes, &drgn) {
+      if case Printed(pm) = gr_destroy_action(gs, &scdi.rhs_cleanup, DeadactAfterDestroyYes, &drgn) {
         return Printed(pm);
       }
       add(bu, drgn);
     }
     case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): {
       dgn gr_num;
-      if case Printed(pm) = gr_destroy_action(gs, &sci.target_destroy, DeadAfterDestroyNo, &dgn) {
+      if case Printed(pm) = gr_destroy_action(gs, &sci.target_destroy, DeadactAfterDestroyNo, &dgn) {
         return Printed(pm);
       }
       add(bu, dgn);
       mgn gr_num;
-      if case Printed(pm) = gr_copy_action(gs, &sci.rhs_copy, &mgn) {
+      if case Printed(pm) = gr_copy_action(gs, &sci.rhs_copy, BiNothing, &mgn) {
         return Printed(pm);
       }
       add(bu, mgn);
@@ -1657,7 +1785,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       add(bu, @[gr_xop]GrAddressof({destptr, destcell}));
       add(bu, @[gr_xop]GrLive({srcptr}));
       add(bu, @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
-      add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result}));
+      add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result, TwoActiveOps({Nothing, Nothing})}));
 
       postbranch_save gr_savetrack = save_celltrack(gs);
 
@@ -1673,12 +1801,12 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       do_assign_bu sq_builder = mk_builder(gs);
       add(&do_assign_bu, @[gr_xop]GrDead({cmp_result}));
       assign_destroy gr_num;
-      if case Printed(pm) = gr_destroy_action(gs, &ci.conditional_destroy, DeadAfterDestroyNo, &assign_destroy) {
+      if case Printed(pm) = gr_destroy_action(gs, &ci.conditional_destroy, DeadactAfterDestroyNo, &assign_destroy) {
         return Printed(pm);
       }
       add(&do_assign_bu, assign_destroy);
       assign_copy gr_num;
-      if case Printed(pm) = gr_copy_action(gs, &ci.conditional_copy, &assign_copy) {
+      if case Printed(pm) = gr_copy_action(gs, &ci.conditional_copy, BiNothing, &assign_copy) {
         return Printed(pm);
       }
       add(&do_assign_bu, assign_copy);
@@ -1709,11 +1837,14 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
 
   // TODO: Having to set this void cell is grotesque -- assignment should be a statement.
   add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(bigu(0))}));
+  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   return NoFail;
 }
 
 func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunction, bu *sq_builder) np {
   end_nopq tracked_target = mk_tracked(nopq(gs.gr));
+
+  // TODO: This is so incredibly lame -- we "know" that the values are of type bool, so we don't do later_discard or anything like that.  We manually deactivate the values.  Make this not be lame.
 
   if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->lhs), bu) {
     return Printed(pm);
@@ -1722,6 +1853,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   postbranch_save gr_savetrack = save_celltrack(gs);
 
   rhs_bu sq_builder = mk_builder(gs);
+  add(&rhs_bu, @[gr_xop]GrActiveXop({Deactivate(result_cell(oo(&a->lhs))), Nothing}));
   add(&rhs_bu, @[gr_xop]GrDead({result_cell(oo(&a->lhs))}));
 
   if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), &rhs_bu) {
@@ -1729,6 +1861,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   }
 
   add(&rhs_bu, @[gr_xop]GrMemCopy({rval_cell(x), result_cell(oo(&a->rhs))}));
+  add(&rhs_bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Deactivate(result_cell(oo(&a->rhs)))}));
   add(&rhs_bu, @[gr_xop]GrDead({result_cell(oo(&a->rhs))}));
 
   rhs_sn sq_num = mut_connect(gs, &rhs_bu, &end_nopq);
@@ -1737,6 +1870,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
 
   lhs_bu sq_builder = mk_builder(gs);
   add(&lhs_bu, @[gr_xop]GrMemCopy({rval_cell(x), result_cell(oo(&a->lhs))}));
+  add(&lhs_bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Deactivate(result_cell(oo(&a->lhs)))}));
   add(&lhs_bu, @[gr_xop]GrDead({result_cell(oo(&a->lhs))}));
 
   lhs_sn sq_num = mut_connect(gs, &lhs_bu, &end_nopq);
@@ -1771,7 +1905,7 @@ func gr_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, bu *sq_builder) np {
     }
     push(&paramcells, result_cell(param));
   }
-  add(bu, @[gr_xop]GrApply({result_cell(oo(&a->fun)), freeze(&paramcells), rval_cell(x)}));
+  add(bu, @[gr_xop]GrApply({result_cell(oo(&a->fun)), freeze(&paramcells), rval_cell(x), StandardApply}));
   return NoFail;
 }
 
@@ -1787,21 +1921,26 @@ func gr_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_
     push(&bytes, ~ch);
   }
   add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstBytes(freeze(&bytes))}));
+  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   return NoFail;
 }
 
 func gr_literal(gs gr_statep, x *ast_expr, value bigint, bu *sq_builder) np {
   add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(value)}));
+  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   return NoFail;
 }
 
 func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) np {
+  // Generally for rvalues we write constant values here -- we can activate *after* we've written a constant value.  No atomic activation necessary.
   switch un(&a->name_info) {
   case &LocalResolve(li local_info): { }
   case &GlobalResolve(gi global_info):
     add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstDef({gi.ent, gi.inst})}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   case &EnumConstructor(ei enum_constructor_info):
     add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstDef(ei.ip)}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   case &EnumVoidConstructed(vi enum_voidconstructed_info):
     info *ast_expr_complete_info = expr_complete_info(x);
     x_cell cell_num = rval_cell(x);
@@ -1817,6 +1956,8 @@ func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) n
       = gr_bzero_subcell(gs, x_cell, tag_end, info->cu_props.flat_size - tag_end);
     addo(bu, postpadding_ogn);
     add(bu, @[gr_xop]GrVirtualDead({tag_cell}));
+    // ^ This hub-bub writes a constant value to x_cell.
+    add(bu, @[gr_xop]GrActiveXop({Activate(x_cell), Nothing}));
   }
   return NoFail;
 }
@@ -1890,9 +2031,9 @@ func partial_cell(x *is_lval) cell_num {
   }
 }
 
-enum dead_after_destroy {
-  DeadAfterDestroyYes void;
-  DeadAfterDestroyNo void;
+enum deadact_after_destroy {
+  DeadactAfterDestroyYes void;
+  DeadactAfterDestroyNo void;
 }
 
 func gr_maybe_virtualdead(gs gr_statep, c cell_num) opt[gr_num] {
@@ -1922,19 +2063,19 @@ func gr_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
   case &ConsumeByInPlace: { }
   case &ConsumeByCopyDestroy(cd copy_destroy_action):
     dep gr_num;
-    if case Printed(pm) = gr_copy_action(gs, &cd.copy, &dep) {
+    if case Printed(pm) = gr_copy_action(gs, &cd.copy, BiCopy, &dep) {
       return Printed(pm);
     }
     add(bu, dep);
     addo(bu, gr_maybe_virtualdead(gs, cd.copy.x.src));
     destroy_gn gr_num;
-    if case Printed(pm) = gr_destroy_action(gs, &cd.destroy, DeadAfterDestroyYes, &destroy_gn) {
+    if case Printed(pm) = gr_destroy_action(gs, &cd.destroy, DeadactAfterDestroyYes, &destroy_gn) {
       return Printed(pm);
     }
     add(bu, destroy_gn);
   case &ConsumeByCopy(cc tup[copy_action, lval_deadme]):
     dep gr_num;
-    if case Printed(pm) = gr_copy_action(gs, &cc.car, &dep) {
+    if case Printed(pm) = gr_copy_action(gs, &cc.car, BiCopy, &dep) {
       return Printed(pm);
     }
     add(bu, dep);
@@ -1943,7 +2084,7 @@ func gr_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
     }
   case &ConsumeByMove(m move_action):
     dep gr_num;
-    if case Printed(pm) = gr_move_action(gs, &m, &dep) {
+    if case Printed(pm) = gr_move_action(gs, &m, BiMove, &dep) {
       return Printed(pm);
     }
     add(bu, dep);
@@ -1951,23 +2092,27 @@ func gr_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
   return NoFail;
 }
 
-func gr_copy_action(gs gr_statep, x *copy_action, out *gr_num) np {
-  return gr_bi_action(gs, &x->x, out);
+func gr_copy_action(gs gr_statep, x *copy_action, statechange bi_ctor_statechange, out *gr_num) np {
+  *out = gr_bi_ctor(gs, x->x.dest, x->x.src, &x->x.ctor, statechange);
+  return NoFail;
 }
 
-func gr_move_action(gs gr_statep, x *move_action, out *gr_num) np {
+func gr_move_action(gs gr_statep, x *move_action, statechange bi_ctor_statechange, out *gr_num) np {
   bu sq_builder = mk_builder(gs);
-  dep gr_num;
-  if case Printed(pm) = gr_bi_action(gs, &x->x, &dep) {
-    return Printed(pm);
-  }
+  dep gr_num = gr_bi_ctor(gs, x->x.dest, x->x.src, &x->x.ctor, statechange);
   add(&bu, dep);
   add(&bu, @[gr_xop]GrDead({x->x.src}));
   *out = done(&bu);
   return NoFail;
 }
 
-func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num) gr_num {
+enum uni_fun_statechange {
+  Nothing void;
+  Activate void;
+  Deactivate void;
+}
+
+func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num, statechange uni_fun_statechange) gr_num {
   argptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, arg)->type);
   voidret cu_typrop = compute_prim(gs.clq, primitive_void_type(gs.clq->cs));
   fnptr cu_typrop = compute_prim(gs.clq, fn_type(gs.clq->cs, argptr.cu.x, voidret.cu.x));
@@ -1984,7 +2129,14 @@ func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num) gr_num {
   add(&bu, @[gr_xop]GrLive({argptrcell}));
   add(&bu, @[gr_xop]GrAddressof({argptrcell, arg}));
 
-  add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid}));
+  switch statechange {
+  case Nothing:
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, TwoActiveOps({Nothing, Nothing})}));
+  case Activate:
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, TwoActiveOps({Activate(arg), Nothing})}));
+  case Deactivate:
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, TwoActiveOps({Deactivate(arg), Nothing})}));
+  }
   add(&bu, @[gr_xop]GrDead({retvoid}));
   return done(&bu);
 }
@@ -1994,32 +2146,23 @@ func gr_init_action(gs gr_statep, x *init_action, out *gr_num) np {
   add(&bu, @[gr_xop]GrLive({x->x.arg}));
   switch &x->x.ctor {
   case &TrivialCtor:
+    // It's OK to make the object active _after_ having written the zero data to the inactive value.  Instead of doing it atomically.  But if GrWriteConst gains that capability, we might as well change this code to use it.
+
     add(&bu, @[gr_xop]GrWriteConst({x->x.arg, ConstInt(bigu(0))}));
+    add(&bu, @[gr_xop]GrActiveXop({Activate(x->x.arg), Nothing}));
   case &FunCtor(ip instpair):
-    dp gr_num = gr_uni_fun(gs, ip, x->x.arg);
+    dp gr_num = gr_uni_fun(gs, ip, x->x.arg, Activate);
     add(&bu, dp);
   }
   *out = done(&bu);
   return NoFail;
 }
 
-func gr_destroy_action(gs gr_statep, x *destroy_action, dad dead_after_destroy, out *gr_num) np {
-  bu sq_builder = mk_builder(gs);
-  switch &x->x.ctor {
-  case &TrivialCtor: { }
-  case &FunCtor(ip instpair):
-    gn gr_num = gr_uni_fun(gs, ip, x->x.arg);
-    add(&bu, gn);
-  }
-  if case DeadAfterDestroyYes = dad {
-    add(&bu, @[gr_xop]GrDead({x->x.arg}));
-  }
-
-  *out = done(&bu);
-  return NoFail;
+func gr_destroy_action(gs gr_statep, x *destroy_action, dad deadact_after_destroy, out *gr_num) np {
+  return gr_destroy_ctor(gs, x->x.arg, &x->x.ctor, dad, out);
 }
 
-func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num) gr_num {
+func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechange bi_ctor_statechange) gr_num {
   // In our "bi_fun" uses the dest and src have the same type.  It seems wrong for this menial code to know that, though.
   destptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, dest)->type);
   srcptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, src)->type);
@@ -2042,25 +2185,20 @@ func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num) gr_num {
   add(&bu, @[gr_xop]GrLive({srcptrcell}));
   add(&bu, @[gr_xop]GrAddressof({srcptrcell, src}));
 
-  add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid}));
+  switch statechange {
+  case BiMove:
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TwoActiveOps({Activate(dest), Deactivate(src)})}));
+  case BiCopy:
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TwoActiveOps({Activate(dest), Nothing})}));
+  case BiDeactivateSrc:
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TwoActiveOps({Deactivate(src), Nothing})}));
+  case BiNothing:
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TwoActiveOps({Nothing, Nothing})}));
+  }
 
   add(&bu, @[gr_xop]GrDead({retvoid}));
 
   return done(&bu);
-}
-
-func gr_bi_action(gs gr_statep, x *bi_action, out *gr_num) np {
-  switch &x->ctor {
-    case &TrivialCtor: {
-      cp var = addx(gs, @[gr_xop]GrMemCopy({x->dest, x->src}));
-      *out = cp;
-      return NoFail;
-    }
-    case &FunCtor(ip instpair): {
-      *out = gr_bi_fun(gs, ip, x->dest, x->src);
-      return NoFail;
-    }
-  }
 }
 
 // TODO: There's a lot of duplicated code in the splay-out of this function.
@@ -2148,10 +2286,9 @@ func gr_minimal_basics_cleanup(gs gr_statep, bas *gr_minimal_basics, bu *sq_buil
   }
   add(bu, @[gr_xop]GrWriteConst({bas->return_cell, ConstInt(bigu(0))}));
 
+  // The void return cell never gets activated... so be it.
   gr_deaden(gs, bas->return_cell);
-  if count(&gs.celltrack->liveset.all) != 0 {
-    ice(_u8("gr_minimal_basics_cleanup sees leftover live cells"));
-  }
+  gr_check_empty(gs.celltrack);
 }
 
 func gr_basics_cleanup(gs gr_statep, bas *gr_basics, bu *sq_builder) void {
@@ -2210,6 +2347,7 @@ func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *
   return NoFail;
 }
 
+// Note that generally these magic ops have "holes" in active-tracking.  If constructors could throw exceptions, we wouldn't unwind properly.  Same with assignment.
 func gr_magic_ctor(clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   info *magic_ctor_info = un(&mc->info);
   switch info {
@@ -2349,7 +2487,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
         add(&vd_bu, @[gr_xop]GrVirtualDead({ec}));
       }
 
-      add(&vd_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell}));
+      add(&vd_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell, TwoActiveOps({Nothing, Nothing})}));
       add(&vd_bu, @[gr_xop]GrDead({elemretcell}));
       vd gr_num = done(&vd_bu);
       add(&loop_bu, vd);
@@ -2372,10 +2510,9 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   add(&bu, @[gr_xop]GrDead({indexcell}));
   add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
 
+  // We did't set the return cell active, whatever.
   gr_deaden(gs, return_cell);
-  if count(&celltrack.liveset.all) != 0 {
-    ice(_u8("gr_magic_arraytype_info leaves behind live cells"));
-  }
+  gr_check_empty(&celltrack);
 
   *gr_out = gr;
   *gn_out = done(&bu);
@@ -2495,7 +2632,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
         add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 
-      add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
+      add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, TwoActiveOps({Nothing, Nothing})}));
       add(&sub_bu, @[gr_xop]GrDead({fieldretcell}));
     } else {
       evaled_fieldcellops bool = true;
@@ -2566,10 +2703,9 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   }
   add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
 
+  // We didn't set the return cell active, whatever.
   gr_deaden(gs, return_cell);
-  if count(&celltrack.liveset.all) != 0 {
-    ice(_u8("gr_magic_enum_info leaves behind live cells"));
-  }
+  gr_check_empty(&celltrack);
 
   *gr_out = gr;
   *gn_out = done(&bu);
@@ -2674,7 +2810,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
         add(&bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 
-      add(&bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell}));
+      add(&bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, TwoActiveOps({Nothing, Nothing})}));
       add(&bu, @[gr_xop]GrDead({fieldretcell}));
     } else {
       evaled_fieldcellops bool = true;
@@ -2720,10 +2856,9 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
 
   gn gr_num = done(&bu);
 
+  // We didn't set the return cell active, whatever.
   gr_deaden(gs, return_cell);
-  if count(&celltrack.liveset.all) != 0 {
-    ice(_u8("gr_magic_struct_info leaves behind live cells"));
-  }
+  gr_check_empty(&celltrack);
 
   *gr_out = gr;
   *gn_out = gn;
@@ -2783,6 +2918,7 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   gr_create(gs, retnum);
   gr_create(gs, argnum);
+  gr_activate(gs, argnum);
 
   retpart cell_num = add_cell(&gr, {LocationVirtual, ~ *argtype, mec->rhs_props});
 
@@ -2797,23 +2933,15 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   switch &mec->operational {
   case &EnumConstructMove(cd ctor_desc):
-    bi_ctor_gn gr_num;
-    if case Printed(pm) = gr_bi_ctor(gs, argtype, retpart, argnum, &cd, &bi_ctor_gn) {
-      return Printed(pm);
-    }
+    bi_ctor_gn gr_num = gr_bi_ctor(gs, retpart, argnum, &cd, BiMove);
     add(&bu, bi_ctor_gn);
-    add(&bu, @[gr_xop]GrVirtualDead({retpart}));
     add(&bu, @[gr_xop]GrDead({argnum}));
 
   case &EnumConstructCopyDestroy(cdd copy_destroy_desc):
-    cpgn gr_num;
-    if case Printed(pm) = gr_bi_ctor(gs, argtype, retpart, argnum, &cdd.copy_desc, &cpgn) {
-      return Printed(pm);
-    }
+    cpgn gr_num = gr_bi_ctor(gs, retpart, argnum, &cdd.copy_desc, BiCopy);
     add(&bu, cpgn);
-    add(&bu, @[gr_xop]GrVirtualDead({retpart}));
     destgn gr_num;
-    if case Printed(pm) = gr_destroy_ctor(gs, argtype, argnum, &cdd.destroy_desc, &destgn) {
+    if case Printed(pm) = gr_destroy_ctor(gs, argnum, &cdd.destroy_desc, DeadactAfterDestroyYes, &destgn) {
       return Printed(pm);
     }
     add(&bu, destgn);
@@ -2828,10 +2956,12 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
     = gr_bzero_subcell(gs, retnum, field_end, mec->return_type_props.flat_size - field_end);
   addo(&bu, postpadding_ogn);
 
+  add(&bu, @[gr_xop]GrActiveXop({Activate(retnum), Deactivate(retpart)}));
+  add(&bu, @[gr_xop]GrVirtualDead({retpart}));
+
+  gr_deactivate(gs, retnum);
   gr_deaden(gs, retnum);
-  if count(&celltrack.liveset.all) != 0 {
-    ice(_u8("gr_magic_enum_construct leaves behind live cells"));
-  }
+  gr_check_empty(&celltrack);
 
   *gr_out = gr;
   *gn_out = done(&bu);
@@ -2840,28 +2970,55 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
   return NoFail;
 }
 
-func gr_bi_ctor(gs gr_statep, ty *te_typeexpr, destnum cell_num, srcnum cell_num, cd *ctor_desc, gn_out *gr_num) np {
-  switch cd {
-  case &TrivialCtor:
-    *gn_out = addx(gs, @[gr_xop]GrMemCopy({destnum, srcnum}));
-  case &FunCtor(ip instpair):
-    *gn_out = gr_bi_fun(gs, ip, destnum, srcnum);
-  }
-  return NoFail;
+enum bi_ctor_statechange {
+  BiMove void;
+  BiCopy void;
+  // These two don't activate the target of the copy or move.  They're used when assigning to some lvalue, which _also_ didn't get deactivated when destroyed.  This means it's sitting in an INVALID state in between the destroy and copy.  In other words, if an exception could be thrown in between (like an async exception) we have no way to have exception safety there.
+  BiDeactivateSrc void;
+  BiNothing void;
 }
 
-func gr_destroy_ctor(gs gr_statep, ty *te_typeexpr, argnum cell_num, cd *ctor_desc, gn_out *gr_num) np {
+func gr_bi_ctor(gs gr_statep, destnum cell_num, srcnum cell_num, cd *ctor_desc, statechange bi_ctor_statechange) gr_num {
+  bu sq_builder = mk_builder(gs);
   switch cd {
   case &TrivialCtor:
-    dp var = addx(gs, @[gr_xop]GrDead({argnum}));
-    *gn_out = dp;
+    add(&bu, @[gr_xop]GrMemCopy({destnum, srcnum}));
+    switch statechange {
+    case BiMove:
+      add(&bu, @[gr_xop]GrActiveXop({Activate(destnum), Deactivate(srcnum)}));
+    case BiCopy:
+      add(&bu, @[gr_xop]GrActiveXop({Activate(destnum), Nothing}));
+    case BiDeactivateSrc:
+      add(&bu, @[gr_xop]GrActiveXop({Deactivate(srcnum), Nothing}));
+    case BiNothing: { }
+    }
   case &FunCtor(ip instpair):
-    bu sq_builder = mk_builder(gs);
-    gn gr_num = gr_uni_fun(gs, ip, argnum);
+    gn gr_num = gr_bi_fun(gs, ip, destnum, srcnum, statechange);
     add(&bu, gn);
-    add(&bu, @[gr_xop]GrDead({argnum}));
-    *gn_out = done(&bu);
   }
+  return done(&bu);
+}
+
+func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_after_destroy, out *gr_num) np {
+  bu sq_builder = mk_builder(gs);
+  switch cd {
+  case &TrivialCtor:
+    if case DeadactAfterDestroyYes = dad {
+      add(&bu, @[gr_xop]GrActiveXop({Deactivate(argnum), Nothing}));
+      add(&bu, @[gr_xop]GrDead({argnum}));
+    }
+  case &FunCtor(ip instpair):
+    if case DeadactAfterDestroyYes = dad {
+      gn gr_num = gr_uni_fun(gs, ip, argnum, Deactivate);
+      add(&bu, gn);
+      add(&bu, @[gr_xop]GrDead({argnum}));
+    } else {
+      gn gr_num = gr_uni_fun(gs, ip, argnum, Nothing);
+      add(&bu, gn);
+    }
+  }
+
+  *out = done(&bu);
   return NoFail;
 }
 
@@ -2900,10 +3057,11 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op pri
   argcells_copy array[cell_num] = argcells;
   argshray shray[cell_num] = freeze(&argcells_copy);
   gn gr_num = addx(gs, @[gr_xop]GrPrimApply({op, argshray, retcell}));
+
+  // GrPrimApply doesn't activate (or deactivate) anything.  Yet.
   gr_deaden(gs, retcell);
-  if count(&celltrack.liveset.all) != 0 {
-    ice(_u8("add_prim_fn_body sees leftover live cells"));
-  }
+  gr_check_empty(&celltrack);
+
   return add_fn_body(clq->cs, {informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells, InlineMust, NotComputed})});
 }
 
@@ -2947,7 +3105,13 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
             return Printed(pm);
           }
           gn gr_num = done(&bu);
-          inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, result_cell(&dire.ec)}));
+
+          rcell cell_num = result_cell(&dire.ec);
+          gr_deactivate(gs, rcell);
+          gr_deaden(gs, rcell);
+          gr_check_empty(gs.celltrack);
+
+          inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, rcell}));
           return NoFail;
         }
 

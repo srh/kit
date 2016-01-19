@@ -293,12 +293,31 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
   return NoFail;
 }
 
+func adjust_active_op_for_inline(cm *array[cell_num], op gr_active_op) gr_active_op {
+  switch op {
+  case Nothing:
+    return Nothing;
+  case Activate(c cell_num):
+    return Activate(get(cm, c.x));
+  case Deactivate(c cell_num):
+    return Deactivate(get(cm, c.x));
+  }
+}
+
 func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_node {
   switch node {
   case XOp(xn gr_xnode):
     switch &xn.op {
     case &GrApply(a gr_apply):
-      return XOp({GrApply({get(cm, a.funcell.x), help_adjust_params(cm, &a.params), get(cm, a.retcell.x)})});
+      act gr_apply_active_change;
+      switch a.act {
+      case TwoActiveOps(ops gr_two_active_ops):
+        act = TwoActiveOps({adjust_active_op_for_inline(cm, ops.one), adjust_active_op_for_inline(cm, ops.two)});
+      case StandardApply:
+        act = StandardApply;
+      }
+
+      return XOp({GrApply({get(cm, a.funcell.x), help_adjust_params(cm, &a.params), get(cm, a.retcell.x), act})});
     case &GrPrimApply(a gr_prim_apply):
       return XOp({GrPrimApply({a.primop, help_adjust_params(cm, &a.params), get(cm, a.retcell.x)})});
     case &GrMemCopy(a gr_memcopy):
@@ -319,6 +338,15 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
       return XOp({GrDead({get(cm, a.cell.x)})});
     case &GrVirtualDead(a gr_virtual_dead):
       return XOp({GrVirtualDead({get(cm, a.cell.x)})});
+    case &GrActiveXop(a gr_active_xop):
+      return XOp({GrActiveXop({adjust_active_op_for_inline(cm, a.op1), adjust_active_op_for_inline(cm, a.op2)})});
+    case &GrManyActiveXop(a gr_many_active_xop):
+      adjusted array[gr_active_op];
+      nops size = count(&a.ops);
+      for i size = 0; i < nops; i = i + 1 {
+        push(&adjusted, adjust_active_op_for_inline(cm, get(&a.ops, i)));
+      }
+      return XOp({GrManyActiveXop({freeze(&adjusted)})});
     }
   case QOp(qn gr_qnode):
     switch &qn.op {

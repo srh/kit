@@ -115,6 +115,14 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *cellset, gn g
       deaden(liveset, a.cell);
       *out = Terminal;
       return NoFail;
+
+    case &GrActiveXop(a gr_active_xop):
+      *out = Terminal;
+      return NoFail;
+
+    case &GrManyActiveXop(a gr_many_active_xop):
+      *out = Terminal;
+      return NoFail;
     }
 
   case &QOp(qn gr_qnode):
@@ -210,7 +218,7 @@ func deaden(liveset *cellset, c cell_num) void {
 
 func expect_live(liveset *cellset, c cell_num) void {
   if case None = lookup(&liveset->all, c) {
-    ice(_u8("input on unlive cell "), c);
+    ice(_u8("expect_live on unlive cell "), c);
   }
 }
 
