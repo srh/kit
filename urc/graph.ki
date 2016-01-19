@@ -2289,10 +2289,9 @@ func gr_minimal_basics_cleanup(gs gr_statep, bas *gr_minimal_basics, bu *sq_buil
   }
   add(bu, @[gr_xop]GrWriteConst({bas->return_cell, ConstInt(bigu(0))}));
 
+  // The void return cell never gets activated... so be it.
   gr_deaden(gs, bas->return_cell);
-  if count(&gs.celltrack->liveset.all) != 0 {
-    ice(_u8("gr_minimal_basics_cleanup sees leftover live cells"));
-  }
+  ac_check_empty(gs.celltrack);
 }
 
 func gr_basics_cleanup(gs gr_statep, bas *gr_basics, bu *sq_builder) void {
