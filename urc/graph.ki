@@ -543,7 +543,7 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   }
 
   parameter_unwinding gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &info->parameter_destructions, &parameter_unwinding) {
+  if case Printed(pm) = ac_unwinding(gs, &info->parameter_destructions, &parameter_unwinding) {
     return Printed(pm);
   }
   add(&bu, parameter_unwinding);
@@ -569,7 +569,7 @@ func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
   }
 
   uw gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &un(&x->info)->destructions, &uw) {
+  if case Printed(pm) = ac_unwinding(gs, &un(&x->info)->destructions, &uw) {
     return Printed(pm);
   }
 
@@ -648,7 +648,7 @@ func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a
   saved gr_savetrack = save_celltrack(gs);
   info *ast_break_statement_info = un(&a->info);
   uw gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
+  if case Printed(pm) = ac_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
   add(bu, uw);
@@ -660,7 +660,7 @@ func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack]
   saved gr_savetrack = save_celltrack(gs);
   info *ast_continue_statement_info = un(&a->info);
   uw gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
+  if case Printed(pm) = ac_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
   add(bu, uw);
@@ -673,7 +673,7 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
   info *ast_goto_statement_info = un(&a->info);
   jmp *tracked_target = ref(&fb->label_gn, info->label_number.x);
   uw gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
+  if case Printed(pm) = ac_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
   add(bu, uw);
@@ -880,7 +880,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     exit_bu sq_builder = mk_builder(gs);
 
     initter_uw gr_num;
-    if case Printed(pm) = gr_unwinding(gs, &un(&a->info)->initter_destructions, &initter_uw) {
+    if case Printed(pm) = ac_unwinding(gs, &un(&a->info)->initter_destructions, &initter_uw) {
       return Printed(pm);
     }
     add(&exit_bu, initter_uw);
@@ -1171,7 +1171,7 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
   }
   info *ast_return_statement_info = un(&a->info);
   uw_op gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw_op) {
+  if case Printed(pm) = ac_unwinding(gs, &info->destructions, &uw_op) {
     return Printed(pm);
   }
   add(bu, uw_op);
@@ -1195,7 +1195,7 @@ func gr_winding(gs gr_statep, initializations *array[init_action], out *gr_num) 
 }
 
 // "destructions" is in variable declaration order -- the _opposite_ order of evaluation.
-func gr_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_num) np {
+func ac_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_num) np {
   bu sq_builder = mk_builder(gs);
   n size = count(destructions);
   for i size = n; i > 0; {
@@ -1326,7 +1326,7 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return gr_index_expr(gs, x, &a, bu);
   case &Lambda(a ast_lambda):
     gn gr_num;
-    if case Printed(pm) = ac_lambda_expr(gs, x, &a, &gn) {
+    if case Printed(pm) = gr_lambda_expr(gs, x, &a, &gn) {
       return Printed(pm);
     }
     add(bu, gn);
@@ -1525,7 +1525,7 @@ func gr_track_active_op(gs gr_statep, op gr_active_op) void {
   }
 }
 
-func ac_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
+func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
   lambda_celltrack gr_celltrack = mk_celltrack();
