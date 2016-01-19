@@ -570,6 +570,9 @@ func ac_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   }
   add(&bu, parameter_unwinding);
 
+  // We artifically activate the return cell after falling off the end of a fullbody.
+  // TODO: This is crazy nonsense.  Detect reachability in a conservative fashion (e.g. everything after a label is reachable, everything after a break/continue/return is not).
+  gr_activate(gs, info->return_cell);
   gn sq_num = mut_connect(gs, &bu, &fb.final_node);
 
   *out = gn.x;
