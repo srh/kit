@@ -1295,7 +1295,7 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   case &ParenExpr(a ast_paren_expr):
     return gr_expr(gs, oo(&a.expr), bu);
   case &NumericLiteral(a ast_numeric_literal):
-    return gr_literal(gs, x, numeric_literal_value(&a), bu);
+    return ac_literal(gs, x, numeric_literal_value(&a), bu);
   case &BoolLiteral(a ast_bool_literal):
     value bigint;
     if a.value {
@@ -1303,16 +1303,16 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     } else {
       value = bigu(0);
     }
-    return gr_literal(gs, x, value, bu);
+    return ac_literal(gs, x, value, bu);
   case &VoidLiteral(a ast_void_literal):
     value bigint = bigu(0);
-    return gr_literal(gs, x, value, bu);
+    return ac_literal(gs, x, value, bu);
   case &NullLiteral(a ast_null_literal):
     value bigint = bigu(0);
-    return gr_literal(gs, x, value, bu);
+    return ac_literal(gs, x, value, bu);
   case &CharLiteral(a ast_char_literal):
     value bigint = ~ a.charspec.value;
-    return gr_literal(gs, x, value, bu);
+    return ac_literal(gs, x, value, bu);
   case &StringLiteral(a ast_string_literal):
     return gr_string_literal(gs, x, &a, bu);
   case &Funcall(a ast_funcall):
@@ -1888,8 +1888,9 @@ func gr_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_
   return NoFail;
 }
 
-func gr_literal(gs gr_statep, x *ast_expr, value bigint, bu *sq_builder) np {
+func ac_literal(gs gr_statep, x *ast_expr, value bigint, bu *sq_builder) np {
   add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(value)}));
+  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x))}));
   return NoFail;
 }
 
