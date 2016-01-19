@@ -1189,7 +1189,7 @@ func ac_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
     add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(subcell)}));
     add(bu, @[gr_xop]GrVirtualDead({subcell}));
   } else {
-    // Write _some_ void value... out of politeness?  NOTE(): Writing zero to void shouldn't be necessary any more, here or in magic ops, because it was just a way to make the cell be live.
+    // Write _some_ void value... out of politeness?  Keeping these void 0 ops for now on the assumption some sort of constant value optimization logic might use it later.
     add(bu, @[gr_xop]GrWriteConst({fb->return_cell, ConstInt(bigu(0))}));
     add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Nothing}));
   }
@@ -1286,7 +1286,7 @@ func ac_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
 
 // Callees of this have to deactivate the result_cell later, of course.
 func ac_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
-  // TODO(): We could certainly assert that result_cell is the only one made live or active.  (If that remains a valid assertion.)
+  // TODO: We could certainly assert that result_cell is the only one made live or active.  (If that remains a valid assertion.)
   add(bu, @[gr_xop]GrLive({result_cell(x)}));
   if case Printed(pm) = ac_expr_consume(gs, x, bu) {
     return Printed(pm);
@@ -1313,7 +1313,7 @@ func ac_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume,
 }
 
 func ac_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
-  // TODO(): Honestly we could have some general assertions about what cells are made live or active, based on lval/rval info.
+  // TODO: Honestly we could have some general assertions about what cells are made live or active, based on lval/rval info.
   cs *checkstate = gs.clq->cs;
   switch &x->u {
   case &NameExpr(a ast_name_expr):
@@ -3109,8 +3109,12 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           }
           gn gr_num = done(&bu);
 
-          // NOTE(): Deaden, deactivate, and assert.
-          inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, result_cell(&dire.ec)}));
+          rcell cell_num = result_cell(&dire.ec);
+          gr_deactivate(gs, rcell);
+          gr_deaden(gs, rcell);
+          ac_check_empty(gs.celltrack);
+
+          inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, rcell}));
           return NoFail;
         }
 
