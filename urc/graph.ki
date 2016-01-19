@@ -549,7 +549,7 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   fb fullbody_state = {info->all_vars, mk_tracked(nopq(gs.gr)), label_gn, info->return_cell};
 
   bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = gr_bracebody(gs, &fb, None, &x->bb, &bu) {
+  if case Printed(pm) = ac_bracebody(gs, &fb, None, &x->bb, &bu) {
     return Printed(pm);
   }
 
@@ -571,10 +571,10 @@ struct breakgrack {
   continue_target *tracked_target;
 }
 
-func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, bu *sq_builder) np {
+func ac_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, bu *sq_builder) np {
   n size = count(&x->statements);
   for i size = 0; i < n; i = i + 1 {
-    if case Printed(pm) = gr_statement(gs, fb, obg, ref(&x->statements, i), bu) {
+    if case Printed(pm) = ac_statement(gs, fb, obg, ref(&x->statements, i), bu) {
       return Printed(pm);
     }
   }
@@ -588,7 +588,7 @@ func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
   return NoFail;
 }
 
-func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_statement, bu *sq_builder) np {
+func ac_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_statement, bu *sq_builder) np {
   switch &x->u {
   case &Expr(a ast_expr_discard):
     if case Printed(pm) = ac_expr_discard(gs, &a, bu) {
@@ -596,33 +596,33 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     }
     return NoFail;
   case &Return(a ast_return_statement):
-    if case Printed(pm) = gr_return_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = ac_return_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &Var(a ast_var_statement):
-    if case Printed(pm) = gr_var_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = ac_var_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &IfThen(a ast_ifthen_statement):
-    if case Printed(pm) = gr_ifthen_statement(gs, fb, obg, &a, bu) {
+    if case Printed(pm) = ac_ifthen_statement(gs, fb, obg, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
 
   case &IfThenElse(a ast_ifthenelse_statement):
-    if case Printed(pm) = gr_ifthenelse_statement(gs, fb, obg, &a, bu) {
+    if case Printed(pm) = ac_ifthenelse_statement(gs, fb, obg, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &While(a ast_while_statement):
-    if case Printed(pm) = gr_while_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = ac_while_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &For(a ast_for_statement):
-    if case Printed(pm) = gr_for_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = ac_for_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
@@ -633,29 +633,29 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     return NoFail;
 
   case &Break(a ast_break_statement):
-    if case Printed(pm) = gr_break_statement(gs, fb, obg, &a, bu) {
+    if case Printed(pm) = ac_break_statement(gs, fb, obg, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &Continue(a ast_continue_statement):
-    if case Printed(pm) = gr_continue_statement(gs, fb, obg, &a, bu) {
+    if case Printed(pm) = ac_continue_statement(gs, fb, obg, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &Label(a ast_label_statement):
-    if case Printed(pm) = gr_label_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = ac_label_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &Goto(a ast_goto_statement):
-    if case Printed(pm) = gr_goto_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = ac_goto_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   }
 }
 
-func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, bu *sq_builder) np {
+func ac_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, bu *sq_builder) np {
   saved gr_savetrack = save_celltrack(gs);
   info *ast_break_statement_info = un(&a->info);
   uw gr_num;
@@ -667,7 +667,7 @@ func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a
   return NoFail;
 }
 
-func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) np {
+func ac_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) np {
   saved gr_savetrack = save_celltrack(gs);
   info *ast_continue_statement_info = un(&a->info);
   uw gr_num;
@@ -679,7 +679,7 @@ func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack]
   return NoFail;
 }
 
-func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, bu *sq_builder) np {
+func ac_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, bu *sq_builder) np {
   saved gr_savetrack = save_celltrack(gs);
   info *ast_goto_statement_info = un(&a->info);
   jmp *tracked_target = ref(&fb->label_gn, info->label_number.x);
@@ -689,7 +689,7 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
   }
   add(bu, uw);
   ww gr_num;
-  if case Printed(pm) = gr_winding(gs, &info->initializations, &ww) {
+  if case Printed(pm) = ac_winding(gs, &info->initializations, &ww) {
     return Printed(pm);
   }
   add(bu, ww);
@@ -697,7 +697,7 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
   return NoFail;
 }
 
-func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) np {
+func ac_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) np {
   targ *tracked_target = ref(&fb->label_gn, un(&a->info)->label_number.x);
   note_celltrack(&targ->note, gs.celltrack);
   jmp_qnop_node(gs.gr, targ->sn, last(bu));
@@ -747,7 +747,7 @@ func ac_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
             add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
           }
 
-          if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &case_bu) {
+          if case Printed(pm) = ac_bracebody(gs, fb, obg, &sc->body, &case_bu) {
             return Printed(pm);
           }
           add(&case_bu, @[gr_xop]GrVirtualDead({vi->cell}));
@@ -757,7 +757,7 @@ func ac_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
         } else {
           case_bu sq_builder = mk_builder(gs);
           add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
-          if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &case_bu) {
+          if case Printed(pm) = ac_bracebody(gs, fb, obg, &sc->body, &case_bu) {
             return Printed(pm);
           }
           gn sq_num = mut_connect(gs, &case_bu, &exit_target);
@@ -767,7 +767,7 @@ func ac_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
       case &Default: {
         case_bu sq_builder = mk_builder(gs);
         add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
-        if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &case_bu) {
+        if case Printed(pm) = ac_bracebody(gs, fb, obg, &sc->body, &case_bu) {
           return Printed(pm);
         }
 
@@ -802,13 +802,13 @@ func ac_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   return NoFail;
 }
 
-func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu *sq_builder) np {
+func ac_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu *sq_builder) np {
   pre_loop_save gr_savetrack = save_celltrack(gs);
   outflow tracked_target = mk_tracked(nopq(gs.gr));
   note_celltrack(&outflow.note, gs.celltrack);
 
   if case &Has(bi box[ast_statement]) = &a->initializer {
-    if case Printed(pm) = gr_statement(gs, fb, None, oo(&bi), bu) {
+    if case Printed(pm) = ac_statement(gs, fb, None, oo(&bi), bu) {
       return Printed(pm);
     }
   }
@@ -838,7 +838,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
   bp breakgrack = {&outflow, &continue_nopq};
 
   body_bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = gr_bracebody(gs, fb, Has(bp), &a->body, &body_bu) {
+  if case Printed(pm) = ac_bracebody(gs, fb, Has(bp), &a->body, &body_bu) {
     return Printed(pm);
   }
 
@@ -898,7 +898,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
 
     // TODO: This would be using the same cells in different nodes.
     loopexitgn gr_num;
-    if case Printed(pm) = gr_later_discard(gs, &cond.discard, &loopexitgn) {
+    if case Printed(pm) = ac_later_discard(gs, &cond.discard, &loopexitgn) {
       return Printed(pm);
     }
     add(&exit_bu, loopexitgn);
@@ -923,7 +923,7 @@ func ac_condition_discard(gs gr_statep, a *ast_condition_discard_info, out *gr_n
   return NoFail;
 }
 
-func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement, bu *sq_builder) np {
+func ac_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement, bu *sq_builder) np {
   outflow tracked_target = mk_tracked(nopq(gs.gr));
 
   then_nop sq_num = nopq(gs.gr);
@@ -944,7 +944,7 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   bp breakgrack = {&outflow, &top};
 
   body_bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = gr_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu) {
+  if case Printed(pm) = ac_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu) {
     return Printed(pm);
   }
 
@@ -973,7 +973,7 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   return NoFail;
 }
 
-func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, bu *sq_builder) np {
+func ac_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, bu *sq_builder) np {
   join_target tracked_target = mk_tracked(nopq(gs.gr));
 
   then_nop sq_num = nopq(gs.gr);
@@ -990,14 +990,14 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   restore_celltrack(gs, &then_save);
 
   then_bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu) {
+  if case Printed(pm) = ac_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu) {
     return Printed(pm);
   }
   thengn sq_num = mut_connect(gs, &then_bu, &join_target);
 
   restore_celltrack(gs, &else_save);
   else_bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = gr_bracebody(gs, fb, obg, &a->elsebody, &else_bu) {
+  if case Printed(pm) = ac_bracebody(gs, fb, obg, &a->elsebody, &else_bu) {
     return Printed(pm);
   }
   elsegn sq_num = mut_connect(gs, &else_bu, &join_target);
@@ -1016,8 +1016,8 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   return NoFail;
 }
 
-func gr_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd *ast_condition_discard_info, body *ast_bracebody, bu *sq_builder) np {
-  if case Printed(pm) = gr_bracebody(gs, fb, obg, body, bu) {
+func ac_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd *ast_condition_discard_info, body *ast_bracebody, bu *sq_builder) np {
+  if case Printed(pm) = ac_bracebody(gs, fb, obg, body, bu) {
     return Printed(pm);
   }
   if case &Has(c cell_num) = un(&cd->virtual_cell_dead) {
@@ -1026,7 +1026,7 @@ func gr_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd
   return NoFail;
 }
 
-func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthen_statement, bu *sq_builder) np {
+func ac_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthen_statement, bu *sq_builder) np {
   join_target tracked_target = mk_tracked(nopq(gs.gr));
 
   then_nop sq_num = nopq(gs.gr);
@@ -1043,7 +1043,7 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   restore_celltrack(gs, &then_save);
 
   then_bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu) {
+  if case Printed(pm) = ac_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu) {
     return Printed(pm);
   }
   bodygn sq_num = mut_connect(gs, &then_bu, &join_target);
@@ -1151,10 +1151,10 @@ func ac_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
   }
 }
 
-func gr_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, bu *sq_builder) np {
+func ac_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, bu *sq_builder) np {
   switch &a->rhs {
   case &HasExpr(be box[ast_expr_consume]):
-    return gr_live_and_expr_consume(gs, oo(&be), bu);
+    return ac_live_and_expr_consume(gs, oo(&be), bu);
   case &AutoInit(x opt[init_action]):
     if case &Has(ia init_action) = &x {
       gn gr_num;
@@ -1170,7 +1170,7 @@ func gr_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, bu
   }
 }
 
-func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_statement, bu *sq_builder) np {
+func ac_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_statement, bu *sq_builder) np {
   saved gr_savetrack = save_celltrack(gs);
   if case &Has(b box[ast_expr_consume]) = &a->expr {
     subcell cell_num = result_cell(oo(&b));
@@ -1178,7 +1178,12 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
     if case Printed(pm) = gr_expr_consume(gs, oo(&b), bu) {
       return Printed(pm);
     }
+    add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(subcell)}));
     add(bu, @[gr_xop]GrVirtualDead({subcell}));
+  } else {
+    // Write _some_ void value... out of politeness?  NOTE(): Writing zero to void shouldn't be necessary any more, here or in magic ops, because it was just a way to make the cell be live.
+    add(bu, @[gr_xop]GrWriteConst({fb->return_cell, ConstInt(bigu(0))}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Nothing}));
   }
   info *ast_return_statement_info = un(&a->info);
   uw_op gr_num;
@@ -1191,7 +1196,7 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
 }
 
 // "initializations" is in variable declaration order -- the _same_ order as evaluation.
-func gr_winding(gs gr_statep, initializations *array[init_action], out *gr_num) np {
+func ac_winding(gs gr_statep, initializations *array[init_action], out *gr_num) np {
   bu sq_builder = mk_builder(gs);
   n size = count(initializations);
   for i size = 0; i < n; i = i + 1 {
