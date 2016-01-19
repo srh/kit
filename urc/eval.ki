@@ -559,8 +559,10 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
         }
         *ref(&env->framecells, a.cell.x) = None;
 
+
+      // TODO(): We could track active/inactive cells at run-time too. (It's a useful assertion.)
       case &GrActiveXop(a gr_active_xop): { }
-        // TODO(): We could track active/inactive cells at run-time too. (It's a useful assertion.)
+      case &GrManyActiveXop(a gr_many_active_xop): { }
       }
 
     case &QOp(qn gr_qnode):

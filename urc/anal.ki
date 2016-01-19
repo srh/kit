@@ -342,6 +342,13 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
       return XOp({GrVirtualDead({get(cm, a.cell.x)})});
     case &GrActiveXop(a gr_active_xop):
       return XOp({GrActiveXop({adjust_active_op_for_inline(cm, a.op1), adjust_active_op_for_inline(cm, a.op2)})});
+    case &GrManyActiveXop(a gr_many_active_xop):
+      adjusted array[gr_active_op];
+      nops size = count(&a.ops);
+      for i size = 0; i < nops; i = i + 1 {
+        push(&adjusted, adjust_active_op_for_inline(cm, get(&a.ops, i)));
+      }
+      return XOp({GrManyActiveXop({freeze(&adjusted)})});
     }
   case QOp(qn gr_qnode):
     switch &qn.op {

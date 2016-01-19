@@ -119,6 +119,10 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *cellset, gn g
     case &GrActiveXop(a gr_active_xop):
       *out = Terminal;
       return NoFail;
+
+    case &GrManyActiveXop(a gr_many_active_xop):
+      *out = Terminal;
+      return NoFail;
     }
 
   case &QOp(qn gr_qnode):

@@ -108,6 +108,7 @@ enum gr_xop {
   GrDead gr_dead;
   GrVirtualDead gr_virtual_dead;
   GrActiveXop gr_active_xop;
+  GrManyActiveXop gr_many_active_xop;
   // A debugging xop for compiler devs.
 }
 
@@ -215,6 +216,11 @@ func addx(gs gr_statep, op gr_xop) gr_num {
   case &GrActiveXop(a gr_active_xop):
     gr_track_active_op(gs, a.op1);
     gr_track_active_op(gs, a.op2);
+  case &GrManyActiveXop(a gr_many_active_xop):
+    nops size = 0;
+    for i size = 0; i < nops; i = i + 1 {
+      gr_track_active_op(gs, get(&a.ops, i));
+    }
   }
 
   return untracked_addx(gs.gr, op);
@@ -411,6 +417,11 @@ struct gr_active_xop {
   // These happen simultaneously -- there's no ordering.  If there's just one op, the other one will be Nothing.
   op1 gr_active_op;
   op2 gr_active_op;
+}
+
+struct gr_many_active_xop {
+  // Same as gr_active_xop, but with a pointer dereference.
+  ops shray[gr_active_op];
 }
 
 struct gr_branch {

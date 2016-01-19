@@ -820,6 +820,8 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           // Do nothing.  (Likewise.)
         case &GrActiveXop(a gr_active_xop):
           DUMBGEN("GrActiveXop");
+        case &GrManyActiveXop(a gr_many_active_xop):
+          DUMBGEN("GrManyActiveXop");
         }
 
       case &QOp(qn gr_qnode):
