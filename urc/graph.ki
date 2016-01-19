@@ -1379,14 +1379,14 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   case &Strinit(a ast_strinit):
     return ac_mk_strinit(gs, x, &a, bu);
   case &Ternary(a ast_ternary):
-    return gr_mk_ternary(gs, x, &a, bu);
+    return ac_mk_ternary(gs, x, &a, bu);
   case &QuickReturn(a ast_quickreturn):
     // TODO(): Implement quick-return graphing.
     return ERR(_u8("ICE: quick-return expressions not fully implemented"));
   }
 }
 
-func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
+func ac_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
   join_target tracked_target = mk_tracked(nopq(gs.gr));
 
   conjoined cell_num = rval_cell(x);
@@ -1405,6 +1405,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   if case Printed(pm) = gr_expr_consume(gs, oo(&a->then_clause), &then_bu) {
     return Printed(pm);
   }
+  add(&then_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->then_clause)))}));
   add(&then_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->then_clause))}));
   then_sn sq_num = mut_connect(gs, &then_bu, &join_target);
 
@@ -1415,6 +1416,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   if case Printed(pm) = gr_expr_consume(gs, oo(&a->else_clause), &else_bu) {
     return Printed(pm);
   }
+  add(&else_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->else_clause)))}));
   add(&else_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->else_clause))}));
   else_sn sq_num = mut_connect(gs, &else_bu, &join_target);
 
