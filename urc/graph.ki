@@ -1,6 +1,9 @@
 import check;
 
-// After goto, return statements, etc, "what cells are live" is faked -- the set of cells that are live (or soon, active) should be identical to that before the goto/return statement.  Once we control flow into something reachable, we'll have a consistent liveness state.
+// After goto, return statements, etc, "what cells are live" is faked -- the set of cells that are live (or soon, active) should be identical to that before the goto/return statement.  Once we control flow into something reachable, we'll have a consistent liveness state.  (That is, the liveness state is bogus (in a sense) for unreachable nodes.  Any liveness state would be bogus, ours is consistent.)
+
+// We're in the process of adding activation markings, and functions which we have "looked at" have ac_ prefixes instead of gr_.
+// TODO(): Rename "ac_" functions back to gr_.
 
 struct frame_graph {
   informal_name sym;
@@ -412,10 +415,20 @@ struct gr_celltrack {
   activeset cellset;
 }
 
+
 func mk_celltrack() gr_celltrack {
   liveset cellset;
   activeset cellset;
   return {liveset, activeset};
+}
+
+func ac_check_empty(celltrack *gr_celltrack) void {
+  if count(&celltrack->liveset.all) != 0 {
+    ice(_u8("celltrack has leftover live cells"));
+  }
+  if count(&celltrack->activeset.all) != 0 {
+    ice(_u8("celltrack has leftover active cells"));
+  }
 }
 
 struct gr_statep {
@@ -1281,7 +1294,7 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return gr_index_expr(gs, x, &a, bu);
   case &Lambda(a ast_lambda):
     gn gr_num;
-    if case Printed(pm) = gr_lambda_expr(gs, x, &a, &gn) {
+    if case Printed(pm) = ac_lambda_expr(gs, x, &a, &gn) {
       return Printed(pm);
     }
     add(bu, gn);
@@ -1470,7 +1483,7 @@ func gr_expect_inactive(gs gr_statep, c cell_num) void {
   }
 }
 
-func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
+func ac_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
   lambda_celltrack gr_celltrack = mk_celltrack();
@@ -1479,7 +1492,9 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   gr_create(lambda_gs, info->return_cell);
   nargs size = count(&info->arg_cells);
   for i size = 0; i < nargs; i = i + 1 {
-    gr_create(lambda_gs, get(&info->arg_cells, i));
+    ac cell_num = get(&info->arg_cells, i);
+    gr_create(lambda_gs, ac);
+    gr_activate(lambda_gs, ac);
   }
 
   fullbody_gn gr_num;
@@ -1487,10 +1502,9 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
     return Printed(pm);
   }
 
+  gr_deactivate(lambda_gs, info->return_cell);
   gr_deaden(lambda_gs, info->return_cell);
-  if count(&lambda_celltrack.liveset.all) != 0 {
-    ice(_u8("gr_lambda_expr sees leftover live cells"));
-  }
+  ac_check_empty(&lambda_celltrack);
 
   id fn_body_id = add_fn_body(gs.clq->cs, {gs.gr->informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, info->return_cell}, info->arg_cells, parsed_inline_to_state_inline(a->is_inline), NotComputed})});
   gn var = addx(gs, @[gr_xop]GrWriteConst({rval_cell(x), ConstFnBody(id)}));
