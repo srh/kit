@@ -2929,17 +2929,17 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   switch &mec->operational {
   case &EnumConstructMove(cd ctor_desc):
-    bi_ctor_gn gr_num = gr_bi_ctor(gs, argtype, retpart, argnum, &cd, TODOBiNothing);
+    bi_ctor_gn gr_num = gr_bi_ctor(gs, retpart, argnum, &cd, TODOBiNothing);
     add(&bu, bi_ctor_gn);
     add(&bu, @[gr_xop]GrVirtualDead({retpart}));
     add(&bu, @[gr_xop]GrDead({argnum}));
 
   case &EnumConstructCopyDestroy(cdd copy_destroy_desc):
-    cpgn gr_num = gr_bi_ctor(gs, argtype, retpart, argnum, &cdd.copy_desc, TODOBiNothing);
+    cpgn gr_num = gr_bi_ctor(gs, retpart, argnum, &cdd.copy_desc, TODOBiNothing);
     add(&bu, cpgn);
     add(&bu, @[gr_xop]GrVirtualDead({retpart}));
     destgn gr_num;
-    if case Printed(pm) = gr_destroy_ctor(gs, argtype, argnum, &cdd.destroy_desc, &destgn) {
+    if case Printed(pm) = gr_destroy_ctor(gs, argnum, &cdd.destroy_desc, &destgn) {
       return Printed(pm);
     }
     add(&bu, destgn);
@@ -2970,7 +2970,7 @@ enum bi_ctor_statechange {
   TODOBiNothing void;  // TODO()
 }
 
-func gr_bi_ctor(gs gr_statep, ty *te_typeexpr, destnum cell_num, srcnum cell_num, cd *ctor_desc, statechange bi_ctor_statechange) gr_num {
+func gr_bi_ctor(gs gr_statep, destnum cell_num, srcnum cell_num, cd *ctor_desc, statechange bi_ctor_statechange) gr_num {
   switch cd {
   case &TrivialCtor:
     return addx(gs, @[gr_xop]GrMemCopy({destnum, srcnum}));
@@ -2979,7 +2979,7 @@ func gr_bi_ctor(gs gr_statep, ty *te_typeexpr, destnum cell_num, srcnum cell_num
   }
 }
 
-func gr_destroy_ctor(gs gr_statep, ty *te_typeexpr, argnum cell_num, cd *ctor_desc, gn_out *gr_num) np {
+func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, gn_out *gr_num) np {
   switch cd {
   case &TrivialCtor:
     dp var = addx(gs, @[gr_xop]GrDead({argnum}));
