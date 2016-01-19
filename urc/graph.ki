@@ -1852,6 +1852,7 @@ func ac_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
 
   // TODO: Having to set this void cell is grotesque -- assignment should be a statement.
   add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(bigu(0))}));
+  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   return NoFail;
 }
 
