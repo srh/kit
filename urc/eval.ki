@@ -558,6 +558,9 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           ice(_u8("GrVirtualDead deading inactive cell "), a.cell.x);
         }
         *ref(&env->framecells, a.cell.x) = None;
+
+      case &GrActiveXop(a gr_active_xop): { }
+        // TODO(): We could track active/inactive cells at run-time too. (It's a useful assertion.)
       }
 
     case &QOp(qn gr_qnode):

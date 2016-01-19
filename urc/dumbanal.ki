@@ -115,6 +115,10 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, liveset *cellset, gn g
       deaden(liveset, a.cell);
       *out = Terminal;
       return NoFail;
+
+    case &GrActiveXop(a gr_active_xop):
+      *out = Terminal;
+      return NoFail;
     }
 
   case &QOp(qn gr_qnode):
