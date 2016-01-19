@@ -1,9 +1,6 @@
 import check;
 
-// After goto, return statements, etc, "what cells are live" is faked -- the set of cells that are live (or soon, active) should be identical to that before the goto/return statement.  Once we control flow into something reachable, we'll have a consistent liveness state.  (That is, the liveness state is bogus (in a sense) for unreachable nodes.  Any liveness state would be bogus, ours is consistent.)
-
-// We're in the process of adding activation markings, and functions which we have "looked at" have ac_ prefixes instead of gr_.
-// TODO(): Rename "ac_" functions back to gr_.
+// After goto, return statements, etc, "what cells are live" is faked -- the set of cells that are live (or soon, active) should be identical to that before the goto/return statement.  Once we control flow into something reachable, we'll have a consistent liveness state.  (That is, the liveness state is bogus (in a sense) for unreachable nodes.  Any liveness state would be bogus, ours is consistent.)  We also bogusly declare the return cell to be "active" after falling off the end of a fullbody.
 
 struct frame_graph {
   informal_name sym;
@@ -470,7 +467,7 @@ func mk_celltrack() gr_celltrack {
   return {liveset, activeset};
 }
 
-func ac_check_empty(celltrack *gr_celltrack) void {
+func gr_check_empty(celltrack *gr_celltrack) void {
   if count(&celltrack->liveset.all) != 0 {
     ice(_u8("celltrack has leftover live cells"));
   }
@@ -542,7 +539,7 @@ struct fullbody_state {
   return_cell cell_num;
 }
 
-func ac_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
+func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   info *ast_fullbody_info = un(&x->info);
 
   label_gn array[tracked_target];
@@ -554,12 +551,12 @@ func ac_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   fb fullbody_state = {info->all_vars, mk_tracked(nopq(gs.gr)), label_gn, info->return_cell};
 
   bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = ac_bracebody(gs, &fb, None, &x->bb, &bu) {
+  if case Printed(pm) = gr_bracebody(gs, &fb, None, &x->bb, &bu) {
     return Printed(pm);
   }
 
   parameter_unwinding gr_num;
-  if case Printed(pm) = ac_unwinding(gs, &info->parameter_destructions, &parameter_unwinding) {
+  if case Printed(pm) = gr_unwinding(gs, &info->parameter_destructions, &parameter_unwinding) {
     return Printed(pm);
   }
   add(&bu, parameter_unwinding);
@@ -579,16 +576,16 @@ struct breakgrack {
   continue_target *tracked_target;
 }
 
-func ac_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, bu *sq_builder) np {
+func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_bracebody, bu *sq_builder) np {
   n size = count(&x->statements);
   for i size = 0; i < n; i = i + 1 {
-    if case Printed(pm) = ac_statement(gs, fb, obg, ref(&x->statements, i), bu) {
+    if case Printed(pm) = gr_statement(gs, fb, obg, ref(&x->statements, i), bu) {
       return Printed(pm);
     }
   }
 
   uw gr_num;
-  if case Printed(pm) = ac_unwinding(gs, &un(&x->info)->destructions, &uw) {
+  if case Printed(pm) = gr_unwinding(gs, &un(&x->info)->destructions, &uw) {
     return Printed(pm);
   }
 
@@ -596,78 +593,78 @@ func ac_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
   return NoFail;
 }
 
-func ac_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_statement, bu *sq_builder) np {
+func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_statement, bu *sq_builder) np {
   switch &x->u {
   case &Expr(a ast_expr_discard):
-    if case Printed(pm) = ac_expr_discard(gs, &a, bu) {
+    if case Printed(pm) = gr_expr_discard(gs, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &Return(a ast_return_statement):
-    if case Printed(pm) = ac_return_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = gr_return_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &Var(a ast_var_statement):
-    if case Printed(pm) = ac_var_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = gr_var_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &IfThen(a ast_ifthen_statement):
-    if case Printed(pm) = ac_ifthen_statement(gs, fb, obg, &a, bu) {
+    if case Printed(pm) = gr_ifthen_statement(gs, fb, obg, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
 
   case &IfThenElse(a ast_ifthenelse_statement):
-    if case Printed(pm) = ac_ifthenelse_statement(gs, fb, obg, &a, bu) {
+    if case Printed(pm) = gr_ifthenelse_statement(gs, fb, obg, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &While(a ast_while_statement):
-    if case Printed(pm) = ac_while_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = gr_while_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &For(a ast_for_statement):
-    if case Printed(pm) = ac_for_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = gr_for_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &Switch(a ast_switch_statement):
-    if case Printed(pm) = ac_switch_statement(gs, fb, obg, &a, bu) {
+    if case Printed(pm) = gr_switch_statement(gs, fb, obg, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
 
   case &Break(a ast_break_statement):
-    if case Printed(pm) = ac_break_statement(gs, fb, obg, &a, bu) {
+    if case Printed(pm) = gr_break_statement(gs, fb, obg, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &Continue(a ast_continue_statement):
-    if case Printed(pm) = ac_continue_statement(gs, fb, obg, &a, bu) {
+    if case Printed(pm) = gr_continue_statement(gs, fb, obg, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &Label(a ast_label_statement):
-    if case Printed(pm) = ac_label_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = gr_label_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   case &Goto(a ast_goto_statement):
-    if case Printed(pm) = ac_goto_statement(gs, fb, &a, bu) {
+    if case Printed(pm) = gr_goto_statement(gs, fb, &a, bu) {
       return Printed(pm);
     }
     return NoFail;
   }
 }
 
-func ac_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, bu *sq_builder) np {
+func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, bu *sq_builder) np {
   saved gr_savetrack = save_celltrack(gs);
   info *ast_break_statement_info = un(&a->info);
   uw gr_num;
-  if case Printed(pm) = ac_unwinding(gs, &info->destructions, &uw) {
+  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
   add(bu, uw);
@@ -675,11 +672,11 @@ func ac_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a
   return NoFail;
 }
 
-func ac_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) np {
+func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) np {
   saved gr_savetrack = save_celltrack(gs);
   info *ast_continue_statement_info = un(&a->info);
   uw gr_num;
-  if case Printed(pm) = ac_unwinding(gs, &info->destructions, &uw) {
+  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
   add(bu, uw);
@@ -687,17 +684,17 @@ func ac_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack]
   return NoFail;
 }
 
-func ac_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, bu *sq_builder) np {
+func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, bu *sq_builder) np {
   saved gr_savetrack = save_celltrack(gs);
   info *ast_goto_statement_info = un(&a->info);
   jmp *tracked_target = ref(&fb->label_gn, info->label_number.x);
   uw gr_num;
-  if case Printed(pm) = ac_unwinding(gs, &info->destructions, &uw) {
+  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
     return Printed(pm);
   }
   add(bu, uw);
   ww gr_num;
-  if case Printed(pm) = ac_winding(gs, &info->initializations, &ww) {
+  if case Printed(pm) = gr_winding(gs, &info->initializations, &ww) {
     return Printed(pm);
   }
   add(bu, ww);
@@ -705,18 +702,18 @@ func ac_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
   return NoFail;
 }
 
-func ac_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) np {
+func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) np {
   targ *tracked_target = ref(&fb->label_gn, un(&a->info)->label_number.x);
   note_celltrack(&targ->note, gs.celltrack);
   jmp_qnop_node(gs.gr, targ->sn, last(bu));
   return NoFail;
 }
 
-func ac_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_switch_statement, bu *sq_builder) np {
+func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_switch_statement, bu *sq_builder) np {
   param_discard *te_typeexpr;
   is_ptr bool = decompose_typeapp(&expr_complete_type(&oo(&a->swartch)->expr)->x, primitive_pointer_puretype(gs.clq->cs), &param_discard);
 
-  if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->swartch), bu) {
+  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->swartch), bu) {
     return Printed(pm);
   }
 
@@ -755,7 +752,7 @@ func ac_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
             add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst(cp_info->field_offset)}));
           }
 
-          if case Printed(pm) = ac_bracebody(gs, fb, obg, &sc->body, &case_bu) {
+          if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &case_bu) {
             return Printed(pm);
           }
           add(&case_bu, @[gr_xop]GrVirtualDead({vi->cell}));
@@ -765,7 +762,7 @@ func ac_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
         } else {
           case_bu sq_builder = mk_builder(gs);
           add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
-          if case Printed(pm) = ac_bracebody(gs, fb, obg, &sc->body, &case_bu) {
+          if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &case_bu) {
             return Printed(pm);
           }
           gn sq_num = mut_connect(gs, &case_bu, &exit_target);
@@ -775,7 +772,7 @@ func ac_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
       case &Default: {
         case_bu sq_builder = mk_builder(gs);
         add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
-        if case Printed(pm) = ac_bracebody(gs, fb, obg, &sc->body, &case_bu) {
+        if case Printed(pm) = gr_bracebody(gs, fb, obg, &sc->body, &case_bu) {
           return Printed(pm);
         }
 
@@ -803,20 +800,20 @@ func ac_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   append(bu, br, exit_target.sn);
 
   swartch_discard_gn gr_num;
-  if case Printed(pm) = ac_later_discard(gs, &a->swartch_discard, &swartch_discard_gn) {
+  if case Printed(pm) = gr_later_discard(gs, &a->swartch_discard, &swartch_discard_gn) {
     return Printed(pm);
   }
   add(bu, swartch_discard_gn);
   return NoFail;
 }
 
-func ac_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu *sq_builder) np {
+func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu *sq_builder) np {
   pre_loop_save gr_savetrack = save_celltrack(gs);
   outflow tracked_target = mk_tracked(nopq(gs.gr));
   note_celltrack(&outflow.note, gs.celltrack);
 
   if case &Has(bi box[ast_statement]) = &a->initializer {
-    if case Printed(pm) = ac_statement(gs, fb, None, oo(&bi), bu) {
+    if case Printed(pm) = gr_statement(gs, fb, None, oo(&bi), bu) {
       return Printed(pm);
     }
   }
@@ -830,7 +827,7 @@ func ac_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
 
   if case &Has(cond ast_expr_condition) = &a->condition {
     else_gn sq_num = nopq(gs.gr);
-    if case Printed(pm) = ac_expr_condition(gs, oo(&cond.expr), body_entry_gn, else_gn, &top.sn) {
+    if case Printed(pm) = gr_expr_condition(gs, oo(&cond.expr), body_entry_gn, else_gn, &top.sn) {
       return Printed(pm);
     }
     condition_else_gn = Has(else_gn);
@@ -846,14 +843,14 @@ func ac_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
   bp breakgrack = {&outflow, &continue_nopq};
 
   body_bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = ac_bracebody(gs, fb, Has(bp), &a->body, &body_bu) {
+  if case Printed(pm) = gr_bracebody(gs, fb, Has(bp), &a->body, &body_bu) {
     return Printed(pm);
   }
 
   loopcleanupgn opt[gr_num];
   if case &Has(cond ast_expr_condition) = &a->condition {
     gn gr_num;
-    if case Printed(pm) = ac_later_discard(gs, &cond.discard, &gn) {
+    if case Printed(pm) = gr_later_discard(gs, &cond.discard, &gn) {
       return Printed(pm);
     }
     loopcleanupgn = Has(gn);
@@ -867,7 +864,7 @@ func ac_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
   continuegn sq_num;
   if case &Has(increment box[ast_expr_discard]) = &a->increment {
     incr_bu sq_builder = mk_builder(gs);
-    if case Printed(pm) = ac_expr_discard(gs, oo(&increment), &incr_bu) {
+    if case Printed(pm) = gr_expr_discard(gs, oo(&increment), &incr_bu) {
       return Printed(pm);
     }
     totopgn sq_num = mut_connect(gs, &incr_bu, &top);
@@ -899,14 +896,14 @@ func ac_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     exit_bu sq_builder = mk_builder(gs);
 
     initter_uw gr_num;
-    if case Printed(pm) = ac_unwinding(gs, &un(&a->info)->initter_destructions, &initter_uw) {
+    if case Printed(pm) = gr_unwinding(gs, &un(&a->info)->initter_destructions, &initter_uw) {
       return Printed(pm);
     }
     add(&exit_bu, initter_uw);
 
     // TODO: This would be using the same cells in different nodes.
     loopexitgn gr_num;
-    if case Printed(pm) = ac_later_discard(gs, &cond.discard, &loopexitgn) {
+    if case Printed(pm) = gr_later_discard(gs, &cond.discard, &loopexitgn) {
       return Printed(pm);
     }
     add(&exit_bu, loopexitgn);
@@ -922,16 +919,16 @@ func ac_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
   return NoFail;
 }
 
-func ac_condition_discard(gs gr_statep, a *ast_condition_discard_info, out *gr_num) np {
+func gr_condition_discard(gs gr_statep, a *ast_condition_discard_info, out *gr_num) np {
   disc gr_num;
-  if case Printed(pm) = ac_later_discard(gs, &a->later, &disc) {
+  if case Printed(pm) = gr_later_discard(gs, &a->later, &disc) {
     return Printed(pm);
   }
   *out = disc;
   return NoFail;
 }
 
-func ac_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement, bu *sq_builder) np {
+func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement, bu *sq_builder) np {
   outflow tracked_target = mk_tracked(nopq(gs.gr));
 
   then_nop sq_num = nopq(gs.gr);
@@ -943,7 +940,7 @@ func ac_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   top tracked_target;
   top.note = mk_noted(gs);
 
-  if case Printed(pm) = ac_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save, &top.sn) {
+  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save, &top.sn) {
     return Printed(pm);
   }
 
@@ -952,12 +949,12 @@ func ac_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   bp breakgrack = {&outflow, &top};
 
   body_bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = ac_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu) {
+  if case Printed(pm) = gr_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu) {
     return Printed(pm);
   }
 
   loopcleanupgn gr_num;
-  if case Printed(pm) = ac_condition_discard(gs, &a->condition_discard_continue, &loopcleanupgn) {
+  if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard_continue, &loopcleanupgn) {
     return Printed(pm);
   }
 
@@ -967,7 +964,7 @@ func ac_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   restore_celltrack(gs, &else_save);
 
   loopexitgn gr_num;
-  if case Printed(pm) = ac_condition_discard(gs, &a->condition_discard_exit, &loopexitgn) {
+  if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard_exit, &loopexitgn) {
     return Printed(pm);
   }
 
@@ -981,7 +978,7 @@ func ac_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   return NoFail;
 }
 
-func ac_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, bu *sq_builder) np {
+func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthenelse_statement, bu *sq_builder) np {
   join_target tracked_target = mk_tracked(nopq(gs.gr));
 
   then_nop sq_num = nopq(gs.gr);
@@ -991,21 +988,21 @@ func ac_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   else_save gr_savetrack;
 
   gn sq_num;
-  if case Printed(pm) = ac_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save, &gn) {
+  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save, &gn) {
     return Printed(pm);
   }
 
   restore_celltrack(gs, &then_save);
 
   then_bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = ac_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu) {
+  if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu) {
     return Printed(pm);
   }
   thengn sq_num = mut_connect(gs, &then_bu, &join_target);
 
   restore_celltrack(gs, &else_save);
   else_bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = ac_bracebody(gs, fb, obg, &a->elsebody, &else_bu) {
+  if case Printed(pm) = gr_bracebody(gs, fb, obg, &a->elsebody, &else_bu) {
     return Printed(pm);
   }
   elsegn sq_num = mut_connect(gs, &else_bu, &join_target);
@@ -1016,7 +1013,7 @@ func ac_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   append(bu, gn, join_target.sn);
 
   condition_discard_gn gr_num;
-  if case Printed(pm) = ac_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
+  if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
     return Printed(pm);
   }
   add(bu, condition_discard_gn);
@@ -1024,8 +1021,8 @@ func ac_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   return NoFail;
 }
 
-func ac_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd *ast_condition_discard_info, body *ast_bracebody, bu *sq_builder) np {
-  if case Printed(pm) = ac_bracebody(gs, fb, obg, body, bu) {
+func gr_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd *ast_condition_discard_info, body *ast_bracebody, bu *sq_builder) np {
+  if case Printed(pm) = gr_bracebody(gs, fb, obg, body, bu) {
     return Printed(pm);
   }
   if case &Has(c cell_num) = un(&cd->virtual_cell_dead) {
@@ -1034,7 +1031,7 @@ func ac_condition_body(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], cd
   return NoFail;
 }
 
-func ac_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthen_statement, bu *sq_builder) np {
+func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_ifthen_statement, bu *sq_builder) np {
   join_target tracked_target = mk_tracked(nopq(gs.gr));
 
   then_nop sq_num = nopq(gs.gr);
@@ -1044,14 +1041,14 @@ func ac_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   else_save gr_savetrack;
 
   gn sq_num;
-  if case Printed(pm) = ac_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save, &gn) {
+  if case Printed(pm) = gr_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save, &gn) {
     return Printed(pm);
   }
 
   restore_celltrack(gs, &then_save);
 
   then_bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = ac_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu) {
+  if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu) {
     return Printed(pm);
   }
   bodygn sq_num = mut_connect(gs, &then_bu, &join_target);
@@ -1065,16 +1062,16 @@ func ac_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   append(bu, gn, join_target.sn);
 
   condition_discard_gn gr_num;
-  if case Printed(pm) = ac_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
+  if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn) {
     return Printed(pm);
   }
   add(bu, condition_discard_gn);
   return NoFail;
 }
 
-func ac_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn sq_num, out *sq_num) np {
+func gr_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn sq_num, out *sq_num) np {
   bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = ac_live_and_expr_consume(gs, a, &bu) {
+  if case Printed(pm) = gr_live_and_expr_consume(gs, a, &bu) {
     return Printed(pm);
   }
   cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(bigu(0)), elsegn});
@@ -1084,10 +1081,10 @@ func ac_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn 
 }
 
 // Leaves the celltrack state in a garbage state -- caller needs to restore thentrack or elsetrack, depending on which it processes first.
-func ac_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, thentrack_out *gr_savetrack, elsetrack_out *gr_savetrack, out *sq_num) np {
+func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, thentrack_out *gr_savetrack, elsetrack_out *gr_savetrack, out *sq_num) np {
   switch a {
     case &ExprCondition(bec box[ast_expr_consume]): {
-      if case Printed(pm) = ac_expr_condition(gs, oo(&bec), thengn, elsegn, out) {
+      if case Printed(pm) = gr_expr_condition(gs, oo(&bec), thengn, elsegn, out) {
         return Printed(pm);
       }
       *thentrack_out = save_celltrack(gs);
@@ -1097,7 +1094,7 @@ func ac_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
 
     case &PatternCondition(pa ast_pattern_assign): {
       bef_bu sq_builder = mk_builder(gs);
-      if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&pa.rhs), &bef_bu) {
+      if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&pa.rhs), &bef_bu) {
         return Printed(pm);
       }
 
@@ -1159,14 +1156,14 @@ func ac_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
   }
 }
 
-func ac_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, bu *sq_builder) np {
+func gr_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, bu *sq_builder) np {
   switch &a->rhs {
   case &HasExpr(be box[ast_expr_consume]):
-    return ac_live_and_expr_consume(gs, oo(&be), bu);
+    return gr_live_and_expr_consume(gs, oo(&be), bu);
   case &AutoInit(x opt[init_action]):
     if case &Has(ia init_action) = &x {
       gn gr_num;
-      if case Printed(pm) = ac_init_action(gs, &ia, &gn) {
+      if case Printed(pm) = gr_init_action(gs, &ia, &gn) {
         return Printed(pm);
       }
       add(bu, gn);
@@ -1178,12 +1175,12 @@ func ac_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, bu
   }
 }
 
-func ac_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_statement, bu *sq_builder) np {
+func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_statement, bu *sq_builder) np {
   saved gr_savetrack = save_celltrack(gs);
   if case &Has(b box[ast_expr_consume]) = &a->expr {
     subcell cell_num = result_cell(oo(&b));
     add(bu, @[gr_xop]GrSubcell({subcell, fb->return_cell, OffsetConst(0)}));
-    if case Printed(pm) = ac_expr_consume(gs, oo(&b), bu) {
+    if case Printed(pm) = gr_expr_consume(gs, oo(&b), bu) {
       return Printed(pm);
     }
     add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(subcell)}));
@@ -1195,7 +1192,7 @@ func ac_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
   }
   info *ast_return_statement_info = un(&a->info);
   uw_op gr_num;
-  if case Printed(pm) = ac_unwinding(gs, &info->destructions, &uw_op) {
+  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw_op) {
     return Printed(pm);
   }
   add(bu, uw_op);
@@ -1204,12 +1201,12 @@ func ac_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
 }
 
 // "initializations" is in variable declaration order -- the _same_ order as evaluation.
-func ac_winding(gs gr_statep, initializations *array[init_action], out *gr_num) np {
+func gr_winding(gs gr_statep, initializations *array[init_action], out *gr_num) np {
   bu sq_builder = mk_builder(gs);
   n size = count(initializations);
   for i size = 0; i < n; i = i + 1 {
     gn gr_num;
-    if case Printed(pm) = ac_init_action(gs, ref(initializations, i), &gn) {
+    if case Printed(pm) = gr_init_action(gs, ref(initializations, i), &gn) {
       return Printed(pm);
     }
     add(&bu, gn);
@@ -1219,7 +1216,7 @@ func ac_winding(gs gr_statep, initializations *array[init_action], out *gr_num) 
 }
 
 // "destructions" is in variable declaration order -- the _opposite_ order of evaluation.
-func ac_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_num) np {
+func gr_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_num) np {
   bu sq_builder = mk_builder(gs);
   n size = count(destructions);
   for i size = n; i > 0; {
@@ -1227,7 +1224,7 @@ func ac_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_nu
     gn gr_num;
     switch get(destructions, i) {
     case VarSelfContainedDestruction(da destroy_action):
-      if case Printed(pm) = ac_destroy_action(gs, &da, DeadactAfterDestroyYes, &gn) {
+      if case Printed(pm) = gr_destroy_action(gs, &da, DeadactAfterDestroyYes, &gn) {
         return Printed(pm);
       }
     case VarVirtualCellDead(c cell_num):
@@ -1239,24 +1236,24 @@ func ac_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_nu
   return NoFail;
 }
 
-func ac_expr_discard(gs gr_statep, x *ast_expr_discard, bu *sq_builder) np {
-  return ac_expr_and_discard(gs, &x->expr, un(&x->after), bu);
+func gr_expr_discard(gs gr_statep, x *ast_expr_discard, bu *sq_builder) np {
+  return gr_expr_and_discard(gs, &x->expr, un(&x->after), bu);
 }
 
-func ac_expr_and_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
-  if case Printed(pm) = ac_expr_after_discard_before(gs, x, aft, bu) {
+func gr_expr_and_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
+  if case Printed(pm) = gr_expr_after_discard_before(gs, x, aft, bu) {
     return Printed(pm);
   }
-  if case Printed(pm) = ac_expr(gs, x, bu) {
+  if case Printed(pm) = gr_expr(gs, x, bu) {
     return Printed(pm);
   }
-  if case Printed(pm) = ac_expr_after_discard(gs, x, aft, bu) {
+  if case Printed(pm) = gr_expr_after_discard(gs, x, aft, bu) {
     return Printed(pm);
   }
   return NoFail;
 }
 
-func ac_expr_after_discard_before(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
+func gr_expr_after_discard_before(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
   switch aft {
   case &DiscardTemporary(da destroy_action):
     add(bu, @[gr_xop]GrLive({whole_cell(x)}));
@@ -1266,14 +1263,14 @@ func ac_expr_after_discard_before(gs gr_statep, x *ast_expr, aft *ast_expr_after
   return NoFail;
 }
 
-func ac_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
+func gr_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
   switch aft {
   case &DiscardTemporary(da destroy_action):
     if whole_cell(x) != partial_cell(x) {
       add(bu, @[gr_xop]GrVirtualDead({partial_cell(x)}));
     }
     gn gr_num;
-    if case Printed(pm) = ac_destroy_action(gs, &da, DeadactAfterDestroyYes, &gn) {
+    if case Printed(pm) = gr_destroy_action(gs, &da, DeadactAfterDestroyYes, &gn) {
       return Printed(pm);
     }
     add(bu, gn);
@@ -1285,43 +1282,43 @@ func ac_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
 }
 
 // Callees of this have to deactivate the result_cell later, of course.
-func ac_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
+func gr_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
   // TODO: We could certainly assert that result_cell is the only one made live or active.  (If that remains a valid assertion.)
   add(bu, @[gr_xop]GrLive({result_cell(x)}));
-  if case Printed(pm) = ac_expr_consume(gs, x, bu) {
+  if case Printed(pm) = gr_expr_consume(gs, x, bu) {
     return Printed(pm);
   }
   return NoFail;
 }
 
-func ac_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
-  return ac_expr_and_consume(gs, &x->expr, un(&x->after), bu);
+func gr_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
+  return gr_expr_and_consume(gs, &x->expr, un(&x->after), bu);
 }
 
-func ac_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
-  if case Printed(pm) = ac_consume_actions_before(gs, x, aft, bu) {
+func gr_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
+  if case Printed(pm) = gr_consume_actions_before(gs, x, aft, bu) {
     return Printed(pm);
   }
-  if case Printed(pm) = ac_expr(gs, x, bu) {
+  if case Printed(pm) = gr_expr(gs, x, bu) {
     return Printed(pm);
   }
-  if case Printed(pm) = ac_consume_actions(gs, x, aft, bu) {
+  if case Printed(pm) = gr_consume_actions(gs, x, aft, bu) {
     return Printed(pm);
   }
 
   return NoFail;
 }
 
-func ac_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
+func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   // TODO: Honestly we could have some general assertions about what cells are made live or active, based on lval/rval info.
   cs *checkstate = gs.clq->cs;
   switch &x->u {
   case &NameExpr(a ast_name_expr):
-    return ac_name_expr(gs, x, &a, bu);
+    return gr_name_expr(gs, x, &a, bu);
   case &ParenExpr(a ast_paren_expr):
-    return ac_expr(gs, oo(&a.expr), bu);
+    return gr_expr(gs, oo(&a.expr), bu);
   case &NumericLiteral(a ast_numeric_literal):
-    return ac_literal(gs, x, numeric_literal_value(&a), bu);
+    return gr_literal(gs, x, numeric_literal_value(&a), bu);
   case &BoolLiteral(a ast_bool_literal):
     value bigint;
     if a.value {
@@ -1329,56 +1326,56 @@ func ac_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     } else {
       value = bigu(0);
     }
-    return ac_literal(gs, x, value, bu);
+    return gr_literal(gs, x, value, bu);
   case &VoidLiteral(a ast_void_literal):
     value bigint = bigu(0);
-    return ac_literal(gs, x, value, bu);
+    return gr_literal(gs, x, value, bu);
   case &NullLiteral(a ast_null_literal):
     value bigint = bigu(0);
-    return ac_literal(gs, x, value, bu);
+    return gr_literal(gs, x, value, bu);
   case &CharLiteral(a ast_char_literal):
     value bigint = ~ a.charspec.value;
-    return ac_literal(gs, x, value, bu);
+    return gr_literal(gs, x, value, bu);
   case &StringLiteral(a ast_string_literal):
-    return ac_string_literal(gs, x, &a, bu);
+    return gr_string_literal(gs, x, &a, bu);
   case &Funcall(a ast_funcall):
-    return ac_funcall(gs, x, &a, bu);
+    return gr_funcall(gs, x, &a, bu);
   case &LogicalConjunction(a ast_logical_conjunction):
-    return ac_logical_conjunction(gs, x, &a, bu);
+    return gr_logical_conjunction(gs, x, &a, bu);
   case &Assignment(a ast_assignment):
-    return ac_assignment(gs, x, &a, bu);
+    return gr_assignment(gs, x, &a, bu);
   case &RefOf(a ast_refof):
-    return ac_mk_refof(gs, x, &a, bu);
+    return gr_mk_refof(gs, x, &a, bu);
   case &AddressOf(a ast_addressof):
-    return ac_mk_addressof(gs, x, &a, bu);
+    return gr_mk_addressof(gs, x, &a, bu);
   case &Deref(a ast_deref):
-    return ac_mk_deref(gs, x, &a, bu);
+    return gr_mk_deref(gs, x, &a, bu);
   case &IndexExpr(a ast_index_expr):
-    return ac_index_expr(gs, x, &a, bu);
+    return gr_index_expr(gs, x, &a, bu);
   case &Lambda(a ast_lambda):
     gn gr_num;
-    if case Printed(pm) = ac_lambda_expr(gs, x, &a, &gn) {
+    if case Printed(pm) = gr_lambda_expr(gs, x, &a, &gn) {
       return Printed(pm);
     }
     add(bu, gn);
     return NoFail;
   case &LocalField(a ast_local_field):
-    return ac_local_field(gs, x, &a, bu);
+    return gr_local_field(gs, x, &a, bu);
   case &DerefField(a ast_deref_field):
-    return ac_deref_field(gs, x, &a, bu);
+    return gr_deref_field(gs, x, &a, bu);
   case &TypedExpr(a ast_typed_expr):
-    return ac_expr(gs, oo(&a.expr), bu);
+    return gr_expr(gs, oo(&a.expr), bu);
   case &Strinit(a ast_strinit):
-    return ac_mk_strinit(gs, x, &a, bu);
+    return gr_mk_strinit(gs, x, &a, bu);
   case &Ternary(a ast_ternary):
-    return ac_mk_ternary(gs, x, &a, bu);
+    return gr_mk_ternary(gs, x, &a, bu);
   case &QuickReturn(a ast_quickreturn):
     // TODO(): Implement quick-return graphing.
     return ERR(_u8("ICE: quick-return expressions not fully implemented"));
   }
 }
 
-func ac_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
+func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
   join_target tracked_target = mk_tracked(nopq(gs.gr));
 
   conjoined cell_num = rval_cell(x);
@@ -1386,7 +1383,7 @@ func ac_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   then_nop sq_num = nopq(gs.gr);
   else_nop sq_num = nopq(gs.gr);
   cond_sn sq_num;
-  if case Printed(pm) = ac_expr_condition(gs, oo(&oo(&a->condition)->expr), then_nop, else_nop, &cond_sn) {
+  if case Printed(pm) = gr_expr_condition(gs, oo(&oo(&a->condition)->expr), then_nop, else_nop, &cond_sn) {
     return Printed(pm);
   }
 
@@ -1394,7 +1391,7 @@ func ac_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
 
   then_bu sq_builder = mk_builder(gs);
   add(&then_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->then_clause)), conjoined, OffsetConst(0)}));
-  if case Printed(pm) = ac_expr_consume(gs, oo(&a->then_clause), &then_bu) {
+  if case Printed(pm) = gr_expr_consume(gs, oo(&a->then_clause), &then_bu) {
     return Printed(pm);
   }
   add(&then_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->then_clause)))}));
@@ -1405,7 +1402,7 @@ func ac_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
 
   else_bu sq_builder = mk_builder(gs);
   add(&else_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->else_clause)), conjoined, OffsetConst(0)}));
-  if case Printed(pm) = ac_expr_consume(gs, oo(&a->else_clause), &else_bu) {
+  if case Printed(pm) = gr_expr_consume(gs, oo(&a->else_clause), &else_bu) {
     return Printed(pm);
   }
   add(&else_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->else_clause)))}));
@@ -1418,7 +1415,7 @@ func ac_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
 
   // TODO: We do the condcleanup at the end instead of repeating it twice right after the branch... do it right after the branch.
   condcleanupgn gr_num;
-  if case Printed(pm) = ac_later_discard(gs, &oo(&a->condition)->discard, &condcleanupgn) {
+  if case Printed(pm) = gr_later_discard(gs, &oo(&a->condition)->discard, &condcleanupgn) {
     return Printed(pm);
   }
   add(bu, condcleanupgn);
@@ -1426,14 +1423,14 @@ func ac_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   return NoFail;
 }
 
-func ac_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np {
+func gr_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np {
   activation_ops array[gr_active_op];
   push(&activation_ops, Activate(rval_cell(x)));
   nparams size = count(&a->exprs);
   for i size = 0; i < nparams; i = i + 1 {
     param *ast_strinit_param = ref(&a->exprs, i);
     add(bu, @[gr_xop]GrSubcell({result_cell(&param->ec), rval_cell(x), OffsetConst(un(&param->info)->offset)}));
-    if case Printed(pm) = ac_expr_consume(gs, &param->ec, bu) {
+    if case Printed(pm) = gr_expr_consume(gs, &param->ec, bu) {
       return Printed(pm);
     }
     push(&activation_ops, Deactivate(result_cell(&param->ec)));
@@ -1450,8 +1447,8 @@ func ac_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np
   return NoFail;
 }
 
-func ac_deref_field(gs gr_statep, x *ast_expr, a *ast_deref_field, bu *sq_builder) np {
-  if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->lhs), bu) {
+func gr_deref_field(gs gr_statep, x *ast_expr, a *ast_deref_field, bu *sq_builder) np {
+  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->lhs), bu) {
     return Printed(pm);
   }
   info *ast_deref_field_info = un(&a->info);
@@ -1464,19 +1461,19 @@ func ac_deref_field(gs gr_statep, x *ast_expr, a *ast_deref_field, bu *sq_builde
     add(bu, @[gr_xop]GrDeref({name, result_cell(oo(&a->lhs)), OffsetConst(offset)}));
   }
   ap gr_num;
-  if case Printed(pm) = ac_later_discard(gs, &a->ptr_discard, &ap) {
+  if case Printed(pm) = gr_later_discard(gs, &a->ptr_discard, &ap) {
     return Printed(pm);
   }
   add(bu, ap);
   return NoFail;
 }
 
-func ac_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builder) np {
+func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builder) np {
   info *ast_local_field_info = un(&a->info);
 
   switch info {
     case &ArrayLength(alinfo ast_arraylength_info): {
-      if case Printed(pm) = ac_expr_and_discard(gs, oo(&a->lhs), &alinfo.after, bu) {
+      if case Printed(pm) = gr_expr_and_discard(gs, oo(&a->lhs), &alinfo.after, bu) {
         return Printed(pm);
       }
 
@@ -1485,7 +1482,7 @@ func ac_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
       return NoFail;
     }
     case &FieldName(offset u32): {
-      if case Printed(pm) = ac_expr(gs, oo(&a->lhs), bu) {
+      if case Printed(pm) = gr_expr(gs, oo(&a->lhs), bu) {
         return Printed(pm);
       }
 
@@ -1497,7 +1494,7 @@ func ac_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
           add(bu, @[gr_xop]GrVirtualDead({desc.num}));
         }
       case &IsLvalNo(desc rval_description):
-        addo(bu, ac_maybe_virtualdead(gs, desc.partial_num));
+        addo(bu, gr_maybe_virtualdead(gs, desc.partial_num));
       }
       return NoFail;
     }
@@ -1558,7 +1555,7 @@ func gr_track_active_op(gs gr_statep, op gr_active_op) void {
   }
 }
 
-func ac_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
+func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
   lambda_celltrack gr_celltrack = mk_celltrack();
@@ -1573,13 +1570,13 @@ func ac_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   }
 
   fullbody_gn gr_num;
-  if case Printed(pm) = ac_fullbody(lambda_gs, &a->body, &fullbody_gn) {
+  if case Printed(pm) = gr_fullbody(lambda_gs, &a->body, &fullbody_gn) {
     return Printed(pm);
   }
 
   gr_deactivate(lambda_gs, info->return_cell);
   gr_deaden(lambda_gs, info->return_cell);
-  ac_check_empty(&lambda_celltrack);
+  gr_check_empty(&lambda_celltrack);
 
   id fn_body_id = add_fn_body(gs.clq->cs, {gs.gr->informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, info->return_cell}, info->arg_cells, parsed_inline_to_state_inline(a->is_inline), NotComputed})});
   bu sq_builder = mk_builder(gs);
@@ -1597,35 +1594,35 @@ func parsed_inline_to_state_inline(a ast_isinline) should_inline {
   }
 }
 
-func ac_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder) np {
+func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder) np {
   info *ast_index_expr_info = un(&a->info);
   if case &Has(aft tup[ast_expr_after_consume, ast_later_discard_info]) = &info->lhs_after {
     // It's a pointer.
     name cell_num = ellval_cell(x);
     flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
     add(bu, @[gr_xop]GrLive({result_cell(&aft.car)}));
-    if case Printed(pm) = ac_expr_and_consume(gs, oo(&a->lhs), &aft.car, bu) {
+    if case Printed(pm) = gr_expr_and_consume(gs, oo(&a->lhs), &aft.car, bu) {
       return Printed(pm);
     }
-    if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->rhs), bu) {
+    if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), bu) {
       return Printed(pm);
     }
     add(bu, @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
     rhs_later gr_num;
-    if case Printed(pm) = ac_later_discard(gs, &info->rhs_later, &rhs_later) {
+    if case Printed(pm) = gr_later_discard(gs, &info->rhs_later, &rhs_later) {
       return Printed(pm);
     }
     add(bu, rhs_later);
     lhs_later gr_num;
-    if case Printed(pm) = ac_later_discard(gs, &aft.cdr, &lhs_later) {
+    if case Printed(pm) = gr_later_discard(gs, &aft.cdr, &lhs_later) {
       return Printed(pm);
     }
     add(bu, lhs_later);
   } else {
-    if case Printed(pm) = ac_expr(gs, oo(&a->lhs), bu) {
+    if case Printed(pm) = gr_expr(gs, oo(&a->lhs), bu) {
       return Printed(pm);
     }
-    if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->rhs), bu) {
+    if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), bu) {
       return Printed(pm);
     }
     name cell_num = value_cell(x);
@@ -1639,10 +1636,10 @@ func ac_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
         add(bu, @[gr_xop]GrVirtualDead({desc.num}));
       }
     case &IsLvalNo(desc rval_description):
-      addo(bu, ac_maybe_virtualdead(gs, desc.partial_num));
+      addo(bu, gr_maybe_virtualdead(gs, desc.partial_num));
     }
     rhs_later gr_num;
-    if case Printed(pm) = ac_later_discard(gs, &info->rhs_later, &rhs_later) {
+    if case Printed(pm) = gr_later_discard(gs, &info->rhs_later, &rhs_later) {
       return Printed(pm);
     }
     add(bu, rhs_later);
@@ -1650,27 +1647,27 @@ func ac_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
   return NoFail;
 }
 
-func ac_later_discard(gs gr_statep, a *ast_later_discard_info, out *gr_num) np {
+func gr_later_discard(gs gr_statep, a *ast_later_discard_info, out *gr_num) np {
   da *destroy_action = un(&a->action);
-  return ac_destroy_action(gs, da, DeadactAfterDestroyYes, out);
+  return gr_destroy_action(gs, da, DeadactAfterDestroyYes, out);
 }
 
-func ac_mk_deref(gs gr_statep, x *ast_expr, a *ast_deref, bu *sq_builder) np {
-  if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->rhs), bu) {
+func gr_mk_deref(gs gr_statep, x *ast_expr, a *ast_deref, bu *sq_builder) np {
+  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), bu) {
     return Printed(pm);
   }
   add(bu, @[gr_xop]GrDeref({ellval_cell(x), result_cell(oo(&a->rhs)), OffsetConst(0)}));
   ap gr_num;
-  if case Printed(pm) = ac_later_discard(gs, &a->ptr_discard, &ap) {
+  if case Printed(pm) = gr_later_discard(gs, &a->ptr_discard, &ap) {
     return Printed(pm);
   }
   add(bu, ap);
   return NoFail;
 }
 
-func ac_mk_addressof(gs gr_statep, x *ast_expr, a *ast_addressof, bu *sq_builder) np {
+func gr_mk_addressof(gs gr_statep, x *ast_expr, a *ast_addressof, bu *sq_builder) np {
   // This is a total copy/paste of gr_mk_refof.
-  if case Printed(pm) = ac_expr(gs, oo(&a->rhs), bu) {
+  if case Printed(pm) = gr_expr(gs, oo(&a->rhs), bu) {
     return Printed(pm);
   }
   desc *lval_description = ellval_desc(oo(&a->rhs));
@@ -1682,9 +1679,9 @@ func ac_mk_addressof(gs gr_statep, x *ast_expr, a *ast_addressof, bu *sq_builder
   return NoFail;
 }
 
-func ac_mk_refof(gs gr_statep, x *ast_expr, a *ast_refof, bu *sq_builder) np {
+func gr_mk_refof(gs gr_statep, x *ast_expr, a *ast_refof, bu *sq_builder) np {
   // This is a total copy/paste of gr_mk_addressof.
-  if case Printed(pm) = ac_expr(gs, oo(&a->rhs), bu) {
+  if case Printed(pm) = gr_expr(gs, oo(&a->rhs), bu) {
     return Printed(pm);
   }
   desc *lval_description = ellval_desc(oo(&a->rhs));
@@ -1696,11 +1693,11 @@ func ac_mk_refof(gs gr_statep, x *ast_expr, a *ast_refof, bu *sq_builder) np {
   return NoFail;
 }
 
-func ac_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder) np {
+func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder) np {
   // The lhs is an lvalue.  If the rhs is an rvalue, we need to make its cell live.
   // The lhs is evaluated before the rhs.  For now.
 
-  if case Printed(pm) = ac_expr(gs, oo(&a->lhs), bu) {
+  if case Printed(pm) = gr_expr(gs, oo(&a->lhs), bu) {
     return Printed(pm);
   }
   switch un(&a->info) {
@@ -1715,7 +1712,7 @@ func ac_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
   case &ConditionalAssignment(ci ast_conditional_assignment_info): { }
   }
 
-  if case Printed(pm) = ac_expr(gs, oo(&a->rhs), bu) {
+  if case Printed(pm) = gr_expr(gs, oo(&a->rhs), bu) {
     return Printed(pm);
   }
 
@@ -1726,47 +1723,47 @@ func ac_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
     case &SimpleMoveAssignment(smi ast_simple_move_assignment_info): {
       // rhs is an rvalue.
       dgn gr_num;
-      if case Printed(pm) = ac_destroy_action(gs, &smi.target_destroy, DeadactAfterDestroyNo, &dgn) {
+      if case Printed(pm) = gr_destroy_action(gs, &smi.target_destroy, DeadactAfterDestroyNo, &dgn) {
         return Printed(pm);
       }
       add(bu, dgn);
       mgn gr_num;
-      if case Printed(pm) = ac_move_action(gs, &smi.rhs_move, BiDeactivateSrc, &mgn) {
+      if case Printed(pm) = gr_move_action(gs, &smi.rhs_move, BiDeactivateSrc, &mgn) {
         return Printed(pm);
       }
       add(bu, mgn);
     }
     case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info): {
       dgn gr_num;
-      if case Printed(pm) = ac_destroy_action(gs, &scdi.target_destroy, DeadactAfterDestroyNo, &dgn) {
+      if case Printed(pm) = gr_destroy_action(gs, &scdi.target_destroy, DeadactAfterDestroyNo, &dgn) {
         return Printed(pm);
       }
       add(bu, dgn);
       mgn1 gr_num;
-      if case Printed(pm) = ac_copy_action(gs, &scdi.rhs_copy, BiNothing, &mgn1) {
+      if case Printed(pm) = gr_copy_action(gs, &scdi.rhs_copy, BiNothing, &mgn1) {
         return Printed(pm);
       }
       add(bu, mgn1);
-      addo(bu, ac_maybe_virtualdead(gs, scdi.rhs_copy.x.src));
+      addo(bu, gr_maybe_virtualdead(gs, scdi.rhs_copy.x.src));
       drgn gr_num;
-      if case Printed(pm) = ac_destroy_action(gs, &scdi.rhs_cleanup, DeadactAfterDestroyYes, &drgn) {
+      if case Printed(pm) = gr_destroy_action(gs, &scdi.rhs_cleanup, DeadactAfterDestroyYes, &drgn) {
         return Printed(pm);
       }
       add(bu, drgn);
     }
     case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): {
       dgn gr_num;
-      if case Printed(pm) = ac_destroy_action(gs, &sci.target_destroy, DeadactAfterDestroyNo, &dgn) {
+      if case Printed(pm) = gr_destroy_action(gs, &sci.target_destroy, DeadactAfterDestroyNo, &dgn) {
         return Printed(pm);
       }
       add(bu, dgn);
       mgn gr_num;
-      if case Printed(pm) = ac_copy_action(gs, &sci.rhs_copy, BiNothing, &mgn) {
+      if case Printed(pm) = gr_copy_action(gs, &sci.rhs_copy, BiNothing, &mgn) {
         return Printed(pm);
       }
       add(bu, mgn);
       if case DeadMe = sci.rhs_deadme {
-        addo(bu, ac_maybe_virtualdead(gs, sci.rhs_copy.x.src));
+        addo(bu, gr_maybe_virtualdead(gs, sci.rhs_copy.x.src));
       }
     }
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
@@ -1804,12 +1801,12 @@ func ac_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       do_assign_bu sq_builder = mk_builder(gs);
       add(&do_assign_bu, @[gr_xop]GrDead({cmp_result}));
       assign_destroy gr_num;
-      if case Printed(pm) = ac_destroy_action(gs, &ci.conditional_destroy, DeadactAfterDestroyNo, &assign_destroy) {
+      if case Printed(pm) = gr_destroy_action(gs, &ci.conditional_destroy, DeadactAfterDestroyNo, &assign_destroy) {
         return Printed(pm);
       }
       add(&do_assign_bu, assign_destroy);
       assign_copy gr_num;
-      if case Printed(pm) = ac_copy_action(gs, &ci.conditional_copy, BiNothing, &assign_copy) {
+      if case Printed(pm) = gr_copy_action(gs, &ci.conditional_copy, BiNothing, &assign_copy) {
         return Printed(pm);
       }
       add(&do_assign_bu, assign_copy);
@@ -1823,7 +1820,7 @@ func ac_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       // br is an expression node -- the cases attach to nopq's
       append(bu, br, exit_nopq.sn);
       if case DeadMe = ci.rhs_deadme {
-        addo(bu, ac_maybe_virtualdead(gs, ci.conditional_copy.x.src));
+        addo(bu, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src));
       }
     }
   }
@@ -1844,12 +1841,12 @@ func ac_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
   return NoFail;
 }
 
-func ac_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunction, bu *sq_builder) np {
+func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunction, bu *sq_builder) np {
   end_nopq tracked_target = mk_tracked(nopq(gs.gr));
 
   // TODO: This is so incredibly lame -- we "know" that the values are of type bool, so we don't do later_discard or anything like that.  We manually deactivate the values.  Make this not be lame.
 
-  if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->lhs), bu) {
+  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->lhs), bu) {
     return Printed(pm);
   }
 
@@ -1859,7 +1856,7 @@ func ac_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   add(&rhs_bu, @[gr_xop]GrActiveXop({Deactivate(result_cell(oo(&a->lhs))), Nothing}));
   add(&rhs_bu, @[gr_xop]GrDead({result_cell(oo(&a->lhs))}));
 
-  if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->rhs), &rhs_bu) {
+  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), &rhs_bu) {
     return Printed(pm);
   }
 
@@ -1894,16 +1891,16 @@ func ac_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   return NoFail;
 }
 
-func ac_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, bu *sq_builder) np {
+func gr_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, bu *sq_builder) np {
   nparams size = count(&a->params);
-  if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->fun), bu) {
+  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->fun), bu) {
     return Printed(pm);
   }
   paramcells array[cell_num];
   reserve(&paramcells, nparams);
   for i size = 0; i < nparams; i = i + 1 {
     param *ast_expr_consume = ref(&a->params, i);
-    if case Printed(pm) = ac_live_and_expr_consume(gs, param, bu) {
+    if case Printed(pm) = gr_live_and_expr_consume(gs, param, bu) {
       return Printed(pm);
     }
     push(&paramcells, result_cell(param));
@@ -1912,7 +1909,7 @@ func ac_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, bu *sq_builder) np {
   return NoFail;
 }
 
-func ac_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_builder) np {
+func gr_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_builder) np {
   bytes array[u8];
   nchars size = count(&a->charspecs);
   reserve(&bytes, nchars);
@@ -1928,13 +1925,13 @@ func ac_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_
   return NoFail;
 }
 
-func ac_literal(gs gr_statep, x *ast_expr, value bigint, bu *sq_builder) np {
+func gr_literal(gs gr_statep, x *ast_expr, value bigint, bu *sq_builder) np {
   add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(value)}));
   add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   return NoFail;
 }
 
-func ac_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) np {
+func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) np {
   // Generally for rvalues we write constant values here -- we can activate *after* we've written a constant value.  No atomic activation necessary.
   switch un(&a->name_info) {
   case &LocalResolve(li local_info): { }
@@ -2039,7 +2036,7 @@ enum deadact_after_destroy {
   DeadactAfterDestroyNo void;
 }
 
-func ac_maybe_virtualdead(gs gr_statep, c cell_num) opt[gr_num] {
+func gr_maybe_virtualdead(gs gr_statep, c cell_num) opt[gr_num] {
   switch location(ref_cell(gs.gr, c)) {
   case LocationVirtual:
     return Has(addx(gs, @[gr_xop]GrVirtualDead({c})));
@@ -2048,7 +2045,7 @@ func ac_maybe_virtualdead(gs gr_statep, c cell_num) opt[gr_num] {
   }
 }
 
-func ac_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
+func gr_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
   add(bu, @[gr_xop]GrAssertLive({result_cell(aft)}));
   switch &aft->actions {
   case &ConsumeByInPlace: { }
@@ -2061,33 +2058,33 @@ func ac_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after
   return NoFail;
 }
 
-func ac_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
+func gr_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
   switch &aft->actions {
   case &ConsumeByInPlace: { }
   case &ConsumeByCopyDestroy(cd copy_destroy_action):
     dep gr_num;
-    if case Printed(pm) = ac_copy_action(gs, &cd.copy, BiCopy, &dep) {
+    if case Printed(pm) = gr_copy_action(gs, &cd.copy, BiCopy, &dep) {
       return Printed(pm);
     }
     add(bu, dep);
-    addo(bu, ac_maybe_virtualdead(gs, cd.copy.x.src));
+    addo(bu, gr_maybe_virtualdead(gs, cd.copy.x.src));
     destroy_gn gr_num;
-    if case Printed(pm) = ac_destroy_action(gs, &cd.destroy, DeadactAfterDestroyYes, &destroy_gn) {
+    if case Printed(pm) = gr_destroy_action(gs, &cd.destroy, DeadactAfterDestroyYes, &destroy_gn) {
       return Printed(pm);
     }
     add(bu, destroy_gn);
   case &ConsumeByCopy(cc tup[copy_action, lval_deadme]):
     dep gr_num;
-    if case Printed(pm) = ac_copy_action(gs, &cc.car, BiCopy, &dep) {
+    if case Printed(pm) = gr_copy_action(gs, &cc.car, BiCopy, &dep) {
       return Printed(pm);
     }
     add(bu, dep);
     if case DeadMe = cc.cdr {
-      addo(bu, ac_maybe_virtualdead(gs, cc.car.x.src));
+      addo(bu, gr_maybe_virtualdead(gs, cc.car.x.src));
     }
   case &ConsumeByMove(m move_action):
     dep gr_num;
-    if case Printed(pm) = ac_move_action(gs, &m, BiMove, &dep) {
+    if case Printed(pm) = gr_move_action(gs, &m, BiMove, &dep) {
       return Printed(pm);
     }
     add(bu, dep);
@@ -2095,14 +2092,14 @@ func ac_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
   return NoFail;
 }
 
-func ac_copy_action(gs gr_statep, x *copy_action, statechange bi_ctor_statechange, out *gr_num) np {
-  *out = ac_bi_ctor(gs, x->x.dest, x->x.src, &x->x.ctor, statechange);
+func gr_copy_action(gs gr_statep, x *copy_action, statechange bi_ctor_statechange, out *gr_num) np {
+  *out = gr_bi_ctor(gs, x->x.dest, x->x.src, &x->x.ctor, statechange);
   return NoFail;
 }
 
-func ac_move_action(gs gr_statep, x *move_action, statechange bi_ctor_statechange, out *gr_num) np {
+func gr_move_action(gs gr_statep, x *move_action, statechange bi_ctor_statechange, out *gr_num) np {
   bu sq_builder = mk_builder(gs);
-  dep gr_num = ac_bi_ctor(gs, x->x.dest, x->x.src, &x->x.ctor, statechange);
+  dep gr_num = gr_bi_ctor(gs, x->x.dest, x->x.src, &x->x.ctor, statechange);
   add(&bu, dep);
   add(&bu, @[gr_xop]GrDead({x->x.src}));
   *out = done(&bu);
@@ -2115,7 +2112,7 @@ enum uni_fun_statechange {
   Deactivate void;
 }
 
-func ac_uni_fun(gs gr_statep, ip instpair, arg cell_num, statechange uni_fun_statechange) gr_num {
+func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num, statechange uni_fun_statechange) gr_num {
   argptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, arg)->type);
   voidret cu_typrop = compute_prim(gs.clq, primitive_void_type(gs.clq->cs));
   fnptr cu_typrop = compute_prim(gs.clq, fn_type(gs.clq->cs, argptr.cu.x, voidret.cu.x));
@@ -2144,7 +2141,7 @@ func ac_uni_fun(gs gr_statep, ip instpair, arg cell_num, statechange uni_fun_sta
   return done(&bu);
 }
 
-func ac_init_action(gs gr_statep, x *init_action, out *gr_num) np {
+func gr_init_action(gs gr_statep, x *init_action, out *gr_num) np {
   bu sq_builder = mk_builder(gs);
   add(&bu, @[gr_xop]GrLive({x->x.arg}));
   switch &x->x.ctor {
@@ -2154,18 +2151,18 @@ func ac_init_action(gs gr_statep, x *init_action, out *gr_num) np {
     add(&bu, @[gr_xop]GrWriteConst({x->x.arg, ConstInt(bigu(0))}));
     add(&bu, @[gr_xop]GrActiveXop({Activate(x->x.arg), Nothing}));
   case &FunCtor(ip instpair):
-    dp gr_num = ac_uni_fun(gs, ip, x->x.arg, Activate);
+    dp gr_num = gr_uni_fun(gs, ip, x->x.arg, Activate);
     add(&bu, dp);
   }
   *out = done(&bu);
   return NoFail;
 }
 
-func ac_destroy_action(gs gr_statep, x *destroy_action, dad deadact_after_destroy, out *gr_num) np {
-  return ac_destroy_ctor(gs, x->x.arg, &x->x.ctor, dad, out);
+func gr_destroy_action(gs gr_statep, x *destroy_action, dad deadact_after_destroy, out *gr_num) np {
+  return gr_destroy_ctor(gs, x->x.arg, &x->x.ctor, dad, out);
 }
 
-func ac_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechange bi_ctor_statechange) gr_num {
+func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechange bi_ctor_statechange) gr_num {
   // In our "bi_fun" uses the dest and src have the same type.  It seems wrong for this menial code to know that, though.
   destptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, dest)->type);
   srcptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, src)->type);
@@ -2291,7 +2288,7 @@ func gr_minimal_basics_cleanup(gs gr_statep, bas *gr_minimal_basics, bu *sq_buil
 
   // The void return cell never gets activated... so be it.
   gr_deaden(gs, bas->return_cell);
-  ac_check_empty(gs.celltrack);
+  gr_check_empty(gs.celltrack);
 }
 
 func gr_basics_cleanup(gs gr_statep, bas *gr_basics, bu *sq_builder) void {
@@ -2515,7 +2512,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
 
   // We did't set the return cell active, whatever.
   gr_deaden(gs, return_cell);
-  ac_check_empty(&celltrack);
+  gr_check_empty(&celltrack);
 
   *gr_out = gr;
   *gn_out = done(&bu);
@@ -2708,7 +2705,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
 
   // We didn't set the return cell active, whatever.
   gr_deaden(gs, return_cell);
-  ac_check_empty(&celltrack);
+  gr_check_empty(&celltrack);
 
   *gr_out = gr;
   *gn_out = done(&bu);
@@ -2861,7 +2858,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
 
   // We didn't set the return cell active, whatever.
   gr_deaden(gs, return_cell);
-  ac_check_empty(&celltrack);
+  gr_check_empty(&celltrack);
 
   *gr_out = gr;
   *gn_out = gn;
@@ -2936,15 +2933,15 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   switch &mec->operational {
   case &EnumConstructMove(cd ctor_desc):
-    bi_ctor_gn gr_num = ac_bi_ctor(gs, retpart, argnum, &cd, BiMove);
+    bi_ctor_gn gr_num = gr_bi_ctor(gs, retpart, argnum, &cd, BiMove);
     add(&bu, bi_ctor_gn);
     add(&bu, @[gr_xop]GrDead({argnum}));
 
   case &EnumConstructCopyDestroy(cdd copy_destroy_desc):
-    cpgn gr_num = ac_bi_ctor(gs, retpart, argnum, &cdd.copy_desc, BiCopy);
+    cpgn gr_num = gr_bi_ctor(gs, retpart, argnum, &cdd.copy_desc, BiCopy);
     add(&bu, cpgn);
     destgn gr_num;
-    if case Printed(pm) = ac_destroy_ctor(gs, argnum, &cdd.destroy_desc, DeadactAfterDestroyYes, &destgn) {
+    if case Printed(pm) = gr_destroy_ctor(gs, argnum, &cdd.destroy_desc, DeadactAfterDestroyYes, &destgn) {
       return Printed(pm);
     }
     add(&bu, destgn);
@@ -2964,7 +2961,7 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   gr_deactivate(gs, retnum);
   gr_deaden(gs, retnum);
-  ac_check_empty(&celltrack);
+  gr_check_empty(&celltrack);
 
   *gr_out = gr;
   *gn_out = done(&bu);
@@ -2981,7 +2978,7 @@ enum bi_ctor_statechange {
   BiNothing void;
 }
 
-func ac_bi_ctor(gs gr_statep, destnum cell_num, srcnum cell_num, cd *ctor_desc, statechange bi_ctor_statechange) gr_num {
+func gr_bi_ctor(gs gr_statep, destnum cell_num, srcnum cell_num, cd *ctor_desc, statechange bi_ctor_statechange) gr_num {
   bu sq_builder = mk_builder(gs);
   switch cd {
   case &TrivialCtor:
@@ -2996,13 +2993,13 @@ func ac_bi_ctor(gs gr_statep, destnum cell_num, srcnum cell_num, cd *ctor_desc, 
     case BiNothing: { }
     }
   case &FunCtor(ip instpair):
-    gn gr_num = ac_bi_fun(gs, ip, destnum, srcnum, statechange);
+    gn gr_num = gr_bi_fun(gs, ip, destnum, srcnum, statechange);
     add(&bu, gn);
   }
   return done(&bu);
 }
 
-func ac_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_after_destroy, out *gr_num) np {
+func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_after_destroy, out *gr_num) np {
   bu sq_builder = mk_builder(gs);
   switch cd {
   case &TrivialCtor:
@@ -3012,11 +3009,11 @@ func ac_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_a
     }
   case &FunCtor(ip instpair):
     if case DeadactAfterDestroyYes = dad {
-      gn gr_num = ac_uni_fun(gs, ip, argnum, Deactivate);
+      gn gr_num = gr_uni_fun(gs, ip, argnum, Deactivate);
       add(&bu, gn);
       add(&bu, @[gr_xop]GrDead({argnum}));
     } else {
-      gn gr_num = ac_uni_fun(gs, ip, argnum, Nothing);
+      gn gr_num = gr_uni_fun(gs, ip, argnum, Nothing);
       add(&bu, gn);
     }
   }
@@ -3063,7 +3060,7 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op pri
 
   // GrPrimApply doesn't activate (or deactivate) anything.  Yet.
   gr_deaden(gs, retcell);
-  ac_check_empty(&celltrack);
+  gr_check_empty(&celltrack);
 
   return add_fn_body(clq->cs, {informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells, InlineMust, NotComputed})});
 }
@@ -3103,7 +3100,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           celltrack gr_celltrack = mk_celltrack();
           gs gr_statep = {clq, &gr, &celltrack};
           bu sq_builder = mk_builder(gs);
-          if case Printed(pm) = ac_live_and_expr_consume(gs, &dire.ec, &bu) {
+          if case Printed(pm) = gr_live_and_expr_consume(gs, &dire.ec, &bu) {
             inst->graph = FailedComputation;
             return Printed(pm);
           }
@@ -3112,7 +3109,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           rcell cell_num = result_cell(&dire.ec);
           gr_deactivate(gs, rcell);
           gr_deaden(gs, rcell);
-          ac_check_empty(gs.celltrack);
+          gr_check_empty(gs.celltrack);
 
           inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, rcell}));
           return NoFail;
