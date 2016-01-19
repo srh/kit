@@ -210,7 +210,7 @@ func deaden(liveset *cellset, c cell_num) void {
 
 func expect_live(liveset *cellset, c cell_num) void {
   if case None = lookup(&liveset->all, c) {
-    ice(_u8("input on unlive cell "), c);
+    ice(_u8("expect_live on unlive cell "), c);
   }
 }
 

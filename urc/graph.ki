@@ -156,6 +156,7 @@ func addx(gs gr_statep, op gr_xop) gr_num {
     for i size = 0; i < nparams; i = i + 1 {
       gr_deaden(gs, get(&a.params, i));
     }
+
   case &GrPrimApply(a gr_prim_apply):
     gr_expect_live(gs, a.retcell);
 
@@ -163,12 +164,16 @@ func addx(gs gr_statep, op gr_xop) gr_num {
     for i size = 0; i < nparams; i = i + 1 {
       gr_deaden(gs, get(&a.params, i));
     }
+
   case &GrMemCopy(a gr_memcopy):
+    // TODO(): We'll probably need some activation annotation at some point.
     gr_expect_live(gs, a.dest);
     gr_expect_live(gs, a.src);
   case &GrWriteConst(a gr_writeconst):
+    // TODO(): We'll probably need some activation annotation at some point.
     gr_expect_live(gs, a.dest);
   case &GrAddressof(a gr_addressof):
+    // TODO(): We'll probably need some activation annotation at some point.
     gr_expect_live(gs, a.addressee);
     gr_expect_live(gs, a.dest);
   case &GrDeref(a gr_deref):
@@ -176,6 +181,7 @@ func addx(gs gr_statep, op gr_xop) gr_num {
     check(!isLocationStatic(ref_cell(gs.gr, a.name)->location));
     gr_create(gs, a.name);
   case &GrSubcell(a gr_subcell):
+    // TODO(): We'll probably need some activation annotation at some point.
     gr_expect_live(gs, a.partof);
     check(!isLocationStatic(ref_cell(gs.gr, a.name)->location));
     gr_create(gs, a.name);
@@ -184,6 +190,7 @@ func addx(gs gr_statep, op gr_xop) gr_num {
   case &GrAssertLive(a gr_assert_live):
     gr_expect_live(gs, a.cell);
   case &GrDead(a gr_dead):
+    gr_expect_inactive(gs, a.cell);
     gr_deaden(gs, a.cell);
   case &GrVirtualDead(a gr_virtual_dead):
     gr_deaden(gs, a.cell);
@@ -401,11 +408,14 @@ enum gr_const {
 
 struct gr_celltrack {
   liveset cellset;
+  // Cells that need to be destructed, specifically.
+  activeset cellset;
 }
 
 func mk_celltrack() gr_celltrack {
   liveset cellset;
-  return {liveset};
+  activeset cellset;
+  return {liveset, activeset};
 }
 
 struct gr_statep {
@@ -451,6 +461,9 @@ func note_celltrack(targ *noted_celltrack, current *gr_celltrack) void {
   if case &Has(ct gr_celltrack) = &targ->celltrack {
     if !matches_checksum(&ct.liveset, &current->liveset) {
       ice(_u8("Inconsistent liveness state, liveset="), current->liveset);
+    }
+    if !matches_checksum(&ct.activeset, &current->activeset) {
+      ice(_u8("Inconsistent activeness state, activeset="), current->activeset);
     }
   } else {
     targ->celltrack = Has(*current);
@@ -1423,6 +1436,38 @@ func gr_deaden(gs gr_statep, c cell_num) void {
 
 func gr_expect_live(gs gr_statep, c cell_num) void {
   expect_live(&gs.celltrack->liveset, c);
+}
+
+func gr_activate(gs gr_statep, c cell_num) void {
+  liveset *cellset = &gs.celltrack->activeset;
+  if !try_insert(&liveset->all, c) {
+    ice(_u8("activate on active cell "), c);
+  }
+  liveset->xored = liveset->xored ^ ~c.x;
+  liveset->summed = liveset->summed + ~c.x;
+}
+
+func gr_deactivate(gs gr_statep, c cell_num) void {
+  liveset *cellset = &gs.celltrack->activeset;
+  if !try_remove(&liveset->all, c) {
+    ice(_u8("deactivate on inactive cell "), c);
+  }
+  liveset->xored = liveset->xored ^ ~c.x;
+  liveset->summed = liveset->summed - ~c.x;
+}
+
+func gr_expect_active(gs gr_statep, c cell_num) void {
+  liveset *cellset = &gs.celltrack->activeset;
+  if case None = lookup(&liveset->all, c) {
+    ice(_u8("expect_active on inactive cell "), c);
+  }
+}
+
+func gr_expect_inactive(gs gr_statep, c cell_num) void {
+  // TODO: This is an inefficient assertion to make.  (Liveness asserts can or will be able to search from the end with practical O(1) cost thanks to the generally fifo nature of cell lifetimes.)  Remove this function.
+  if case Has(ix size) = lookup(&gs.celltrack->activeset.all, c) {
+    ice(_u8("expected inactive cell"));
+  }
 }
 
 func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
