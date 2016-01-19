@@ -1287,10 +1287,11 @@ func gr_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume,
 }
 
 func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
+  // TODO(): Honestly we could have some general assertions about what cells are made live or active, based on lval/rval info.
   cs *checkstate = gs.clq->cs;
   switch &x->u {
   case &NameExpr(a ast_name_expr):
-    return gr_name_expr(gs, x, &a, bu);
+    return ac_name_expr(gs, x, &a, bu);
   case &ParenExpr(a ast_paren_expr):
     return gr_expr(gs, oo(&a.expr), bu);
   case &NumericLiteral(a ast_numeric_literal):
@@ -1892,13 +1893,16 @@ func gr_literal(gs gr_statep, x *ast_expr, value bigint, bu *sq_builder) np {
   return NoFail;
 }
 
-func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) np {
+func ac_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) np {
+  // Generally for rvalues we write constant values here -- we can activate *after* we've written a constant value.  No atomic activation necessary.
   switch un(&a->name_info) {
   case &LocalResolve(li local_info): { }
   case &GlobalResolve(gi global_info):
     add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstDef({gi.ent, gi.inst})}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x))}));
   case &EnumConstructor(ei enum_constructor_info):
     add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstDef(ei.ip)}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x))}));
   case &EnumVoidConstructed(vi enum_voidconstructed_info):
     info *ast_expr_complete_info = expr_complete_info(x);
     x_cell cell_num = rval_cell(x);
@@ -1914,6 +1918,8 @@ func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) n
       = gr_bzero_subcell(gs, x_cell, tag_end, info->cu_props.flat_size - tag_end);
     addo(bu, postpadding_ogn);
     add(bu, @[gr_xop]GrVirtualDead({tag_cell}));
+    // ^ This hub-bub writes a constant value to x_cell.
+    add(bu, @[gr_xop]GrActiveXop({Activate(x_cell)}));
   }
   return NoFail;
 }
