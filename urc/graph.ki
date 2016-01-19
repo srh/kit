@@ -246,7 +246,7 @@ func addo(bu *sq_builder, ogn opt[gr_num]) void {
 }
 
 
-// Control flow connecting functions.  Every place we use these, we need to save/connect celltracking info.  They are:  jmp_qnop_node, append, mut_connect, last, nopq, and seqq.  The sq_ versions are ones that we've done the save/connecting celltracking modifications for.
+// Control flow connecting functions.  Every place we use these, we need to save/connect celltracking info.  They are:  jmp_qnop_node, append, mut_connect(done), last(done), nopq, and seqq.  The sq_ versions are ones that we've done the save/connecting celltracking modifications for.
 // TODO(): Rename the sq_ versions back to the original names.
 
 func nopq(gr *frame_graph) sq_num {
@@ -261,6 +261,11 @@ func seqq(gr *frame_graph, gsq gr_sequence) sq_num {
 }
 
 func sq_seqq(gr *frame_graph, gsq gr_sequence) sq_num { return seqq(gr, gsq); }
+
+func sq_seqq(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
+  note_celltrack(&outflow->note, gs.celltrack);
+  return seqq(gs.gr, {gn, outflow->sn});
+}
 
 func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
   help_mut_qnop_node(gr, ix, {@[gr_qop]GrJmp({outflow})});
@@ -648,7 +653,7 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
 func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) np {
   targ *tracked_target = ref(&fb->label_gn, un(&a->info)->label_number.x);
   note_celltrack(&targ->note, gs.celltrack);
-  sq_jmp_qnop_node(gs.gr, targ->sn, last(bu));
+  sq_jmp_qnop_node(gs.gr, targ->sn, sq_last(bu));
   return NoFail;
 }
 
@@ -2434,7 +2439,8 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
 
-  join_target sq_num = nopq(&gr);
+  join_target tracked_target = mk_tracked(nopq(&gr));
+  postbranch_save gr_savetrack = save_celltrack(gs);
 
   cases_gn array[tup[gr_const, sq_num]];
   nconstructors size = count(&et->constructors);
@@ -2457,6 +2463,10 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
       fc cell_num = add_cell(&gr, {LocationVirtual, fieldtype, fieldtype_props});
       push(&fieldcella, fc);
       push(&fieldcellops, @[gr_xop]GrSubcell({get(&fieldcella, j), get(&pointeecells, j), OffsetConst(field_offset)}));
+    }
+
+    if i != 0 {
+      restore_celltrack(gs, &postbranch_save);
     }
 
     sub_bu sq_builder = mk_builder(gs);
@@ -2534,20 +2544,22 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
 
     finalgn gr_num = done(&sub_bu);
 
-    finalseqgn sq_num = seqq(&gr, {finalgn, join_target});
+    finalseqgn sq_num = sq_seqq(gs, finalgn, &join_target);
     push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), finalseqgn});
   }
 
+  restore_celltrack(gs, &postbranch_save);
   if case CtorDestroy = wc {
-    push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), join_target});
+    note_celltrack(&join_target.note, gs.celltrack);
+    push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), join_target.sn});
   } else {
     ztgn gr_num = addx(gs, @[gr_xop]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))}));
-    ztseq sq_num = seqq(&gr, {ztgn, join_target});
+    ztseq sq_num = sq_seqq(gs, ztgn, &join_target);
     push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), ztseq});
   }
 
   br sq_num = addq(&gr, @[gr_qop]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None}));
-  append(&bu, br, join_target);
+  sq_append(&bu, br, join_target.sn);
   for i size = nargs; i > 0; {
     i = i - 1;
     add(&bu, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
