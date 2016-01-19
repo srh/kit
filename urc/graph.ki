@@ -1657,11 +1657,6 @@ func ac_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
 }
 
 func ac_later_discard(gs gr_statep, a *ast_later_discard_info, out *gr_num) np {
-  return gr_later_discard(gs, a, out);
-}
-
-// TODO(): Make sure callers can deactivate the cell, make them call ac_later_discard.
-func gr_later_discard(gs gr_statep, a *ast_later_discard_info, out *gr_num) np {
   da *destroy_action = un(&a->action);
   return ac_destroy_action(gs, da, DeadactAfterDestroyYes, out);
 }
@@ -2072,7 +2067,6 @@ func ac_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after
   return NoFail;
 }
 
-// TODO(): This function assumes we need to activate the dest cell.  Is that right?
 func ac_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
   switch &aft->actions {
   case &ConsumeByInPlace: { }
@@ -2108,15 +2102,13 @@ func ac_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
 }
 
 func ac_copy_action(gs gr_statep, x *copy_action, statechange bi_ctor_statechange, out *gr_num) np {
-  return ac_bi_action(gs, &x->x, statechange, out);
+  *out = ac_bi_ctor(gs, x->x.dest, x->x.src, &x->x.ctor, statechange);
+  return NoFail;
 }
 
 func ac_move_action(gs gr_statep, x *move_action, statechange bi_ctor_statechange, out *gr_num) np {
   bu sq_builder = mk_builder(gs);
-  dep gr_num;
-  if case Printed(pm) = ac_bi_action(gs, &x->x, statechange, &dep) {
-    return Printed(pm);
-  }
+  dep gr_num = ac_bi_ctor(gs, x->x.dest, x->x.src, &x->x.ctor, statechange);
   add(&bu, dep);
   add(&bu, @[gr_xop]GrDead({x->x.src}));
   *out = done(&bu);
@@ -2216,12 +2208,6 @@ func ac_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechan
   add(&bu, @[gr_xop]GrDead({retvoid}));
 
   return done(&bu);
-}
-
-// TODO(): Maybe just get rid of this function.
-func ac_bi_action(gs gr_statep, x *bi_action, statechange bi_ctor_statechange, out *gr_num) np {
-  *out = ac_bi_ctor(gs, x->dest, x->src, &x->ctor, statechange);
-  return NoFail;
 }
 
 // TODO: There's a lot of duplicated code in the splay-out of this function.
