@@ -1292,10 +1292,10 @@ func gr_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder)
 }
 
 func gr_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
-  return gr_expr_and_consume(gs, &x->expr, un(&x->after), bu);
+  return ac_expr_and_consume(gs, &x->expr, un(&x->after), bu);
 }
 
-func gr_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
+func ac_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
   if case Printed(pm) = ac_consume_actions_before(gs, x, aft, bu) {
     return Printed(pm);
   }
@@ -1349,20 +1349,20 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   case &AddressOf(a ast_addressof):
     return ac_mk_addressof(gs, x, &a, bu);
   case &Deref(a ast_deref):
-    return gr_mk_deref(gs, x, &a, bu);
+    return ac_mk_deref(gs, x, &a, bu);
   case &IndexExpr(a ast_index_expr):
-    return gr_index_expr(gs, x, &a, bu);
+    return ac_index_expr(gs, x, &a, bu);
   case &Lambda(a ast_lambda):
     gn gr_num;
-    if case Printed(pm) = gr_lambda_expr(gs, x, &a, &gn) {
+    if case Printed(pm) = ac_lambda_expr(gs, x, &a, &gn) {
       return Printed(pm);
     }
     add(bu, gn);
     return NoFail;
   case &LocalField(a ast_local_field):
-    return gr_local_field(gs, x, &a, bu);
+    return ac_local_field(gs, x, &a, bu);
   case &DerefField(a ast_deref_field):
-    return gr_deref_field(gs, x, &a, bu);
+    return ac_deref_field(gs, x, &a, bu);
   case &TypedExpr(a ast_typed_expr):
     return gr_expr(gs, oo(&a.expr), bu);
   case &Strinit(a ast_strinit):
@@ -1439,27 +1439,28 @@ func gr_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np
   return NoFail;
 }
 
-func gr_deref_field(gs gr_statep, x *ast_expr, a *ast_deref_field, bu *sq_builder) np {
-  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->lhs), bu) {
+func ac_deref_field(gs gr_statep, x *ast_expr, a *ast_deref_field, bu *sq_builder) np {
+  if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->lhs), bu) {
     return Printed(pm);
   }
   info *ast_deref_field_info = un(&a->info);
   switch info {
   case &DerefArrayLength(count u32):
     add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~count)}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   case &DerefFieldName(offset u32):
     name cell_num = ellval_cell(x);
     add(bu, @[gr_xop]GrDeref({name, result_cell(oo(&a->lhs)), OffsetConst(offset)}));
   }
   ap gr_num;
-  if case Printed(pm) = gr_later_discard(gs, &a->ptr_discard, &ap) {
+  if case Printed(pm) = ac_later_discard(gs, &a->ptr_discard, &ap) {
     return Printed(pm);
   }
   add(bu, ap);
   return NoFail;
 }
 
-func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builder) np {
+func ac_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builder) np {
   info *ast_local_field_info = un(&a->info);
 
   switch info {
@@ -1469,6 +1470,7 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
       }
 
       add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)}));
+      add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
       return NoFail;
     }
     case &FieldName(offset u32): {
@@ -1545,7 +1547,7 @@ func gr_track_active_op(gs gr_statep, op gr_active_op) void {
   }
 }
 
-func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
+func ac_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
   lambda_celltrack gr_celltrack = mk_celltrack();
@@ -1569,8 +1571,11 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   ac_check_empty(&lambda_celltrack);
 
   id fn_body_id = add_fn_body(gs.clq->cs, {gs.gr->informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, info->return_cell}, info->arg_cells, parsed_inline_to_state_inline(a->is_inline), NotComputed})});
-  gn var = addx(gs, @[gr_xop]GrWriteConst({rval_cell(x), ConstFnBody(id)}));
-  *out = gn;
+  bu sq_builder = mk_builder(gs);
+  add(&bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstFnBody(id)}));
+  add(&bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
+
+  *out = done(&bu);
   return NoFail;
 }
 
@@ -1581,27 +1586,27 @@ func parsed_inline_to_state_inline(a ast_isinline) should_inline {
   }
 }
 
-func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder) np {
+func ac_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder) np {
   info *ast_index_expr_info = un(&a->info);
   if case &Has(aft tup[ast_expr_after_consume, ast_later_discard_info]) = &info->lhs_after {
     // It's a pointer.
     name cell_num = ellval_cell(x);
     flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
     add(bu, @[gr_xop]GrLive({result_cell(&aft.car)}));
-    if case Printed(pm) = gr_expr_and_consume(gs, oo(&a->lhs), &aft.car, bu) {
+    if case Printed(pm) = ac_expr_and_consume(gs, oo(&a->lhs), &aft.car, bu) {
       return Printed(pm);
     }
-    if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), bu) {
+    if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->rhs), bu) {
       return Printed(pm);
     }
     add(bu, @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
     rhs_later gr_num;
-    if case Printed(pm) = gr_later_discard(gs, &info->rhs_later, &rhs_later) {
+    if case Printed(pm) = ac_later_discard(gs, &info->rhs_later, &rhs_later) {
       return Printed(pm);
     }
     add(bu, rhs_later);
     lhs_later gr_num;
-    if case Printed(pm) = gr_later_discard(gs, &aft.cdr, &lhs_later) {
+    if case Printed(pm) = ac_later_discard(gs, &aft.cdr, &lhs_later) {
       return Printed(pm);
     }
     add(bu, lhs_later);
@@ -1609,7 +1614,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
     if case Printed(pm) = gr_expr(gs, oo(&a->lhs), bu) {
       return Printed(pm);
     }
-    if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), bu) {
+    if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->rhs), bu) {
       return Printed(pm);
     }
     name cell_num = value_cell(x);
@@ -1626,7 +1631,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
       addo(bu, ac_maybe_virtualdead(gs, desc.partial_num));
     }
     rhs_later gr_num;
-    if case Printed(pm) = gr_later_discard(gs, &info->rhs_later, &rhs_later) {
+    if case Printed(pm) = ac_later_discard(gs, &info->rhs_later, &rhs_later) {
       return Printed(pm);
     }
     add(bu, rhs_later);
@@ -1644,13 +1649,13 @@ func gr_later_discard(gs gr_statep, a *ast_later_discard_info, out *gr_num) np {
   return ac_destroy_action(gs, da, DeadactAfterDestroyYes, out);
 }
 
-func gr_mk_deref(gs gr_statep, x *ast_expr, a *ast_deref, bu *sq_builder) np {
-  if case Printed(pm) = gr_live_and_expr_consume(gs, oo(&a->rhs), bu) {
+func ac_mk_deref(gs gr_statep, x *ast_expr, a *ast_deref, bu *sq_builder) np {
+  if case Printed(pm) = ac_live_and_expr_consume(gs, oo(&a->rhs), bu) {
     return Printed(pm);
   }
   add(bu, @[gr_xop]GrDeref({ellval_cell(x), result_cell(oo(&a->rhs)), OffsetConst(0)}));
   ap gr_num;
-  if case Printed(pm) = gr_later_discard(gs, &a->ptr_discard, &ap) {
+  if case Printed(pm) = ac_later_discard(gs, &a->ptr_discard, &ap) {
     return Printed(pm);
   }
   add(bu, ap);
