@@ -2077,7 +2077,6 @@ func gr_move_action(gs gr_statep, x *move_action, out *gr_num) np {
 }
 
 enum uni_fun_statechange {
-  TODOUniNothing void;  // TODO(): Remove?
   Nothing void;
   Activate void;
   Deactivate void;
@@ -2101,8 +2100,6 @@ func ac_uni_fun(gs gr_statep, ip instpair, arg cell_num, statechange uni_fun_sta
   add(&bu, @[gr_xop]GrAddressof({argptrcell, arg}));
 
   switch statechange {
-  case TODOUniNothing:
-    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, TODOApplyNothing}));
   case Nothing:
     add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, TwoActiveOps({Nothing, Nothing})}));
   case Activate:
@@ -2131,28 +2128,8 @@ func ac_init_action(gs gr_statep, x *init_action, out *gr_num) np {
   return NoFail;
 }
 
-// TODO(): This should be combined with gr_destroy_ctor.
 func ac_destroy_action(gs gr_statep, x *destroy_action, dad deadact_after_destroy, out *gr_num) np {
-  bu sq_builder = mk_builder(gs);
-  switch &x->x.ctor {
-  case &TrivialCtor:
-    if case DeadactAfterDestroyYes = dad {
-      add(&bu, @[gr_xop]GrActiveXop({Deactivate(x->x.arg), Nothing}));
-      add(&bu, @[gr_xop]GrDead({x->x.arg}));
-    }
-  case &FunCtor(ip instpair):
-    if case DeadactAfterDestroyYes = dad {
-      gn gr_num = ac_uni_fun(gs, ip, x->x.arg, Deactivate);
-      add(&bu, gn);
-      add(&bu, @[gr_xop]GrDead({x->x.arg}));
-    } else {
-      gn gr_num = ac_uni_fun(gs, ip, x->x.arg, Nothing);
-      add(&bu, gn);
-    }
-  }
-
-  *out = done(&bu);
-  return NoFail;
+  return ac_destroy_ctor(gs, x->x.arg, &x->x.ctor, dad, out);
 }
 
 func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechange bi_ctor_statechange) gr_num {
@@ -2937,10 +2914,10 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
     add(&bu, @[gr_xop]GrDead({argnum}));
 
   case &EnumConstructCopyDestroy(cdd copy_destroy_desc):
-    cpgn gr_num = gr_bi_ctor(gs, retpart, argnum, &cdd.copy_desc, TODOBiNothing);
+    cpgn gr_num = gr_bi_ctor(gs, retpart, argnum, &cdd.copy_desc, BiCopy);
     add(&bu, cpgn);
     destgn gr_num;
-    if case Printed(pm) = gr_destroy_ctor(gs, argnum, &cdd.destroy_desc, &destgn) {
+    if case Printed(pm) = ac_destroy_ctor(gs, argnum, &cdd.destroy_desc, DeadactAfterDestroyYes, &destgn) {
       return Printed(pm);
     }
     add(&bu, destgn);
@@ -2993,18 +2970,26 @@ func gr_bi_ctor(gs gr_statep, destnum cell_num, srcnum cell_num, cd *ctor_desc, 
   return done(&bu);
 }
 
-func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, gn_out *gr_num) np {
+func ac_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_after_destroy, out *gr_num) np {
+  bu sq_builder = mk_builder(gs);
   switch cd {
   case &TrivialCtor:
-    dp var = addx(gs, @[gr_xop]GrDead({argnum}));
-    *gn_out = dp;
+    if case DeadactAfterDestroyYes = dad {
+      add(&bu, @[gr_xop]GrActiveXop({Deactivate(argnum), Nothing}));
+      add(&bu, @[gr_xop]GrDead({argnum}));
+    }
   case &FunCtor(ip instpair):
-    bu sq_builder = mk_builder(gs);
-    gn gr_num = ac_uni_fun(gs, ip, argnum, TODOUniNothing);
-    add(&bu, gn);
-    add(&bu, @[gr_xop]GrDead({argnum}));
-    *gn_out = done(&bu);
+    if case DeadactAfterDestroyYes = dad {
+      gn gr_num = ac_uni_fun(gs, ip, argnum, Deactivate);
+      add(&bu, gn);
+      add(&bu, @[gr_xop]GrDead({argnum}));
+    } else {
+      gn gr_num = ac_uni_fun(gs, ip, argnum, Nothing);
+      add(&bu, gn);
+    }
   }
+
+  *out = done(&bu);
   return NoFail;
 }
 
