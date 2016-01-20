@@ -1,3 +1,4 @@
+import celltrack;
 import dumbanal;
 import state;
 
@@ -10,37 +11,6 @@ enum cell_loc {
   ConstIntCellLoc bigint;
   // The cell is completely unused, it's never made live.  It's in a dead code part of the graph.
   UnusedLoc void;
-}
-
-struct cellset {
-  // Maintained in sorted order.
-  all array[cell_num];
-  // The xor and sum of the cell nums -- makes for a quick commutative hash.
-  xored osize;
-  summed osize;
-}
-
-struct cellset_checksum {
-  xored osize;
-  summed osize;
-}
-
-func swap(x *cellset, y *cellset) void {
-  swap(&x->all, &y->all);
-  tmpx osize = x->xored;
-  x->xored = y->xored;
-  y->xored = tmpx;
-  tmps osize = x->summed;
-  x->summed = y->summed;
-  y->summed = tmps;
-}
-
-func matches_checksum(a *cellset, b *cellset_checksum) bool {
-  return a->xored == b->xored && a->summed == b->summed;
-}
-
-func matches_checksum(a *cellset, b *cellset) bool {
-  return a->xored == b->xored && a->summed == b->summed;
 }
 
 struct gn_annot {
