@@ -191,7 +191,6 @@ func addx(gs gr_statep, op gr_xop) gr_num {
   case &GrAssertLive(a gr_assert_live):
     gr_expect_live(gs.ctr, a.cell);
   case &GrDead(a gr_dead):
-    gr_expect_inactive(gs.ctr, a.cell);
     gr_deaden(gs.ctr, a.cell);
   case &GrVirtualDead(a gr_virtual_dead):
     gr_deaden(gs.ctr, a.cell);
@@ -1447,40 +1446,23 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
 }
 
 func gr_create(ctr *celltrack, c cell_num) void {
-  gr_create(&ctr->liveset, c);
+  ctr_create(ctr, c);
 }
 
 func gr_deaden(ctr *celltrack, c cell_num) void {
-  deaden(ctr, c);
+  ctr_deaden(ctr, c);
 }
 
 func gr_expect_live(ctr *celltrack, c cell_num) void {
-  expect_live(ctr, c);
+  ctr_expect_live(ctr, c);
 }
 
 func gr_activate(ctr *celltrack, c cell_num) void {
-  activeset *cellset = &ctr->activeset;
-  if !try_insert(&activeset->all, c) {
-    ice(_u8("activate on active cell "), c);
-  }
-  activeset->xored = activeset->xored ^ ~c.x;
-  activeset->summed = activeset->summed + ~c.x;
+  ctr_activate(ctr, c);
 }
 
 func gr_deactivate(ctr *celltrack, c cell_num) void {
-  activeset *cellset = &ctr->activeset;
-  if !try_remove(&activeset->all, c) {
-    ice(_u8("deactivate on inactive cell "), c);
-  }
-  activeset->xored = activeset->xored ^ ~c.x;
-  activeset->summed = activeset->summed - ~c.x;
-}
-
-func gr_expect_inactive(ctr *celltrack, c cell_num) void {
-  // TODO: This is an inefficient assertion to make.  (Liveness asserts can or will be able to search from the end with practical O(1) cost thanks to the generally fifo nature of cell lifetimes.)  Remove this function.
-  if case Has(ix size) = lookup(&ctr->activeset.all, c) {
-    ice(_u8("expected inactive cell, c="), c);
-  }
+  ctr_deactivate(ctr, c);
 }
 
 func gr_track_active_op(ctr *celltrack, op gr_active_op) void {

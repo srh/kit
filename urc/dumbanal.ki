@@ -23,7 +23,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
   gnc *gn_annot = ref_annot(h, gn);
   if case &Computed(checksum celltrack_checksum) = &gnc->plainly_live {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
-    if !matches_checksums(ctr, &checksum) {
+    if !matches_checksum(ctr, &checksum) {
       return ERR(_u8("ICE: Inconsistent liveness/active state when revisiting node ("), gn.x, _u8("), celltrack="), *ctr);
     }
     *out = NonTerminal;
@@ -41,7 +41,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
       expect_live(ctr, a.retcell);
 
       note_lower_paramlists(h, gn, ctr);
-      annotate_ref(&gnc->app_time_live, &ctr->liveset);
+      annotate_ref(&gnc->app_time_live, ctr);
 
       nparams size = count(&a.params);
 
@@ -121,7 +121,6 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
       return NoFail;
 
     case &GrDead(a gr_dead):
-      gr_expect_inactive(ctr, a.cell);
       deaden(ctr, a.cell);
       *out = Terminal;
       return NoFail;
@@ -196,9 +195,9 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
 
 func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *celltrack) void {
   paramlists array[gr_num];
-  nall size = count(&live_at_app_time->liveset.all);
+  nall size = count(&live_at_app_time->all);
   for i size = 0; i < nall; i = i + 1 {
-    c cell_num = get(&live_at_app_time->liveset.all, i);
+    c cell_num = ref(&live_at_app_time->all, i)->cell;
     if case Has(gn gr_num) = ref(&h->bas->celldisp, c.x)->paramlist {
       if gn != our_gn {
         push(&paramlists, gn);
@@ -217,7 +216,7 @@ func combine_branch_mut(new_live *celltrack, onto *genexpr_result, case_mut gene
   case Terminal:
     switch *onto {
     case Terminal:
-      if !matches_checksums(new_live, end_ctr) {
+      if !matches_checksum(new_live, end_ctr) {
         ice(_u8("terminal/terminal new_live not equal, end_celltrack="), *end_ctr, _u8(", new_live="), *new_live);
       }
     case NonTerminal:
@@ -230,42 +229,24 @@ func combine_branch_mut(new_live *celltrack, onto *genexpr_result, case_mut gene
 
 // For deaden and other functions, prelive shows what was alive _before_ prec_muts modified it.
 func deaden(ctr *celltrack, c cell_num) void {
-  liveset *cellset = &ctr->liveset;
-  if !try_remove(&liveset->all, c) {
-    ice(_u8("deaden on unlive cell "), c);
-  }
-  liveset->xored = liveset->xored ^ ~c.x;
-  liveset->summed = liveset->summed - ~c.x;
+  ctr_deaden(ctr, c);
 }
 
 func expect_live(ctr *celltrack, c cell_num) void {
-  liveset *cellset = &ctr->liveset;
-  if case None = lookup(&liveset->all, c) {
-    ice(_u8("expect_live on unlive cell "), c);
-  }
+  ctr_expect_live(ctr, c);
 }
 
 func create(h *frame, ctr *celltrack, c cell_num) void {
-  liveset *cellset = &ctr->liveset;
-  gr_create(liveset, c);
-  note_conflicting(h, &liveset->all, c);
+  ctr_create(ctr, c);
+  note_conflicting(h, &ctr->all, c);
 }
 
-// Used in graph code because we don't note conflicting and don't have a frame (yet).
-func gr_create(liveset *cellset, c cell_num) void {
-  if !try_insert(&liveset->all, c) {
-    ice(_u8("create on live cell "), c);
-  }
-  liveset->xored = liveset->xored ^ ~c.x;
-  liveset->summed = liveset->summed + ~c.x;
-}
-
-func note_conflicting(h *frame, all *array[cell_num], c cell_num) void {
+func note_conflicting(h *frame, all *array[celltrack_entry], c cell_num) void {
   // This also means conflicting is set to non-empty for any cell that's made live.
   c_disp *cell_disp = ref(&h->bas->celldisp, c.x);
   nall size = count(all);
   for i size = 0; i < nall; i = i + 1 {
-    d cell_num = get(all, i);
+    d cell_num = ref(all, i)->cell;
     d_disp *cell_disp = ref(&h->bas->celldisp, d.x);
     push(&c_disp->conflicting, d);
     push(&d_disp->conflicting, c);
