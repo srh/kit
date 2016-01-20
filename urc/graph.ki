@@ -496,6 +496,7 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   }
 
   fb fullbody_state = {info->all_vars, mk_tracked(nopq(gs.gr)), label_gn, info->return_cell};
+  DBG(_u8("return cell "), info->return_cell);
 
   bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_bracebody(gs, &fb, None, &x->bb, &bu) {
@@ -1613,6 +1614,7 @@ func gr_mk_addressof(gs gr_statep, x *ast_expr, a *ast_addressof, bu *sq_builder
   desc *lval_description = ellval_desc(oo(&a->rhs));
   add(bu, @[gr_xop]GrAddressof({rval_cell(x), desc->num}));
   add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
+  DBG(_u8("addressof cell "), rval_cell(x));
   if case DeadMe = desc->deadme {
     add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->rhs))}));
   }
@@ -2057,6 +2059,7 @@ func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num, statechange uni_fun_sta
   voidret cu_typrop = compute_prim(gs.clq, primitive_void_type(gs.clq->cs));
   fnptr cu_typrop = compute_prim(gs.clq, fn_type(gs.clq->cs, argptr.cu.x, voidret.cu.x));
   funcell cell_num = add_cell(gs.gr, {LocationStatic, fnptr.cu, fnptr.props});
+  DBG(_u8("uni funcell "), funcell);
   argptrcell cell_num = add_cell(gs.gr, {LocationStatic, argptr.cu, argptr.props});
   retvoid cell_num = add_cell(gs.gr, {LocationStatic, voidret.cu, voidret.props});
 
@@ -2091,6 +2094,7 @@ func gr_init_action(gs gr_statep, x *init_action, out *gr_num) np {
     add(&bu, @[gr_xop]GrWriteConst({x->x.arg, ConstInt(bigu(0))}));
     add(&bu, @[gr_xop]GrActiveXop({Activate(x->x.arg), Nothing}));
   case &FunCtor(ip instpair):
+    DBG(_u8("init cell "), x->x.arg);
     dp gr_num = gr_uni_fun(gs, ip, x->x.arg, Activate);
     add(&bu, dp);
   }
@@ -2201,6 +2205,7 @@ func add_minimal_basics(gs gr_statep, size u32, arity size, out *gr_minimal_basi
     ac cell_num = add_cell(gs.gr, {LocationStatic, argtp.cu, argtp.props});
     push(&ret.argcells, ac);
     gr_create(gs.celltrack, ac);
+    gr_activate(gs.celltrack, ac);
   }
   *out = ret;
 }
@@ -2222,6 +2227,7 @@ func gr_add_basics(gs gr_statep, size u32, arity size, out *gr_basics, bu *sq_bu
 func gr_minimal_basics_cleanup(gs gr_statep, bas *gr_minimal_basics, bu *sq_builder) void {
   for i size = count(&bas->argcells); i > 0; {
     i = i - 1;
+    add(bu, @[gr_xop]GrActiveXop({Deactivate(get(&bas->argcells, i)), Nothing}));
     add(bu, @[gr_xop]GrDead({get(&bas->argcells, i)}));
   }
   add(bu, @[gr_xop]GrWriteConst({bas->return_cell, ConstInt(bigu(0))}));
