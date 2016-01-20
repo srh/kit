@@ -1448,11 +1448,11 @@ func gr_create(gs gr_statep, c cell_num) void {
 }
 
 func gr_deaden(gs gr_statep, c cell_num) void {
-  deaden(&gs.celltrack->liveset, c);
+  deaden(gs.celltrack, c);
 }
 
 func gr_expect_live(gs gr_statep, c cell_num) void {
-  expect_live(&gs.celltrack->liveset, c);
+  expect_live(gs.celltrack, c);
 }
 
 func gr_activate(gs gr_statep, c cell_num) void {

@@ -27,6 +27,10 @@ struct cellset {
   summed osize;
 }
 
+func[H] build_u8str(help H, r *array[u8], x *cellset) void {
+  build_array_u8str(help, r, &x->all);
+}
+
 struct cellset_checksum {
   xored osize;
   summed osize;
@@ -58,6 +62,26 @@ struct gr_celltrack {
   activeset cellset;
 }
 
+func[H] build_u8str(help H, r *array[u8], x *gr_celltrack) void {
+  append(r, _u8("{liveset: "));
+  build_u8str(help, r, &x->liveset);
+  append(r, _u8(", activeset: "));
+  build_u8str(help, r, &x->activeset);
+  append(r, _u8("}"));
+}
+
+struct celltrack_checksum {
+  liveset_checksum cellset_checksum;
+  activeset_checksum cellset_checksum;
+}
+
+func matches_checksums(a *gr_celltrack, b *celltrack_checksum) bool {
+  return matches_checksum(&a->liveset, &b->liveset_checksum) && matches_checksum(&a->activeset, &b->activeset_checksum);
+}
+
+func matches_checksums(a *gr_celltrack, b *gr_celltrack) bool {
+  return matches_checksum(&a->liveset, &b->liveset) && matches_checksum(&a->activeset, &b->activeset);
+}
 
 func mk_celltrack() gr_celltrack {
   liveset cellset;
