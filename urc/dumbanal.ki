@@ -30,8 +30,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, celltrack *gr_celltrac
     return NoFail;
   }
 
-  // TODO(): Make a checksum-getting function.
-  annotate(&gnc->plainly_live, {{celltrack->liveset.xored, celltrack->liveset.summed}, {celltrack->activeset.xored, celltrack->activeset.summed}});
+  annotate(&gnc->plainly_live, get_checksum(celltrack));
 
   node *gr_node = ref_node(gr, gn);
   switch node {

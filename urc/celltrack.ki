@@ -36,6 +36,10 @@ struct cellset_checksum {
   summed osize;
 }
 
+func get_checksum(a *cellset) cellset_checksum {
+  return {a->xored, a->summed};
+}
+
 func swap(x *cellset, y *cellset) void {
   swap(&x->all, &y->all);
   tmpx osize = x->xored;
@@ -73,6 +77,10 @@ func[H] build_u8str(help H, r *array[u8], x *gr_celltrack) void {
 struct celltrack_checksum {
   liveset_checksum cellset_checksum;
   activeset_checksum cellset_checksum;
+}
+
+func get_checksum(ctr *gr_celltrack) celltrack_checksum {
+  return {get_checksum(&ctr->liveset), get_checksum(&ctr->activeset)};
 }
 
 func matches_checksums(a *gr_celltrack, b *celltrack_checksum) bool {
