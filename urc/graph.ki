@@ -136,67 +136,67 @@ func untracked_addx(gr *frame_graph, op gr_xop) gr_num {
 func addx(gs gr_statep, op gr_xop) gr_num {
   switch &op {
   case &GrApply(a gr_apply):
-    gr_expect_live(gs, a.retcell);
+    gr_expect_live(gs.celltrack, a.retcell);
 
     nparams size = count(&a.params);
 
     switch a.act {
     case TwoActiveOps(ops gr_two_active_ops):
-      gr_track_active_op(gs, ops.one);
-      gr_track_active_op(gs, ops.two);
+      gr_track_active_op(gs.celltrack, ops.one);
+      gr_track_active_op(gs.celltrack, ops.two);
     case StandardApply:
-      gr_deactivate(gs, a.funcell);
+      gr_deactivate(gs.celltrack, a.funcell);
       for i size = 0; i < nparams; i = i + 1 {
-        gr_deactivate(gs, get(&a.params, i));
+        gr_deactivate(gs.celltrack, get(&a.params, i));
       }
-      gr_activate(gs, a.retcell);
+      gr_activate(gs.celltrack, a.retcell);
     }
 
-    gr_deaden(gs, a.funcell);
+    gr_deaden(gs.celltrack, a.funcell);
     for i size = 0; i < nparams; i = i + 1 {
-      gr_deaden(gs, get(&a.params, i));
+      gr_deaden(gs.celltrack, get(&a.params, i));
     }
 
   case &GrPrimApply(a gr_prim_apply):
-    gr_expect_live(gs, a.retcell);
+    gr_expect_live(gs.celltrack, a.retcell);
 
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
-      gr_deaden(gs, get(&a.params, i));
+      gr_deaden(gs.celltrack, get(&a.params, i));
     }
 
   case &GrMemCopy(a gr_memcopy):
-    gr_expect_live(gs, a.dest);
-    gr_expect_live(gs, a.src);
+    gr_expect_live(gs.celltrack, a.dest);
+    gr_expect_live(gs.celltrack, a.src);
   case &GrWriteConst(a gr_writeconst):
-    gr_expect_live(gs, a.dest);
+    gr_expect_live(gs.celltrack, a.dest);
   case &GrAddressof(a gr_addressof):
-    gr_expect_live(gs, a.addressee);
-    gr_expect_live(gs, a.dest);
+    gr_expect_live(gs.celltrack, a.addressee);
+    gr_expect_live(gs.celltrack, a.dest);
   case &GrDeref(a gr_deref):
-    gr_expect_live(gs, a.pointer);
+    gr_expect_live(gs.celltrack, a.pointer);
     check(!isLocationStatic(ref_cell(gs.gr, a.name)->location));
-    gr_create(gs, a.name);
+    gr_create(gs.celltrack, a.name);
   case &GrSubcell(a gr_subcell):
-    gr_expect_live(gs, a.partof);
+    gr_expect_live(gs.celltrack, a.partof);
     check(!isLocationStatic(ref_cell(gs.gr, a.name)->location));
-    gr_create(gs, a.name);
+    gr_create(gs.celltrack, a.name);
   case &GrLive(a gr_live):
-    gr_create(gs, a.cell);
+    gr_create(gs.celltrack, a.cell);
   case &GrAssertLive(a gr_assert_live):
-    gr_expect_live(gs, a.cell);
+    gr_expect_live(gs.celltrack, a.cell);
   case &GrDead(a gr_dead):
-    gr_expect_inactive(gs, a.cell);
-    gr_deaden(gs, a.cell);
+    gr_expect_inactive(gs.celltrack, a.cell);
+    gr_deaden(gs.celltrack, a.cell);
   case &GrVirtualDead(a gr_virtual_dead):
-    gr_deaden(gs, a.cell);
+    gr_deaden(gs.celltrack, a.cell);
   case &GrActiveXop(a gr_active_xop):
-    gr_track_active_op(gs, a.op1);
-    gr_track_active_op(gs, a.op2);
+    gr_track_active_op(gs.celltrack, a.op1);
+    gr_track_active_op(gs.celltrack, a.op2);
   case &GrManyActiveXop(a gr_many_active_xop):
     nops size = count(&a.ops);
     for i size = 0; i < nops; i = i + 1 {
-      gr_track_active_op(gs, get(&a.ops, i));
+      gr_track_active_op(gs.celltrack, get(&a.ops, i));
     }
   }
 
@@ -505,7 +505,7 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
 
   // We artifically activate the return cell after falling off the end of a fullbody.
   // TODO: This is crazy nonsense.  Detect reachability in a conservative fashion (e.g. everything after a label is reachable, everything after a break/continue/return is not).
-  gr_activate(gs, info->return_cell);
+  gr_activate(gs.celltrack, info->return_cell);
   gn sq_num = mut_connect(gs, &bu, &fb.final_node);
 
   *out = gn.x;
@@ -1443,57 +1443,50 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
   }
 }
 
-func gr_create(gs gr_statep, c cell_num) void {
-  gr_create(&gs.celltrack->liveset, c);
+func gr_create(ctr *gr_celltrack, c cell_num) void {
+  gr_create(&ctr->liveset, c);
 }
 
-func gr_deaden(gs gr_statep, c cell_num) void {
-  deaden(gs.celltrack, c);
+func gr_deaden(ctr *gr_celltrack, c cell_num) void {
+  deaden(ctr, c);
 }
 
-func gr_expect_live(gs gr_statep, c cell_num) void {
-  expect_live(gs.celltrack, c);
+func gr_expect_live(ctr *gr_celltrack, c cell_num) void {
+  expect_live(ctr, c);
 }
 
-func gr_activate(gs gr_statep, c cell_num) void {
-  liveset *cellset = &gs.celltrack->activeset;
-  if !try_insert(&liveset->all, c) {
+func gr_activate(ctr *gr_celltrack, c cell_num) void {
+  activeset *cellset = &ctr->activeset;
+  if !try_insert(&activeset->all, c) {
     ice(_u8("activate on active cell "), c);
   }
-  liveset->xored = liveset->xored ^ ~c.x;
-  liveset->summed = liveset->summed + ~c.x;
+  activeset->xored = activeset->xored ^ ~c.x;
+  activeset->summed = activeset->summed + ~c.x;
 }
 
-func gr_deactivate(gs gr_statep, c cell_num) void {
-  liveset *cellset = &gs.celltrack->activeset;
-  if !try_remove(&liveset->all, c) {
+func gr_deactivate(ctr *gr_celltrack, c cell_num) void {
+  activeset *cellset = &ctr->activeset;
+  if !try_remove(&activeset->all, c) {
     ice(_u8("deactivate on inactive cell "), c);
   }
-  liveset->xored = liveset->xored ^ ~c.x;
-  liveset->summed = liveset->summed - ~c.x;
+  activeset->xored = activeset->xored ^ ~c.x;
+  activeset->summed = activeset->summed - ~c.x;
 }
 
-func gr_expect_active(gs gr_statep, c cell_num) void {
-  liveset *cellset = &gs.celltrack->activeset;
-  if case None = lookup(&liveset->all, c) {
-    ice(_u8("expect_active on inactive cell "), c);
-  }
-}
-
-func gr_expect_inactive(gs gr_statep, c cell_num) void {
+func gr_expect_inactive(ctr *gr_celltrack, c cell_num) void {
   // TODO: This is an inefficient assertion to make.  (Liveness asserts can or will be able to search from the end with practical O(1) cost thanks to the generally fifo nature of cell lifetimes.)  Remove this function.
-  if case Has(ix size) = lookup(&gs.celltrack->activeset.all, c) {
+  if case Has(ix size) = lookup(&ctr->activeset.all, c) {
     ice(_u8("expected inactive cell"));
   }
 }
 
-func gr_track_active_op(gs gr_statep, op gr_active_op) void {
+func gr_track_active_op(ctr *gr_celltrack, op gr_active_op) void {
   switch op {
   case Nothing: { }
   case Activate(c cell_num):
-    gr_activate(gs, c);
+    gr_activate(ctr, c);
   case Deactivate(c cell_num):
-    gr_deactivate(gs, c);
+    gr_deactivate(ctr, c);
   }
 }
 
@@ -1503,12 +1496,12 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   lambda_celltrack gr_celltrack = mk_celltrack();
   lambda_gs gr_statep = {gs.clq, &lambda_gr, &lambda_celltrack};
 
-  gr_create(lambda_gs, info->return_cell);
+  gr_create(&lambda_celltrack, info->return_cell);
   nargs size = count(&info->arg_cells);
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = get(&info->arg_cells, i);
-    gr_create(lambda_gs, ac);
-    gr_activate(lambda_gs, ac);
+    gr_create(&lambda_celltrack, ac);
+    gr_activate(&lambda_celltrack, ac);
   }
 
   fullbody_gn gr_num;
@@ -1516,8 +1509,8 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
     return Printed(pm);
   }
 
-  gr_deactivate(lambda_gs, info->return_cell);
-  gr_deaden(lambda_gs, info->return_cell);
+  gr_deactivate(&lambda_celltrack, info->return_cell);
+  gr_deaden(&lambda_celltrack, info->return_cell);
   gr_check_empty(&lambda_celltrack);
 
   id fn_body_id = add_fn_body(gs.clq->cs, {gs.gr->informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {lambda_gr, fullbody_gn, info->return_cell}, info->arg_cells, parsed_inline_to_state_inline(a->is_inline), NotComputed})});
@@ -2198,11 +2191,11 @@ func add_minimal_basics(gs gr_statep, size u32, arity size, out *gr_minimal_basi
   voidtp cu_typrop = compute_prim(gs.clq, primitive_void_type(cs));
   ret gr_minimal_basics;
   ret.return_cell = add_cell(gs.gr, {LocationStatic, voidtp.cu, voidtp.props});
-  gr_create(gs, ret.return_cell);
+  gr_create(gs.celltrack, ret.return_cell);
   for i size = 0; i < arity; i = i + 1 {
     ac cell_num = add_cell(gs.gr, {LocationStatic, argtp.cu, argtp.props});
     push(&ret.argcells, ac);
-    gr_create(gs, ac);
+    gr_create(gs.celltrack, ac);
   }
   *out = ret;
 }
@@ -2229,7 +2222,7 @@ func gr_minimal_basics_cleanup(gs gr_statep, bas *gr_minimal_basics, bu *sq_buil
   add(bu, @[gr_xop]GrWriteConst({bas->return_cell, ConstInt(bigu(0))}));
 
   // The void return cell never gets activated... so be it.
-  gr_deaden(gs, bas->return_cell);
+  gr_deaden(gs.celltrack, bas->return_cell);
   gr_check_empty(gs.celltrack);
 }
 
@@ -2344,13 +2337,13 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   compute_prim(clq, primitive_size_type(cs), &size_type, &size_type_props);
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-  gr_create(gs, return_cell);
+  gr_create(&celltrack, return_cell);
 
   argcells array[cell_num];
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = add_cell(&gr, {LocationStatic, argtp.cu, argtp.props});
     push(&argcells, ac);
-    gr_create(gs, ac);
+    gr_create(&celltrack, ac);
   }
 
   bu sq_builder = mk_builder(gs);
@@ -2453,7 +2446,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
 
   // We did't set the return cell active, whatever.
-  gr_deaden(gs, return_cell);
+  gr_deaden(&celltrack, return_cell);
   gr_check_empty(&celltrack);
 
   *gr_out = gr;
@@ -2496,13 +2489,13 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   bu sq_builder = mk_builder(gs);
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-  gr_create(gs, return_cell);
+  gr_create(&celltrack, return_cell);
 
   nargs size = num_args(wc);
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = add_cell(&gr, {LocationStatic, argtp.cu, argtp.props});
     push(&argcells, ac);
-    gr_create(gs, ac);
+    gr_create(&celltrack, ac);
   }
 
   for i size = 0; i < nargs; i = i + 1 {
@@ -2646,7 +2639,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
 
   // We didn't set the return cell active, whatever.
-  gr_deaden(gs, return_cell);
+  gr_deaden(&celltrack, return_cell);
   gr_check_empty(&celltrack);
 
   *gr_out = gr;
@@ -2687,13 +2680,13 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
   nargs size = num_args(wc);
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
-  gr_create(gs, return_cell);
+  gr_create(&celltrack, return_cell);
 
   argcells array[cell_num];
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = add_cell(&gr, {LocationStatic, argtp.cu, argtp.props});
     push(&argcells, ac);
-    gr_create(gs, ac);
+    gr_create(&celltrack, ac);
   }
 
   pointeecells array[cell_num];
@@ -2799,7 +2792,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
   gn gr_num = done(&bu);
 
   // We didn't set the return cell active, whatever.
-  gr_deaden(gs, return_cell);
+  gr_deaden(&celltrack, return_cell);
   gr_check_empty(&celltrack);
 
   *gr_out = gr;
@@ -2858,9 +2851,9 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   argnum cell_num = add_cell(&gr, {LocationStatic, ~ *argtype, mec->rhs_props});
 
-  gr_create(gs, retnum);
-  gr_create(gs, argnum);
-  gr_activate(gs, argnum);
+  gr_create(&celltrack, retnum);
+  gr_create(&celltrack, argnum);
+  gr_activate(&celltrack, argnum);
 
   retpart cell_num = add_cell(&gr, {LocationVirtual, ~ *argtype, mec->rhs_props});
 
@@ -2901,8 +2894,8 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
   add(&bu, @[gr_xop]GrActiveXop({Activate(retnum), Deactivate(retpart)}));
   add(&bu, @[gr_xop]GrVirtualDead({retpart}));
 
-  gr_deactivate(gs, retnum);
-  gr_deaden(gs, retnum);
+  gr_deactivate(&celltrack, retnum);
+  gr_deaden(&celltrack, retnum);
   gr_check_empty(&celltrack);
 
   *gr_out = gr;
@@ -2991,9 +2984,9 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op pri
   }
   retcell cell_num = add_cell(&gr, {LocationStatic, ~ *retty, retprops});
 
-  gr_create(gs, retcell);
+  gr_create(&celltrack, retcell);
   for i size = 0; i < nfn_params; i = i + 1 {
-    gr_create(gs, get(&argcells, i));
+    gr_create(&celltrack, get(&argcells, i));
   }
 
   argcells_copy array[cell_num] = argcells;
@@ -3001,7 +2994,7 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op pri
   gn gr_num = addx(gs, @[gr_xop]GrPrimApply({op, argshray, retcell}));
 
   // GrPrimApply doesn't activate (or deactivate) anything.  Yet.
-  gr_deaden(gs, retcell);
+  gr_deaden(&celltrack, retcell);
   gr_check_empty(&celltrack);
 
   return add_fn_body(clq->cs, {informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells, InlineMust, NotComputed})});
@@ -3049,9 +3042,9 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           gn gr_num = done(&bu);
 
           rcell cell_num = result_cell(&dire.ec);
-          gr_deactivate(gs, rcell);
-          gr_deaden(gs, rcell);
-          gr_check_empty(gs.celltrack);
+          gr_deactivate(&celltrack, rcell);
+          gr_deaden(&celltrack, rcell);
+          gr_check_empty(&celltrack);
 
           inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, rcell}));
           return NoFail;
