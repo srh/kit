@@ -132,12 +132,10 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
 
   switch &mut {
   case &Terminal:
-    // TODO(): I think the gr_deactivate doesn't work because some func graphs skip the active-setting.  Look where we have weak assertions in magic graph ops.
-    /* gr_deactivate(&celltrack, g->graph.cell); */
+    gr_deactivate(&celltrack, g->graph.cell);
     deaden(&celltrack, g->graph.cell);
-    // TODO(): Reuse existing assertion code, check actives.
-    if count(&celltrack.liveset.all) != 0 /* || count(&celltrack.activeset.all) != 0 TODO() */ {
-      ice(_u8("fn_body leaves cells alive, expected "), g->graph.cell, _u8(", saw "), to_array_u8str(cs->im, celltrack.liveset.all));
+    if !celltrack_is_empty(&celltrack) {
+      ice(_u8("fn_body leaves cells alive or active, saw "), to_u8str(cs->im, celltrack));
     }
   case &NonTerminal: { /* nothing to assert */ }
   }
