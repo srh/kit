@@ -162,6 +162,11 @@ func addx(gs gr_statep, op gr_xop) gr_num {
 
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
+      gr_deactivate(gs.celltrack, get(&a.params, i));
+    }
+    gr_activate(gs.celltrack, a.retcell);
+
+    for i size = 0; i < nparams; i = i + 1 {
       gr_deaden(gs.celltrack, get(&a.params, i));
     }
 
@@ -2220,8 +2225,9 @@ func gr_minimal_basics_cleanup(gs gr_statep, bas *gr_minimal_basics, bu *sq_buil
     add(bu, @[gr_xop]GrDead({get(&bas->argcells, i)}));
   }
   add(bu, @[gr_xop]GrWriteConst({bas->return_cell, ConstInt(bigu(0))}));
+  add(bu, @[gr_xop]GrActiveXop({Activate(bas->return_cell), Nothing}));
 
-  // The void return cell never gets activated... so be it.
+  gr_deactivate(gs.celltrack, bas->return_cell);
   gr_deaden(gs.celltrack, bas->return_cell);
   gr_check_empty(gs.celltrack);
 }
@@ -2386,6 +2392,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
       onecell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
       add(&incr_bu, @[gr_xop]GrLive({onecell}));
       add(&incr_bu, @[gr_xop]GrWriteConst({onecell, ConstInt(bigu(1))}));
+      add(&incr_bu, @[gr_xop]GrActiveXop({Activate(ic2cell), Activate(onecell)}));
       op_action primitive_numeric_op_action;
       if case CtorDestroy = wc {
         op_action = NumSub;
@@ -2393,6 +2400,8 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
         op_action = NumAdd;
       }
       add(&incr_bu, @[gr_xop]GrPrimApply({PrimNum({cs->plat.sizetraits.flat.size, cs->plat.sizetraits.numeric, op_action}), mk_shray(ic2cell, onecell), indexcell}));
+      // We just keep everything deactivated, our activation tracking is B.S.  The only important thing is that the return cell be activated, so that function inlining works.
+      add(&incr_bu, @[gr_xop]GrActiveXop({Deactivate(indexcell), Nothing}));
       incrgn gr_num = done(&incr_bu);
       add(&loop_bu, incrgn);
     } else {
@@ -2444,8 +2453,9 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   }
   add(&bu, @[gr_xop]GrDead({indexcell}));
   add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
+  add(&bu, @[gr_xop]GrActiveXop({Activate(return_cell), Nothing}));
 
-  // We did't set the return cell active, whatever.
+  gr_deactivate(&celltrack, return_cell);
   gr_deaden(&celltrack, return_cell);
   gr_check_empty(&celltrack);
 
@@ -2637,8 +2647,9 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     add(&bu, @[gr_xop]GrVirtualDead({get(&tagcells, i)}));
   }
   add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
+  add(&bu, @[gr_xop]GrActiveXop({Activate(return_cell), Nothing}));
 
-  // We didn't set the return cell active, whatever.
+  gr_deactivate(&celltrack, return_cell);
   gr_deaden(&celltrack, return_cell);
   gr_check_empty(&celltrack);
 
@@ -2788,10 +2799,11 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
     add(&bu, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));
   }
   add(&bu, @[gr_xop]GrWriteConst({return_cell, ConstInt(bigu(0))}));
+  add(&bu, @[gr_xop]GrActiveXop({Activate(return_cell), Nothing}));
 
   gn gr_num = done(&bu);
 
-  // We didn't set the return cell active, whatever.
+  gr_deactivate(&celltrack, return_cell);
   gr_deaden(&celltrack, return_cell);
   gr_check_empty(&celltrack);
 
@@ -2987,13 +2999,14 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op pri
   gr_create(&celltrack, retcell);
   for i size = 0; i < nfn_params; i = i + 1 {
     gr_create(&celltrack, get(&argcells, i));
+    gr_activate(&celltrack, get(&argcells, i));
   }
 
   argcells_copy array[cell_num] = argcells;
   argshray shray[cell_num] = freeze(&argcells_copy);
   gn gr_num = addx(gs, @[gr_xop]GrPrimApply({op, argshray, retcell}));
 
-  // GrPrimApply doesn't activate (or deactivate) anything.  Yet.
+  gr_deactivate(&celltrack, retcell);
   gr_deaden(&celltrack, retcell);
   gr_check_empty(&celltrack);
 
