@@ -60,13 +60,13 @@ func matches_checksum(a *cellset, b *cellset) bool {
 
 
 // TODO: Get rid of the gr_ prefix, but note that "celltrack" is a variable named used a lot in graph.ki.
-struct gr_celltrack {
+struct celltrack {
   liveset cellset;
   // Cells that need to be destructed, specifically.
   activeset cellset;
 }
 
-func[H] build_u8str(help H, r *array[u8], x *gr_celltrack) void {
+func[H] build_u8str(help H, r *array[u8], x *celltrack) void {
   append(r, _u8("{liveset: "));
   build_u8str(help, r, &x->liveset);
   append(r, _u8(", activeset: "));
@@ -79,29 +79,29 @@ struct celltrack_checksum {
   activeset_checksum cellset_checksum;
 }
 
-func get_checksum(ctr *gr_celltrack) celltrack_checksum {
+func get_checksum(ctr *celltrack) celltrack_checksum {
   return {get_checksum(&ctr->liveset), get_checksum(&ctr->activeset)};
 }
 
-func matches_checksums(a *gr_celltrack, b *celltrack_checksum) bool {
+func matches_checksums(a *celltrack, b *celltrack_checksum) bool {
   return matches_checksum(&a->liveset, &b->liveset_checksum) && matches_checksum(&a->activeset, &b->activeset_checksum);
 }
 
-func matches_checksums(a *gr_celltrack, b *gr_celltrack) bool {
+func matches_checksums(a *celltrack, b *celltrack) bool {
   return matches_checksum(&a->liveset, &b->liveset) && matches_checksum(&a->activeset, &b->activeset);
 }
 
-func mk_celltrack() gr_celltrack {
+func mk_celltrack() celltrack {
   liveset cellset;
   activeset cellset;
   return {liveset, activeset};
 }
 
-func celltrack_is_empty(ctr *gr_celltrack) bool {
+func celltrack_is_empty(ctr *celltrack) bool {
   return empty(&ctr->liveset.all) && empty(&ctr->activeset.all);
 }
 
-func gr_check_empty(ctr *gr_celltrack) void {
+func gr_check_empty(ctr *celltrack) void {
   if count(&ctr->liveset.all) != 0 {
     ice(_u8("celltrack has leftover live cells"));
   }
@@ -111,19 +111,19 @@ func gr_check_empty(ctr *gr_celltrack) void {
 }
 
 struct noted_celltrack {
-  celltrack opt[gr_celltrack];
+  celltrack opt[celltrack];
 }
 
 func mk_noted() noted_celltrack {
   return {None};
 }
 
-func mk_noted(copyee *gr_celltrack) noted_celltrack {
+func mk_noted(copyee *celltrack) noted_celltrack {
   return {Has(*copyee)};
 }
 
-func note_celltrack(targ *noted_celltrack, current *gr_celltrack) void {
-  if case &Has(ct gr_celltrack) = &targ->celltrack {
+func note_celltrack(targ *noted_celltrack, current *celltrack) void {
+  if case &Has(ct celltrack) = &targ->celltrack {
     if !matches_checksum(&ct.liveset, &current->liveset) {
       ice(_u8("Inconsistent liveness state, liveset="), current->liveset);
     }

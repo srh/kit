@@ -117,25 +117,25 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
   bas *basic_analyze_state = un(&g->inline_state);
   h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed, NotComputed, mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed};
 
-  celltrack gr_celltrack;
-  create(&h, &celltrack, g->graph.cell);
+  ctr celltrack;
+  create(&h, &ctr, g->graph.cell);
   nargcells size = count(&g->argcells);
   for i size = 0; i < nargcells; i = i + 1 {
-    create(&h, &celltrack, get(&g->argcells, i));
-    gr_activate(&celltrack, get(&g->argcells, i));
+    create(&h, &ctr, get(&g->argcells, i));
+    gr_activate(&ctr, get(&g->argcells, i));
   }
 
   mut genexpr_result;
-  if case Printed(pm) = dumbly_analyze_expression(&h, &g->graph.gr, &celltrack, g->graph.gn, &mut) {
+  if case Printed(pm) = dumbly_analyze_expression(&h, &g->graph.gr, &ctr, g->graph.gn, &mut) {
     return Printed(pm);
   }
 
   switch &mut {
   case &Terminal:
-    gr_deactivate(&celltrack, g->graph.cell);
-    deaden(&celltrack, g->graph.cell);
-    if !celltrack_is_empty(&celltrack) {
-      ice(_u8("fn_body leaves cells alive or active, saw "), to_u8str(cs->im, celltrack));
+    gr_deactivate(&ctr, g->graph.cell);
+    deaden(&ctr, g->graph.cell);
+    if !celltrack_is_empty(&ctr) {
+      ice(_u8("fn_body leaves cells alive or active, saw "), to_u8str(cs->im, ctr));
     }
   case &NonTerminal: { /* nothing to assert */ }
   }

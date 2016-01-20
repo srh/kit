@@ -1,6 +1,6 @@
 import state;
 
-func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, ctr *gr_celltrack, gn gr_num) np {
+func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num) np {
   mbmut genexpr_result;
   if case Printed(pm) = dumbly_analyze_expression(h, gr, ctr, gn, &mbmut) {
     return Printed(pm);
@@ -19,7 +19,7 @@ enum genexpr_result {
 }
 
 
-func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *gr_celltrack, gn gr_num, out *genexpr_result) np {
+func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num, out *genexpr_result) np {
   gnc *gn_annot = ref_annot(h, gn);
   if case &Computed(checksum celltrack_checksum) = &gnc->plainly_live {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
@@ -151,12 +151,12 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *gr_celltrack, gn 
     case &GrBranch(a gr_branch):
       expect_live(ctr, a.src);
 
-      end_ctr gr_celltrack;
+      end_ctr celltrack;
       combined_mut genexpr_result = NonTerminal;
       ncases size = count(&a.cases);
       for i size = 0; i < ncases; i = i + 1 {
         cas *tup[gr_const, sq_num] = ref(&a.cases, i);
-        new_live gr_celltrack = *ctr;
+        new_live celltrack = *ctr;
         casmut genexpr_result;
         if case Printed(pm) = dumbly_analyze_expression(h, gr, &new_live, cas->cdr.x, &casmut) {
           return Printed(pm);
@@ -165,7 +165,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *gr_celltrack, gn 
       }
 
       if case Has(def_gn sq_num) = a.default_case {
-        new_live gr_celltrack = *ctr;
+        new_live celltrack = *ctr;
         defcasmut genexpr_result;
         if case Printed(pm) = dumbly_analyze_expression(h, gr, &new_live, def_gn.x, &defcasmut) {
           return Printed(pm);
@@ -194,7 +194,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *gr_celltrack, gn 
   }
 }
 
-func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *gr_celltrack) void {
+func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *celltrack) void {
   paramlists array[gr_num];
   nall size = count(&live_at_app_time->liveset.all);
   for i size = 0; i < nall; i = i + 1 {
@@ -212,7 +212,7 @@ func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *gr_celltra
   annotate_move(&ref_annot(h, our_gn)->lower_paramlists, &paramlists);
 }
 
-func combine_branch_mut(new_live *gr_celltrack, onto *genexpr_result, case_mut genexpr_result, end_ctr *gr_celltrack) void {
+func combine_branch_mut(new_live *celltrack, onto *genexpr_result, case_mut genexpr_result, end_ctr *celltrack) void {
   switch case_mut {
   case Terminal:
     switch *onto {
@@ -229,7 +229,7 @@ func combine_branch_mut(new_live *gr_celltrack, onto *genexpr_result, case_mut g
 }
 
 // For deaden and other functions, prelive shows what was alive _before_ prec_muts modified it.
-func deaden(ctr *gr_celltrack, c cell_num) void {
+func deaden(ctr *celltrack, c cell_num) void {
   liveset *cellset = &ctr->liveset;
   if !try_remove(&liveset->all, c) {
     ice(_u8("deaden on unlive cell "), c);
@@ -238,14 +238,14 @@ func deaden(ctr *gr_celltrack, c cell_num) void {
   liveset->summed = liveset->summed - ~c.x;
 }
 
-func expect_live(ctr *gr_celltrack, c cell_num) void {
+func expect_live(ctr *celltrack, c cell_num) void {
   liveset *cellset = &ctr->liveset;
   if case None = lookup(&liveset->all, c) {
     ice(_u8("expect_live on unlive cell "), c);
   }
 }
 
-func create(h *frame, ctr *gr_celltrack, c cell_num) void {
+func create(h *frame, ctr *celltrack, c cell_num) void {
   liveset *cellset = &ctr->liveset;
   gr_create(liveset, c);
   note_conflicting(h, &liveset->all, c);

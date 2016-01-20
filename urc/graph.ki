@@ -442,11 +442,11 @@ enum gr_const {
 struct gr_statep {
   clq *clqueue;
   gr *frame_graph;
-  ctr *gr_celltrack;
+  ctr *celltrack;
 }
 
 struct gr_savetrack {
-  ctr gr_celltrack;
+  ctr celltrack;
 }
 
 func save_celltrack(gs gr_statep) gr_savetrack {
@@ -1446,19 +1446,19 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
   }
 }
 
-func gr_create(ctr *gr_celltrack, c cell_num) void {
+func gr_create(ctr *celltrack, c cell_num) void {
   gr_create(&ctr->liveset, c);
 }
 
-func gr_deaden(ctr *gr_celltrack, c cell_num) void {
+func gr_deaden(ctr *celltrack, c cell_num) void {
   deaden(ctr, c);
 }
 
-func gr_expect_live(ctr *gr_celltrack, c cell_num) void {
+func gr_expect_live(ctr *celltrack, c cell_num) void {
   expect_live(ctr, c);
 }
 
-func gr_activate(ctr *gr_celltrack, c cell_num) void {
+func gr_activate(ctr *celltrack, c cell_num) void {
   activeset *cellset = &ctr->activeset;
   if !try_insert(&activeset->all, c) {
     ice(_u8("activate on active cell "), c);
@@ -1467,7 +1467,7 @@ func gr_activate(ctr *gr_celltrack, c cell_num) void {
   activeset->summed = activeset->summed + ~c.x;
 }
 
-func gr_deactivate(ctr *gr_celltrack, c cell_num) void {
+func gr_deactivate(ctr *celltrack, c cell_num) void {
   activeset *cellset = &ctr->activeset;
   if !try_remove(&activeset->all, c) {
     ice(_u8("deactivate on inactive cell "), c);
@@ -1476,14 +1476,14 @@ func gr_deactivate(ctr *gr_celltrack, c cell_num) void {
   activeset->summed = activeset->summed - ~c.x;
 }
 
-func gr_expect_inactive(ctr *gr_celltrack, c cell_num) void {
+func gr_expect_inactive(ctr *celltrack, c cell_num) void {
   // TODO: This is an inefficient assertion to make.  (Liveness asserts can or will be able to search from the end with practical O(1) cost thanks to the generally fifo nature of cell lifetimes.)  Remove this function.
   if case Has(ix size) = lookup(&ctr->activeset.all, c) {
     ice(_u8("expected inactive cell, c="), c);
   }
 }
 
-func gr_track_active_op(ctr *gr_celltrack, op gr_active_op) void {
+func gr_track_active_op(ctr *celltrack, op gr_active_op) void {
   switch op {
   case Nothing: { }
   case Activate(c cell_num):
@@ -1496,7 +1496,7 @@ func gr_track_active_op(ctr *gr_celltrack, op gr_active_op) void {
 func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
-  lambda_ctr gr_celltrack = mk_celltrack();
+  lambda_ctr celltrack = mk_celltrack();
   lambda_gs gr_statep = {gs.clq, &lambda_gr, &lambda_ctr};
 
   gr_create(&lambda_ctr, info->return_cell);
@@ -2252,7 +2252,7 @@ func gr_basics_cleanup(gs gr_statep, bas *gr_basics, bu *sq_builder) void {
 
 func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_nopdestroy")));
-  ctr gr_celltrack = mk_celltrack();
+  ctr celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &ctr};
   bas gr_minimal_basics;
   // TODO: How about make the size parameter opt[u32], don't deref if no size.
@@ -2268,7 +2268,7 @@ func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num, retu
 
 func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_memcopy")));
-  ctr gr_celltrack = mk_celltrack();
+  ctr celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &ctr};
   bas gr_basics;
   bu sq_builder = mk_builder(gs);
@@ -2284,7 +2284,7 @@ func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_o
 
 func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_bzero")));
-  ctr gr_celltrack = mk_celltrack();
+  ctr celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &ctr};
   bas gr_basics;
   bu sq_builder = mk_builder(gs);
@@ -2314,7 +2314,7 @@ func gr_magic_ctor(clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_gr
 func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   cs *checkstate = clq->cs;
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_arraytype")));
-  ctr gr_celltrack = mk_celltrack();
+  ctr celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &ctr};
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mai->cu_type.x));
 
@@ -2494,7 +2494,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   case CtorDestroy: { /* don't init padding. */ }
   }
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_info")));
-  ctr gr_celltrack = mk_celltrack();
+  ctr celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &ctr};
 
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mei->cu_type.x));
@@ -2692,7 +2692,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
   }
 
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_struct_info")));
-  ctr gr_celltrack = mk_celltrack();
+  ctr celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &ctr};
 
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, msi->cu_type.x));
@@ -2867,7 +2867,7 @@ func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *
 
 func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cell_out *cell_num) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_enum_construct")));
-  ctr gr_celltrack = mk_celltrack();
+  ctr celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &ctr};
 
   retnum cell_num = add_cell(&gr, {LocationStatic, mec->return_type, mec->return_type_props});
@@ -2996,7 +2996,7 @@ func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_a
 
 func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op primitive_op) fn_body_id {
   gr frame_graph = init_frame_graph_empty(informal_name);
-  ctr gr_celltrack = mk_celltrack();
+  ctr celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &ctr};
   typarams *shray[te_typeexpr];
   if !decompose_typeapp(&type->x, primitive_function_puretype(clq->cs), &typarams) {
@@ -3070,7 +3070,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
             ice(_u8("ensure_def_inst_graphed missing 'dire' info"));
           }
           gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
-          ctr gr_celltrack = mk_celltrack();
+          ctr celltrack = mk_celltrack();
           gs gr_statep = {clq, &gr, &ctr};
           bu sq_builder = mk_builder(gs);
           if case Printed(pm) = gr_live_and_expr_consume(gs, &dire.ec, &bu) {
@@ -3139,7 +3139,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
 func mk_const_frame_regraphed(clq *clqueue, informal_name sym, type *cu_typeexpr, props *type_properties, c gr_const) frame_regraphed {
   // I don't think we _actually_ use clq for anything.
   gr frame_graph = init_frame_graph_empty(informal_name);
-  ctr gr_celltrack = mk_celltrack();
+  ctr celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &ctr};
   bu sq_builder = mk_builder(gs);
   cell cell_num = add_cell(&gr, {LocationStatic, *type, *props});
