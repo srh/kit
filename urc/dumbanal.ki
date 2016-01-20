@@ -24,7 +24,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, celltrack *gr_celltrac
   if case &Computed(checksum celltrack_checksum) = &gnc->plainly_live {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
     if !matches_checksums(celltrack, &checksum) {
-      return ERR(_u8("ICE: Inconsistent liveness/active state when revisiting node"));
+      return ERR(_u8("ICE: Inconsistent liveness/active state when revisiting node ("), gn.x, _u8("), celltrack="), *celltrack);
     }
     *out = NonTerminal;
     return NoFail;

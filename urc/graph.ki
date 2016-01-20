@@ -509,9 +509,12 @@ func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
   }
   add(&bu, parameter_unwinding);
 
-  // We artifically activate the return cell after falling off the end of a fullbody.
+  // We artifically activate the return cell after aflling off the end of a fullbody.
+  // If the function returns void, this creates the desired effect for analysis in dumbanal, and correct behavior.
+  // If the function does not return void, this is unreachable anyway, but it gives us the right active state as we fall off the end.
+  add(&bu, @[gr_xop]GrActiveXop({Activate(info->return_cell), Nothing}));
+
   // TODO: This is crazy nonsense.  Detect reachability in a conservative fashion (e.g. everything after a label is reachable, everything after a break/continue/return is not).
-  gr_activate(gs.celltrack, info->return_cell);
   gn sq_num = mut_connect(gs, &bu, &fb.final_node);
 
   *out = gn.x;
