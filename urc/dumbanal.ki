@@ -46,16 +46,16 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, celltrack *gr_celltrac
       nparams size = count(&a.params);
 
       switch a.act {
-      case TwoActiveOps(ops gr_two_active_ops):
-        gr_track_active_op(celltrack, ops.one);
-        gr_track_active_op(celltrack, ops.two);
-      case StandardApply:
-        gr_deactivate(celltrack, a.funcell);
-        for i size = 0; i < nparams; i = i + 1 {
-          gr_deactivate(celltrack, get(&a.params, i));
-        }
-        gr_activate(celltrack, a.retcell);
+      case TwoExtraOps(ops gr_active_xop):
+        gr_track_active_op(celltrack, ops.op1);
+        gr_track_active_op(celltrack, ops.op2);
+      case StandardApply: { }
       }
+      gr_deactivate(celltrack, a.funcell);
+      for i size = 0; i < nparams; i = i + 1 {
+        gr_deactivate(celltrack, get(&a.params, i));
+      }
+      gr_activate(celltrack, a.retcell);
 
       deaden(celltrack, a.funcell);
       for i size = 0; i < nparams; i = i + 1 {
