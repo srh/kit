@@ -101,11 +101,11 @@ func celltrack_is_empty(ctr *gr_celltrack) bool {
   return empty(&ctr->liveset.all) && empty(&ctr->activeset.all);
 }
 
-func gr_check_empty(celltrack *gr_celltrack) void {
-  if count(&celltrack->liveset.all) != 0 {
+func gr_check_empty(ctr *gr_celltrack) void {
+  if count(&ctr->liveset.all) != 0 {
     ice(_u8("celltrack has leftover live cells"));
   }
-  if count(&celltrack->activeset.all) != 0 {
+  if count(&ctr->activeset.all) != 0 {
     ice(_u8("celltrack has leftover active cells"));
   }
 }
