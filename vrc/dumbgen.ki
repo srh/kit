@@ -1,3 +1,4 @@
+import celltrack;
 import dumbanal;
 import state;
 
@@ -12,40 +13,9 @@ enum cell_loc {
   UnusedLoc void;
 }
 
-struct cellset {
-  // Maintained in sorted order.
-  all array[cell_num];
-  // The xor and sum of the cell nums -- makes for a quick commutative hash.
-  xored osize;
-  summed osize;
-}
-
-struct cellset_checksum {
-  xored osize;
-  summed osize;
-}
-
-func swap(x *cellset, y *cellset) void {
-  swap(&x->all, &y->all);
-  tmpx osize = x->xored;
-  x->xored = y->xored;
-  y->xored = tmpx;
-  tmps osize = x->summed;
-  x->summed = y->summed;
-  y->summed = tmps;
-}
-
-func matches_checksum(a *cellset, b *cellset_checksum) bool {
-  return a->xored == b->xored && a->summed == b->summed;
-}
-
-func matches_checksum(a *cellset, b *cellset) bool {
-  return a->xored == b->xored && a->summed == b->summed;
-}
-
 struct gn_annot {
-  // A checksum for the liveset before this node is evaluated. (Used for assertions.) Is also the checksum for app_time_live.
-  plainly_live nc[cellset_checksum];
+  // A checksum for the liveset before this node is evaluated. (Used for assertions.) It also has the checksum for app_time_live.
+  plainly_live nc[celltrack_checksum];
 
   // Only for GrApply.
   // lower_paramlists and higher_paramlists are set on the second pass.
@@ -146,23 +116,29 @@ func get_size_loc(h *frame, c cell_num) cell_loc {
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) np {
   bas *basic_analyze_state = un(&g->inline_state);
   h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed, NotComputed, mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed};
+  DBG(_u8("dumbly gen "), lookup(cs->im, g->graph.gr.informal_name));
 
-  liveset cellset;
-  create(&h, &liveset, g->graph.cell);
+  celltrack gr_celltrack;
+  create(&h, &celltrack, g->graph.cell);
   nargcells size = count(&g->argcells);
   for i size = 0; i < nargcells; i = i + 1 {
-    create(&h, &liveset, get(&g->argcells, i));
+    create(&h, &celltrack, get(&g->argcells, i));
+    gr_activate(&celltrack, get(&g->argcells, i));
   }
 
   mut genexpr_result;
-  if case Printed(pm) = dumbly_analyze_expression(&h, &g->graph.gr, &liveset, g->graph.gn, &mut) {
+  if case Printed(pm) = dumbly_analyze_expression(&h, &g->graph.gr, &celltrack, g->graph.gn, &mut) {
     return Printed(pm);
   }
 
   switch &mut {
   case &Terminal:
-    if !(count(&liveset.all) == 1 && get(&liveset.all, 0) == g->graph.cell) {
-      ice(_u8("fn_body leaves cells alive, expected "), g->graph.cell, _u8(", saw "), to_array_u8str(cs->im, liveset.all));
+    // TODO(): I think the gr_deactivate doesn't work because some func graphs skip the active-setting.  Look where we have weak assertions in magic graph ops.
+    /* gr_deactivate(&celltrack, g->graph.cell); */
+    deaden(&celltrack, g->graph.cell);
+    // TODO(): Reuse existing assertion code, check actives.
+    if count(&celltrack.liveset.all) != 0 /* || count(&celltrack.activeset.all) != 0 TODO() */ {
+      ice(_u8("fn_body leaves cells alive, expected "), g->graph.cell, _u8(", saw "), to_array_u8str(cs->im, celltrack.liveset.all));
     }
   case &NonTerminal: { /* nothing to assert */ }
   }
