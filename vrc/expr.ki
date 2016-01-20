@@ -1158,13 +1158,11 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
     }
     case &IsLvalYes(desc lval_description): {
       dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
-      DBG(_u8("annotate disposal for consume "), dest, _u8(", <- "), desc.num);
       if case Has(ix size) = find(movable_cells, Has(desc.num)) {
         move ctor_desc;
         if case Printed(pm) = get_move_ctor(es->ds, &info->cu, &move) {
           return Printed(pm);
         }
-        DBG(_u8("consume by move "), dest, _u8(" <- "), desc.num);
         annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]+{move, dest, desc.num}), dest));
         *moved_cell_ix_out = Has(ix);
       } else {

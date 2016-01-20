@@ -1107,7 +1107,6 @@ func gr_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, bu
     return gr_live_and_expr_consume(gs, oo(&be), bu);
   case &AutoInit(x opt[init_action]):
     if case &Has(ia init_action) = &x {
-      DBG(_u8("auto init "), ia.x.arg);
       gn gr_num;
       if case Printed(pm) = gr_init_action(gs, &ia, &gn) {
         return Printed(pm);
@@ -1125,7 +1124,6 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
   saved gr_savetrack = save_celltrack(gs);
   if case &Has(b box[ast_expr_consume]) = &a->expr {
     subcell cell_num = result_cell(oo(&b));
-    DBG(_u8("return subcell "), subcell);
     add(bu, @[gr_xop]GrSubcell({subcell, fb->return_cell, OffsetConst(0)}));
     if case Printed(pm) = gr_expr_consume(gs, oo(&b), bu) {
       return Printed(pm);
@@ -1501,7 +1499,6 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   lambda_celltrack gr_celltrack = mk_celltrack();
   lambda_gs gr_statep = {gs.clq, &lambda_gr, &lambda_celltrack};
 
-  DBG(_u8("graphing for "), lookup(gs.clq->im, gs.gr->informal_name));
   gr_create(&lambda_celltrack, info->return_cell);
   nargs size = count(&info->arg_cells);
   for i size = 0; i < nargs; i = i + 1 {

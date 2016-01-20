@@ -116,7 +116,6 @@ func get_size_loc(h *frame, c cell_num) cell_loc {
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) np {
   bas *basic_analyze_state = un(&g->inline_state);
   h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed, NotComputed, mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed};
-  DBG(_u8("dumbly gen "), lookup(cs->im, g->graph.gr.informal_name));
 
   celltrack gr_celltrack;
   create(&h, &celltrack, g->graph.cell);
