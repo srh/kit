@@ -1481,7 +1481,7 @@ func gr_deactivate(ctr *gr_celltrack, c cell_num) void {
 func gr_expect_inactive(ctr *gr_celltrack, c cell_num) void {
   // TODO: This is an inefficient assertion to make.  (Liveness asserts can or will be able to search from the end with practical O(1) cost thanks to the generally fifo nature of cell lifetimes.)  Remove this function.
   if case Has(ix size) = lookup(&ctr->activeset.all, c) {
-    ice(_u8("expected inactive cell"));
+    ice(_u8("expected inactive cell, c="), c);
   }
 }
 
@@ -2350,6 +2350,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
     ac cell_num = add_cell(&gr, {LocationStatic, argtp.cu, argtp.props});
     push(&argcells, ac);
     gr_create(&celltrack, ac);
+    gr_activate(&celltrack, ac);
   }
 
   bu sq_builder = mk_builder(gs);
@@ -2362,6 +2363,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
     push(&pointeecells, pc);
 
     add(&bu, @[gr_xop]GrDeref({pc, ac, OffsetConst(0)}));
+    add(&bu, @[gr_xop]GrActiveXop({Deactivate(ac), Nothing}));
     add(&bu, @[gr_xop]GrDead({ac}));
   }
 
@@ -2506,6 +2508,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     ac cell_num = add_cell(&gr, {LocationStatic, argtp.cu, argtp.props});
     push(&argcells, ac);
     gr_create(&celltrack, ac);
+    gr_activate(&celltrack, ac);
   }
 
   for i size = 0; i < nargs; i = i + 1 {
@@ -2516,6 +2519,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
 
     ac cell_num = get(&argcells, i);
     add(&bu, @[gr_xop]GrDeref({pc, ac, OffsetConst(0)}));
+    add(&bu, @[gr_xop]GrActiveXop({Deactivate(ac), Nothing}));
     add(&bu, @[gr_xop]GrDead({ac}));
     add(&bu, @[gr_xop]GrSubcell({tc, pc, OffsetConst(enum_tag_offset)}));
   }
@@ -2698,6 +2702,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
     ac cell_num = add_cell(&gr, {LocationStatic, argtp.cu, argtp.props});
     push(&argcells, ac);
     gr_create(&celltrack, ac);
+    gr_activate(&celltrack, ac);
   }
 
   pointeecells array[cell_num];
@@ -2707,6 +2712,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
 
     ac cell_num = get(&argcells, i);
     add(&bu, @[gr_xop]GrDeref({pc, ac, OffsetConst(0)}));
+    add(&bu, @[gr_xop]GrActiveXop({Deactivate(ac), Nothing}));
     add(&bu, @[gr_xop]GrDead({ac}));
   }
 

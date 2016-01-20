@@ -43,8 +43,21 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, celltrack *gr_celltrac
       note_lower_paramlists(h, gn, celltrack);
       annotate_ref(&gnc->app_time_live, &celltrack->liveset);
 
-      deaden(celltrack, a.funcell);
       nparams size = count(&a.params);
+
+      switch a.act {
+      case TwoActiveOps(ops gr_two_active_ops):
+        gr_track_active_op(celltrack, ops.one);
+        gr_track_active_op(celltrack, ops.two);
+      case StandardApply:
+        gr_deactivate(celltrack, a.funcell);
+        for i size = 0; i < nparams; i = i + 1 {
+          gr_deactivate(celltrack, get(&a.params, i));
+        }
+        gr_activate(celltrack, a.retcell);
+      }
+
+      deaden(celltrack, a.funcell);
       for i size = 0; i < nparams; i = i + 1 {
         deaden(celltrack, get(&a.params, i));
       }
@@ -55,6 +68,11 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, celltrack *gr_celltrac
       expect_live(celltrack, a.retcell);
 
       nparams size = count(&a.params);
+      for i size = 0; i < nparams; i = i + 1 {
+        gr_deactivate(celltrack, get(&a.params, i));
+      }
+      gr_activate(celltrack, a.retcell);
+
       for i size = 0; i < nparams; i = i + 1 {
         deaden(celltrack, get(&a.params, i));
       }
@@ -103,6 +121,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, celltrack *gr_celltrac
       return NoFail;
 
     case &GrDead(a gr_dead):
+      gr_expect_inactive(celltrack, a.cell);
       deaden(celltrack, a.cell);
       *out = Terminal;
       return NoFail;
@@ -113,10 +132,16 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, celltrack *gr_celltrac
       return NoFail;
 
     case &GrActiveXop(a gr_active_xop):
+      gr_track_active_op(celltrack, a.op1);
+      gr_track_active_op(celltrack, a.op2);
       *out = Terminal;
       return NoFail;
 
     case &GrManyActiveXop(a gr_many_active_xop):
+      nops size = count(&a.ops);
+      for i size = 0; i < nops; i = i + 1 {
+        gr_track_active_op(celltrack, get(&a.ops, i));
+      }
       *out = Terminal;
       return NoFail;
     }

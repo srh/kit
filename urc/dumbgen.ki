@@ -116,12 +116,14 @@ func get_size_loc(h *frame, c cell_num) cell_loc {
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) np {
   bas *basic_analyze_state = un(&g->inline_state);
   h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed, NotComputed, mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed};
+  DBG(_u8("dumbly gen "), lookup(cs->im, g->graph.gr.informal_name));
 
   celltrack gr_celltrack;
   create(&h, &celltrack, g->graph.cell);
   nargcells size = count(&g->argcells);
   for i size = 0; i < nargcells; i = i + 1 {
     create(&h, &celltrack, get(&g->argcells, i));
+    gr_activate(&celltrack, get(&g->argcells, i));
   }
 
   mut genexpr_result;
@@ -131,9 +133,11 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
 
   switch &mut {
   case &Terminal:
+    // TODO(): I think the gr_deactivate doesn't work because some func graphs skip the active-setting.  Look where we have weak assertions in magic graph ops.
+    /* gr_deactivate(&celltrack, g->graph.cell); */
     deaden(&celltrack, g->graph.cell);
     // TODO(): Reuse existing assertion code, check actives.
-    if count(&celltrack.liveset.all) != 0 {
+    if count(&celltrack.liveset.all) != 0 /* || count(&celltrack.activeset.all) != 0 TODO() */ {
       ice(_u8("fn_body leaves cells alive, expected "), g->graph.cell, _u8(", saw "), to_array_u8str(cs->im, celltrack.liveset.all));
     }
   case &NonTerminal: { /* nothing to assert */ }
