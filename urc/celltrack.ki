@@ -149,11 +149,7 @@ func ctr_deaden(ctr *celltrack, c cell_num) void {
     if ent->active {
       ice(_u8("ctr_deaden: active cell "), c);
     }
-    nminus1 size = count(&ctr->all) - 1;
-    for j size = ix; j < nminus1; j = j + 1 {
-      *ref(&ctr->all, j) = *ref(&ctr->all, j + 1);
-    }
-    pop(&ctr->all);
+    shifterase_elem(&ctr->all, ix);
     checksum_remove(&ctr->checksum.live_checksum, c);
   } else {
     ice(_u8("ctr_deaden: no has cell "), c);
