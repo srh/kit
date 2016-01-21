@@ -24,7 +24,8 @@ struct gn_annot {
   higher_paramlists hash[gr_num, void];
   // What's live when we evaluate... which now must include the return cell
   // This is only annotated for GrApply, and is checkedsummed by plainly_live.
-  app_time_live nc[cellset];
+  // The celltrack's activity information is no longer used.
+  app_time_live nc[celltrack];
   paramlist_bottom_frame_offset nc[i32];
 
   dumbgen_gen_function_body_visited bool;
@@ -32,7 +33,7 @@ struct gn_annot {
   this_targetnum nc[jmp_targetnum];
 }
 
-func live_for_funcall(annot *gn_annot) *array[cell_num] {
+func live_for_funcall(annot *gn_annot) *array[celltrack_entry] {
   return &un(&annot->app_time_live)->all;
 }
 
@@ -117,25 +118,25 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
   bas *basic_analyze_state = un(&g->inline_state);
   h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed, NotComputed, mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed};
 
-  celltrack gr_celltrack;
-  create(&h, &celltrack, g->graph.cell);
+  ctr celltrack;
+  create(&h, &ctr, g->graph.cell);
   nargcells size = count(&g->argcells);
   for i size = 0; i < nargcells; i = i + 1 {
-    create(&h, &celltrack, get(&g->argcells, i));
-    gr_activate(&celltrack, get(&g->argcells, i));
+    create(&h, &ctr, get(&g->argcells, i));
+    gr_activate(&ctr, get(&g->argcells, i));
   }
 
   mut genexpr_result;
-  if case Printed(pm) = dumbly_analyze_expression(&h, &g->graph.gr, &celltrack, g->graph.gn, &mut) {
+  if case Printed(pm) = dumbly_analyze_expression(&h, &g->graph.gr, &ctr, g->graph.gn, &mut) {
     return Printed(pm);
   }
 
   switch &mut {
   case &Terminal:
-    gr_deactivate(&celltrack, g->graph.cell);
-    deaden(&celltrack, g->graph.cell);
-    if !celltrack_is_empty(&celltrack) {
-      ice(_u8("fn_body leaves cells alive or active, saw "), to_u8str(cs->im, celltrack));
+    gr_deactivate(&ctr, g->graph.cell);
+    deaden(&ctr, g->graph.cell);
+    if !celltrack_is_empty(&ctr) {
+      ice(_u8("fn_body leaves cells alive or active, saw "), to_u8str(cs->im, ctr));
     }
   case &NonTerminal: { /* nothing to assert */ }
   }
@@ -234,14 +235,14 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
   for i size = 0; i < ncalls; i = i + 1 {
     gn gr_num = get(&paramlist_ordering, i);
     annot *gn_annot = ref_annot(h, gn);
-    live *array[cell_num] = live_for_funcall(annot);
+    live *array[celltrack_entry] = live_for_funcall(annot);
 
     bumpline i32 = 0;
 
     // 1. Layout any cells live during the funcall, that are _not_ part of the paramlist.
     nlive size = count(live);
     for j size = 0; j < nlive; j = j + 1 {
-      c cell_num = get(live, j);
+      c cell_num = ref(live, j)->cell;
       if isNope(ref(&offsets, c.x)) {
         if case &Has(cell_paramlistgn gr_num) = &ref(&h->bas->celldisp, c.x)->paramlist {
           // Cells in other paramlists should already been processed -- and would have failed the isNone check just above.

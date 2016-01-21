@@ -19,119 +19,166 @@ inline func hash_equal(x *cell_num, y *cell_num) bool {
 }
 
 
-struct cellset {
-  // Maintained in sorted order.
-  all array[cell_num];
-  // The xor and sum of the cell nums -- makes for a quick commutative hash.
-  xored osize;
-  summed osize;
-}
-
-func[H] build_u8str(help H, r *array[u8], x *cellset) void {
-  build_array_u8str(help, r, &x->all);
-}
-
 struct cellset_checksum {
   xored osize;
   summed osize;
 }
 
-func get_checksum(a *cellset) cellset_checksum {
-  return {a->xored, a->summed};
-}
-
-func swap(x *cellset, y *cellset) void {
-  swap(&x->all, &y->all);
-  tmpx osize = x->xored;
-  x->xored = y->xored;
-  y->xored = tmpx;
-  tmps osize = x->summed;
-  x->summed = y->summed;
-  y->summed = tmps;
-}
-
-func matches_checksum(a *cellset, b *cellset_checksum) bool {
+func matches_checksum(a *cellset_checksum, b *cellset_checksum) bool {
   return a->xored == b->xored && a->summed == b->summed;
 }
 
-func matches_checksum(a *cellset, b *cellset) bool {
-  return a->xored == b->xored && a->summed == b->summed;
+func checksum_add(a *cellset_checksum, c cell_num) void {
+  a->xored = a->xored ^ +c.x;
+  a->summed = a->summed + +c.x;
 }
 
-
-// TODO: Get rid of the gr_ prefix, but note that "celltrack" is a variable named used a lot in graph.ki.
-struct gr_celltrack {
-  liveset cellset;
-  // Cells that need to be destructed, specifically.
-  activeset cellset;
+func checksum_remove(a *cellset_checksum, c cell_num) void {
+  a->xored = a->xored ^ +c.x;
+  a->summed = a->summed - +c.x;
 }
 
-func[H] build_u8str(help H, r *array[u8], x *gr_celltrack) void {
-  append(r, _u8("{liveset: "));
-  build_u8str(help, r, &x->liveset);
-  append(r, _u8(", activeset: "));
-  build_u8str(help, r, &x->activeset);
-  append(r, _u8("}"));
+struct celltrack_entry {
+  cell cell_num;
+  // An "active" cell is one whose destructor needs to be run (if we threw an exception at the given point in time).
+  active bool;
+}
+
+struct celltrack {
+  all array[celltrack_entry];
+  checksum celltrack_checksum;
+}
+
+func[H] build_u8str(help H, r *array[u8], x *celltrack) void {
+  build_array_u8str(help, r, &x->all);
+}
+
+func[H] build_u8str(help H, r *array[u8], x *celltrack_entry) void {
+  push(r, '{');
+  build_u8str(help, r, &x->cell);
+  if x->active {
+    append(r, _u8(" active"));
+  }
+  push(r, '}');
 }
 
 struct celltrack_checksum {
-  liveset_checksum cellset_checksum;
-  activeset_checksum cellset_checksum;
+  live_checksum cellset_checksum;
+  active_checksum cellset_checksum;
 }
 
-func get_checksum(ctr *gr_celltrack) celltrack_checksum {
-  return {get_checksum(&ctr->liveset), get_checksum(&ctr->activeset)};
+func matches_checksum(a *celltrack_checksum, b *celltrack_checksum) bool {
+  return matches_checksum(&a->live_checksum, &b->live_checksum) && matches_checksum(&a->active_checksum, &b->active_checksum);
 }
 
-func matches_checksums(a *gr_celltrack, b *celltrack_checksum) bool {
-  return matches_checksum(&a->liveset, &b->liveset_checksum) && matches_checksum(&a->activeset, &b->activeset_checksum);
+func get_checksum(ctr *celltrack) celltrack_checksum {
+  return ctr->checksum;
 }
 
-func matches_checksums(a *gr_celltrack, b *gr_celltrack) bool {
-  return matches_checksum(&a->liveset, &b->liveset) && matches_checksum(&a->activeset, &b->activeset);
+func matches_checksum(a *celltrack, b *celltrack_checksum) bool {
+  return matches_checksum(&a->checksum, b);
 }
 
-func mk_celltrack() gr_celltrack {
-  liveset cellset;
-  activeset cellset;
-  return {liveset, activeset};
+func matches_checksum(a *celltrack, b *celltrack) bool {
+  return matches_checksum(&a->checksum, &b->checksum);
 }
 
-func celltrack_is_empty(ctr *gr_celltrack) bool {
-  return empty(&ctr->liveset.all) && empty(&ctr->activeset.all);
+func mk_celltrack() celltrack {
+  x celltrack;
+  return x;
 }
 
-func gr_check_empty(celltrack *gr_celltrack) void {
-  if count(&celltrack->liveset.all) != 0 {
+func celltrack_is_empty(ctr *celltrack) bool {
+  return empty(&ctr->all);
+}
+
+func gr_check_empty(ctr *celltrack) void {
+  if !celltrack_is_empty(ctr) {
     ice(_u8("celltrack has leftover live cells"));
-  }
-  if count(&celltrack->activeset.all) != 0 {
-    ice(_u8("celltrack has leftover active cells"));
   }
 }
 
 struct noted_celltrack {
-  celltrack opt[gr_celltrack];
+  celltrack opt[celltrack];
 }
 
 func mk_noted() noted_celltrack {
   return {None};
 }
 
-func mk_noted(copyee *gr_celltrack) noted_celltrack {
+func mk_noted(copyee *celltrack) noted_celltrack {
   return {Has(*copyee)};
 }
 
-func note_celltrack(targ *noted_celltrack, current *gr_celltrack) void {
-  if case &Has(ct gr_celltrack) = &targ->celltrack {
-    if !matches_checksum(&ct.liveset, &current->liveset) {
-      ice(_u8("Inconsistent liveness state, liveset="), current->liveset);
-    }
-    if !matches_checksum(&ct.activeset, &current->activeset) {
-      ice(_u8("Inconsistent activeness state, activeset="), current->activeset);
+func note_celltrack(targ *noted_celltrack, current *celltrack) void {
+  if case &Has(ct celltrack) = &targ->celltrack {
+    if !matches_checksum(&ct, current) {
+      ice(_u8("Inconsistent celltrack state, current="), current);
     }
   } else {
     targ->celltrack = Has(*current);
   }
 }
 
+func ctr_find(ctr *celltrack, c cell_num) opt[size] {
+  for i size = count(&ctr->all); i > 0; {
+    i = i - 1;
+    if ref(&ctr->all, i)->cell == c {
+      return Has(i);
+    }
+  }
+  return None;
+}
+
+func ctr_create(ctr *celltrack, c cell_num) void {
+  if case Has(ix size) = ctr_find(ctr, c) {
+    ice(_u8("ctr_create: has cell "), c);
+  }
+  push(&ctr->all, {c, false});
+  checksum_add(&ctr->checksum.live_checksum, c);
+}
+
+func ctr_expect_live(ctr *celltrack, c cell_num) void {
+  if case None = ctr_find(ctr, c) {
+    ice(_u8("ctr_expect_live: no has cell "), c);
+  }
+}
+
+func ctr_deaden(ctr *celltrack, c cell_num) void {
+  if case Has(ix size) = ctr_find(ctr, c) {
+    ent *celltrack_entry = ref(&ctr->all, ix);
+    if ent->active {
+      ice(_u8("ctr_deaden: active cell "), c);
+    }
+    shifterase_elem(&ctr->all, ix);
+    checksum_remove(&ctr->checksum.live_checksum, c);
+  } else {
+    ice(_u8("ctr_deaden: no has cell "), c);
+  }
+}
+
+func ctr_activate(ctr *celltrack, c cell_num) void {
+  if case Has(ix size) = ctr_find(ctr, c) {
+    ent *celltrack_entry = ref(&ctr->all, ix);
+    if ent->active {
+      ice(_u8("ctr_activate: active cell "), c);
+    }
+    ent->active = true;
+    checksum_add(&ctr->checksum.active_checksum, c);
+  } else {
+    ice(_u8("ctr_activate: no has cell "), c);
+  }
+}
+
+func ctr_deactivate(ctr *celltrack, c cell_num) void {
+  if case Has(ix size) = ctr_find(ctr, c) {
+    ent *celltrack_entry = ref(&ctr->all, ix);
+    if !ent->active {
+      ice(_u8("ctr_deactivate: inactive cell "), c);
+    }
+    ent->active = false;
+    checksum_remove(&ctr->checksum.active_checksum, c);
+  } else {
+    ice(_u8("ctr_activate: no has cell "), c);
+  }
+}
