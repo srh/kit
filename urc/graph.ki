@@ -1314,9 +1314,13 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   case &Ternary(a ast_ternary):
     return gr_mk_ternary(gs, x, &a, bu);
   case &QuickReturn(a ast_quickreturn):
-    // TODO(): Implement quick-return graphing.
-    return ERR(_u8("ICE: quick-return expressions not fully implemented"));
+    return gr_mk_quickreturn(gs, x, &a, bu);
   }
+}
+
+func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_builder) np {
+  // TODO(): Implement quick-return graphing.
+  return ERR(_u8("ICE: quick-return expressions not fully implemented"));
 }
 
 func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {

@@ -40,6 +40,7 @@ func checksum_remove(a *cellset_checksum, c cell_num) void {
 
 struct celltrack_entry {
   cell cell_num;
+  // An "active" cell is one whose destructor needs to be run (if we threw an exception at the given point in time).
   active bool;
 }
 
