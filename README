@@ -103,4 +103,4 @@ language with ever-more-advanced features.
 
 Right now, s1 can compile s2, and it can almost compile s3.  In the
 long run, as soon as s4 is the actively developed version, s2 will
-go away.
+eventually go away.

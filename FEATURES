@@ -6,6 +6,7 @@ Some feature differences between s1 and s2:
   - s2 allows negation for overflow types.
   - s2 allows deftype names to shadow def names.
   - s2 doesn't sanity-check template defs' types.  (It should.)
+  - s2 has quick-return expressions (error handling with unary "#")
 
   Subset of s1:
   - s2 disallows assignment except for top-level exprs.
