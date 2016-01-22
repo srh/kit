@@ -1369,12 +1369,6 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       field_cell cell_num = add_cell(gs.gr, {LocationVirtual, ~ *field_type, field_props});
       return_field_cell cell_num = add_cell(gs.gr, {LocationVirtual, ~ *field_type, field_props});
 
-      // TODO(): Support treating types with move ctor more efficiently.
-      copy_ctor_desc ctor_desc;
-      if case Printed(pm) = behavior_to_desc(&field_props.copy_behavior, &copy_ctor_desc) {
-        return Printed(pm);
-      }
-
       case_bu sq_builder = mk_builder(gs);
 
       add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
@@ -1383,6 +1377,12 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       add(&case_bu, @[gr_xop]GrSubcell({info->return_tag_cell, fb->return_cell, OffsetConst(enum_tag_offset)}));
       add(&case_bu, @[gr_xop]GrWriteConst({info->return_tag_cell, ConstInt(~ mk_enum_tag_value(i).x)}));
       add(&case_bu, @[gr_xop]GrVirtualDead({info->return_tag_cell}));
+
+      // TODO: Support treating types with move ctor more efficiently, when we can.  This is possible when the rhs is a whole-cell rval.
+      copy_ctor_desc ctor_desc;
+      if case Printed(pm) = behavior_to_desc(&field_props.copy_behavior, &copy_ctor_desc) {
+        return Printed(pm);
+      }
 
       copy_gn gr_num = gr_bi_ctor(gs, return_field_cell, field_cell, &copy_ctor_desc, BiCopy);
 
