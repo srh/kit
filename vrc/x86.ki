@@ -215,7 +215,7 @@ func x86_mov_stiptr(plat *platform_info, f *objfile, dest u8, symbol_table_index
   }
 }
 
-func x86_int_3(f *objfile) void {
+func x86_int3(f *objfile) void {
   appendtext(f, 0xCC);
 }
 
