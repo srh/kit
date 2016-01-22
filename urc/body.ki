@@ -101,7 +101,7 @@ func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *en
 func make_init_action(es *framescope, vn var_number, out *init_action) np {
   vi *var_info = ref_var(es, vn);
   init ctor_desc;
-  if case Printed(pm) = get_init_ctor(es->ds, &vi->type, &init) {
+  if case Printed(pm) = get_init_ctor(es->clq, &vi->type, &init) {
     return Printed(pm);
   }
   ia init_action = +{init, vi->cell};
@@ -126,7 +126,7 @@ func make_initializations(es *framescope, vns *array[var_number], out *array[ini
 func make_destroy_action(es *framescope, vn var_number, out *destroy_action) np {
   vi *var_info = ref_var(es, vn);
   destroy ctor_desc;
-  if case Printed(pm) = get_destroy_ctor(es->ds, &vi->type, &destroy) {
+  if case Printed(pm) = get_destroy_ctor(es->clq, &vi->type, &destroy) {
     return Printed(pm);
   }
   da destroy_action = +{destroy, vi->cell};
@@ -652,7 +652,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
       }
       case &AutoInit(x opt[init_action]): {
         init ctor_desc;
-        if case Printed(pm) = get_init_ctor(bs->ds, complete_type, &init) {
+        if case Printed(pm) = get_init_ctor(bs->clq, complete_type, &init) {
           return Printed(pm);
         }
         ia init_action = +{init, cell};

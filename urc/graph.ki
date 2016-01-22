@@ -1328,8 +1328,148 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
 }
 
 func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_builder) np {
-  // TODO(): Implement quick-return graphing.
-  return ERR(_u8("ICE: quick-return expressions not fully implemented"));
+  fb *fullbody_state;
+  if case Has(fb_ *fullbody_state) = gs.fb {
+    fb = fb_;
+  } else {
+    return ERR(_u8("Quick-return expression outside of function body"));
+  }
+
+  if case Printed(pm) = gr_expr(gs, oo(&a->rhs), bu) {
+    return Printed(pm);
+  }
+
+  info *ast_quickreturn_info = un(&a->info);
+  et *enumspec = &info->et;
+  add(bu, @[gr_xop]GrSubcell({info->tag_cell, value_cell(oo(&a->rhs)), OffsetConst(enum_tag_offset)}));
+
+  success_case_ix size = unHas(et->success_case_ix);
+
+  unwind_join_target tracked_target = mk_tracked(nopq(gs.gr));
+
+  saved_aftercond gr_savetrack = save_celltrack(gs.ctr);
+
+  cases array[tup[gr_const, sq_num]];
+
+  tag_ty cu_typrop = compute_prim(gs.clq, enum_tag_type(gs.clq->cs, &info->return_et));
+  return_cell_size u32 = ref_cell(gs.gr, fb->return_cell)->props.flat_size;
+
+  nconstructors size = count(&et->constructors);
+  for i size = 0; i < nconstructors; i = i + 1 {
+    if i != success_case_ix {
+      field_offset u32 = enum_field_offset(gs.clq->cs, et, mk_enum_tag_value(i));
+      return_field_offset u32 = enum_field_offset(gs.clq->cs, &info->return_et, mk_enum_tag_value(get(&info->constructor_mapping, i)));
+
+      field_type *te_typeexpr = &ref(&et->constructors, i)->type;
+      field_props type_properties;
+      if case Printed(pm) = compute_complete_type_properties(gs.clq, field_type, &field_props) {
+        return Printed(pm);
+      }
+
+      field_cell cell_num = add_cell(gs.gr, {LocationVirtual, ~ *field_type, field_props});
+      return_field_cell cell_num = add_cell(gs.gr, {LocationVirtual, ~ *field_type, field_props});
+
+      // TODO(): Support treating types with move ctor more efficiently.
+      copy_ctor_desc ctor_desc;
+      if case Printed(pm) = behavior_to_desc(&field_props.copy_behavior, &copy_ctor_desc) {
+        return Printed(pm);
+      }
+
+      case_bu sq_builder = mk_builder(gs);
+
+      add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
+      add(&case_bu, @[gr_xop]GrSubcell({field_cell, value_cell(oo(&a->rhs)), OffsetConst(field_offset)}));
+      add(&case_bu, @[gr_xop]GrSubcell({return_field_cell, fb->return_cell, OffsetConst(return_field_offset)}));
+      add(&case_bu, @[gr_xop]GrSubcell({info->return_tag_cell, fb->return_cell, OffsetConst(enum_tag_offset)}));
+      add(&case_bu, @[gr_xop]GrWriteConst({info->return_tag_cell, ConstInt(~ mk_enum_tag_value(i).x)}));
+      add(&case_bu, @[gr_xop]GrVirtualDead({info->return_tag_cell}));
+
+      copy_gn gr_num = gr_bi_ctor(gs, return_field_cell, field_cell, &copy_ctor_desc, BiCopy);
+
+      add(&case_bu, copy_gn);
+      add(&case_bu, @[gr_xop]GrVirtualDead({field_cell}));
+
+      check(enum_tag_offset == 0);
+      prepadding_ogn opt[gr_num] = gr_bzero_subcell(gs, fb->return_cell, tag_ty.props.flat_size, return_field_offset - tag_ty.props.flat_size);
+      addo(&case_bu, prepadding_ogn);
+
+      postpadding_ogn opt[gr_num] = gr_bzero_subcell(gs, fb->return_cell, return_field_offset + field_props.flat_size, return_cell_size - (return_field_offset + field_props.flat_size));
+      addo(&case_bu, postpadding_ogn);
+
+      add(&case_bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(return_field_cell)}));
+      add(&case_bu, @[gr_xop]GrVirtualDead({return_field_cell}));
+
+      push(&cases, {ConstInt(~ mk_enum_tag_value(i).x), mut_connect(gs, &case_bu, &unwind_join_target)});
+
+      restore_celltrack(gs.ctr, &saved_aftercond);
+    }
+  }
+
+  success_nopq sq_num = nopq(gs.gr);
+
+  if true {
+    field_offset u32 = enum_field_offset(gs.clq->cs, et, mk_enum_tag_value(success_case_ix));
+
+    case_bu sq_builder = mk_builder(gs);
+    add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
+    add(&case_bu, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->rhs)), OffsetConst(field_offset)}));
+    switch &expr_complete_info(oo(&a->rhs))->lval {
+    case &IsLvalYes(desc lval_description):
+      if case DeadMe = desc.deadme {
+        add(&case_bu, @[gr_xop]GrVirtualDead({desc.num}));
+      }
+    case &IsLvalNo(desc rval_description):
+      addo(&case_bu, gr_maybe_virtualdead(gs, desc.partial_num));
+    }
+
+    push(&cases, {ConstInt(bigu(~ mk_enum_tag_value(success_case_ix).x)), mut_connect(&case_bu, success_nopq)});
+  }
+
+  if case &Has(ct celltrack) = &unwind_join_target.note.ctr {
+    saved_aftersuccess gr_savetrack = save_celltrack(gs.ctr);
+
+    *gs.ctr = ct;
+
+    unwind_bu sq_builder = mk_builder(gs);
+    for i size = count(&gs.ctr->all); i > 0; {
+      i = i - 1;
+      ent *celltrack_entry = ref(&gs.ctr->all, i);
+      cell cell_num = ent->cell;
+      // TODO: I'd like to be able to assert that the return cell is at index 0.
+      if cell != fb->return_cell {
+        if ent->active {
+          ci *cell_info = ref_cell(gs.gr, cell);
+          destroy_ctor ctor_desc;
+          if case Printed(pm) = behavior_to_desc(&ci->props.destroy_behavior, &destroy_ctor) {
+            return Printed(pm);
+          }
+          gn gr_num;
+          if case Printed(pm) = gr_destroy_ctor(gs, cell, &destroy_ctor, DeadactAfterDestroyYes, &gn) {
+            return Printed(pm);
+          }
+          add(&unwind_bu, gn);
+        } else {
+          ci *cell_info = ref_cell(gs.gr, cell);
+          switch ci->location {
+          case LocationVirtual:
+            add(&unwind_bu, @[gr_xop]GrVirtualDead({cell}));
+          case LocationStatic:
+            add(&unwind_bu, @[gr_xop]GrDead({cell}));
+          }
+        }
+      }
+    }
+
+    unwind_sn sq_num = mut_connect(gs, &unwind_bu, &fb->final_node);
+    jmp_qnop_node(gs.gr, unwind_join_target.sn, unwind_sn);
+
+    restore_celltrack(gs.ctr, &saved_aftersuccess);
+  }
+
+  br sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&cases), None}));
+
+  append(bu, br, success_nopq);
+  return NoFail;
 }
 
 func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
@@ -1444,7 +1584,6 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
       }
 
       add(bu, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst(offset)}));
-      gn gr_num;
       switch &expr_complete_info(oo(&a->lhs))->lval {
       case &IsLvalYes(desc lval_description):
         if case DeadMe = desc.deadme {
@@ -2871,6 +3010,7 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   argtype *te_typeexpr = &ref(&mec->et.constructors, mec->constructor_index)->type;
   field_offset u32 = enum_field_offset(clq->cs, &mec->et, tagval);
+  check(enum_tag_offset == 0);
   tag_end u32;
   tag_cell cell_num;
   if true {

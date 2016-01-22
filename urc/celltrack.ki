@@ -99,7 +99,7 @@ func gr_check_empty(ctr *celltrack) void {
 }
 
 struct noted_celltrack {
-  celltrack opt[celltrack];
+  ctr opt[celltrack];
 }
 
 func mk_noted() noted_celltrack {
@@ -111,12 +111,12 @@ func mk_noted(copyee *celltrack) noted_celltrack {
 }
 
 func note_celltrack(targ *noted_celltrack, current *celltrack) void {
-  if case &Has(ct celltrack) = &targ->celltrack {
+  if case &Has(ct celltrack) = &targ->ctr {
     if !matches_checksum(&ct, current) {
-      ice(_u8("Inconsistent celltrack state, current="), current);
+      ice(_u8("Inconsistent celltrack state, current="), *current, _u8(", saved="), ct);
     }
   } else {
-    targ->celltrack = Has(*current);
+    targ->ctr = Has(*current);
   }
 }
 

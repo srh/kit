@@ -519,7 +519,19 @@ struct ast_ternary {
   else_clause box[ast_expr_consume];
 }
 
+struct ast_quickreturn_info {
+  tag_cell cell_num;
+  et enumspec;
+
+  return_tag_cell cell_num;
+  return_et enumspec;
+
+  // get(&constructor_mapping, i) returns the constructor corresponding to i.  (The value for the success case is unused.)  Right now we require "structurally convertible" to maintain identical constructor ordering, thus, get(&constructor_mapping, i) returns i.
+  constructor_mapping array[size];
+}
+
 struct ast_quickreturn {
+  info nc[ast_quickreturn_info];
   rhs box[ast_expr];
 }
 

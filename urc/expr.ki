@@ -187,7 +187,7 @@ func es_note_var_initter(es *framescope, vn var_number) np {
     return NoFail;
   }
   desc ctor_desc;
-  if case Printed(pm) = get_init_ctor(es->ds, &info->type, &desc) {
+  if case Printed(pm) = get_init_ctor(es->clq, &info->type, &desc) {
     return Printed(pm);
   }
   info->initter = Has(desc);
@@ -200,7 +200,7 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
     return NoFail;
   }
   desc ctor_desc;
-  if case Printed(pm) = get_destroy_ctor(es->ds, &info->type, &desc) {
+  if case Printed(pm) = get_destroy_ctor(es->clq, &info->type, &desc) {
     return Printed(pm);
   }
   info->destroyer = Has(desc);
@@ -650,15 +650,15 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
   }
 }
 
-func success_enum_case_info(es *framescope, cu *cu_typeexpr, success_case_ix_out *size, constructors **shray[te_vardecl]) np {
+func success_enum_case_info(ds *defscope, cu *cu_typeexpr, success_case_ix_out *size, et_out **enumspec) np {
   et *enumspec;
-  switch structural_enumspec(es->ds, &cu->x, &et) {
+  switch structural_enumspec(ds, &cu->x, &et) {
   case Error(pm):
     return Printed(pm);
   case Success:
     if case Has(ix size) = et->success_case_ix {
       *success_case_ix_out = ix;
-      *constructors = &et->constructors;
+      *et_out = et;
       return NoFail;
     } else {
       return ERR(_u8("Bad type (enum without success case) in quick-return"));
@@ -668,25 +668,21 @@ func success_enum_case_info(es *framescope, cu *cu_typeexpr, success_case_ix_out
   }
 }
 
-func structurally_convertible_in_non_success(es *framescope, rhs_success_ix size, rhs_constructors *shray[te_vardecl], return_type *cu_typeexpr, out *bool) np {
-  return_success_ix size;
-  return_constructors *shray[te_vardecl];
-  if case Printed(pm) = success_enum_case_info(es, return_type, &return_success_ix, &return_constructors) {
-    return Printed(pm);
-  }
-
+func structurally_convertible_in_non_success(ds *defscope, rhs_success_ix size, rhs_constructors *shray[te_vardecl], return_success_ix size, return_et *enumspec, out *bool, constructor_mapping_out *array[size]) np {
   // For now we're going to be uber-restrictive and require exactly the same constructor ordering (and of course exactly the same enum case types).  "Structurally convertible" is designed around generic enum types like opt[T] or cr[T].
 
   n size = count(rhs_constructors);
-  if n != count(return_constructors) || rhs_success_ix != return_success_ix {
+  if n != count(&return_et->constructors) || rhs_success_ix != return_success_ix {
     *out = false;
     return NoFail;
   }
 
+  constructor_mapping array[size];
   for i size = 0; i < n; i = i + 1 {
+    push(&constructor_mapping, i);
     if i != rhs_success_ix {
       rhs_constructor *te_vardecl = ref(rhs_constructors, i);
-      return_constructor *te_vardecl = ref(return_constructors, i);
+      return_constructor *te_vardecl = ref(&return_et->constructors, i);
       if rhs_constructor->name != return_constructor->name {
         *out = false;
         return NoFail;
@@ -699,6 +695,7 @@ func structurally_convertible_in_non_success(es *framescope, rhs_success_ix size
   }
 
   *out = true;
+  swap(constructor_mapping_out, &constructor_mapping);
   return NoFail;
 }
 
@@ -719,20 +716,27 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
     rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
 
     success_case_ix size;
-    constructors *shray[te_vardecl];
-    if case Printed(pm) = success_enum_case_info(es, &rhs_info->cu, &success_case_ix, &constructors) {
+    et *enumspec;
+    if case Printed(pm) = success_enum_case_info(es->ds, &rhs_info->cu, &success_case_ix, &et) {
       return Printed(pm);
     }
 
-    success_case_type *te_typeexpr = &ref(constructors, success_case_ix)->type;
+    success_case_type *te_typeexpr = &ref(&et->constructors, success_case_ix)->type;
 
     unified te_typeexpr;
     if !unify_types(pt, success_case_type, &unified) {
       return ERR(_u8("quick-return expr has bad type"));
     }
 
+    return_success_case_ix size;
+    return_et *enumspec;
+    if case Printed(pm) = success_enum_case_info(es->ds, return_type, &return_success_case_ix, &return_et) {
+      return Printed(pm);
+    }
+
     is_structurally_convertible bool;
-    if case Printed(pm) = structurally_convertible_in_non_success(es, success_case_ix, constructors, return_type, &is_structurally_convertible) {
+    constructor_mapping array[size];
+    if case Printed(pm) = structurally_convertible_in_non_success(es->ds, success_case_ix, &et->constructors, return_success_case_ix, return_et, &is_structurally_convertible, &constructor_mapping) {
       return Printed(pm);
     }
     if !is_structurally_convertible {
@@ -754,7 +758,11 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
     }
 
     annotate_info(x, CompleteCheck(mk(lval, success_case_cu, success_case_props)));
-    // TODO(): We'll need some more info for graph gen to use, I think.
+
+    tag_cell cell_num = add_virtual_tag_cell(es, et);
+    return_tag_cell cell_num = add_virtual_tag_cell(es, et);
+    annotate(&a->info, {tag_cell, *et, return_tag_cell, *return_et, constructor_mapping});
+
     return NoFail;
   } else {
     return ERR(_u8("quick-return expression outside body"));
@@ -1094,33 +1102,33 @@ func computed_ptr_type(clq *clqueue, t *cu_typeexpr) cu_typrop {
   return compute_prim(clq, ptr_type(clq->cs, t->x));
 }
 
-func get_init_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
+func get_init_ctor(clq *clqueue, t *cu_typeexpr, out *ctor_desc) np {
   props type_properties;
-  if case Printed(pm) = compute_type_properties(ds->clq, t, &props) {
+  if case Printed(pm) = compute_type_properties(clq, t, &props) {
     return Printed(pm);
   }
   return behavior_to_desc(&props.init_behavior, out);
 }
 
-func get_copy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
+func get_copy_ctor(clq *clqueue, t *cu_typeexpr, out *ctor_desc) np {
   props type_properties;
-  if case Printed(pm) = compute_type_properties(ds->clq, t, &props) {
+  if case Printed(pm) = compute_type_properties(clq, t, &props) {
     return Printed(pm);
   }
   return behavior_to_desc(&props.copy_behavior, out);
 }
 
-func get_move_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
+func get_move_ctor(clq *clqueue, t *cu_typeexpr, out *ctor_desc) np {
   props type_properties;
-  if case Printed(pm) = compute_type_properties(ds->clq, t, &props) {
+  if case Printed(pm) = compute_type_properties(clq, t, &props) {
     return Printed(pm);
   }
   return behavior_to_desc(&props.move_behavior, out);
 }
 
-func get_destroy_ctor(ds *defscope, t *cu_typeexpr, out *ctor_desc) np {
+func get_destroy_ctor(clq *clqueue, t *cu_typeexpr, out *ctor_desc) np {
   props type_properties;
-  if case Printed(pm) = compute_type_properties(ds->clq, t, &props) {
+  if case Printed(pm) = compute_type_properties(clq, t, &props) {
     return Printed(pm);
   }
   return behavior_to_desc(&props.destroy_behavior, out);
@@ -1141,11 +1149,11 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
         annotate(after, mk_after(@[consume_actions]ConsumeByInPlace, desc.whole_num));
       } else {
         copy ctor_desc;
-        if case Printed(pm) = get_copy_ctor(es->ds, &info->cu, &copy) {
+        if case Printed(pm) = get_copy_ctor(es->clq, &info->cu, &copy) {
           return Printed(pm);
         }
         destroy ctor_desc;
-        if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
+        if case Printed(pm) = get_destroy_ctor(es->clq, &ref_cell(es, desc.whole_num)->type, &destroy) {
           return Printed(pm);
         }
         dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
@@ -1160,14 +1168,14 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
       dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
       if case Has(ix size) = find(movable_cells, Has(desc.num)) {
         move ctor_desc;
-        if case Printed(pm) = get_move_ctor(es->ds, &info->cu, &move) {
+        if case Printed(pm) = get_move_ctor(es->clq, &info->cu, &move) {
           return Printed(pm);
         }
         annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]+{move, dest, desc.num}), dest));
         *moved_cell_ix_out = Has(ix);
       } else {
         copy ctor_desc;
-        if case Printed(pm) = get_copy_ctor(es->ds, &info->cu, &copy) {
+        if case Printed(pm) = get_copy_ctor(es->clq, &info->cu, &copy) {
           return Printed(pm);
         }
         annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]+{copy, dest, desc.num}, desc.deadme)), dest));
@@ -1184,7 +1192,7 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       destroy ctor_desc;
-      if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
+      if case Printed(pm) = get_destroy_ctor(es->clq, &ref_cell(es, desc.whole_num)->type, &destroy) {
         return Printed(pm);
       }
       annotate(after, mk_after_discard(@[destroy_action]+{destroy, desc.whole_num}));
@@ -1212,7 +1220,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
   if true {
     info *ast_expr_complete_info = expr_complete_info(a);
     destroy ctor_desc;
-    if case Printed(pm) = get_destroy_ctor(es->ds, &info->cu, &destroy) {
+    if case Printed(pm) = get_destroy_ctor(es->clq, &info->cu, &destroy) {
       return Printed(pm);
     }
     annotate(&later->action, @[destroy_action]+{destroy, result_cell(un(after))});
@@ -1221,7 +1229,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
   if case Has(p *ast_later_discard_info) = later2 {
     info *ast_expr_complete_info = expr_complete_info(a);
     destroy ctor_desc;
-    if case Printed(pm) = get_destroy_ctor(es->ds, &info->cu, &destroy) {
+    if case Printed(pm) = get_destroy_ctor(es->clq, &info->cu, &destroy) {
       return Printed(pm);
     }
     annotate(&p->action, @[destroy_action]+{destroy, result_cell(un(after))});
@@ -1248,12 +1256,12 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
       target_destroy ctor_desc;
-      if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
+      if case Printed(pm) = get_destroy_ctor(es->clq, &ref_cell(es, dest)->type, &target_destroy) {
         return Printed(pm);
       }
       if whole_temporary(&desc) {
         move ctor_desc;
-        if case Printed(pm) = get_move_ctor(es->ds, &ref_cell(es, dest)->type, &move) {
+        if case Printed(pm) = get_move_ctor(es->clq, &ref_cell(es, dest)->type, &move) {
           return Printed(pm);
         }
         annotate(&assignment->info,
@@ -1263,11 +1271,11 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
         copy ctor_desc;
-        if case Printed(pm) = get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
+        if case Printed(pm) = get_copy_ctor(es->clq, &ref_cell(es, dest)->type, &copy) {
           return Printed(pm);
         }
         destroy ctor_desc;
-        if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, desc.whole_num)->type, &destroy) {
+        if case Printed(pm) = get_destroy_ctor(es->clq, &ref_cell(es, desc.whole_num)->type, &destroy) {
           return Printed(pm);
         }
 
@@ -1284,11 +1292,11 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         annotate(&assignment->info, StaticSelfAssignment);
       } else {
         target_destroy ctor_desc;
-        if case Printed(pm) = get_destroy_ctor(es->ds, &ref_cell(es, dest)->type, &target_destroy) {
+        if case Printed(pm) = get_destroy_ctor(es->clq, &ref_cell(es, dest)->type, &target_destroy) {
           return Printed(pm);
         }
         copy ctor_desc;
-        if case Printed(pm) = get_copy_ctor(es->ds, &ref_cell(es, dest)->type, &copy) {
+        if case Printed(pm) = get_copy_ctor(es->clq, &ref_cell(es, dest)->type, &copy) {
           return Printed(pm);
         }
         do_conditional bool;
