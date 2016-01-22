@@ -162,9 +162,7 @@ func value_read(plat *platform_info, val *st_value, offset u32, ncount u32, out 
 
 func obj_read(env *st_env, oref st_obj_ref, out *st_value) np {
   val *st_value;
-  if case Printed(pm) = ref_obj(env, oref.num, &val) {
-    return Printed(pm);
-  }
+  #ref_obj(env, oref.num, &val);
   value_read(&env->plat, val, oref.offset, oref.count, out);
   return NoFail;
 }
@@ -221,9 +219,7 @@ func obj_write(env *st_env, oref st_obj_ref, in *st_value) np {
     ice(_u8("static eval writing object with non-matching length (oref.count="), oref.count, _u8(", in->length="), in->length, _u8(")"));
   }
   val *st_value;
-  if case Printed(pm) = ref_obj(env, oref.num, &val) {
-    return Printed(pm);
-  }
+  #ref_obj(env, oref.num, &val);
   value_write(&env->plat, val, oref.offset, oref.count, in);
   return NoFail;
 }
@@ -301,9 +297,7 @@ func mk_st_value_symbolref(plat *platform_info, fnid fn_body_id) st_value {
 }
 
 func ensure_def_inst_evaled(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **st_value) np {
-  if case Printed(pm) = ensure_def_inst_graphed(clq, ent_id, inst_id) {
-    return Printed(pm);
-  }
+  #ensure_def_inst_graphed(clq, ent_id, inst_id);
   return st_eval_def(clq, ent_id, inst_id, out);
 }
 
@@ -393,15 +387,11 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           ice(_u8("Function apply funptr cell is sub-object"));
         }
         funvalue st_value;
-        if case Printed(pm) = obj_read(env, funref, &funvalue) {
-          return Printed(pm);
-        }
+        #obj_read(env, funref, &funvalue);
         st_deaden(env, a.funcell);
 
         funcval st_symbolref;
-        if case Printed(pm) = st_value_as_symbolref(&env->plat, &funvalue, &funcval) {
-          return Printed(pm);
-        }
+        #st_value_as_symbolref(&env->plat, &funvalue, &funcval);
         nparams size = count(&a.params);
         paramorefs array[st_obj_ref];
         reserve(&paramorefs, nparams);
@@ -417,9 +407,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
 
         retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in III");
 
-        if case Printed(pm) = st_eval_fn_body(clq, env, &paramorefs, retvalref, funcval.fnid) {
-          return Printed(pm);
-        }
+        #st_eval_fn_body(clq, env, &paramorefs, retvalref, funcval.fnid);
 
       case &GrPrimApply(a gr_prim_apply):
         nparams size = count(&a.params);
@@ -438,9 +426,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
 
         retvalref st_obj_ref = cell_obj_ref(env, a.retcell, "in IIIb");
 
-        if case Printed(pm) = st_eval_prim_op(clq, env, &paramorefs, retvalref, &a.primop) {
-          return Printed(pm);
-        }
+        #st_eval_prim_op(clq, env, &paramorefs, retvalref, &a.primop);
 
       case &GrMemCopy(a gr_memcopy):
         destref st_obj_ref = cell_obj_ref(env, a.dest, "in IV");
@@ -449,12 +435,8 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           return ERR(_u8("ICE: cell obj cannot be reffed (in V) (cell num = "), a.src.x, _u8(")"));
         }
         value st_value;
-        if case Printed(pm) = obj_read(env, srcref, &value) {
-          return Printed(pm);
-        }
-        if case Printed(pm) = obj_write(env, destref, &value) {
-          return Printed(pm);
-        }
+        #obj_read(env, srcref, &value);
+        #obj_write(env, destref, &value);
 
       case &GrWriteConst(a gr_writeconst):
         destref st_obj_ref;
@@ -462,38 +444,26 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           return ERR(_u8("ICE: cell obj cannot be reffed (in VI) (cell num = "), a.dest.x, _u8(")"));
         }
         value st_value;
-        if case Printed(pm) = st_const_compute(clq, &env->plat, &a.value, destref.count, &value) {
-          return Printed(pm);
-        }
-        if case Printed(pm) = obj_write(env, destref, &value) {
-          return Printed(pm);
-        }
+        #st_const_compute(clq, &env->plat, &a.value, destref.count, &value);
+        #obj_write(env, destref, &value);
 
       case &GrAddressof(a gr_addressof):
         destref st_obj_ref = cell_obj_ref(env, a.dest, "in VII");
         addressee_ref st_obj_ref = cell_obj_ref(env, a.addressee, "in VIII");
         value st_value = mk_st_value_pointer(&env->plat, {addressee_ref.num, addressee_ref.offset});
-        if case Printed(pm) = obj_write(env, destref, &value) {
-          return Printed(pm);
-        }
+        #obj_write(env, destref, &value);
 
       case &GrDeref(a gr_deref):
         pointer_obj st_obj_ref = cell_obj_ref(env, a.pointer, "in IX");
         pointer_value st_value;
-        if case Printed(pm) = obj_read(env, pointer_obj, &pointer_value) {
-          return Printed(pm);
-        }
+        #obj_read(env, pointer_obj, &pointer_value);
         pointer st_pointer;
-        if case Printed(pm) = st_value_as_pointer(&env->plat, &pointer_value, &pointer) {
-          return Printed(pm);
-        }
+        #st_value_as_pointer(&env->plat, &pointer_value, &pointer);
         info *cell_info = ref_cell(&fg->gr, a.name);
         deref_size u32 = info->props.flat_size;
         // We add offset to pointer.offset.
         offset u32;
-        if case Printed(pm) = st_offset_compute(env, a.offset, &offset) {
-          return Printed(pm);
-        }
+        #st_offset_compute(env, a.offset, &offset);
         new_offset u32 = pointer.offset + offset;
         if case &Has(referee_val st_value) = ref(&env->pool->objects, pointer.num.x) {
           if new_offset > referee_val.length {
@@ -507,9 +477,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
       case &GrSubcell(a gr_subcell):
         partof_obj st_obj_ref = cell_obj_ref(env, a.partof, "in X");
         offset u32;
-        if case Printed(pm) = st_offset_compute(env, a.offset, &offset) {
-          return Printed(pm);
-        }
+        #st_offset_compute(env, a.offset, &offset);
         if offset > partof_obj.count {
           return ERR(_u8("Subcell index out of range (for cell)"));
         }
@@ -539,9 +507,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
 
         destref st_obj_ref = cell_obj_ref(env, a.cell, "in XII");
         value st_value = mk_st_value(&env->plat, destref.count);
-        if case Printed(pm) = obj_write(env, destref, &value) {
-          return Printed(pm);
-        }
+        #obj_write(env, destref, &value);
 
       case &GrAssertLive(a gr_assert_live):
         if !isHas(ref(&env->framecells, a.cell.x)) {
@@ -570,21 +536,15 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
       case &GrBranch(a gr_branch):
         src_obj st_obj_ref = cell_obj_ref(env, a.src, "in XI");
         src_value st_value;
-        if case Printed(pm) = obj_read(env, src_obj, &src_value) {
-          return Printed(pm);
-        }
+        #obj_read(env, src_obj, &src_value);
         ncases size = count(&a.cases);
         found bool = false;
         for i size = 0; i < ncases && !found; i = i + 1 {
           case_i *tup[gr_const, sq_num] = ref(&a.cases, i);
           case_value st_value;
-          if case Printed(pm) = st_const_compute(clq, &env->plat, &case_i->car, src_obj.count, &case_value) {
-            return Printed(pm);
-          }
+          #st_const_compute(clq, &env->plat, &case_i->car, src_obj.count, &case_value);
           case_matches bool;
-          if case Printed(pm) = st_values_selfcontained_equal(&env->plat, &src_value, &case_value, &case_matches) {
-            return Printed(pm);
-          }
+          #st_values_selfcontained_equal(&env->plat, &src_value, &case_value, &case_matches);
           if case_matches {
             push(&stack, case_i->cdr.x);
             found = true;
@@ -693,9 +653,7 @@ func st_const_compute(clq *clqueue, plat *platform_info, c *gr_const, length u32
     *out = st_bigint_to_value_unsigned(plat, length, b);
   case &ConstDef(ip instpair):
     val *st_value;
-    if case Printed(pm) = ensure_def_inst_evaled(clq, ip.ent_id, ip.inst_id, &val) {
-      return Printed(pm);
-    }
+    #ensure_def_inst_evaled(clq, ip.ent_id, ip.inst_id, &val);
     *out = *val;
   case &ConstFnBody(fnid fn_body_id):
     *out = mk_st_value_symbolref(plat, fnid);
@@ -732,13 +690,9 @@ func st_offset_compute(env *st_env, gro gr_offset, out *u32) np {
   case OffsetComputed(pair tup[u32, cell_num]):
     index_obj st_obj_ref = cell_obj_ref(env, pair.cdr, "in XIII");
     index_value st_value;
-    if case Printed(pm) = obj_read(env, index_obj, &index_value) {
-      return Printed(pm);
-    }
+    #obj_read(env, index_obj, &index_value);
     index u32;
-    if case Printed(pm) = st_value_as_size(&env->plat, &index_value, &index) {
-      return Printed(pm);
-    }
+    #st_value_as_size(&env->plat, &index_value, &index);
     *out = pair.car * index;
   }
   return NoFail;
@@ -788,9 +742,7 @@ func st_bigint_to_value_twos(plat *platform_info, length u32, b bigint, out *st_
 
 func st_value_unsigned_as_bigint(plat *platform_info, val *st_value, out *bigint) np {
   words array[u32];
-  if case Printed(pm) = st_value_self_contained(plat, val, &words) {
-    return Printed(pm);
-  }
+  #st_value_self_contained(plat, val, &words);
 
   check_littleendian(plat);
   // It's pretty simple when it's little-endian.
@@ -800,9 +752,7 @@ func st_value_unsigned_as_bigint(plat *platform_info, val *st_value, out *bigint
 
 func st_value_signed_twos_as_bigint(plat *platform_info, val *st_value, out *bigint) np {
   words array[u32];
-  if case Printed(pm) = st_value_self_contained(plat, val, &words) {
-    return Printed(pm);
-  }
+  #st_value_self_contained(plat, val, &words);
 
   check_littleendian(plat);
   check(val->length > 0);
@@ -945,9 +895,7 @@ func st_value_as_size(plat *platform_info, val *st_value, out *u32) np {
     return ERR(_u8("Treating non-size-sized value as size."));
   }
   b bigint;
-  if case Printed(pm) = st_value_unsigned_as_bigint(plat, val, &b) {
-    return Printed(pm);
-  }
+  #st_value_unsigned_as_bigint(plat, val, &b);
   x u32;
   if !as_non_negative_u32(&b, &x) {
     return ERR(_u8("Size out of range for static evaluation."));

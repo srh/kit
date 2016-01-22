@@ -83,16 +83,12 @@ func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *en
   for i size = 0; i < nstatements; i = i + 1 {
     s *ast_statement = ref(&a->statements, i);
     ee entryexit;
-    if case Printed(pm) = check_statement(bs, &vp, obp, s, &ee) {
-      return Printed(pm);
-    }
+    #check_statement(bs, &vp, obp, s, &ee);
     connect_statements(bs, exit, ee.entry);
     exit = ee.exit;
   }
   destructions array[var_destruction];
-  if case Printed(pm) = make_destructions(&bs->es, read_nums(&vp), &destructions) {
-    return Printed(pm);
-  }
+  #make_destructions(&bs->es, read_nums(&vp), &destructions);
   annotate(&a->info, {destructions});
   *ee_out = {entry, exit};
   return NoFail;
@@ -101,9 +97,7 @@ func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *en
 func make_init_action(es *framescope, vn var_number, out *init_action) np {
   vi *var_info = ref_var(es, vn);
   init ctor_desc;
-  if case Printed(pm) = get_init_ctor(es->clq, &vi->type, &init) {
-    return Printed(pm);
-  }
+  #get_init_ctor(es->clq, &vi->type, &init);
   ia init_action = +{init, vi->cell};
   *out = ia;
   return NoFail;
@@ -114,9 +108,7 @@ func make_initializations(es *framescope, vns *array[var_number], out *array[ini
   n size = count(vns);
   for i size = 0; i < n; i = i + 1 {
     ia init_action;
-    if case Printed(pm) = make_init_action(es, get(vns, i), &ia) {
-      return Printed(pm);
-    }
+    #make_init_action(es, get(vns, i), &ia);
     push(&initializations, ia);
   }
   *out = initializations;
@@ -126,9 +118,7 @@ func make_initializations(es *framescope, vns *array[var_number], out *array[ini
 func make_destroy_action(es *framescope, vn var_number, out *destroy_action) np {
   vi *var_info = ref_var(es, vn);
   destroy ctor_desc;
-  if case Printed(pm) = get_destroy_ctor(es->clq, &vi->type, &destroy) {
-    return Printed(pm);
-  }
+  #get_destroy_ctor(es->clq, &vi->type, &destroy);
   da destroy_action = +{destroy, vi->cell};
   *out = da;
   return NoFail;
@@ -148,9 +138,7 @@ func make_destructions(es *framescope, vns *array[var_number], out *array[var_de
     switch vi->binding {
     case VarSelfContained:
       da destroy_action;
-      if case Printed(pm) = make_destroy_action(es, get(vns, i), &da) {
-        return Printed(pm);
-      }
+      #make_destroy_action(es, get(vns, i), &da);
       push(&destructions, VarSelfContainedDestruction(da));
     case VarOverlay:
       push(&destructions, VarVirtualCellDead(vi->cell));
@@ -161,12 +149,8 @@ func make_destructions(es *framescope, vns *array[var_number], out *array[var_de
 }
 
 func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) np {
-  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, &x->expr, pt) {
-    return Printed(pm);
-  }
-  if case Printed(pm) = annotate_disposal_for_discard(es, &x->expr, &x->after) {
-    return Printed(pm);
-  }
+  #check_expr_ai(es, AllowIncompleteNo, &x->expr, pt);
+  #annotate_disposal_for_discard(es, &x->expr, &x->after);
   return NoFail;
 }
 
@@ -175,12 +159,8 @@ func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te
   return check_consume_then_discard_expr(es, x, pt, later, None);
 }
 func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) np {
-  if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, &x->expr, pt) {
-    return Printed(pm);
-  }
-  if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later, later2) {
-    return Printed(pm);
-  }
+  #check_expr_ai(es, AllowIncompleteNo, &x->expr, pt);
+  #annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later, later2);
   return NoFail;
 }
 
@@ -209,24 +189,18 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
     case &Expr(b ast_expr_discard): {
       // This is a bit restrictive and anal, especially for a language designed to interact with C API's that might have "helpful" but ignorable return values.
       pt te_typeexpr = primitive_void_type(bs->cs);
-      if case Printed(pm) = check_discard_expr(&bs->es, &b, &pt) {
-        return Printed(pm);
-      }
+      #check_discard_expr(&bs->es, &b, &pt);
       *ee_out = {num, num};
     }
 
     case &Return(b ast_return_statement): {
       exit_num statement_num;
-      if case Printed(pm) = check_return_statement(bs, &b, &exit_num) {
-        return Printed(pm);
-      }
+      #check_return_statement(bs, &b, &exit_num);
       *ee_out = {num, exit_num};
     }
 
     case &Var(b ast_var_statement): {
-      if case Printed(pm) = check_var_statement(bs, vp, &b) {
-        return Printed(pm);
-      }
+      #check_var_statement(bs, vp, &b);
       *ee_out = {num, num};
     }
 
@@ -236,13 +210,9 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
 
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
-      if case Printed(pm) = check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard) {
-        return Printed(pm);
-      }
+      #check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard);
       body_ee entryexit;
-      if case Printed(pm) = check_body(bs, obp, &b.body, &body_ee) {
-        return Printed(pm);
-      }
+      #check_body(bs, obp, &b.body, &body_ee);
       tailnum statement_num = add_statement(bs, None);
       connect_statements(bs, num, tailnum);
       connect_statements(bs, num, body_ee.entry);
@@ -256,18 +226,12 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
 
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
-      if case Printed(pm) = check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard) {
-        return Printed(pm);
-      }
+      #check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard);
       then_ee entryexit;
-      if case Printed(pm) = check_body(bs, obp, &b.thenbody, &then_ee) {
-        return Printed(pm);
-      }
+      #check_body(bs, obp, &b.thenbody, &then_ee);
       descope_vars(&cond_vp);
       else_ee entryexit;
-      if case Printed(pm) = check_body(bs, obp, &b.elsebody, &else_ee) {
-        return Printed(pm);
-      }
+      #check_body(bs, obp, &b.elsebody, &else_ee);
       tailnum statement_num = add_statement(bs, None);
       connect_statements(bs, num, then_ee.entry);
       connect_statements(bs, num, else_ee.entry);
@@ -284,13 +248,9 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       bp breakpack = {tailnum, vars_in_scope(&bs->es), num, vars_in_scope(&bs->es)};
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
-      if case Printed(pm) = check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard_continue, Has(&b.condition_discard_exit)) {
-        return Printed(pm);
-      }
+      #check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard_continue, Has(&b.condition_discard_exit));
       body_ee entryexit;
-      if case Printed(pm) = check_body(bs, Has(&bp), &b.body, &body_ee) {
-        return Printed(pm);
-      }
+      #check_body(bs, Has(&bp), &b.body, &body_ee);
       connect_statements(bs, num, body_ee.entry);
       connect_statements(bs, body_ee.exit, num);
       connect_statements(bs, num, tailnum);
@@ -299,26 +259,20 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
 
     case &For(b ast_for_statement): {
       exitnum statement_num;
-      if case Printed(pm) = check_for_statement(bs, vp, &b, num, &exitnum) {
-        return Printed(pm);
-      }
+      #check_for_statement(bs, vp, &b, num, &exitnum);
       *ee_out = {num, exitnum};
     }
 
     case &Switch(b ast_switch_statement): {
       exitnum statement_num;
-      if case Printed(pm) = check_switch_statement(bs, vp, obp, &b, num, &exitnum) {
-        return Printed(pm);
-      }
+      #check_switch_statement(bs, vp, obp, &b, num, &exitnum);
       *ee_out = {num, exitnum};
     }
 
     case &Break(b ast_break_statement):
       if case Has(bp *breakpack) = obp {
         destructions array[var_destruction];
-        if case Printed(pm) = compute_destruct(bs, vars_in_scope(&bs->es), &bp->break_in_scope, &destructions) {
-          return Printed(pm);
-        }
+        #compute_destruct(bs, vars_in_scope(&bs->es), &bp->break_in_scope, &destructions);
         annotate(&b.info, {destructions});
         connect_statements(bs, num, bp->break_target);
         *ee_out = {num, add_statement(bs, None)};
@@ -329,9 +283,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
     case &Continue(b ast_continue_statement):
       if case Has(bp *breakpack) = obp {
         destructions array[var_destruction];
-        if case Printed(pm) = compute_destruct(bs, vars_in_scope(&bs->es), &bp->continue_in_scope, &destructions) {
-          return Printed(pm);
-        }
+        #compute_destruct(bs, vars_in_scope(&bs->es), &bp->continue_in_scope, &destructions);
         annotate(&b.info, {destructions});
         connect_statements(bs, num, bp->continue_target);
         *ee_out = {num, add_statement(bs, None)};
@@ -369,9 +321,7 @@ struct swartch_checkobj {
 
 func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard_info, later2 opt[*ast_later_discard_info], checkobj_out *swartch_checkobj) np {
   unknown te_typeexpr = TeUnknown;
-  if case Printed(pm) = check_consume_then_discard_expr(es, a, &unknown, later, later2) {
-    return Printed(pm);
-  }
+  #check_consume_then_discard_expr(es, a, &unknown, later, later2);
 
   swartch_type *cu_typeexpr = expr_complete_type(&a->expr);
   checkobj_out->swartch_type = swartch_type;
@@ -418,14 +368,10 @@ func check_pattern(es *framescope, chk *swartch_checkobj, et *enumspec, patt *as
 func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_type *te_typeexpr, vd *ast_vardecl, cu_expected_type_out *cu_typeexpr, varcell_out *cell_num) np {
   // TODO: Cache converted?
   converted te_typeexpr;
-  if case Printed(pm) = convert_typeexpr(es->cs, &vd->type, &converted) {
-    return Printed(pm);
-  }
+  #convert_typeexpr(es->cs, &vd->type, &converted);
 
   cac cac_typeexpr;
-  if case Printed(pm) = check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &cac) {
-    return Printed(pm);
-  }
+  #check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &cac);
 
   unified te_typeexpr;
   if !unify_types(&cac.te, expected_type, &unified) {
@@ -434,18 +380,14 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
 
   *cu_expected_type_out = ~ *expected_type;
   expected_type_props type_properties;
-  if case Printed(pm) = compute_type_properties(es->clq, cu_expected_type_out, &expected_type_props) {
-    return Printed(pm);
-  }
+  #compute_type_properties(es->clq, cu_expected_type_out, &expected_type_props);
   *varcell_out = add_cell(es, {LocationVirtual, *cu_expected_type_out, expected_type_props});
   return NoFail;
 }
 
 func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a *ast_switch_statement, num statement_num, exit_out *statement_num) np {
   chk swartch_checkobj;
-  if case Printed(pm) = check_swartch(&bs->es, oo(&a->swartch), &a->swartch_discard, None, &chk) {
-    return Printed(pm);
-  }
+  #check_swartch(&bs->es, oo(&a->swartch), &a->swartch_discard, None, &chk);
 
   // enum_type is complete, because check_swartch says so.
 
@@ -457,9 +399,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
   swartch_vp varpopper;
   init_vp(&swartch_vp, &bs->es);
   swartch_vn var_number;
-  if case Printed(pm) = es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
-    return Printed(pm);
-  }
+  #es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn);
   for i size = 0; i < ncases; i = i + 1 {
     cas *ast_switch_case = ref(&a->cases, i);
     for j size = 0; j < i; j = j + 1 {
@@ -472,9 +412,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
       case &Case(patt ast_constructor_pattern): {
         expected_type *te_typeexpr;
         decl_index size;
-        if case Printed(pm) = check_pattern(&bs->es, &chk, et, &patt, &expected_type, &decl_index) {
-          return Printed(pm);
-        }
+        #check_pattern(&bs->es, &chk, et, &patt, &expected_type, &decl_index);
         // expected_type is complete, because check_pattern says so.
 
         tag_value enum_tag_value = mk_enum_tag_value(decl_index);
@@ -485,14 +423,10 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
         if case &Has(vd ast_vardecl) = &patt.decl {
           cu_expected_type cu_typeexpr;
           cell cell_num;
-          if case Printed(pm) = check_pattern_var(&bs->es, &patt, expected_type, &vd, &cu_expected_type, &cell) {
-            return Printed(pm);
-          }
+          #check_pattern_var(&bs->es, &patt, expected_type, &vd, &cu_expected_type, &cell);
 
           vn var_number;
-          if case Printed(pm) = es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
-            return Printed(pm);
-          }
+          #es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn);
           ovn = Has(vn);
         } else {
           voidtp cu_typrop = compute_prim(bs->clq, primitive_void_type(bs->cs));
@@ -505,17 +439,13 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
         annotate(&patt.cp_info, {ovn, tag_value, enum_field_offset(bs->cs, et, tag_value)});
 
         body_ee entryexit;
-        if case Printed(pm) = check_body(bs, obp, &cas->body, &body_ee) {
-          return Printed(pm);
-        }
+        #check_body(bs, obp, &cas->body, &body_ee);
         connect_statements(bs, num, body_ee.entry);
         connect_statements(bs, body_ee.exit, exitnum);
       }
       case &Default: {
         body_ee entryexit;
-        if case Printed(pm) = check_body(bs, obp, &cas->body, &body_ee) {
-          return Printed(pm);
-        }
+        #check_body(bs, obp, &cas->body, &body_ee);
         connect_statements(bs, num, body_ee.entry);
         connect_statements(bs, body_ee.exit, exitnum);
       }
@@ -545,9 +475,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   loopnum statement_num = add_statement(bs, None);
   if case &Has(initter box[ast_statement]) = &a->initializer {
     initter_ee entryexit;
-    if case Printed(pm) = check_statement(bs, &initter_vp, None, oo(&initter), &initter_ee) {
-      return Printed(pm);
-    }
+    #check_statement(bs, &initter_vp, None, oo(&initter), &initter_ee);
     connect_statements(bs, num, initter_ee.entry);
     connect_statements(bs, initter_ee.exit, loopnum);
   } else {
@@ -560,34 +488,24 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   init_vp(&cond_vp, &bs->es);
   if case &Has(cond ast_expr_condition) = &a->condition {
     boolean cu_typeexpr = compute_prim(bs->clq, primitive_bool_type(bs->cs));
-    if case Printed(pm) = check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.x, &cond.discard) {
-      return Printed(pm);
-    }
+    #check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.x, &cond.discard);
     connect_statements(bs, loopnum, exitnum);
     cond_vn var_number;
-    if case Printed(pm) = es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, ~unnamed_lifetime(&bs->es), &boolean, VarSelfContained, &cond_vn) {
-      return Printed(pm);
-    }
+    #es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, ~unnamed_lifetime(&bs->es), &boolean, VarSelfContained, &cond_vn);
   }
   if case &Has(incr box[ast_expr_discard]) = &a->increment {
     unknown te_typeexpr = TeUnknown;
-    if case Printed(pm) = check_discard_expr(&bs->es, oo(&incr), &unknown) {
-      return Printed(pm);
-    }
+    #check_discard_expr(&bs->es, oo(&incr), &unknown);
   }
 
   bp breakpack = {exitnum, break_in_scope, loopnum, loop_in_scope};
 
   body_ee entryexit;
-  if case Printed(pm) = check_body(bs, Has(&bp), &a->body, &body_ee) {
-    return Printed(pm);
-  }
+  #check_body(bs, Has(&bp), &a->body, &body_ee);
   connect_statements(bs, loopnum, body_ee.entry);
   connect_statements(bs, body_ee.exit, loopnum);
   initter_destructions array[var_destruction];
-  if case Printed(pm) = make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions) {
-    return Printed(pm);
-  }
+  #make_destructions(&bs->es, read_nums(&initter_vp), &initter_destructions);
   annotate(&a->info, {initter_destructions});
   *exit_out = exitnum;
   return NoFail;
@@ -596,14 +514,10 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
 func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np {
   // TODO: Cache converted... or something.
   converted te_typeexpr;
-  if case Printed(pm) = convert_typeexpr(bs->cs, &a->decl.type, &converted) {
-    return Printed(pm);
-  }
+  #convert_typeexpr(bs->cs, &a->decl.type, &converted);
 
   computed cac_typeexpr;
-  if case Printed(pm) = check_and_compute_typeexpr(bs->clq, bs->ds->generics, bs->ds->repls, &converted, &computed) {
-    return Printed(pm);
-  }
+  #check_and_compute_typeexpr(bs->clq, bs->ds->generics, bs->ds->repls, &converted, &computed);
   cu_computed cu_typeexpr;
 
   complete_type *cu_typeexpr;
@@ -611,9 +525,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   cell cell_num;
   switch &a->rhs {
     case &HasExpr(x box[ast_expr_consume]): {
-      if case Printed(pm) = check_expr_consume(&bs->es, oo(&x), &computed.te) {
-        return Printed(pm);
-      }
+      #check_expr_consume(&bs->es, oo(&x), &computed.te);
       info *ast_expr_complete_info = expr_complete_info(&oo(&x)->expr);
       complete_type = &info->cu;
       note_initter = false;
@@ -626,35 +538,25 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
       cu_computed = ~computed.te;
       complete_type = &cu_computed;
       cu_props type_properties;
-      if case Printed(pm) = compute_type_properties(bs->clq, complete_type, &cu_props) {
-        return Printed(pm);
-      }
+      #compute_type_properties(bs->clq, complete_type, &cu_props);
       note_initter = true;
       cell = add_cell(&bs->es, {LocationStatic, *complete_type, cu_props});
     }
   }
 
   vn var_number;
-  if case Printed(pm) = es_push_var(&bs->es, vp, cell, Has(&a->decl.name), ~varname_lifetime(bs->im, a->decl.name.value), complete_type, VarSelfContained, &vn) {
-    return Printed(pm);
-  }
+  #es_push_var(&bs->es, vp, cell, Has(&a->decl.name), ~varname_lifetime(bs->im, a->decl.name.value), complete_type, VarSelfContained, &vn);
   annotate(&a->info, {vn});
-  if case Printed(pm) = es_note_var_destroyer(&bs->es, vn) {
-    return Printed(pm);
-  }
+  #es_note_var_destroyer(&bs->es, vn);
   if note_initter {
-    if case Printed(pm) = es_note_var_initter(&bs->es, vn) {
-      return Printed(pm);
-    }
+    #es_note_var_initter(&bs->es, vn);
     switch &a->rhs {
       case &HasExpr(x box[ast_expr_consume]): {
         ice(_u8("note_initter true, on HasExpr, locally impossible"));
       }
       case &AutoInit(x opt[init_action]): {
         init ctor_desc;
-        if case Printed(pm) = get_init_ctor(bs->clq, complete_type, &init) {
-          return Printed(pm);
-        }
+        #get_init_ctor(bs->clq, complete_type, &init);
         ia init_action = +{init, cell};
         x = Has(ia);
       }
@@ -692,9 +594,7 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
   varcells shray[opt[cell_num]] = compute_varcells(&bs->es, &vars);
   moved_var_ix opt[size];
   if case &Has(c box[ast_expr_consume]) = &a->expr {
-    if case Printed(pm) = check_expr_retconsume(&bs->es, oo(&c), &bs->return_type->x, &varcells, &moved_var_ix) {
-      return Printed(pm);
-    }
+    #check_expr_retconsume(&bs->es, oo(&c), &bs->return_type->x, &varcells, &moved_var_ix);
     reannotate_static_to_virtual(&bs->es, result_cell(oo(&c)));
   } else {
     if !type_is_void(bs->cs, bs->return_type) {
@@ -706,9 +606,7 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
     shifterase_elem(&vars, ix);
   }
   destructions array[var_destruction];
-  if case Printed(pm) = make_destructions(&bs->es, &vars, &destructions) {
-    return Printed(pm);
-  }
+  #make_destructions(&bs->es, &vars, &destructions);
   annotate(&a->info, {destructions});
   *exit_out = add_statement(bs, None);
   return NoFail;
@@ -760,15 +658,11 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
   switch a {
     case &ExprCondition(b box[ast_expr_consume]): {
       booltype cu_typeexpr = compute_prim(es->clq, primitive_bool_type(es->cs));
-      if case Printed(pm) = check_consume_then_discard_expr(es, oo(&b), &booltype.x, &cd->later, cdi_later(cd2)) {
-        return Printed(pm);
-      }
+      #check_consume_then_discard_expr(es, oo(&b), &booltype.x, &cd->later, cdi_later(cd2));
 
       // We need return statements in the "then" or "else" block to mark the boolean condition dead.  (It would be a smarter graph if we just marked it dead immediately after the branch, but... this way makes the code here handle all cases equivalently.)
       swartch_vn var_number;
-      if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_lifetime(es), &booltype, VarSelfContained, &swartch_vn) {
-        return Printed(pm);
-      }
+      #es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_lifetime(es), &booltype, VarSelfContained, &swartch_vn);
       annotate(&cd->virtual_cell_dead, None);
       if case Has(p) = cd2 {
         annotate(&p->virtual_cell_dead, None);
@@ -777,25 +671,19 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
     }
     case &PatternCondition(b ast_pattern_assign): {
       chk swartch_checkobj;
-      if case Printed(pm) = check_swartch(es, oo(&b.rhs), &cd->later, cdi_later(cd2), &chk) {
-        return Printed(pm);
-      }
+      #check_swartch(es, oo(&b.rhs), &cd->later, cdi_later(cd2), &chk);
 
       // enum_type is complete, because check_swartch says so.
 
       et *enumspec = chk.enum_type;
       if true {
         swartch_vn var_number;
-        if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn) {
-          return Printed(pm);
-        }
+        #es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_lifetime, chk.swartch_type, VarSelfContained, &swartch_vn);
       }
 
       expected_type *te_typeexpr;
       decl_index size;
-      if case Printed(pm) = check_pattern(es, &chk, et, &b.pattern, &expected_type, &decl_index) {
-        return Printed(pm);
-      }
+      #check_pattern(es, &chk, et, &b.pattern, &expected_type, &decl_index);
       // expected_type is complete, because check_pattern says so.
 
       tag_cell cell_num = add_virtual_tag_cell(es, et);
@@ -805,18 +693,14 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
       if case &Has(vd ast_vardecl) = &b.pattern.decl {
         cu_expected_type cu_typeexpr;
         cell cell_num;
-        if case Printed(pm) = check_pattern_var(es, &b.pattern, expected_type, &vd, &cu_expected_type, &cell) {
-          return Printed(pm);
-        }
+        #check_pattern_var(es, &b.pattern, expected_type, &vd, &cu_expected_type, &cell);
 
         annotate(&cd->virtual_cell_dead, Has(cell));
         if case Has(p) = cd2 {
           annotate(&p->virtual_cell_dead, Has(cell));
         }
         vn var_number;
-        if case Printed(pm) = es_push_var(es, cond_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
-          return Printed(pm);
-        }
+        #es_push_var(es, cond_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn);
 
         ovn = Has(vn);
       } else {
@@ -846,9 +730,7 @@ func type_is_void(cs *checkstate, t *cu_typeexpr) bool {
 }
 
 func finish_lambda_body(bs *bodystate, ee entryexit) np {
-  if case Printed(pm) = connect_gotos(bs) {
-    return Printed(pm);
-  }
+  #connect_gotos(bs);
   mark_reachable(bs, ee.entry);
   if ref(&bs->statements, ee.exit.x)->marked_reachable && !type_is_void(bs->cs, bs->return_type) {
     return ERR(_u8("Body can exit without return"));
@@ -871,9 +753,7 @@ func mark_reachable(bs *bodystate, entry statement_num) void {
 func compute_destruct(bs *bodystate, goto_in_scope array[var_number], target_in_scope *array[var_number], out *array[var_destruction]) np {
   destructions array[var_destruction];
   initializations array[init_action];
-  if case Printed(pm) = compute_destruct_construct(bs, &goto_in_scope, target_in_scope, &destructions, &initializations) {
-    return Printed(pm);
-  }
+  #compute_destruct_construct(bs, &goto_in_scope, target_in_scope, &destructions, &initializations);
   check(empty(&initializations));
   swap(out, &destructions);
   return NoFail;
@@ -891,28 +771,20 @@ func compute_destruct_construct(bs *bodystate, goto_in_scope *array[var_number],
     if case VarOverlay = vi->binding {
       return ERR(_u8("goto enters non-initiannlizable variable scope"));
     }
-    if case Printed(pm) = es_note_var_initter(&bs->es, vn) {
-      return Printed(pm);
-    }
+    #es_note_var_initter(&bs->es, vn);
   }
 
   ndestruct size = count(&destruct);
   for i size = 0; i < ndestruct; i = i + 1 {
     vn var_number = get(&destruct, i);
-    if case Printed(pm) = es_note_var_destroyer(&bs->es, vn) {
-      return Printed(pm);
-    }
+    #es_note_var_destroyer(&bs->es, vn);
   }
 
   destructions array[var_destruction];
-  if case Printed(pm) = make_destructions(&bs->es, &destruct, &destructions) {
-    return Printed(pm);
-  }
+  #make_destructions(&bs->es, &destruct, &destructions);
 
   initializations array[init_action];
-  if case Printed(pm) = make_initializations(&bs->es, &construct, &initializations) {
-    return Printed(pm);
-  }
+  #make_initializations(&bs->es, &construct, &initializations);
 
   swap(destructions_out, &destructions);
   swap(initializations_out, &initializations);
@@ -927,9 +799,7 @@ func connect_gotos(bs *bodystate) np {
       l *label_info = ref(&bs->labels, j);
       destructions array[var_destruction];
       initializations array[init_action];
-      if case Printed(pm) = compute_destruct_construct(bs, &g->in_scope, &l->in_scope, &destructions, &initializations) {
-        return Printed(pm);
-      }
+      #compute_destruct_construct(bs, &g->in_scope, &l->in_scope, &destructions, &initializations);
 
       l->hit = true;
       connect_statements(bs, g->stnum, l->stnum);

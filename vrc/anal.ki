@@ -218,9 +218,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
           case &GraphedFnBody(eg graphed_fn_body):
             switch eg.inline {
             case InlineMust:
-              if case Printed(pm) = basic_and_inline(cs, &eg) {
-                return Printed(pm);
-              }
+              #basic_and_inline(cs, &eg);
               nparams size = count(&a.params);
               check(count(&eg.argcells) == nparams);
               // Okay, we're inlining.

@@ -127,9 +127,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
   }
 
   mut genexpr_result;
-  if case Printed(pm) = dumbly_analyze_expression(&h, &g->graph.gr, &ctr, g->graph.gn, &mut) {
-    return Printed(pm);
-  }
+  #dumbly_analyze_expression(&h, &g->graph.gr, &ctr, g->graph.gn, &mut);
 
   switch &mut {
   case &Terminal:
@@ -141,9 +139,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
   case &NonTerminal: { /* nothing to assert */ }
   }
 
-  if case Printed(pm) = dumbly_layout_frame_cells(g, &h) {
-    return Printed(pm);
-  }
+  #dumbly_layout_frame_cells(g, &h);
 
   dumbly_gen_machine_code(f, &h, g->graph.gn);
 
@@ -193,9 +189,7 @@ func isNope(p *tmp_offsets_val) bool {
 func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
   // Left-most paramlist goes first.
   paramlist_ordering array[gr_num];
-  if case Printed(pm) = dumbly_linearize_paramlist_ordering(h, &paramlist_ordering) {
-    return Printed(pm);
-  }
+  #dumbly_linearize_paramlist_ordering(h, &paramlist_ordering);
 
   // Offsets of either a static cell or a virtual cell's pointer.
   offsets array[tmp_offsets_val] = repeat(count(&h->gr->cells), Nope);

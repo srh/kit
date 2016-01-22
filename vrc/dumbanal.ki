@@ -2,9 +2,7 @@ import state;
 
 func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num) np {
   mbmut genexpr_result;
-  if case Printed(pm) = dumbly_analyze_expression(h, gr, ctr, gn, &mbmut) {
-    return Printed(pm);
-  }
+  #dumbly_analyze_expression(h, gr, ctr, gn, &mbmut);
   switch &mbmut {
   case &Terminal:
     return NoFail;
@@ -157,18 +155,14 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
         cas *tup[gr_const, sq_num] = ref(&a.cases, i);
         new_live celltrack = *ctr;
         casmut genexpr_result;
-        if case Printed(pm) = dumbly_analyze_expression(h, gr, &new_live, cas->cdr.x, &casmut) {
-          return Printed(pm);
-        }
+        #dumbly_analyze_expression(h, gr, &new_live, cas->cdr.x, &casmut);
         combine_branch_mut(&new_live, &combined_mut, casmut, &end_ctr);
       }
 
       if case Has(def_gn sq_num) = a.default_case {
         new_live celltrack = *ctr;
         defcasmut genexpr_result;
-        if case Printed(pm) = dumbly_analyze_expression(h, gr, &new_live, def_gn.x, &defcasmut) {
-          return Printed(pm);
-        }
+        #dumbly_analyze_expression(h, gr, &new_live, def_gn.x, &defcasmut);
         combine_branch_mut(&new_live, &combined_mut, defcasmut, &end_ctr);
       }
 
@@ -178,9 +172,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
       return NoFail;
 
     case &GrSequence(a gr_sequence):
-      if case Printed(pm) = dumbly_analyze_returning_expression(h, gr, ctr, a.first) {
-        return Printed(pm);
-      }
+      #dumbly_analyze_returning_expression(h, gr, ctr, a.first);
       return dumbly_analyze_expression(h, gr, ctr, a.second.x, out);
 
     case &GrJmp(a gr_jmp):

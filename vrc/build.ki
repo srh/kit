@@ -8,21 +8,15 @@ import osx_objfile;
 import objfile;
 
 func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u8]) np {
-  if case Printed(pm) = check_module(cs, modulename) {
-    return Printed(pm);
-  }
+  #check_module(cs, modulename);
 
   f objfile = mk_objfile();
 
   add_fn_body_symbols(cs, &f);
 
-  if case Printed(pm) = build_fn_bodies(cs, &f) {
-    return Printed(pm);
-  }
+  #build_fn_bodies(cs, &f);
 
-  if case Printed(pm) = add_export_symbols(cs, &f, modulename) {
-    return Printed(pm);
-  }
+  #add_export_symbols(cs, &f, modulename);
 
   switch cs->plat.opsys {
   case Linux32:
@@ -38,9 +32,7 @@ func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u
 
 func build_module(cs *checkstate, modulename sym) np {
   flattened array[u8];
-  if case Printed(pm) = build_nowrite_module(cs, modulename, &flattened) {
-    return Printed(pm);
-  }
+  #build_nowrite_module(cs, modulename, &flattened);
 
   path array[u8] = to_u8str(lookup(cs->im, modulename));
   switch cs->plat.opsys {
@@ -63,9 +55,7 @@ func build_fn_bodies(cs *checkstate, f *objfile) np {
   nbodies size = count(&cs->fn_bodies);
   for i size = 0; i < nbodies; i = i + 1 {
     ent *fn_body_entry = oo(ref(&cs->fn_bodies, i));
-    if case Printed(pm) = build_fn_body(cs, f, ent) {
-      return Printed(pm);
-    }
+    #build_fn_body(cs, f, ent);
   }
   return NoFail;
 }
@@ -74,9 +64,7 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) np {
   switch &ent->u {
   case &GraphedFnBody(g graphed_fn_body):
     // DBG(_u8("build fn body for "), lookup(cs->im, g.graph.gr.informal_name));
-    if case Printed(pm) = basic_and_inline(cs, &g) {
-      return Printed(pm);
-    }
+    #basic_and_inline(cs, &g);
 
     fillercode_align_double_quadword(f);
     text_offset u32 = secsize(&f->text);

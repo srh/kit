@@ -619,9 +619,7 @@ func is_defwise_trivial(props *type_properties) bool {
 func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, impl_name sym, behavior_out *derived_method_behavior) np {
   res match_def_res;
   gp genparms = NoParms;
-  if case Printed(pm) = match_def(clq->cs, impl_name, &gp, fntype, &res) {
-    return Printed(pm);
-  }
+  #match_def(clq->cs, impl_name, &gp, fntype, &res);
 
   switch &res {
     case &NoMatch: {
@@ -633,9 +631,7 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
     }
     case &OneMatch(m ent_and_parms): {
       inst_id def_inst_id;
-      if case Printed(pm) = make_inst(clq, m.ent, &m.parms, &inst_id) {
-        return Printed(pm);
-      }
+      #make_inst(clq, m.ent, &m.parms, &inst_id);
       *behavior_out = DerivedMethodExplicit({m.ent, inst_id});
       return NoFail;
     }
@@ -648,60 +644,38 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
   switch a {
     case DefaultMoveCopyDestroy: {
       ret type_properties;
-      if case Printed(pm) = compute_complete_struct_properties(clq, st, &it, (ComputeMove | ComputeCopy) | ComputeDestroy, &ret) {
-        return Printed(pm);
-      }
+      #compute_complete_struct_properties(clq, st, &it, (ComputeMove | ComputeCopy) | ComputeDestroy, &ret);
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
-        return Printed(pm);
-      }
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior);
       *out = ret;
       return NoFail;
     }
     case DefaultMove: {
       ret type_properties;
-      if case Printed(pm) = compute_complete_struct_properties(clq, st, &it, ComputeMove, &ret) {
-        return Printed(pm);
-      }
+      #compute_complete_struct_properties(clq, st, &it, ComputeMove, &ret);
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
-        return Printed(pm);
-      }
-      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype2, intern(cs->im, _s("do_copy")), &ret.copy_behavior) {
-        return Printed(pm);
-      }
-      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior) {
-        return Printed(pm);
-      }
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, intern(cs->im, _s("do_copy")), &ret.copy_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior);
       *out = ret;
       return NoFail;
     }
     case NoDefaults: {
       ret type_properties;
-      if case Printed(pm) = compute_complete_struct_properties(clq, st, &it, ComputeNone, &ret) {
-        return Printed(pm);
-      }
+      #compute_complete_struct_properties(clq, st, &it, ComputeNone, &ret);
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior) {
-        return Printed(pm);
-      }
-      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype2, intern(cs->im, _s("do_move")), &ret.move_behavior) {
-        return Printed(pm);
-      }
-      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype2, intern(cs->im, _s("do_copy")), &ret.copy_behavior) {
-        return Printed(pm);
-      }
-      if case Printed(pm) = lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior) {
-        return Printed(pm);
-      }
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, intern(cs->im, _s("do_move")), &ret.move_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, intern(cs->im, _s("do_copy")), &ret.copy_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior);
       ret.is_scalar = IsScalarNo;
       *out = ret;
       return NoFail;
