@@ -595,10 +595,7 @@ func check_and_compute_name_type(clq *clqueue, g *ast_generics, parms *idy_repls
   }
 
   id deftype_entry_id;
-  if case Printed(pm) = match_deftype(clq->cs, fake_ast_meta(), a->value, None, &id) {
-    // An error happened when looking up a deftype (multiple matches?).
-    return Printed(pm);
-  }
+  #match_deftype(clq->cs, fake_ast_meta(), a->value, None, &id);
 
   np idy_genparms = blank_idyparms();
   inst_id deftype_inst_id = enqueue_deftype_inst(clq, id, &np);
@@ -1500,8 +1497,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
       ent *def_entry = ref_def_entry(cs, id);
       ent_typeexpr *te_typeexpr;
       #def_converted_typeexpr(cs, ent, &ent_typeexpr);
-      match_result entry_matches_res;
-      #entry_matches(cs, pt, &ent->generics, gp, ent_typeexpr, &match_result);
+      match_result entry_matches_res = entry_matches(cs, pt, &ent->generics, gp, ent_typeexpr);
       switch match_result {
         case EntryDoesNotMatch: {
           // Do nothing.
@@ -1559,20 +1555,18 @@ func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res
   }
 }
 
-func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *genparms, typeexpr *te_typeexpr, matches_out *entry_matches_res) np {
+func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *genparms, typeexpr *te_typeexpr) entry_matches_res {
   switch generics {
     case &NoGenerics: {
       switch gp {
         case &HasParms(parms shray[te_typeexpr]): {
-          *matches_out = EntryDoesNotMatch;
-          return NoFail;
+          return EntryDoesNotMatch;
         }
         case &NoParms: {
           names array[ast_generik];
           parms shray[te_typeexpr];
           res var = type_matches(pt, &names, &parms, typeexpr);
-          *matches_out = from_type_matches_res(false, &res);
-          return NoFail;
+          return from_type_matches_res(false, &res);
         }
       }
     }
@@ -1580,18 +1574,15 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *
       switch gp {
         case &HasParms(parms shray[te_typeexpr]): {
           if count(&parms) != count(&names) {
-            *matches_out = EntryDoesNotMatch;
-            return NoFail;
+            return EntryDoesNotMatch;
           }
           res var = type_matches(pt, &names, &parms, typeexpr);
-          *matches_out = from_type_matches_res(true, &res);
-          return NoFail;
+          return from_type_matches_res(true, &res);
         }
         case &NoParms: {
           parms shray[te_typeexpr] = repeat(count(&names), TeUnknown);
           res var = type_matches(pt, &names, &parms, typeexpr);
-          *matches_out = from_type_matches_res(true, &res);
-          return NoFail;
+          return from_type_matches_res(true, &res);
         }
       }
     }
