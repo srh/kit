@@ -505,10 +505,7 @@ func gr_fullbody(outer_gs gr_statep, x *ast_fullbody, out *gr_num) np {
     return Printed(pm);
   }
 
-  parameter_unwinding gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &info->parameter_destructions, &parameter_unwinding) {
-    return Printed(pm);
-  }
+  parameter_unwinding gr_num = gr_unwinding(gs, &info->parameter_destructions);
   add(&bu, parameter_unwinding);
 
   // We artifically activate the return cell after aflling off the end of a fullbody.
@@ -537,10 +534,7 @@ func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     }
   }
 
-  uw gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &un(&x->info)->destructions, &uw) {
-    return Printed(pm);
-  }
+  uw gr_num = gr_unwinding(gs, &un(&x->info)->destructions);
 
   add(bu, uw);
   return NoFail;
@@ -616,10 +610,7 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
 func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, bu *sq_builder) np {
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_break_statement_info = un(&a->info);
-  uw gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
-    return Printed(pm);
-  }
+  uw gr_num = gr_unwinding(gs, &info->destructions);
   add(bu, uw);
   append_and_nopq(bu, unHas(&obg)->break_target, &saved);
   return NoFail;
@@ -628,10 +619,7 @@ func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a
 func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) np {
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_continue_statement_info = un(&a->info);
-  uw gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
-    return Printed(pm);
-  }
+  uw gr_num = gr_unwinding(gs, &info->destructions);
   add(bu, uw);
   append_and_nopq(bu, unHas(&obg)->continue_target, &saved);
   return NoFail;
@@ -641,15 +629,9 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_goto_statement_info = un(&a->info);
   jmp *tracked_target = ref(&fb->label_gn, info->label_number.x);
-  uw gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
-    return Printed(pm);
-  }
+  uw gr_num = gr_unwinding(gs, &info->destructions);
   add(bu, uw);
-  ww gr_num;
-  if case Printed(pm) = gr_winding(gs, &info->initializations, &ww) {
-    return Printed(pm);
-  }
+  ww gr_num = gr_winding(gs, &info->initializations);
   add(bu, ww);
   append_and_nopq(bu, jmp, &saved);
   return NoFail;
@@ -842,10 +824,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
 
     exit_bu sq_builder = mk_builder(gs);
 
-    initter_uw gr_num;
-    if case Printed(pm) = gr_unwinding(gs, &un(&a->info)->initter_destructions, &initter_uw) {
-      return Printed(pm);
-    }
+    initter_uw gr_num = gr_unwinding(gs, &un(&a->info)->initter_destructions);
     add(&exit_bu, initter_uw);
 
     // TODO: This would be using the same cells in different nodes.
@@ -1129,29 +1108,25 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
     add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Nothing}));
   }
   info *ast_return_statement_info = un(&a->info);
-  uw_op gr_num;
-  if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw_op) {
-    return Printed(pm);
-  }
+  uw_op gr_num = gr_unwinding(gs, &info->destructions);
   add(bu, uw_op);
   append_and_nopq(bu, &fb->final_node, &saved);
   return NoFail;
 }
 
 // "initializations" is in variable declaration order -- the _same_ order as evaluation.
-func gr_winding(gs gr_statep, initializations *array[init_action], out *gr_num) np {
+func gr_winding(gs gr_statep, initializations *array[init_action]) gr_num {
   bu sq_builder = mk_builder(gs);
   n size = count(initializations);
   for i size = 0; i < n; i = i + 1 {
     gn gr_num = gr_init_action(gs, ref(initializations, i));
     add(&bu, gn);
   }
-  *out = done(&bu);
-  return NoFail;
+  return done(&bu);
 }
 
 // "destructions" is in variable declaration order -- the _opposite_ order of evaluation.
-func gr_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_num) np {
+func gr_unwinding(gs gr_statep, destructions *array[var_destruction]) gr_num {
   bu sq_builder = mk_builder(gs);
   n size = count(destructions);
   for i size = n; i > 0; {
@@ -1165,8 +1140,7 @@ func gr_unwinding(gs gr_statep, destructions *array[var_destruction], out *gr_nu
     }
     add(&bu, gn);
   }
-  *out = done(&bu);
-  return NoFail;
+  return done(&bu);
 }
 
 func gr_expr_discard(gs gr_statep, x *ast_expr_discard, bu *sq_builder) np {
