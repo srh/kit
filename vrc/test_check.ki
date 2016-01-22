@@ -1987,11 +1987,41 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def glob void = blah();\n"));
 
-  // TODO(): Make this test pass.
-  run_check_negtest(ctx, "c160",
-    _u8("enum[T] foo { Pass T; Fail void; }\n"
+  run_check_test(ctx, "c160-a1",
+    _u8("enum[T] foo { #Pass T; Fail void; }\n"
         "func bar(x foo[u32]) foo[i32] {\n"
         "  r u32 = #x;\n"
+        "  return Pass(@[i32]~r);\n"
+        "}\n"
+        "def z foo[i32] = bar(@[foo[u32]]Pass(3));\n"));
+
+  run_check_test(ctx, "c160-a2",
+    _u8("enum[T] foo { #Pass T; Fail void; }\n"
+        "func bar(x foo[u32]) foo[i32] {\n"
+        "  r u32 = #x;\n"
+        "  return Pass(@[i32]~r);\n"
+        "}\n"
+        "def z foo[i32] = bar(Fail);\n"));
+
+  run_check_test(ctx, "c160-b",
+    _u8("enum[T] foo { #Pass T; Fail void; }\n"
+        "func quux() foo[u32] {\n"
+        "  return Pass(3);\n"
+        "}\n"
+        "func bar() foo[i32] {\n"
+        "  r u32 = #quux();\n"
+        "  return Pass(@[i32]~r);\n"
+        "}\n"
+        "def z foo[i32] = bar();\n"));
+
+  run_check_test(ctx, "c160-c",
+    _u8("enum[T] foo { #Pass T; Fail void; }\n"
+        "struct stroo { n i32; x foo[u32]; }\n"
+        "func quux() stroo {\n"
+        "  return {2, Pass(3)};\n"
+        "}\n"
+        "func bar() foo[i32] {\n"
+        "  r u32 = #quux().x;\n"
         "  return Pass(@[i32]~r);\n"
         "}\n"));
 

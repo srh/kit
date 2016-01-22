@@ -1027,7 +1027,7 @@ func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_e
   } else if op.value == im->cym.derefsym {
     return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(&rhs))}));
   } else if op.value == im->cym.quickreturnsym {
-    return mk(m, @[ast_expr_enum]QuickReturn({embox(rhs)}));
+    return mk(m, @[ast_expr_enum]QuickReturn({NotComputed, embox(rhs)}));
   } else {
     return mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))), mk_array(consume(&rhs))}));
   }

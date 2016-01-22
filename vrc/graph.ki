@@ -133,82 +133,86 @@ func untracked_addx(gr *frame_graph, op gr_xop) gr_num {
   return help_add_node(gr, @[gr_node]XOp({op}));
 }
 
-func addx(gs gr_statep, op gr_xop) gr_num {
+inline func addx(gs gr_statep, op gr_xop) gr_num {
+  return addx(gs.gr, gs.ctr, op);
+}
+
+func addx(gr *frame_graph, ctr *celltrack, op gr_xop) gr_num {
   switch &op {
   case &GrApply(a gr_apply):
-    gr_expect_live(gs.ctr, a.retcell);
+    gr_expect_live(ctr, a.retcell);
 
     nparams size = count(&a.params);
 
     switch a.act {
     case TwoExtraOps(ops gr_active_xop):
-      gr_track_active_op(gs.ctr, ops.op1);
-      gr_track_active_op(gs.ctr, ops.op2);
+      gr_track_active_op(ctr, ops.op1);
+      gr_track_active_op(ctr, ops.op2);
     case StandardApply: { }
     }
-    gr_deactivate(gs.ctr, a.funcell);
+    gr_deactivate(ctr, a.funcell);
     for i size = 0; i < nparams; i = i + 1 {
-      gr_deactivate(gs.ctr, get(&a.params, i));
+      gr_deactivate(ctr, get(&a.params, i));
     }
-    gr_activate(gs.ctr, a.retcell);
+    gr_activate(ctr, a.retcell);
 
-    gr_deaden(gs.ctr, a.funcell);
+    gr_deaden(ctr, a.funcell);
     for i size = 0; i < nparams; i = i + 1 {
-      gr_deaden(gs.ctr, get(&a.params, i));
+      gr_deaden(ctr, get(&a.params, i));
     }
 
   case &GrPrimApply(a gr_prim_apply):
-    gr_expect_live(gs.ctr, a.retcell);
+    gr_expect_live(ctr, a.retcell);
 
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
-      gr_deactivate(gs.ctr, get(&a.params, i));
+      gr_deactivate(ctr, get(&a.params, i));
     }
-    gr_activate(gs.ctr, a.retcell);
+    gr_activate(ctr, a.retcell);
 
     for i size = 0; i < nparams; i = i + 1 {
-      gr_deaden(gs.ctr, get(&a.params, i));
+      gr_deaden(ctr, get(&a.params, i));
     }
 
   case &GrMemCopy(a gr_memcopy):
-    gr_expect_live(gs.ctr, a.dest);
-    gr_expect_live(gs.ctr, a.src);
+    gr_expect_live(ctr, a.dest);
+    gr_expect_live(ctr, a.src);
   case &GrWriteConst(a gr_writeconst):
-    gr_expect_live(gs.ctr, a.dest);
+    gr_expect_live(ctr, a.dest);
   case &GrAddressof(a gr_addressof):
-    gr_expect_live(gs.ctr, a.addressee);
-    gr_expect_live(gs.ctr, a.dest);
+    gr_expect_live(ctr, a.addressee);
+    gr_expect_live(ctr, a.dest);
   case &GrDeref(a gr_deref):
-    gr_expect_live(gs.ctr, a.pointer);
-    check(!isLocationStatic(ref_cell(gs.gr, a.name)->location));
-    gr_create(gs.ctr, a.name);
+    gr_expect_live(ctr, a.pointer);
+    check(!isLocationStatic(ref_cell(gr, a.name)->location));
+    gr_create(ctr, a.name);
   case &GrSubcell(a gr_subcell):
-    gr_expect_live(gs.ctr, a.partof);
-    check(!isLocationStatic(ref_cell(gs.gr, a.name)->location));
-    gr_create(gs.ctr, a.name);
+    gr_expect_live(ctr, a.partof);
+    check(!isLocationStatic(ref_cell(gr, a.name)->location));
+    gr_create(ctr, a.name);
   case &GrLive(a gr_live):
-    gr_create(gs.ctr, a.cell);
+    gr_create(ctr, a.cell);
   case &GrAssertLive(a gr_assert_live):
-    gr_expect_live(gs.ctr, a.cell);
+    gr_expect_live(ctr, a.cell);
   case &GrDead(a gr_dead):
-    gr_deaden(gs.ctr, a.cell);
+    gr_deaden(ctr, a.cell);
   case &GrVirtualDead(a gr_virtual_dead):
-    gr_deaden(gs.ctr, a.cell);
+    gr_deaden(ctr, a.cell);
   case &GrActiveXop(a gr_active_xop):
-    gr_track_active_op(gs.ctr, a.op1);
-    gr_track_active_op(gs.ctr, a.op2);
+    gr_track_active_op(ctr, a.op1);
+    gr_track_active_op(ctr, a.op2);
   case &GrManyActiveXop(a gr_many_active_xop):
     nops size = count(&a.ops);
     for i size = 0; i < nops; i = i + 1 {
-      gr_track_active_op(gs.ctr, get(&a.ops, i));
+      gr_track_active_op(ctr, get(&a.ops, i));
     }
   }
 
-  return untracked_addx(gs.gr, op);
+  return untracked_addx(gr, op);
 }
 
 func add(bu *sq_builder, op gr_xop) void {
-  num gr_num = addx(bu->gs, op);
+  num gr_num = addx(bu->gr, bu->ctr, op);
   add(bu, num);
 }
 
@@ -231,19 +235,20 @@ func help_mut_qnop_node(gr *frame_graph, ix sq_num, newnode gr_qnode) void {
 }
 
 struct sq_builder {
-  // Stored here for "convenience," also gs.gr being null means this object is dead.
-  gs gr_statep;
+  // Stored here for "convenience," also ctr and gr being null means this object is dead.
+  ctr *celltrack;
+  gr *frame_graph;
   first sq_num;
   last sq_num;
 }
 
 func mk_builder(gs gr_statep) sq_builder {
   sq sq_num = nopq(gs.gr);
-  return {gs, sq, sq};
+  return {gs.ctr, gs.gr, sq, sq};
 }
 
 func add(bu *sq_builder, gn gr_num) void {
-  gr *frame_graph = bu->gs.gr;
+  gr *frame_graph = bu->gr;
   check(gr != null);
   next sq_num = nopq(gr);
   help_mut_qnop_node(gr, bu->last, {@[gr_qop]GrSequence({gn, next})});
@@ -277,7 +282,7 @@ func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
 }
 
 func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
-  gr *frame_graph = bu->gs.gr;
+  gr *frame_graph = bu->gr;
   check(gr != null);
   jmp_qnop_node(gr, bu->last, enter_rhs);
   bu->last = rhs_nopq;
@@ -285,17 +290,18 @@ func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
 
 // Adds an unattached nopq afterward, with the given saved state restored (typically the variables-in-scope state before a return, break, continue, or goto statement).
 func append_and_nopq(bu *sq_builder, outflow *tracked_target, saved *gr_savetrack) void {
-  note_celltrack(&outflow->note, bu->gs.ctr);
-  append(bu, outflow->sn, nopq(bu->gs.gr));
-  restore_celltrack(bu->gs, saved);
+  note_celltrack(&outflow->note, bu->ctr);
+  append(bu, outflow->sn, nopq(bu->gr));
+  restore_celltrack(bu->ctr, saved);
 }
 
 func help_mut_connect(bu *sq_builder, outflow sq_num) sq_num {
-  gr *frame_graph = bu->gs.gr;
+  gr *frame_graph = bu->gr;
   check(gr != null);
   jmp_qnop_node(gr, bu->last, outflow);
   ret sq_num = bu->first;
-  bu->gs = {null, null, null};
+  bu->gr = null;
+  bu->ctr = null;
   return ret;
 }
 
@@ -319,7 +325,8 @@ func last(bu *sq_builder) sq_num {
 }
 
 func done(bu *sq_builder) gr_num {
-  bu->gs = {null, null, null};
+  bu->gr = null;
+  bu->ctr = null;
   return bu->first.x;
 }
 
@@ -442,18 +449,19 @@ struct gr_statep {
   clq *clqueue;
   gr *frame_graph;
   ctr *celltrack;
+  fb opt[*fullbody_state];
 }
 
 struct gr_savetrack {
   ctr celltrack;
 }
 
-func save_celltrack(gs gr_statep) gr_savetrack {
-  return {*gs.ctr};
+func save_celltrack(ctr *celltrack) gr_savetrack {
+  return {*ctr};
 }
 
-func restore_celltrack(gs gr_statep, savetrack *gr_savetrack) void {
-  *gs.ctr = savetrack->ctr;
+func restore_celltrack(ctr *celltrack, savetrack *gr_savetrack) void {
+  *ctr = savetrack->ctr;
 }
 
 struct tracked_target {
@@ -480,16 +488,17 @@ struct fullbody_state {
   return_cell cell_num;
 }
 
-func gr_fullbody(gs gr_statep, x *ast_fullbody, out *gr_num) np {
+func gr_fullbody(outer_gs gr_statep, x *ast_fullbody, out *gr_num) np {
   info *ast_fullbody_info = un(&x->info);
 
   label_gn array[tracked_target];
   n size = count(&info->labels);
   for i size = 0; i < n; i = i + 1 {
-    push(&label_gn, mk_tracked(nopq(gs.gr)));
+    push(&label_gn, mk_tracked(nopq(outer_gs.gr)));
   }
 
-  fb fullbody_state = {info->all_vars, mk_tracked(nopq(gs.gr)), label_gn, info->return_cell};
+  fb fullbody_state = {info->all_vars, mk_tracked(nopq(outer_gs.gr)), label_gn, info->return_cell};
+  gs gr_statep = {outer_gs.clq, outer_gs.gr, outer_gs.ctr, Has(&fb)};
 
   bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_bracebody(gs, &fb, None, &x->bb, &bu) {
@@ -605,7 +614,7 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
 }
 
 func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, bu *sq_builder) np {
-  saved gr_savetrack = save_celltrack(gs);
+  saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_break_statement_info = un(&a->info);
   uw gr_num;
   if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
@@ -617,7 +626,7 @@ func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a
 }
 
 func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) np {
-  saved gr_savetrack = save_celltrack(gs);
+  saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_continue_statement_info = un(&a->info);
   uw gr_num;
   if case Printed(pm) = gr_unwinding(gs, &info->destructions, &uw) {
@@ -629,7 +638,7 @@ func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack]
 }
 
 func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, bu *sq_builder) np {
-  saved gr_savetrack = save_celltrack(gs);
+  saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_goto_statement_info = un(&a->info);
   jmp *tracked_target = ref(&fb->label_gn, info->label_number.x);
   uw gr_num;
@@ -670,7 +679,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 
   exit_target tracked_target = mk_tracked(nopq(gs.gr));
 
-  saved_afterswartch gr_savetrack = save_celltrack(gs);
+  saved_afterswartch gr_savetrack = save_celltrack(gs.ctr);
 
   cases array[opt[sq_num]] = repeat(info->num_enum_constructors, None);
   default_case opt[sq_num] = None;
@@ -678,7 +687,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   reserve(&cases, ncases);
   for i size = 0; i < ncases; i = i + 1 {
     if i != 0 {
-      restore_celltrack(gs, &saved_afterswartch);
+      restore_celltrack(gs.ctr, &saved_afterswartch);
     }
     sc *ast_switch_case = ref(&a->cases, i);
 
@@ -752,7 +761,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 }
 
 func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu *sq_builder) np {
-  pre_loop_save gr_savetrack = save_celltrack(gs);
+  pre_loop_save gr_savetrack = save_celltrack(gs.ctr);
   outflow tracked_target = mk_tracked(nopq(gs.gr));
   note_celltrack(&outflow.note, gs.ctr);
 
@@ -780,7 +789,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     condition_else_gn = None;
   }
 
-  postcond_save gr_savetrack = save_celltrack(gs);
+  postcond_save gr_savetrack = save_celltrack(gs.ctr);
 
   continue_nopq tracked_target = mk_tracked(nopq(gs.gr));
 
@@ -835,7 +844,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
   jmp_qnop_node(gs.gr, body_entry_gn, thengn);
 
   if case &Has(cond ast_expr_condition) = &a->condition {
-    restore_celltrack(gs, &postcond_save);
+    restore_celltrack(gs.ctr, &postcond_save);
 
     exit_bu sq_builder = mk_builder(gs);
 
@@ -856,7 +865,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
 
     jmp_qnop_node(gs.gr, unHas(condition_else_gn), exitseq);
   } else {
-    restore_celltrack(gs, &pre_loop_save);
+    restore_celltrack(gs.ctr, &pre_loop_save);
   }
 
   append(bu, top.sn, outflow.sn);
@@ -888,7 +897,7 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
     return Printed(pm);
   }
 
-  restore_celltrack(gs, &then_save);
+  restore_celltrack(gs.ctr, &then_save);
 
   bp breakgrack = {&outflow, &top};
 
@@ -905,7 +914,7 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   add(&body_bu, loopcleanupgn);
   thengn sq_num = mut_connect(gs, &body_bu, &top);
 
-  restore_celltrack(gs, &else_save);
+  restore_celltrack(gs.ctr, &else_save);
 
   loopexitgn gr_num;
   if case Printed(pm) = gr_condition_discard(gs, &a->condition_discard_exit, &loopexitgn) {
@@ -936,7 +945,7 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
     return Printed(pm);
   }
 
-  restore_celltrack(gs, &then_save);
+  restore_celltrack(gs.ctr, &then_save);
 
   then_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu) {
@@ -944,7 +953,7 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   }
   thengn sq_num = mut_connect(gs, &then_bu, &join_target);
 
-  restore_celltrack(gs, &else_save);
+  restore_celltrack(gs.ctr, &else_save);
   else_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_bracebody(gs, fb, obg, &a->elsebody, &else_bu) {
     return Printed(pm);
@@ -989,7 +998,7 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
     return Printed(pm);
   }
 
-  restore_celltrack(gs, &then_save);
+  restore_celltrack(gs.ctr, &then_save);
 
   then_bu sq_builder = mk_builder(gs);
   if case Printed(pm) = gr_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu) {
@@ -997,7 +1006,7 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   }
   bodygn sq_num = mut_connect(gs, &then_bu, &join_target);
 
-  restore_celltrack(gs, &else_save);
+  restore_celltrack(gs.ctr, &else_save);
   note_celltrack(&join_target.note, gs.ctr);
 
   jmp_qnop_node(gs.gr, then_nop, bodygn);
@@ -1031,8 +1040,8 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
       if case Printed(pm) = gr_expr_condition(gs, oo(&bec), thengn, elsegn, out) {
         return Printed(pm);
       }
-      *thentrack_out = save_celltrack(gs);
-      *elsetrack_out = save_celltrack(gs);
+      *thentrack_out = save_celltrack(gs.ctr);
+      *elsetrack_out = save_celltrack(gs.ctr);
       return NoFail;
     }
 
@@ -1049,14 +1058,14 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
       } else {
         add(&bef_bu, @[gr_xop]GrSubcell({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst(enum_tag_offset)}));
       }
-      postcond_save gr_savetrack = save_celltrack(gs);
+      postcond_save gr_savetrack = save_celltrack(gs.ctr);
       saved_elsecase bool = false;
       cases array[tup[gr_const, sq_num]];
       n size = info->deconstruct.num_enum_constructors;
       reserve(&cases, n);
       for i size = 0; i < n; i = i + 1 {
         if i != 0 {
-          restore_celltrack(gs, &postcond_save);
+          restore_celltrack(gs.ctr, &postcond_save);
         }
         tag enum_tag_value = mk_enum_tag_value(i);
         if info->matching_tag_value.x == tag.x {
@@ -1071,14 +1080,14 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
               add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst(cp_info->field_offset)}));
             }
           }
-          *thentrack_out = save_celltrack(gs);
+          *thentrack_out = save_celltrack(gs.ctr);
           thenseq sq_num = mut_connect(&case_bu, thengn);
           push(&cases, {@[gr_const]ConstInt(~tag.x), thenseq});
         } else {
           tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
           elseseq sq_num = seqq(gs.gr, {tagdead, elsegn});
           if !saved_elsecase {
-            *elsetrack_out = save_celltrack(gs);
+            *elsetrack_out = save_celltrack(gs.ctr);
             saved_elsecase = true;
           }
           push(&cases, {@[gr_const]ConstInt(~tag.x), elseseq});
@@ -1086,9 +1095,9 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
       }
       if !saved_elsecase {
         // We need to output an elsecase savetrack even if it's never reachable, because this function's API doesn't have a way to tell the caller the elsecase is not reachable.
-        restore_celltrack(gs, &postcond_save);
+        restore_celltrack(gs.ctr, &postcond_save);
         tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
-        *elsetrack_out = save_celltrack(gs);
+        *elsetrack_out = save_celltrack(gs.ctr);
       }
 
       br_point sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None}));
@@ -1120,7 +1129,7 @@ func gr_var_statement(gs gr_statep, fb *fullbody_state, a *ast_var_statement, bu
 }
 
 func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_statement, bu *sq_builder) np {
-  saved gr_savetrack = save_celltrack(gs);
+  saved gr_savetrack = save_celltrack(gs.ctr);
   if case &Has(b box[ast_expr_consume]) = &a->expr {
     subcell cell_num = result_cell(oo(&b));
     add(bu, @[gr_xop]GrSubcell({subcell, fb->return_cell, OffsetConst(0)}));
@@ -1319,8 +1328,148 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
 }
 
 func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_builder) np {
-  // TODO(): Implement quick-return graphing.
-  return ERR(_u8("ICE: quick-return expressions not fully implemented"));
+  fb *fullbody_state;
+  if case Has(fb_ *fullbody_state) = gs.fb {
+    fb = fb_;
+  } else {
+    return ERR(_u8("Quick-return expression outside of function body"));
+  }
+
+  if case Printed(pm) = gr_expr(gs, oo(&a->rhs), bu) {
+    return Printed(pm);
+  }
+
+  info *ast_quickreturn_info = un(&a->info);
+  et *enumspec = &info->et;
+  add(bu, @[gr_xop]GrSubcell({info->tag_cell, value_cell(oo(&a->rhs)), OffsetConst(enum_tag_offset)}));
+
+  success_case_ix size = unHas(et->success_case_ix);
+
+  unwind_join_target tracked_target = mk_tracked(nopq(gs.gr));
+
+  saved_aftercond gr_savetrack = save_celltrack(gs.ctr);
+
+  cases array[tup[gr_const, sq_num]];
+
+  tag_ty cu_typrop = compute_prim(gs.clq, enum_tag_type(gs.clq->cs, &info->return_et));
+  return_cell_size u32 = ref_cell(gs.gr, fb->return_cell)->props.flat_size;
+
+  nconstructors size = count(&et->constructors);
+  for i size = 0; i < nconstructors; i = i + 1 {
+    if i != success_case_ix {
+      field_offset u32 = enum_field_offset(gs.clq->cs, et, mk_enum_tag_value(i));
+      return_field_offset u32 = enum_field_offset(gs.clq->cs, &info->return_et, mk_enum_tag_value(get(&info->constructor_mapping, i)));
+
+      field_type *te_typeexpr = &ref(&et->constructors, i)->type;
+      field_props type_properties;
+      if case Printed(pm) = compute_complete_type_properties(gs.clq, field_type, &field_props) {
+        return Printed(pm);
+      }
+
+      field_cell cell_num = add_cell(gs.gr, {LocationVirtual, ~ *field_type, field_props});
+      return_field_cell cell_num = add_cell(gs.gr, {LocationVirtual, ~ *field_type, field_props});
+
+      case_bu sq_builder = mk_builder(gs);
+
+      add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
+      add(&case_bu, @[gr_xop]GrSubcell({field_cell, value_cell(oo(&a->rhs)), OffsetConst(field_offset)}));
+      add(&case_bu, @[gr_xop]GrSubcell({return_field_cell, fb->return_cell, OffsetConst(return_field_offset)}));
+      add(&case_bu, @[gr_xop]GrSubcell({info->return_tag_cell, fb->return_cell, OffsetConst(enum_tag_offset)}));
+      add(&case_bu, @[gr_xop]GrWriteConst({info->return_tag_cell, ConstInt(~ mk_enum_tag_value(i).x)}));
+      add(&case_bu, @[gr_xop]GrVirtualDead({info->return_tag_cell}));
+
+      // TODO: Support treating types with move ctor more efficiently, when we can.  This is possible when the rhs is a whole-cell rval.
+      copy_ctor_desc ctor_desc;
+      if case Printed(pm) = behavior_to_desc(&field_props.copy_behavior, &copy_ctor_desc) {
+        return Printed(pm);
+      }
+
+      copy_gn gr_num = gr_bi_ctor(gs, return_field_cell, field_cell, &copy_ctor_desc, BiCopy);
+
+      add(&case_bu, copy_gn);
+      add(&case_bu, @[gr_xop]GrVirtualDead({field_cell}));
+
+      check(enum_tag_offset == 0);
+      prepadding_ogn opt[gr_num] = gr_bzero_subcell(gs, fb->return_cell, tag_ty.props.flat_size, return_field_offset - tag_ty.props.flat_size);
+      addo(&case_bu, prepadding_ogn);
+
+      postpadding_ogn opt[gr_num] = gr_bzero_subcell(gs, fb->return_cell, return_field_offset + field_props.flat_size, return_cell_size - (return_field_offset + field_props.flat_size));
+      addo(&case_bu, postpadding_ogn);
+
+      add(&case_bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(return_field_cell)}));
+      add(&case_bu, @[gr_xop]GrVirtualDead({return_field_cell}));
+
+      push(&cases, {ConstInt(~ mk_enum_tag_value(i).x), mut_connect(gs, &case_bu, &unwind_join_target)});
+
+      restore_celltrack(gs.ctr, &saved_aftercond);
+    }
+  }
+
+  success_nopq sq_num = nopq(gs.gr);
+
+  if true {
+    field_offset u32 = enum_field_offset(gs.clq->cs, et, mk_enum_tag_value(success_case_ix));
+
+    case_bu sq_builder = mk_builder(gs);
+    add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
+    add(&case_bu, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->rhs)), OffsetConst(field_offset)}));
+    switch &expr_complete_info(oo(&a->rhs))->lval {
+    case &IsLvalYes(desc lval_description):
+      if case DeadMe = desc.deadme {
+        add(&case_bu, @[gr_xop]GrVirtualDead({desc.num}));
+      }
+    case &IsLvalNo(desc rval_description):
+      addo(&case_bu, gr_maybe_virtualdead(gs, desc.partial_num));
+    }
+
+    push(&cases, {ConstInt(bigu(~ mk_enum_tag_value(success_case_ix).x)), mut_connect(&case_bu, success_nopq)});
+  }
+
+  if case &Has(ct celltrack) = &unwind_join_target.note.ctr {
+    saved_aftersuccess gr_savetrack = save_celltrack(gs.ctr);
+
+    *gs.ctr = ct;
+
+    unwind_bu sq_builder = mk_builder(gs);
+    for i size = count(&gs.ctr->all); i > 0; {
+      i = i - 1;
+      ent *celltrack_entry = ref(&gs.ctr->all, i);
+      cell cell_num = ent->cell;
+      // TODO: I'd like to be able to assert that the return cell is at index 0.
+      if cell != fb->return_cell {
+        if ent->active {
+          ci *cell_info = ref_cell(gs.gr, cell);
+          destroy_ctor ctor_desc;
+          if case Printed(pm) = behavior_to_desc(&ci->props.destroy_behavior, &destroy_ctor) {
+            return Printed(pm);
+          }
+          gn gr_num;
+          if case Printed(pm) = gr_destroy_ctor(gs, cell, &destroy_ctor, DeadactAfterDestroyYes, &gn) {
+            return Printed(pm);
+          }
+          add(&unwind_bu, gn);
+        } else {
+          ci *cell_info = ref_cell(gs.gr, cell);
+          switch ci->location {
+          case LocationVirtual:
+            add(&unwind_bu, @[gr_xop]GrVirtualDead({cell}));
+          case LocationStatic:
+            add(&unwind_bu, @[gr_xop]GrDead({cell}));
+          }
+        }
+      }
+    }
+
+    unwind_sn sq_num = mut_connect(gs, &unwind_bu, &fb->final_node);
+    jmp_qnop_node(gs.gr, unwind_join_target.sn, unwind_sn);
+
+    restore_celltrack(gs.ctr, &saved_aftersuccess);
+  }
+
+  br sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&cases), None}));
+
+  append(bu, br, success_nopq);
+  return NoFail;
 }
 
 func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
@@ -1335,7 +1484,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
     return Printed(pm);
   }
 
-  postcond_save gr_savetrack = save_celltrack(gs);
+  postcond_save gr_savetrack = save_celltrack(gs.ctr);
 
   then_bu sq_builder = mk_builder(gs);
   add(&then_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->then_clause)), conjoined, OffsetConst(0)}));
@@ -1346,7 +1495,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   add(&then_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->then_clause))}));
   then_sn sq_num = mut_connect(gs, &then_bu, &join_target);
 
-  restore_celltrack(gs, &postcond_save);
+  restore_celltrack(gs.ctr, &postcond_save);
 
   else_bu sq_builder = mk_builder(gs);
   add(&else_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->else_clause)), conjoined, OffsetConst(0)}));
@@ -1435,7 +1584,6 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
       }
 
       add(bu, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst(offset)}));
-      gn gr_num;
       switch &expr_complete_info(oo(&a->lhs))->lval {
       case &IsLvalYes(desc lval_description):
         if case DeadMe = desc.deadme {
@@ -1483,7 +1631,7 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
   lambda_ctr celltrack = mk_celltrack();
-  lambda_gs gr_statep = {gs.clq, &lambda_gr, &lambda_ctr};
+  lambda_gs gr_statep = {gs.clq, &lambda_gr, &lambda_ctr, None};
 
   gr_create(&lambda_ctr, info->return_cell);
   nargs size = count(&info->arg_cells);
@@ -1713,7 +1861,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       add(bu, @[gr_xop]GrActiveXop({Activate(destptr), Activate(srcptr)}));
       add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result, StandardApply}));
 
-      postbranch_save gr_savetrack = save_celltrack(gs);
+      postbranch_save gr_savetrack = save_celltrack(gs.ctr);
 
       exit_nopq tracked_target = mk_tracked(nopq(gs.gr));
 
@@ -1723,7 +1871,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
 
       just_dead_sn sq_num = mut_connect(gs, &just_dead_bu, &exit_nopq);
 
-      restore_celltrack(gs, &postbranch_save);
+      restore_celltrack(gs.ctr, &postbranch_save);
 
       do_assign_bu sq_builder = mk_builder(gs);
       add(&do_assign_bu, @[gr_xop]GrActiveXop({Deactivate(cmp_result), Nothing}));
@@ -1778,7 +1926,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
     return Printed(pm);
   }
 
-  postbranch_save gr_savetrack = save_celltrack(gs);
+  postbranch_save gr_savetrack = save_celltrack(gs.ctr);
 
   rhs_bu sq_builder = mk_builder(gs);
   add(&rhs_bu, @[gr_xop]GrActiveXop({Deactivate(result_cell(oo(&a->lhs))), Nothing}));
@@ -1794,7 +1942,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
 
   rhs_sn sq_num = mut_connect(gs, &rhs_bu, &end_nopq);
 
-  restore_celltrack(gs, &postbranch_save);
+  restore_celltrack(gs.ctr, &postbranch_save);
 
   lhs_bu sq_builder = mk_builder(gs);
   add(&lhs_bu, @[gr_xop]GrMemCopy({rval_cell(x), result_cell(oo(&a->lhs))}));
@@ -2239,7 +2387,7 @@ func gr_basics_cleanup(gs gr_statep, bas *gr_basics, bu *sq_builder) void {
 func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_nopdestroy")));
   ctr celltrack = mk_celltrack();
-  gs gr_statep = {clq, &gr, &ctr};
+  gs gr_statep = {clq, &gr, &ctr, None};
   bas gr_minimal_basics;
   // TODO: How about make the size parameter opt[u32], don't deref if no size.
   add_minimal_basics(gs, 0 /* Pass a made-up size. */, 1, &bas);
@@ -2255,7 +2403,7 @@ func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num, retu
 func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_memcopy")));
   ctr celltrack = mk_celltrack();
-  gs gr_statep = {clq, &gr, &ctr};
+  gs gr_statep = {clq, &gr, &ctr, None};
   bas gr_basics;
   bu sq_builder = mk_builder(gs);
   gr_add_basics(gs, *un(&mm->size), 2, &bas, &bu);
@@ -2271,7 +2419,7 @@ func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_o
 func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_bzero")));
   ctr celltrack = mk_celltrack();
-  gs gr_statep = {clq, &gr, &ctr};
+  gs gr_statep = {clq, &gr, &ctr, None};
   bas gr_basics;
   bu sq_builder = mk_builder(gs);
   gr_add_basics(gs, *un(&mb->size), 1, &bas, &bu);
@@ -2301,7 +2449,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   cs *checkstate = clq->cs;
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_arraytype")));
   ctr celltrack = mk_celltrack();
-  gs gr_statep = {clq, &gr, &ctr};
+  gs gr_statep = {clq, &gr, &ctr, None};
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mai->cu_type.x));
 
   voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
@@ -2481,7 +2629,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   }
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_info")));
   ctr celltrack = mk_celltrack();
-  gs gr_statep = {clq, &gr, &ctr};
+  gs gr_statep = {clq, &gr, &ctr, None};
 
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mei->cu_type.x));
 
@@ -2524,7 +2672,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   }
 
   join_target tracked_target = mk_tracked(nopq(&gr));
-  postbranch_save gr_savetrack = save_celltrack(gs);
+  postbranch_save gr_savetrack = save_celltrack(gs.ctr);
 
   cases_gn array[tup[gr_const, sq_num]];
   nconstructors size = count(&et->constructors);
@@ -2550,7 +2698,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     }
 
     if i != 0 {
-      restore_celltrack(gs, &postbranch_save);
+      restore_celltrack(gs.ctr, &postbranch_save);
     }
 
     sub_bu sq_builder = mk_builder(gs);
@@ -2635,7 +2783,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), finalseqgn});
   }
 
-  restore_celltrack(gs, &postbranch_save);
+  restore_celltrack(gs.ctr, &postbranch_save);
   if case CtorDestroy = wc {
     note_celltrack(&join_target.note, gs.ctr);
     push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), join_target.sn});
@@ -2679,7 +2827,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
 
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_struct_info")));
   ctr celltrack = mk_celltrack();
-  gs gr_statep = {clq, &gr, &ctr};
+  gs gr_statep = {clq, &gr, &ctr, None};
 
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, msi->cu_type.x));
 
@@ -2854,7 +3002,7 @@ func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *
 func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cell_out *cell_num) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_enum_construct")));
   ctr celltrack = mk_celltrack();
-  gs gr_statep = {clq, &gr, &ctr};
+  gs gr_statep = {clq, &gr, &ctr, None};
 
   retnum cell_num = add_cell(&gr, {LocationStatic, mec->return_type, mec->return_type_props});
 
@@ -2862,6 +3010,7 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   argtype *te_typeexpr = &ref(&mec->et.constructors, mec->constructor_index)->type;
   field_offset u32 = enum_field_offset(clq->cs, &mec->et, tagval);
+  check(enum_tag_offset == 0);
   tag_end u32;
   tag_cell cell_num;
   if true {
@@ -2983,7 +3132,7 @@ func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_a
 func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op primitive_op) fn_body_id {
   gr frame_graph = init_frame_graph_empty(informal_name);
   ctr celltrack = mk_celltrack();
-  gs gr_statep = {clq, &gr, &ctr};
+  gs gr_statep = {clq, &gr, &ctr, None};
   typarams *shray[te_typeexpr];
   if !decompose_typeapp(&type->x, primitive_function_puretype(clq->cs), &typarams) {
     ice(_u8("add_prim_fn_body called with non-fn type"));
@@ -3057,7 +3206,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           }
           gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
           ctr celltrack = mk_celltrack();
-          gs gr_statep = {clq, &gr, &ctr};
+          gs gr_statep = {clq, &gr, &ctr, None};
           bu sq_builder = mk_builder(gs);
           if case Printed(pm) = gr_live_and_expr_consume(gs, &dire.ec, &bu) {
             inst->graph = FailedComputation;
@@ -3126,7 +3275,7 @@ func mk_const_frame_regraphed(clq *clqueue, informal_name sym, type *cu_typeexpr
   // I don't think we _actually_ use clq for anything.
   gr frame_graph = init_frame_graph_empty(informal_name);
   ctr celltrack = mk_celltrack();
-  gs gr_statep = {clq, &gr, &ctr};
+  gs gr_statep = {clq, &gr, &ctr, None};
   bu sq_builder = mk_builder(gs);
   cell cell_num = add_cell(&gr, {LocationStatic, *type, *props});
   add(&bu, @[gr_xop]GrLive({cell}));
