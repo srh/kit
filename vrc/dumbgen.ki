@@ -692,37 +692,33 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
             ret_ci *cell_info = ref_cell(h->gr, a.retcell);
             hrp bool = for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props);
             framelist_bottom i32 = *un(&ref_annot(h, gn)->paramlist_bottom_frame_offset);
+
+            callsite_bottom i32;
             if hrp {
               hrp_bottom i32 = framelist_bottom - 4;
               x86_load_cell_address(f, h, X86_EAX, a.retcell);
               x86_store32(f, X86_EBP, hrp_bottom, X86_EAX);
-              // TODO: I think we could dedup some code here and below.
-              switch get_loc(h, a.funcell) {
-              case DirectLoc(x i32):
-                x86_load32(f, X86_EAX, X86_EBP, x);
-                set_esp_to_frame_offset(f, h, hrp_bottom);
-                x86_indirect_call(f, X86_EAX);
-              case ConstFuncellLoc(fnid fn_body_id):
-                symbol_table_index sti = *un(&ref_fn_body(h->cs, fnid)->symbol_table_index);
-                set_esp_to_frame_offset(f, h, hrp_bottom);
-                x86_call(f, symbol_table_index);
-              }
-              restore_esp_to_default_position(f, h);
+              callsite_bottom = hrp_bottom;
             } else {
-              switch get_loc(h, a.funcell) {
-              case DirectLoc(x i32):
-                x86_load32(f, X86_EAX, X86_EBP, x);
-                set_esp_to_frame_offset(f, h, framelist_bottom);
-                x86_indirect_call(f, X86_EAX);
-              case ConstFuncellLoc(fnid fn_body_id):
-                symbol_table_index sti = *un(&ref_fn_body(h->cs, fnid)->symbol_table_index);
-                set_esp_to_frame_offset(f, h, framelist_bottom);
-                x86_call(f, symbol_table_index);
-              }
-
-              universal_cc_write_to_retcell(f, h, a.retcell);
-              restore_esp_to_default_position(f, h);
+              callsite_bottom = framelist_bottom;
             }
+
+            switch get_loc(h, a.funcell) {
+            case DirectLoc(x i32):
+              x86_load32(f, X86_EAX, X86_EBP, x);
+              set_esp_to_frame_offset(f, h, callsite_bottom);
+              x86_indirect_call(f, X86_EAX);
+            case ConstFuncellLoc(fnid fn_body_id):
+              symbol_table_index sti = *un(&ref_fn_body(h->cs, fnid)->symbol_table_index);
+              set_esp_to_frame_offset(f, h, callsite_bottom);
+              x86_call(f, symbol_table_index);
+            }
+
+            if !hrp {
+              universal_cc_write_to_retcell(f, h, a.retcell);
+            }
+
+            restore_esp_to_default_position(f, h);
           }
         case &GrPrimApply(a gr_prim_apply):
           x86_dumbly_prim_apply(f, h, &a);
