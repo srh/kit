@@ -585,47 +585,37 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     return NoFail;
 
   case &Break(a ast_break_statement):
-    if case Printed(pm) = gr_break_statement(gs, fb, obg, &a, bu) {
-      return Printed(pm);
-    }
+    gr_break_statement(gs, fb, obg, &a, bu);
     return NoFail;
   case &Continue(a ast_continue_statement):
-    if case Printed(pm) = gr_continue_statement(gs, fb, obg, &a, bu) {
-      return Printed(pm);
-    }
+    gr_continue_statement(gs, fb, obg, &a, bu);
     return NoFail;
   case &Label(a ast_label_statement):
-    if case Printed(pm) = gr_label_statement(gs, fb, &a, bu) {
-      return Printed(pm);
-    }
+    gr_label_statement(gs, fb, &a, bu);
     return NoFail;
   case &Goto(a ast_goto_statement):
-    if case Printed(pm) = gr_goto_statement(gs, fb, &a, bu) {
-      return Printed(pm);
-    }
+    gr_goto_statement(gs, fb, &a, bu);
     return NoFail;
   }
 }
 
-func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, bu *sq_builder) np {
+func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, bu *sq_builder) void {
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_break_statement_info = un(&a->info);
   uw gr_num = gr_unwinding(gs, &info->destructions);
   add(bu, uw);
   append_and_nopq(bu, unHas(&obg)->break_target, &saved);
-  return NoFail;
 }
 
-func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) np {
+func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) void {
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_continue_statement_info = un(&a->info);
   uw gr_num = gr_unwinding(gs, &info->destructions);
   add(bu, uw);
   append_and_nopq(bu, unHas(&obg)->continue_target, &saved);
-  return NoFail;
 }
 
-func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, bu *sq_builder) np {
+func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, bu *sq_builder) void {
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_goto_statement_info = un(&a->info);
   jmp *tracked_target = ref(&fb->label_gn, info->label_number.x);
@@ -634,14 +624,12 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
   ww gr_num = gr_winding(gs, &info->initializations);
   add(bu, ww);
   append_and_nopq(bu, jmp, &saved);
-  return NoFail;
 }
 
-func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) np {
+func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) void {
   targ *tracked_target = ref(&fb->label_gn, un(&a->info)->label_number.x);
   note_celltrack(&targ->note, gs.ctr);
   jmp_qnop_node(gs.gr, targ->sn, last(bu));
-  return NoFail;
 }
 
 func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_switch_statement, bu *sq_builder) np {
@@ -1148,29 +1136,24 @@ func gr_expr_discard(gs gr_statep, x *ast_expr_discard, bu *sq_builder) np {
 }
 
 func gr_expr_and_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
-  if case Printed(pm) = gr_expr_after_discard_before(gs, x, aft, bu) {
-    return Printed(pm);
-  }
+  gr_expr_after_discard_before(gs, x, aft, bu);
   if case Printed(pm) = gr_expr(gs, x, bu) {
     return Printed(pm);
   }
-  if case Printed(pm) = gr_expr_after_discard(gs, x, aft, bu) {
-    return Printed(pm);
-  }
+  gr_expr_after_discard(gs, x, aft, bu);
   return NoFail;
 }
 
-func gr_expr_after_discard_before(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
+func gr_expr_after_discard_before(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) void {
   switch aft {
   case &DiscardTemporary(da destroy_action):
     add(bu, @[gr_xop]GrLive({whole_cell(x)}));
   case &DiscardVirtualDead(c cell_num): { }
   case &DiscardNothing: { }
   }
-  return NoFail;
 }
 
-func gr_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) np {
+func gr_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discard, bu *sq_builder) void {
   switch aft {
   case &DiscardTemporary(da destroy_action):
     if whole_cell(x) != partial_cell(x) {
@@ -1182,7 +1165,6 @@ func gr_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
     add(bu, @[gr_xop]GrVirtualDead({c}));
   case &DiscardNothing: { }
   }
-  return NoFail;
 }
 
 // Callees of this have to deactivate the result_cell later, of course.
@@ -1200,15 +1182,11 @@ func gr_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
 }
 
 func gr_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
-  if case Printed(pm) = gr_consume_actions_before(gs, x, aft, bu) {
-    return Printed(pm);
-  }
+  gr_consume_actions_before(gs, x, aft, bu);
   if case Printed(pm) = gr_expr(gs, x, bu) {
     return Printed(pm);
   }
-  if case Printed(pm) = gr_consume_actions(gs, x, aft, bu) {
-    return Printed(pm);
-  }
+  gr_consume_actions(gs, x, aft, bu);
 
   return NoFail;
 }
@@ -2024,7 +2002,7 @@ func gr_maybe_virtualdead(gs gr_statep, c cell_num) opt[gr_num] {
   }
 }
 
-func gr_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
+func gr_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) void {
   add(bu, @[gr_xop]GrAssertLive({result_cell(aft)}));
   switch &aft->actions {
   case &ConsumeByInPlace: { }
@@ -2034,10 +2012,9 @@ func gr_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after
   case &ConsumeByCopy(cc tup[copy_action, lval_deadme]): { }
   case &ConsumeByMove(m move_action): { }
   }
-  return NoFail;
 }
 
-func gr_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) np {
+func gr_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) void {
   switch &aft->actions {
   case &ConsumeByInPlace: { }
   case &ConsumeByCopyDestroy(cd copy_destroy_action):
@@ -2056,7 +2033,6 @@ func gr_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
     dep gr_num = gr_move_action(gs, &m, BiMove);
     add(bu, dep);
   }
-  return NoFail;
 }
 
 func gr_copy_action(gs gr_statep, x *copy_action, statechange bi_ctor_statechange) gr_num {
@@ -2175,21 +2151,15 @@ func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechan
 func gr_magic(clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num], inline_out *should_inline) np {
   switch mag {
   case &MagicBzero(mb magic_bzero):
-    if case Printed(pm) = gr_magic_bzero(clq, &mb, gr_out, gn_out, return_cell_out, arg_cells_out) {
-      return Printed(pm);
-    }
+    gr_magic_bzero(clq, &mb, gr_out, gn_out, return_cell_out, arg_cells_out);
     *inline_out = InlineMust;
     return NoFail;
   case &MagicMemcopy(mm magic_memcopy):
-    if case Printed(pm) = gr_magic_memcopy(clq, &mm, gr_out, gn_out, return_cell_out, arg_cells_out) {
-      return Printed(pm);
-    }
+    gr_magic_memcopy(clq, &mm, gr_out, gn_out, return_cell_out, arg_cells_out);
     *inline_out = InlineMust;
     return NoFail;
   case &MagicNopdestroy:
-    if case Printed(pm) = gr_magic_nopdestroy(clq, gr_out, gn_out, return_cell_out, arg_cells_out) {
-      return Printed(pm);
-    }
+    gr_magic_nopdestroy(clq, gr_out, gn_out, return_cell_out, arg_cells_out);
     *inline_out = InlineMust;
     return NoFail;
   case &MagicCtor(wmc which_magic_ctor):
@@ -2272,7 +2242,7 @@ func gr_basics_cleanup(gs gr_statep, bas *gr_basics, bu *sq_builder) void {
   gr_minimal_basics_cleanup(gs, &bas->minimal, bu);
 }
 
-func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
+func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_nopdestroy")));
   ctr celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &ctr, None};
@@ -2285,10 +2255,9 @@ func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num, retu
   *gr_out = *gs.gr;
   *return_cell_out = bas.return_cell;
   *arg_cells_out = bas.argcells;
-  return NoFail;
 }
 
-func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
+func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_memcopy")));
   ctr celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &ctr, None};
@@ -2301,10 +2270,9 @@ func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_o
   *gr_out = *gs.gr;
   *return_cell_out = bas.minimal.return_cell;
   *arg_cells_out = bas.minimal.argcells;
-  return NoFail;
 }
 
-func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
+func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_bzero")));
   ctr celltrack = mk_celltrack();
   gs gr_statep = {clq, &gr, &ctr, None};
@@ -2317,7 +2285,6 @@ func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *
   *gr_out = *gs.gr;
   *return_cell_out = bas.minimal.return_cell;
   *arg_cells_out = bas.minimal.argcells;
-  return NoFail;
 }
 
 // Note that generally these magic ops have "holes" in active-tracking.  If constructors could throw exceptions, we wouldn't unwind properly.  Same with assignment.
