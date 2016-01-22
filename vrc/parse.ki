@@ -114,10 +114,10 @@ func try_skip_token(p *ps, expected tokval) parse_result {
 }
 
 func try_parse_oper(p *ps, expected i32, out *ast_ident) parse_result {
-  if case &Oper(arr shray[i32]) = &peek(p)->val {
-    if count(&arr) == 1 && get(&arr, 0) == expected {
+  if case &Oper(arr smallstr) = &peek(p)->val {
+    if arr.len == 1 && arr.vals[0] == expected {
       m ast_meta = startend(p);
-      *out = {m, intern(p->im, ~arr)};
+      *out = {m, intern(p->im, to_str(&arr))};
       step(p);
       return Success;
     }
@@ -125,8 +125,8 @@ func try_parse_oper(p *ps, expected i32, out *ast_ident) parse_result {
   return Fail;
 }
 func try_skip_oper(p *ps, expected i32) parse_result {
-  if case &Oper(arr shray[i32]) = &peek(p)->val {
-    if count(&arr) == 1 && get(&arr, 0) == expected {
+  if case &Oper(arr smallstr) = &peek(p)->val {
+    if arr.len == 1 && arr.vals[0] == expected {
       step(p);
       return Success;
     }
@@ -134,8 +134,8 @@ func try_skip_oper(p *ps, expected i32) parse_result {
   return Fail;
 }
 func try_skip_oper(p *ps, exp0 i32, exp1 i32) parse_result {
-  if case &Oper(arr shray[i32]) = &peek(p)->val {
-    if count(&arr) == 2 && get(&arr, 0) == exp0 && get(&arr, 1) == exp1 {
+  if case &Oper(arr smallstr) = &peek(p)->val {
+    if arr.len == 2 && arr.vals[0] == exp0 && arr.vals[1] == exp1 {
       step(p);
       return Success;
     }
@@ -143,8 +143,8 @@ func try_skip_oper(p *ps, exp0 i32, exp1 i32) parse_result {
   return Fail;
 }
 func try_skip_oper(p *ps, exp0 i32, exp1 i32, exp2 i32) parse_result {
-  if case &Oper(arr shray[i32]) = &peek(p)->val {
-    if count(&arr) == 3 && get(&arr, 0) == exp0 && get(&arr, 1) == exp1 && get(&arr, 2) == exp2 {
+  if case &Oper(arr smallstr) = &peek(p)->val {
+    if arr.len == 3 && arr.vals[0] == exp0 && arr.vals[1] == exp1 && arr.vals[2] == exp2 {
       step(p);
       return Success;
     }
@@ -398,13 +398,13 @@ func parse_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) parse_resu
   default:
     return Fail;
   // NOTE: "Opers" such as "@" or maybe even "=" shouldn't really be allowed here -- only functional opers allowed.
-  case Oper(operch shray[i32]):
+  case Oper(operch smallstr):
     backquote_step(p);
     if ! +try_skip_token(p, @[tokval]Grouper(Backtick)) {
       return Fail;
     }
     end(p, ident_meta);
-    *out = {ident_meta, intern(p->im, ~operch)};
+    *out = {ident_meta, intern(p->im, to_str(&operch))};
     return Success;
   }
 }
@@ -901,7 +901,8 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
           return Success;
         }
         case PullsRight: {
-          oper ast_ident = {startend(p), intern(p->im, ~oper_arr(op.val))};
+          oparr smallstr = oper_arr(op.val);
+          oper ast_ident = {startend(p), intern(p->im, to_str(&oparr))};
           step(p);
           rhs ast_expr;
           if ! +parse_expr(p, op_facts.op_prec.right, ab, IsNotStatementExpr, &rhs) {
@@ -922,15 +923,15 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
 }
 
 func is_postfix_incrdecr(t tokval) opt[bool] {
-  if case &Oper(x shray[i32]) = &t {
-    if count(&x) == 2 {
-      ch0 i32 = get(&x, 0);
+  if case &Oper(x smallstr) = &t {
+    if x.len == 2 {
+      ch0 i32 = x.vals[0];
       if ch0 == '+' {
-        if get(&x, 1) == '+' {
+        if x.vals[1] == '+' {
           return Has(true);
         }
       } else if ch0 == '-' {
-        if get(&x, 1) == '-' {
+        if x.vals[1] == '-' {
           return Has(false);
         }
       }
@@ -962,9 +963,9 @@ struct binop_facts {
 func binop_info(t tokval) opt[binop_facts] {
   switch t {
     default: { return None; }
-    case Oper(x shray[i32]): {
-      if count(&x) == 1 {
-        c0 i32 = get(&x, 0);
+    case Oper(x smallstr): {
+      if x.len == 1 {
+        c0 i32 = x.vals[0];
         if c0 == '=' { return Has({{305, 305}, false}); }
         if c0 == '+' || c0 == '-' { return Has({{504, 506}, false}); }
         if c0 == '<' || c0 == '>' { return Has({{405, 405}, false}); }
@@ -973,9 +974,9 @@ func binop_info(t tokval) opt[binop_facts] {
         if c0 == '^' || c0 == '&' || c0 == '|' { return Has({{405, 405}, false}); }
         return None;
       }
-      if count(&x) == 2 {
-        c0 i32 = get(&x, 0);
-        c1 i32 = get(&x, 1);
+      if x.len == 2 {
+        c0 i32 = x.vals[0];
+        c1 i32 = x.vals[1];
         if c0 == '&' && c1 == '&' { return Has({{376, 374}, false}); }
         if c0 == '|' && c1 == '|' { return Has({{356, 354}, false}); }
         if (c0 == '<' && c1 == '<') || (c0 == '>' && c1 =='>') {
@@ -991,10 +992,10 @@ func binop_info(t tokval) opt[binop_facts] {
         }
         return None;
       }
-      if count(&x) == 3 {
-        c0 i32 = get(&x, 0);
-        c1 i32 = get(&x, 1);
-        c2 i32 = get(&x, 2);
+      if x.len == 3 {
+        c0 i32 = x.vals[0];
+        c1 i32 = x.vals[1];
+        c2 i32 = x.vals[2];
         if c2 == '=' && ((c0 == '<' && c1 == '<')
                          || (c0 == '>' && c1 == '>')) {
           return Has({{305, 305}, true});
@@ -1012,9 +1013,9 @@ func compare_prec(left i32, right i32) prec_cmp {
   return Conflicts;
 }
 
-func oper_arr(tv tokval) shray[i32] {
+func oper_arr(tv tokval) smallstr {
   switch tv {
-    case Oper(arr shray[i32]): { return arr; }
+    case Oper(arr smallstr): { return arr; }
     default: { check(false); return fake(); }
   }
 }
@@ -1066,7 +1067,7 @@ func build_binop_expr(p *ps, se statement_expr, m ast_meta, user_assignment bool
 
 func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) parse_result {
   switch peek(p)->val {
-    case Oper(operch shray[i32]): {
+    case Oper(operch smallstr): {
       if is_at_sign(&operch) {
         step(p);
         args array[ast_typeexpr];
@@ -1178,7 +1179,7 @@ func parse_atomic_expr_upon_grouper(p *ps, ab allow_braces, g grouper, out *ast_
   }
 }
 
-func parse_atomic_expr_upon_oper(p *ps, ab allow_braces, operch *shray[i32], out *ast_expr) parse_result {
+func parse_atomic_expr_upon_oper(p *ps, ab allow_braces, operch *smallstr, out *ast_expr) parse_result {
   m ast_meta = start(p);
   if is_at_sign(operch) {
     step(p);
@@ -1204,7 +1205,7 @@ func parse_atomic_expr_upon_oper(p *ps, ab allow_braces, operch *shray[i32], out
           return Fail;
         }
         end(p, m);
-        *out = build_unop_expr(p->im, m, {oper_meta, intern(p->im, ~ *operch)}, rhs);
+        *out = build_unop_expr(p->im, m, {oper_meta, intern(p->im, to_str(operch))}, rhs);
         return Success;
       }
     }
@@ -1238,7 +1239,7 @@ func parse_atomic_expr(p *ps, ab allow_braces, out *ast_expr) parse_result {
       ident_meta ast_meta = startend(p);
       step(p);
       return parse_finish_name_expr(p, {ident_meta, intern(p->im, ~identch)}, out);
-    case Oper(operch shray[i32]):
+    case Oper(operch smallstr):
       return parse_atomic_expr_upon_oper(p, ab, &operch, out);
     case Bad: {
       return Fail;
@@ -1249,27 +1250,27 @@ func parse_atomic_expr(p *ps, ab allow_braces, out *ast_expr) parse_result {
   }
 }
 
-func unop_info(operch *shray[i32]) opt[i32] {
-  nch size = count(operch);
+func unop_info(operch *smallstr) opt[i32] {
+  nch size = +operch->len;
   if nch == 1 {
-    ch0 i32 = get(operch, 0);
+    ch0 i32 = operch->vals[0];
     if ch0 == '~' || ch0 == '*' || ch0 == '&'
        || ch0 == '-' || ch0 == '!' || ch0 == '^' || ch0 == '+' || ch0 == '#' {
       return Has(905);
     }
   } else if nch == 2 {
-    if get(operch, 0) == '&' && get(operch, 1) == '&' {
+    if operch->vals[0] == '&' && operch->vals[1] == '&' {
       return Has(905);
     }
   }
   return None;
 }
 
-func is_equal(arr *shray[i32], v0 i32) bool {
-  return count(arr) == 1 && get(arr, 0) == v0;
+func is_equal(arr *smallstr, v0 i32) bool {
+  return arr->len == 1 && arr->vals[0] == v0;
 }
 
-func is_at_sign(operch *shray[i32]) bool {
+func is_at_sign(operch *smallstr) bool {
   return is_equal(operch, at_sign);
 }
 
