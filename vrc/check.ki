@@ -1310,34 +1310,31 @@ func find_pos_module(cs *checkstate, p pos) opt[*module] {
 }
 
 func load_module(cs *checkstate, mod_name sym) cr[module_id] {
-  switch lookup(&cs->modules_by_name, &mod_name) {
-    case Has(id module_id): {
-      return NoFail(id);
+  if case Has(id module_id) = lookup(&cs->modules_by_name, &mod_name) {
+    return NoFail(id);
+  }
+
+  arr array[u8];
+  if (cs->loader)(cs, mod_name, &arr) {
+    mod shp[module];
+    oo(&mod)->process_state = Unprocessed;
+    oo(&mod)->module_name = mod_name;
+    oo(&mod)->base_offset = modules_next_base_offset(cs);
+    swap(&oo(&mod)->buf, &arr);
+    p ps = make_ps(cs->im, &cs->posits, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
+    if ! +parse_file(&p, &oo(&mod)->file) {
+      // The @[np] was something to grep for at one point.  TODO: Something about this is bad?
+      ign np = @[np]ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p)->interval.left)));
+      return Printed(true);
     }
-    case None: {
-      arr array[u8];
-      if (cs->loader)(cs, mod_name, &arr) {
-        mod shp[module];
-        oo(&mod)->process_state = Unprocessed;
-        oo(&mod)->module_name = mod_name;
-        oo(&mod)->base_offset = modules_next_base_offset(cs);
-        swap(&oo(&mod)->buf, &arr);
-        p ps = make_ps(cs->im, &cs->posits, oo(&mod)->base_offset, data(&oo(&mod)->buf), count(&oo(&mod)->buf));
-        if ! +parse_file(&p, &oo(&mod)->file) {
-          // The @[np] was something to grep for at one point.  TODO: Something about this is bad?
-          ign np = @[np]ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p)->interval.left)));
-          return Printed(true);
-        }
-        mod_id module_id = ~count(&cs->modules);
-        push(&cs->modules, mod);
-        if !try_insert(&cs->modules_by_name, &mod_name, mod_id) {
-          return ERR(_u8("ICE: modules_by_name already has name "), lookup(cs->im, mod_name));
-        }
-        return NoFail(mod_id);
-      } else {
-        return ERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
-      }
+    mod_id module_id = ~count(&cs->modules);
+    push(&cs->modules, mod);
+    if !try_insert(&cs->modules_by_name, &mod_name, mod_id) {
+      return ERR(_u8("ICE: modules_by_name already has name "), lookup(cs->im, mod_name));
     }
+    return NoFail(mod_id);
+  } else {
+    return ERR(_u8("Could not open file for module "), lookup(cs->im, mod_name));
   }
 }
 
