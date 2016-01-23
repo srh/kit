@@ -794,10 +794,9 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
   return NoFail;
 }
 
-func gr_condition_discard(gs gr_statep, a *ast_condition_discard_info, out *gr_num) np {
+func gr_condition_discard(gs gr_statep, a *ast_condition_discard_info) gr_num {
   disc gr_num = gr_later_discard(gs, &a->later);
-  *out = disc;
-  return NoFail;
+  return disc;
 }
 
 func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement, bu *sq_builder) np {
@@ -821,16 +820,14 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   body_bu sq_builder = mk_builder(gs);
   #gr_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu);
 
-  loopcleanupgn gr_num;
-  #gr_condition_discard(gs, &a->condition_discard_continue, &loopcleanupgn);
+  loopcleanupgn gr_num = gr_condition_discard(gs, &a->condition_discard_continue);
 
   add(&body_bu, loopcleanupgn);
   thengn sq_num = mut_connect(gs, &body_bu, &top);
 
   restore_celltrack(gs.ctr, &else_save);
 
-  loopexitgn gr_num;
-  #gr_condition_discard(gs, &a->condition_discard_exit, &loopexitgn);
+  loopexitgn gr_num = gr_condition_discard(gs, &a->condition_discard_exit);
 
   // TODO: Would be kinda nice if break (or continue) targeted _before_ the condition discard.
   exitseq sq_num = uni_connect(gs, loopexitgn, &outflow);
@@ -870,8 +867,7 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
 
   append(bu, gn, join_target.sn);
 
-  condition_discard_gn gr_num;
-  #gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn);
+  condition_discard_gn gr_num = gr_condition_discard(gs, &a->condition_discard);
   add(bu, condition_discard_gn);
 
   return NoFail;
@@ -911,8 +907,7 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 
   append(bu, gn, join_target.sn);
 
-  condition_discard_gn gr_num;
-  #gr_condition_discard(gs, &a->condition_discard, &condition_discard_gn);
+  condition_discard_gn gr_num = gr_condition_discard(gs, &a->condition_discard);
   add(bu, condition_discard_gn);
   return NoFail;
 }
@@ -1122,11 +1117,13 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   cs *checkstate = gs.clq->cs;
   switch &x->u {
   case &NameExpr(a ast_name_expr):
-    return gr_name_expr(gs, x, &a, bu);
+    gr_name_expr(gs, x, &a, bu);
+    return NoFail;
   case &ParenExpr(a ast_paren_expr):
     return gr_expr(gs, oo(&a.expr), bu);
   case &NumericLiteral(a ast_numeric_literal):
-    return gr_literal(gs, x, numeric_literal_value(&a), bu);
+    gr_literal(gs, x, numeric_literal_value(&a), bu);
+    return NoFail;
   case &BoolLiteral(a ast_bool_literal):
     value bigint;
     if a.value {
@@ -1134,18 +1131,23 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     } else {
       value = bigu(0);
     }
-    return gr_literal(gs, x, value, bu);
+    gr_literal(gs, x, value, bu);
+    return NoFail;
   case &VoidLiteral(a ast_void_literal):
     value bigint = bigu(0);
-    return gr_literal(gs, x, value, bu);
+    gr_literal(gs, x, value, bu);
+    return NoFail;
   case &NullLiteral(a ast_null_literal):
     value bigint = bigu(0);
-    return gr_literal(gs, x, value, bu);
+    gr_literal(gs, x, value, bu);
+    return NoFail;
   case &CharLiteral(a ast_char_literal):
     value bigint = ~ a.charspec.value;
-    return gr_literal(gs, x, value, bu);
+    gr_literal(gs, x, value, bu);
+    return NoFail;
   case &StringLiteral(a ast_string_literal):
-    return gr_string_literal(gs, x, &a, bu);
+    gr_string_literal(gs, x, &a, bu);
+    return NoFail;
   case &Funcall(a ast_funcall):
     return gr_funcall(gs, x, &a, bu);
   case &LogicalConjunction(a ast_logical_conjunction):
@@ -1740,7 +1742,7 @@ func gr_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, bu *sq_builder) np {
   return NoFail;
 }
 
-func gr_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_builder) np {
+func gr_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_builder) void {
   bytes array[u8];
   nchars size = count(&a->charspecs);
   reserve(&bytes, nchars);
@@ -1753,16 +1755,14 @@ func gr_string_literal(gs gr_statep, x *ast_expr, a *ast_string_literal, bu *sq_
   }
   add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstBytes(freeze(&bytes))}));
   add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
-  return NoFail;
 }
 
-func gr_literal(gs gr_statep, x *ast_expr, value bigint, bu *sq_builder) np {
+func gr_literal(gs gr_statep, x *ast_expr, value bigint, bu *sq_builder) void {
   add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(value)}));
   add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
-  return NoFail;
 }
 
-func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) np {
+func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) void {
   // Generally for rvalues we write constant values here -- we can activate *after* we've written a constant value.  No atomic activation necessary.
   switch un(&a->name_info) {
   case &LocalResolve(li local_info): { }
@@ -1790,7 +1790,6 @@ func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) n
     // ^ This hub-bub writes a constant value to x_cell.
     add(bu, @[gr_xop]GrActiveXop({Activate(x_cell), Nothing}));
   }
-  return NoFail;
 }
 
 func ellval_desc(x *is_lval) *lval_description {
