@@ -488,7 +488,7 @@ struct fullbody_state {
   return_cell cell_num;
 }
 
-func gr_fullbody(outer_gs gr_statep, x *ast_fullbody, out *gr_num) np {
+func gr_fullbody(outer_gs gr_statep, x *ast_fullbody) cr[gr_num] {
   info *ast_fullbody_info = un(&x->info);
 
   label_gn array[tracked_target];
@@ -514,8 +514,7 @@ func gr_fullbody(outer_gs gr_statep, x *ast_fullbody, out *gr_num) np {
   // TODO: This is crazy nonsense.  Detect reachability in a conservative fashion (e.g. everything after a label is reachable, everything after a break/continue/return is not).
   gn sq_num = mut_connect(gs, &bu, &fb.final_node);
 
-  *out = gn.x;
-  return NoFail;
+  return NoFail(gn.x);
 }
 
 // TODO: Stop needing this -- make label_info and goto_info more general and use that, or make some other sort of annotation.  The use of breakgrack duplicates the usage of breakpack in body.ki.  It's not _particularly_ unsafe though.
@@ -539,30 +538,22 @@ func gr_bracebody(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
 func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_statement, bu *sq_builder) np {
   switch &x->u {
   case &Expr(a ast_expr_discard):
-    #gr_expr_discard(gs, &a, bu);
-    return NoFail;
+    return gr_expr_discard(gs, &a, bu);
   case &Return(a ast_return_statement):
-    #gr_return_statement(gs, fb, &a, bu);
-    return NoFail;
+    return gr_return_statement(gs, fb, &a, bu);
   case &Var(a ast_var_statement):
-    #gr_var_statement(gs, fb, &a, bu);
-    return NoFail;
+    return gr_var_statement(gs, fb, &a, bu);
   case &IfThen(a ast_ifthen_statement):
-    #gr_ifthen_statement(gs, fb, obg, &a, bu);
-    return NoFail;
+    return gr_ifthen_statement(gs, fb, obg, &a, bu);
 
   case &IfThenElse(a ast_ifthenelse_statement):
-    #gr_ifthenelse_statement(gs, fb, obg, &a, bu);
-    return NoFail;
+    return gr_ifthenelse_statement(gs, fb, obg, &a, bu);
   case &While(a ast_while_statement):
-    #gr_while_statement(gs, fb, &a, bu);
-    return NoFail;
+    return gr_while_statement(gs, fb, &a, bu);
   case &For(a ast_for_statement):
-    #gr_for_statement(gs, fb, &a, bu);
-    return NoFail;
+    return gr_for_statement(gs, fb, &a, bu);
   case &Switch(a ast_switch_statement):
-    #gr_switch_statement(gs, fb, obg, &a, bu);
-    return NoFail;
+    return gr_switch_statement(gs, fb, obg, &a, bu);
 
   case &Break(a ast_break_statement):
     gr_break_statement(gs, fb, obg, &a, bu);
@@ -717,7 +708,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
 
   if case &Has(cond ast_expr_condition) = &a->condition {
     else_gn sq_num = nopq(gs.gr);
-    #gr_expr_condition(gs, oo(&cond.expr), body_entry_gn, else_gn, &top.sn);
+    top.sn = #gr_expr_condition(gs, oo(&cond.expr), body_entry_gn, else_gn);
     condition_else_gn = Has(else_gn);
   } else {
     top.sn= body_entry_gn;
@@ -810,8 +801,7 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
 
   top tracked_target;
   top.note = mk_noted(gs);
-
-  #gr_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save, &top.sn);
+  top.sn = #gr_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save);
 
   restore_celltrack(gs.ctr, &then_save);
 
@@ -848,8 +838,7 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   then_save gr_savetrack;
   else_save gr_savetrack;
 
-  gn sq_num;
-  #gr_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save, &gn);
+  gn sq_num = #gr_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save);
 
   restore_celltrack(gs.ctr, &then_save);
 
@@ -890,8 +879,7 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   then_save gr_savetrack;
   else_save gr_savetrack;
 
-  gn sq_num;
-  #gr_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save, &gn);
+  gn sq_num = #gr_condition(gs, fb, &a->condition, then_nop, else_nop, &then_save, &else_save);
 
   restore_celltrack(gs.ctr, &then_save);
 
@@ -912,23 +900,23 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   return NoFail;
 }
 
-func gr_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn sq_num, out *sq_num) np {
+func gr_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn sq_num) cr[sq_num] {
   bu sq_builder = mk_builder(gs);
   #gr_live_and_expr_consume(gs, a, &bu);
   cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(bigu(0)), elsegn});
   br var = addq(gs.gr, @[gr_qop]GrBranch({result_cell(a), cases, Has(thengn)}));
-  *out = mut_connect(&bu, br);
-  return NoFail;
+  ret sq_num = mut_connect(&bu, br);
+  return NoFail(ret);
 }
 
 // Leaves the celltrack state in a garbage state -- caller needs to restore thentrack or elsetrack, depending on which it processes first.
-func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, thentrack_out *gr_savetrack, elsetrack_out *gr_savetrack, out *sq_num) np {
+func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_num, elsegn sq_num, thentrack_out *gr_savetrack, elsetrack_out *gr_savetrack) cr[sq_num] {
   switch a {
     case &ExprCondition(bec box[ast_expr_consume]): {
-      #gr_expr_condition(gs, oo(&bec), thengn, elsegn, out);
+      ret sq_num = #gr_expr_condition(gs, oo(&bec), thengn, elsegn);
       *thentrack_out = save_celltrack(gs.ctr);
       *elsetrack_out = save_celltrack(gs.ctr);
-      return NoFail;
+      return NoFail(ret);
     }
 
     case &PatternCondition(pa ast_pattern_assign): {
@@ -987,8 +975,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
       br_point sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None}));
       br sq_num = mut_connect(&bef_bu, br_point);
 
-      *out = br;
-      return NoFail;
+      return NoFail(br);
     }
   }
 }
@@ -1163,9 +1150,7 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
   case &IndexExpr(a ast_index_expr):
     return gr_index_expr(gs, x, &a, bu);
   case &Lambda(a ast_lambda):
-    gn gr_num;
-    #gr_lambda_expr(gs, x, &a, &gn);
-    add(bu, gn);
+    add(bu, #gr_lambda_expr(gs, x, &a));
     return NoFail;
   case &LocalField(a ast_local_field):
     return gr_local_field(gs, x, &a, bu);
@@ -1323,8 +1308,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
 
   then_nop sq_num = nopq(gs.gr);
   else_nop sq_num = nopq(gs.gr);
-  cond_sn sq_num;
-  #gr_expr_condition(gs, oo(&oo(&a->condition)->expr), then_nop, else_nop, &cond_sn);
+  cond_sn sq_num = #gr_expr_condition(gs, oo(&oo(&a->condition)->expr), then_nop, else_nop);
 
   postcond_save gr_savetrack = save_celltrack(gs.ctr);
 
@@ -1451,7 +1435,7 @@ func gr_track_active_op(ctr *celltrack, op gr_active_op) void {
   }
 }
 
-func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
+func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda) cr[gr_num] {
   info *ast_fullbody_info = un(&a->body.info);
   lambda_gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
   lambda_ctr celltrack = mk_celltrack();
@@ -1465,8 +1449,7 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
     gr_activate(&lambda_ctr, ac);
   }
 
-  fullbody_gn gr_num;
-  #gr_fullbody(lambda_gs, &a->body, &fullbody_gn);
+  fullbody_gn gr_num = #gr_fullbody(lambda_gs, &a->body);
 
   gr_deactivate(&lambda_ctr, info->return_cell);
   gr_deaden(&lambda_ctr, info->return_cell);
@@ -1477,8 +1460,8 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda, out *gr_num) np {
   add(&bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstFnBody(id)}));
   add(&bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
 
-  *out = done(&bu);
-  return NoFail;
+  ret gr_num = done(&bu);
+  return NoFail(ret);
 }
 
 func parsed_inline_to_state_inline(a ast_isinline) should_inline {
