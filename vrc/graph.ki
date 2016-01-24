@@ -1265,31 +1265,9 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
     *gs.ctr = ct;
 
     unwind_bu sq_builder = mk_builder(gs);
-    for i size = count(&gs.ctr->all); i > 0; {
-      i = i - 1;
-      ent *celltrack_entry = ref(&gs.ctr->all, i);
-      cell cell_num = ent->cell;
-      if cell != fb->return_cell {
-        if ent->active {
-          ci *cell_info = ref_cell(gs.gr, cell);
-          destroy_ctor ctor_desc;
-          #behavior_to_desc(&ci->props.destroy_behavior, &destroy_ctor);
-          gn gr_num = gr_destroy_ctor(gs, cell, &destroy_ctor, DeadactAfterDestroyYes);
-          add(&unwind_bu, gn);
-        } else {
-          ci *cell_info = ref_cell(gs.gr, cell);
-          switch ci->location {
-          case LocationVirtual:
-            add(&unwind_bu, @[gr_xop]GrVirtualDead({cell}));
-          case LocationStatic:
-            add(&unwind_bu, @[gr_xop]GrDead({cell}));
-          }
-        }
-      } else {
-        // Return cell should be the bottom-most.
-        check(i == 0);
-      }
-    }
+    #gr_unwind(gs, fb->return_cell, &unwind_bu);
+    // Return cell should have been the first/last/outermost cell.
+    check(count(&gs.ctr->all) == 1);
 
     unwind_sn sq_num = mut_connect(gs, &unwind_bu, &fb->final_node);
     jmp_qnop_node(gs.gr, unwind_join_target.sn, unwind_sn);
@@ -1301,6 +1279,34 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
 
   append(bu, br, success_nopq);
   return NoFail;
+}
+
+// Unwinds until our last cell is the target cell -- the target cell does _not_ get unwoound.
+func gr_unwind(gs gr_statep, target_cell cell_num, bu *sq_builder) np {
+  for i size = count(&gs.ctr->all); i > 0; {
+    i = i - 1;
+    ent *celltrack_entry = ref(&gs.ctr->all, i);
+    cell cell_num = ent->cell;
+    if cell == target_cell {
+      return NoFail;
+    }
+    if ent->active {
+      ci *cell_info = ref_cell(gs.gr, cell);
+      destroy_ctor ctor_desc;
+      #behavior_to_desc(&ci->props.destroy_behavior, &destroy_ctor);
+      gn gr_num = gr_destroy_ctor(gs, cell, &destroy_ctor, DeadactAfterDestroyYes);
+      add(bu, gn);
+    } else {
+      ci *cell_info = ref_cell(gs.gr, cell);
+      switch ci->location {
+      case LocationVirtual:
+        add(bu, @[gr_xop]GrVirtualDead({cell}));
+      case LocationStatic:
+        add(bu, @[gr_xop]GrDead({cell}));
+      }
+    }
+  }
+  return ERR(_u8("ICE: gr_unwind misses target"));
 }
 
 func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
