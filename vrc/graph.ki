@@ -1584,6 +1584,8 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       add(bu, dgn);
       mgn gr_num = gr_move_action(gs, &smi.rhs_move, BiDeactivateSrc);
       add(bu, mgn);
+      // TODO: We could use whole_cell(oo(&a->rhs)) or something...
+      add(bu, @[gr_xop]GrDead({smi.rhs_move.x.src}));
     }
     case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info): {
       dgn gr_num = gr_destroy_action(gs, &scdi.target_destroy, DeadactAfterDestroyNo);
@@ -1907,11 +1909,7 @@ func gr_copy_action(gs gr_statep, x *copy_action, statechange bi_ctor_statechang
 }
 
 func gr_move_action(gs gr_statep, x *move_action, statechange bi_ctor_statechange) gr_num {
-  bu sq_builder = mk_builder(gs);
-  dep gr_num = gr_bi_ctor(gs, x->x.dest, x->x.src, &x->x.ctor, statechange);
-  add(&bu, dep);
-  add(&bu, @[gr_xop]GrDead({x->x.src}));
-  return done(&bu);
+  return gr_bi_ctor(gs, x->x.dest, x->x.src, &x->x.ctor, statechange);
 }
 
 enum uni_fun_statechange {
