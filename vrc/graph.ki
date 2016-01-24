@@ -1306,13 +1306,7 @@ func gr_unwind(gs gr_statep, target_cell cell_num, bu *sq_builder) np {
       gn gr_num = gr_destroy_ctor(gs, cell, &destroy_ctor, DeadactAfterDestroyYes);
       add(bu, gn);
     } else {
-      ci *cell_info = ref_cell(gs.gr, cell);
-      switch ci->location {
-      case LocationVirtual:
-        add(bu, @[gr_xop]GrVirtualDead({cell}));
-      case LocationStatic:
-        add(bu, @[gr_xop]GrDead({cell}));
-      }
+      add(bu, gr_generic_dead(gs.gr, cell));
     }
   }
   return ERR(_u8("ICE: gr_unwind misses target"));
