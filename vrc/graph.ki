@@ -816,16 +816,16 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   bp breakgrack = {&outflow, &top};
 
   body_bu sq_builder = mk_builder(gs);
-  #gr_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu);
+  #gr_condition_body(gs, fb, Has(bp), &a->condition_discard, &a->body, &body_bu);
 
-  loopcleanupgn gr_num = gr_condition_discard(gs, &a->condition_discard_continue);
+  loopcleanupgn gr_num = gr_condition_discard(gs, &a->condition_discard);
 
   add(&body_bu, loopcleanupgn);
   thengn sq_num = mut_connect(gs, &body_bu, &top);
 
   restore_celltrack(gs.ctr, &else_save);
 
-  loopexitgn gr_num = gr_condition_discard(gs, &a->condition_discard_exit);
+  loopexitgn gr_num = gr_condition_discard(gs, &a->condition_discard);
 
   // TODO: Would be kinda nice if break (or continue) targeted _before_ the condition discard.
   exitseq sq_num = uni_connect(gs, loopexitgn, &outflow);

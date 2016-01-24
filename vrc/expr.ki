@@ -1091,7 +1091,7 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
 
 
 // Annotates the disposal for a value we'll use but then discard.
-func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume], later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) np {
+func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume], later *ast_later_discard_info) np {
   #annotate_disposal_for_consume(es, a, after);
 
   if true {
@@ -1101,10 +1101,6 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
     annotate(&later->action, @[destroy_action]+{destroy, result_cell(un(after))});
   }
 
-  if case Has(p *ast_later_discard_info) = later2 {
-    // There's no longer any cell-reuse issues -- we don't declare the arg-cells up front anymore.
-    *p = *later;
-  }
   return NoFail;
 }
 
@@ -1927,7 +1923,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe, field_lifetime(fake_lifetime(es->cs))});
     ie_info_after nc[ast_expr_after_consume] = NotComputed;
     lhs_later ast_later_discard_info = mk_later();
-    #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later, None);
+    #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
 
     annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), rhs_later});
   }

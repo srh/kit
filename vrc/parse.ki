@@ -1359,7 +1359,7 @@ func parse_rest_of_while_statement_enum(p *ps, out *ast_statement_enum) parse_re
   body ast_bracebody;
   #parse_condition(p, AllowBracesNo, &condition);
   #parse_bracebody(p, &body);
-  *out = While({mk_condition_discard_info(), mk_condition_discard_info(), condition, body});
+  *out = While({mk_condition_discard_info(), condition, body});
   return Success;
 }
 
