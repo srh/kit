@@ -262,10 +262,9 @@ enum ds_constructor_res {
 }
 
 // Like any pt, pt is either (a) incomplete, or (b) complete and computed.
-func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr, res_out *ds_constructor_res) np {
+func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr) cr[ds_constructor_res] {
   if case &HasParms(a) = gp {
-    *res_out = NoMatchConstructor;
-    return NoFail;
+    return NoFail(NoMatchConstructor);
   }
   arg_type *te_typeexpr;
   return_type *te_typeexpr;
@@ -275,16 +274,13 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     case &TeName(te te_name): { }
     case &TeApp(te te_typeapp): { }
     case &TeUnknown:
-      *res_out = AmbigMatchConstructor;
-      return NoFail;
+      return NoFail(AmbigMatchConstructor);
     default:
-      *res_out = NoMatchConstructor;
-      return NoFail;
+      return NoFail(NoMatchConstructor);
     }
     // TODO: Dedup some of the code from here on?
     if !is_complete(pt) {
-      *res_out = AmbigMatchConstructor;
-      return NoFail;
+      return NoFail(AmbigMatchConstructor);
     }
     et *enumspec;
     switch structural_enumspec(ds, pt, &et) {
@@ -292,33 +288,27 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       return Printed(pm);
     case Success: { }
     case NotAccessible:
-      *res_out = NoMatchConstructor;
-      return NoFail;
+      return NoFail(NoMatchConstructor);
     }
 
     rhs_type *te_typeexpr;
     decl_index size;
     if !find_vardecl(&et->constructors, name, &rhs_type, &decl_index) {
-      *res_out = NoMatchConstructor;
-      return NoFail;
+      return NoFail(NoMatchConstructor);
     }
     void_type te_typeexpr = primitive_void_type(ds->cs);
     unified te_typeexpr;
     if !unify_types(&void_type, rhs_type, &unified) {
-      *res_out = NoMatchConstructor;
-      return NoFail;
+      return NoFail(NoMatchConstructor);
     }
-    *res_out = MatchedVoidConstructed({~ *pt, *et, mk_enum_tag_value(decl_index)});
-    return NoFail;
+    return NoFail(@[ds_constructor_res]MatchedVoidConstructed({~ *pt, *et, mk_enum_tag_value(decl_index)}));
   case BadArity:
-    *res_out = NoMatchConstructor;
-    return NoFail;
+    return NoFail(NoMatchConstructor);
   case Success:
     cac_return_type cac_typeexpr;
     #noscoped_check_and_compute_typeexpr(ds->clq, return_type, &cac_return_type);
     if !cac_return_type.complete {
-      *res_out = AmbigMatchConstructor;
-      return NoFail;
+      return NoFail(AmbigMatchConstructor);
     }
     et *enumspec;
     switch structural_enumspec(ds, &cac_return_type.te, &et) {
@@ -326,36 +316,31 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       return Printed(pm);
     case Success: { }
     case NotAccessible:
-      *res_out = NoMatchConstructor;
-      return NoFail;
+      return NoFail(NoMatchConstructor);
     }
     rhs_type *te_typeexpr;
     decl_index size;
     if !find_vardecl(&et->constructors, name, &rhs_type, &decl_index) {
-      *res_out = NoMatchConstructor;
-      return NoFail;
+      return NoFail(NoMatchConstructor);
     }
     // rhs_type is complete.
     unified te_typeexpr;
     if !unify_types(arg_type, rhs_type, &unified) {
-      *res_out = NoMatchConstructor;
-      return NoFail;
+      return NoFail(NoMatchConstructor);
     }
     ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
     cac_ctor_type cac_typeexpr;
     #noscoped_check_and_compute_typeexpr(ds->clq, &ctor_type, &cac_ctor_type);
     check(cac_ctor_type.complete);
 
-    ip instpair;
-    #lookup_or_make_enum_constructor_def(ds, et, &cac_return_type.te, &cac_ctor_type.te, decl_index, &ip);
+    ip instpair = #lookup_or_make_enum_constructor_def(ds, et, &cac_return_type.te, &cac_ctor_type.te, decl_index);
 
-    *res_out = MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index), ip});
-    return NoFail;
+    return NoFail(@[ds_constructor_res]MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index), ip}));
   }
 }
 
 // return_type is the return type of ctor_type.  Both are complete and computed.
-func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type *te_typeexpr, ctor_type *te_typeexpr, decl_index size, out *instpair) np {
+func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type *te_typeexpr, ctor_type *te_typeexpr, decl_index size) cr[instpair] {
   defname_u8 array[u8] = _u8("$magic_enum_ctor_");
   build_u8str(void, &defname_u8, &decl_index);
   defname sym = intern(ds->im, from_u8(defname_u8));
@@ -376,8 +361,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
         if !from_np(make_inst(ds->clq, m.ent, &m.parms, &inst_id)) {
           ice(_u8("lookup_or_make_enum_constructor_def make_inst failed after match"));
         }
-        *out = {m.ent, inst_id};
-        return NoFail;
+        return NoFail({m.ent, inst_id});
       }
     }
   }
@@ -416,8 +400,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
     ice(_u8("lookup_or_make_enum_constructor_def make_inst failed on fresh def"));
   }
 
-  *out = {ent, inst_id};
-  return NoFail;
+  return NoFail({ent, inst_id});
 }
 
 struct es_global_match {
@@ -454,8 +437,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
 
   switch &res {
     case &NoMatch: {
-      constructor_res ds_constructor_res;
-      #ds_lookup_constructor(es->ds, name, gp, pt, &constructor_res);
+      constructor_res ds_constructor_res = #ds_lookup_constructor(es->ds, name, gp, pt);
       switch &constructor_res {
       case &NoMatchConstructor:
         *res_out = NoMatch;
