@@ -424,6 +424,7 @@ struct es_global_match {
 enum es_match_res {
   NoMatch void;
   AmbigGlobalMatch void;
+  NoGlobalAmbigEnumConstructorMatch void;
   OneGlobalMatch es_global_match;
   OneLocalMatch local_info;
   OneEnumConstructorMatch constructor_info;
@@ -454,7 +455,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
       case &NoMatchConstructor:
         *res_out = NoMatch;
       case &AmbigMatchConstructor:
-        *res_out = AmbigGlobalMatch;
+        *res_out = NoGlobalAmbigEnumConstructorMatch;
       case &MatchedConstructor(inf constructor_info):
         *res_out = OneEnumConstructorMatch(inf);
       case &MatchedVoidConstructed(inf voidconstructed_info):
@@ -1177,6 +1178,14 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
         return NoFail;
       } else {
         return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), pretty(es->im, pt));
+      }
+    }
+    case &NoGlobalAmbigEnumConstructorMatch: {
+      if ai == AllowIncompleteYes {
+        annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown));
+        return NoFail;
+      } else {
+        return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, but cannot rule out enum constructor, on type '"), pretty(es->im, pt));
       }
     }
     case &OneEnumConstructorMatch(ci constructor_info): {
