@@ -1094,12 +1094,10 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
 func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume], later *ast_later_discard_info) np {
   #annotate_disposal_for_consume(es, a, after);
 
-  if true {
-    info *ast_expr_complete_info = expr_complete_info(a);
-    destroy ctor_desc;
-    #get_destroy_ctor(es->clq, &info->cu, &destroy);
-    annotate(&later->action, @[destroy_action]+{destroy, result_cell(un(after))});
-  }
+  info *ast_expr_complete_info = expr_complete_info(a);
+  destroy ctor_desc;
+  #get_destroy_ctor(es->clq, &info->cu, &destroy);
+  annotate(&later->action, @[destroy_action]+{destroy, result_cell(un(after))});
 
   return NoFail;
 }
