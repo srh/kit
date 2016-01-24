@@ -1094,7 +1094,6 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
 func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume], later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) np {
   #annotate_disposal_for_consume(es, a, after);
 
-  // TODO: Dedup this code or stop generating all cells at check-time.
   if true {
     info *ast_expr_complete_info = expr_complete_info(a);
     destroy ctor_desc;
@@ -1103,10 +1102,8 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
   }
 
   if case Has(p *ast_later_discard_info) = later2 {
-    info *ast_expr_complete_info = expr_complete_info(a);
-    destroy ctor_desc;
-    #get_destroy_ctor(es->clq, &info->cu, &destroy);
-    annotate(&p->action, @[destroy_action]+{destroy, result_cell(un(after))});
+    // There's no longer any cell-reuse issues -- we don't declare the arg-cells up front anymore.
+    *p = *later;
   }
   return NoFail;
 }
