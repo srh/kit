@@ -269,7 +269,8 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
   }
   arg_type *te_typeexpr;
   return_type *te_typeexpr;
-  if !decompose_typeapp(pt, primitive_function_puretype(ds->cs), &arg_type, &return_type) {
+  switch tri_decompose_typeapp(pt, primitive_function_puretype(ds->cs), &arg_type, &return_type) {
+  case BadPuretype:
     switch pt {
     case &TeName(te te_name): { }
     case &TeApp(te te_typeapp): { }
@@ -309,44 +310,48 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     }
     *res_out = MatchedVoidConstructed({~ *pt, *et, mk_enum_tag_value(decl_index)});
     return NoFail;
-  }
-  cac_return_type cac_typeexpr;
-  #noscoped_check_and_compute_typeexpr(ds->clq, return_type, &cac_return_type);
-  if !cac_return_type.complete {
-    *res_out = AmbigMatchConstructor;
-    return NoFail;
-  }
-  et *enumspec;
-  switch structural_enumspec(ds, &cac_return_type.te, &et) {
-  case Error(pm):
-    return Printed(pm);
-  case Success: { }
-  case NotAccessible:
+  case BadArity:
     *res_out = NoMatchConstructor;
     return NoFail;
-  }
-  rhs_type *te_typeexpr;
-  decl_index size;
-  if !find_vardecl(&et->constructors, name, &rhs_type, &decl_index) {
-    *res_out = NoMatchConstructor;
-    return NoFail;
-  }
-  // rhs_type is complete.
-  unified te_typeexpr;
-  if !unify_types(arg_type, rhs_type, &unified) {
-    *res_out = NoMatchConstructor;
-    return NoFail;
-  }
-  ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
-  cac_ctor_type cac_typeexpr;
-  #noscoped_check_and_compute_typeexpr(ds->clq, &ctor_type, &cac_ctor_type);
-  check(cac_ctor_type.complete);
+  case Success:
+    cac_return_type cac_typeexpr;
+    #noscoped_check_and_compute_typeexpr(ds->clq, return_type, &cac_return_type);
+    if !cac_return_type.complete {
+      *res_out = AmbigMatchConstructor;
+      return NoFail;
+    }
+    et *enumspec;
+    switch structural_enumspec(ds, &cac_return_type.te, &et) {
+    case Error(pm):
+      return Printed(pm);
+    case Success: { }
+    case NotAccessible:
+      *res_out = NoMatchConstructor;
+      return NoFail;
+    }
+    rhs_type *te_typeexpr;
+    decl_index size;
+    if !find_vardecl(&et->constructors, name, &rhs_type, &decl_index) {
+      *res_out = NoMatchConstructor;
+      return NoFail;
+    }
+    // rhs_type is complete.
+    unified te_typeexpr;
+    if !unify_types(arg_type, rhs_type, &unified) {
+      *res_out = NoMatchConstructor;
+      return NoFail;
+    }
+    ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
+    cac_ctor_type cac_typeexpr;
+    #noscoped_check_and_compute_typeexpr(ds->clq, &ctor_type, &cac_ctor_type);
+    check(cac_ctor_type.complete);
 
-  ip instpair;
-  #lookup_or_make_enum_constructor_def(ds, et, &cac_return_type.te, &cac_ctor_type.te, decl_index, &ip);
+    ip instpair;
+    #lookup_or_make_enum_constructor_def(ds, et, &cac_return_type.te, &cac_ctor_type.te, decl_index, &ip);
 
-  *res_out = MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index), ip});
-  return NoFail;
+    *res_out = MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index), ip});
+    return NoFail;
+  }
 }
 
 // return_type is the return type of ctor_type.  Both are complete and computed.
@@ -1484,17 +1489,31 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
   return true;
 }
 
-func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr, twoparam_out **te_typeexpr) bool {
+enum decompose_result {
+  Success void;
+  BadPuretype void;
+  BadArity void;
+}
+
+func tri_decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr, twoparam_out **te_typeexpr) decompose_result {
   params *shray[te_typeexpr];
   if !decompose_typeapp(t, expected_puretype, &params) {
-    return false;
+    return BadPuretype;
   }
   if count(params) != 2 {
-    return false;
+    return BadArity;
   }
   *oneparam_out = ref(params, 0);
   *twoparam_out = ref(params, 1);
-  return true;
+  return Success;
+}
+
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr, twoparam_out **te_typeexpr) bool {
+  if case Success = tri_decompose_typeapp(t, expected_puretype, oneparam_out, twoparam_out) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 enum check_field_result {
