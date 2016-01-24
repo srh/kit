@@ -23,6 +23,13 @@ enum cell_location {
   LocationStatic void;
 }
 
+func[H] build_u8str(help H, r *array[u8], x *cell_location) void {
+  switch *x {
+  case LocationStatic: append(r, _u8("LocationStatic"));
+  case LocationVirtual: append(r, _u8("LocationVirtual"));
+  }
+}
+
 func `==`(x cell_location, y cell_location) bool {
   return enumnum(&x) == enumnum(&y);
 }
@@ -195,8 +202,10 @@ func addx(gr *frame_graph, ctr *celltrack, op gr_xop) gr_num {
   case &GrAssertLive(a gr_assert_live):
     gr_expect_live(ctr, a.cell);
   case &GrDead(a gr_dead):
+    check(isLocationStatic(ref_cell(gr, a.cell)->location));
     gr_deaden(ctr, a.cell);
   case &GrVirtualDead(a gr_virtual_dead):
+    check(!isLocationStatic(ref_cell(gr, a.cell)->location));
     gr_deaden(ctr, a.cell);
   case &GrActiveXop(a gr_active_xop):
     gr_track_active_op(ctr, a.op1);
@@ -1354,31 +1363,11 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
     *gs.ctr = ct;
 
     unwind_bu sq_builder = mk_builder(gs);
-    for i size = count(&gs.ctr->all); i > 0; {
-      i = i - 1;
-      ent *celltrack_entry = ref(&gs.ctr->all, i);
-      cell cell_num = ent->cell;
-      // TODO: I'd like to be able to assert that the return cell is at index 0.
-      if cell != fb->return_cell {
-        if ent->active {
-          ci *cell_info = ref_cell(gs.gr, cell);
-          destroy_ctor ctor_desc;
-          if case Printed(pm) = behavior_to_desc(&ci->props.destroy_behavior, &destroy_ctor) {
-            return Printed(pm);
-          }
-          gn gr_num = gr_destroy_ctor(gs, cell, &destroy_ctor, DeadactAfterDestroyYes);
-          add(&unwind_bu, gn);
-        } else {
-          ci *cell_info = ref_cell(gs.gr, cell);
-          switch ci->location {
-          case LocationVirtual:
-            add(&unwind_bu, @[gr_xop]GrVirtualDead({cell}));
-          case LocationStatic:
-            add(&unwind_bu, @[gr_xop]GrDead({cell}));
-          }
-        }
-      }
+    if case Printed(pm) = gr_unwind(gs, fb->return_cell, &unwind_bu) {
+      return Printed(pm);
     }
+    // Return cell should have been the first/last/outermost cell.
+    check(count(&gs.ctr->all) == 1);
 
     unwind_sn sq_num = mut_connect(gs, &unwind_bu, &fb->final_node);
     jmp_qnop_node(gs.gr, unwind_join_target.sn, unwind_sn);
@@ -1390,6 +1379,36 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
 
   append(bu, br, success_nopq);
   return NoFail;
+}
+
+// Unwinds until our last cell is the target cell -- the target cell does _not_ get unwoound.
+func gr_unwind(gs gr_statep, target_cell cell_num, bu *sq_builder) np {
+  for i size = count(&gs.ctr->all); i > 0; {
+    i = i - 1;
+    ent *celltrack_entry = ref(&gs.ctr->all, i);
+    cell cell_num = ent->cell;
+    if cell == target_cell {
+      return NoFail;
+    }
+    if ent->active {
+      ci *cell_info = ref_cell(gs.gr, cell);
+      destroy_ctor ctor_desc;
+      if case Printed(pm) = behavior_to_desc(&ci->props.destroy_behavior, &destroy_ctor) {
+        return Printed(pm);
+      }
+      gn gr_num = gr_destroy_ctor(gs, cell, &destroy_ctor, DeadactAfterDestroyYes);
+      add(bu, gn);
+    } else {
+      ci *cell_info = ref_cell(gs.gr, cell);
+      switch ci->location {
+      case LocationVirtual:
+        add(bu, @[gr_xop]GrVirtualDead({cell}));
+      case LocationStatic:
+        add(bu, @[gr_xop]GrDead({cell}));
+      }
+    }
+  }
+  return ERR(_u8("ICE: gr_unwind misses target"));
 }
 
 func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np {
@@ -2949,19 +2968,28 @@ func gr_bi_ctor(gs gr_statep, destnum cell_num, srcnum cell_num, cd *ctor_desc, 
   return done(&bu);
 }
 
+func gr_generic_dead(gr *frame_graph, c cell_num) gr_xop {
+  switch ref_cell(gr, c)->location {
+  case LocationStatic:
+    return @[gr_xop]GrDead({c});
+  case LocationVirtual:
+    return @[gr_xop]GrVirtualDead({c});
+  }
+}
+
 func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_after_destroy) gr_num {
   bu sq_builder = mk_builder(gs);
   switch cd {
   case &TrivialCtor:
     if case DeadactAfterDestroyYes = dad {
       add(&bu, @[gr_xop]GrActiveXop({Deactivate(argnum), Nothing}));
-      add(&bu, @[gr_xop]GrDead({argnum}));
+      add(&bu, gr_generic_dead(gs.gr, argnum));
     }
   case &FunCtor(ip instpair):
     if case DeadactAfterDestroyYes = dad {
       gn gr_num = gr_uni_fun(gs, ip, argnum, Deactivate);
       add(&bu, gn);
-      add(&bu, @[gr_xop]GrDead({argnum}));
+      add(&bu, gr_generic_dead(gs.gr, argnum));
     } else {
       gn gr_num = gr_uni_fun(gs, ip, argnum, Nothing);
       add(&bu, gn);
