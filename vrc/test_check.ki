@@ -2075,6 +2075,28 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  }\n"
         "  return k;\n"
         "}\n"));
+  // Forces quick-return to unwind an active virtual cell.
+  run_check_test(ctx, "c166",
+    _u8("defclass ty { n i8; }\n"
+        "access ty {\n"
+        "  func do_init(x *ty) void {\n"
+        "    x->n = 5;\n"
+        "  }\n"
+        "  func do_copy(x *ty, y *ty) void {\n"
+        "    x->n = y->n + 1;\n"
+        "  }\n"
+        "  func do_destroy(x *ty) void {\n"
+        "  }\n"
+        "}\n"
+        "struct foo { x ty; y i32; }\n"
+        "enum opt { None void; #Has i32; }\n"
+        "func bar() opt {\n"
+        "  x opt = None;\n"
+        "  z ty;\n"
+        "  y foo = {z, #x};\n"
+        "  return Has(y.y);\n"
+        "}\n"
+        "def glob opt = bar();\n"));
 }
 
 func mk_ctx(verbose bool, build bool, name opt[array[u8]]) check_ctx {

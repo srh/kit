@@ -23,6 +23,13 @@ enum cell_location {
   LocationStatic void;
 }
 
+func[H] build_u8str(help H, r *array[u8], x *cell_location) void {
+  switch *x {
+  case LocationStatic: append(r, _u8("LocationStatic"));
+  case LocationVirtual: append(r, _u8("LocationVirtual"));
+  }
+}
+
 func `==`(x cell_location, y cell_location) bool {
   return enumnum(&x) == enumnum(&y);
 }
@@ -195,8 +202,10 @@ func addx(gr *frame_graph, ctr *celltrack, op gr_xop) gr_num {
   case &GrAssertLive(a gr_assert_live):
     gr_expect_live(ctr, a.cell);
   case &GrDead(a gr_dead):
+    check(isLocationStatic(ref_cell(gr, a.cell)->location));
     gr_deaden(ctr, a.cell);
   case &GrVirtualDead(a gr_virtual_dead):
+    check(!isLocationStatic(ref_cell(gr, a.cell)->location));
     gr_deaden(ctr, a.cell);
   case &GrActiveXop(a gr_active_xop):
     gr_track_active_op(ctr, a.op1);
@@ -2812,19 +2821,28 @@ func gr_bi_ctor(gs gr_statep, destnum cell_num, srcnum cell_num, cd *ctor_desc, 
   return done(&bu);
 }
 
+func gr_generic_dead(gr *frame_graph, c cell_num) gr_xop {
+  switch ref_cell(gr, c)->location {
+  case LocationStatic:
+    return @[gr_xop]GrDead({c});
+  case LocationVirtual:
+    return @[gr_xop]GrVirtualDead({c});
+  }
+}
+
 func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_after_destroy) gr_num {
   bu sq_builder = mk_builder(gs);
   switch cd {
   case &TrivialCtor:
     if case DeadactAfterDestroyYes = dad {
       add(&bu, @[gr_xop]GrActiveXop({Deactivate(argnum), Nothing}));
-      add(&bu, @[gr_xop]GrDead({argnum}));
+      add(&bu, gr_generic_dead(gs.gr, argnum));
     }
   case &FunCtor(ip instpair):
     if case DeadactAfterDestroyYes = dad {
       gn gr_num = gr_uni_fun(gs, ip, argnum, Deactivate);
       add(&bu, gn);
-      add(&bu, @[gr_xop]GrDead({argnum}));
+      add(&bu, gr_generic_dead(gs.gr, argnum));
     } else {
       gn gr_num = gr_uni_fun(gs, ip, argnum, Nothing);
       add(&bu, gn);
