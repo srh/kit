@@ -271,12 +271,7 @@ struct ast_switch_statement {
 }
 
 
-struct ast_return_statement_info {
-  destructions array[var_destruction];
-}
-
 struct ast_return_statement {
-  info nc[ast_return_statement_info];
   // If no expr, it returns void.
   expr opt[box[ast_expr_consume]];
 }

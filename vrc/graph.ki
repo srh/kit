@@ -1018,9 +1018,9 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
     add(bu, @[gr_xop]GrWriteConst({fb->return_cell, ConstInt(bigu(0))}));
     add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Nothing}));
   }
-  info *ast_return_statement_info = un(&a->info);
-  uw_op gr_num = gr_unwinding(gs, &info->destructions);
-  add(bu, uw_op);
+  unwind_bu sq_builder = mk_builder(gs);
+  #gr_unwind(gs, fb->return_cell, &unwind_bu);
+  add(bu, done(&unwind_bu));
   append_and_nopq(bu, &fb->final_node, &saved);
   return NoFail;
 }
