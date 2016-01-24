@@ -779,7 +779,6 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     initter_uw gr_num = gr_unwinding(gs, &un(&a->info)->initter_destructions);
     add(&exit_bu, initter_uw);
 
-    // TODO: This would be using the same cells in different nodes.
     loopexitgn gr_num = gr_later_discard(gs, &cond.discard);
     add(&exit_bu, loopexitgn);
 
