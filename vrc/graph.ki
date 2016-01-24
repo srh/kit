@@ -1269,7 +1269,6 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       i = i - 1;
       ent *celltrack_entry = ref(&gs.ctr->all, i);
       cell cell_num = ent->cell;
-      // TODO: I'd like to be able to assert that the return cell is at index 0.
       if cell != fb->return_cell {
         if ent->active {
           ci *cell_info = ref_cell(gs.gr, cell);
@@ -1286,6 +1285,9 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
             add(&unwind_bu, @[gr_xop]GrDead({cell}));
           }
         }
+      } else {
+        // Return cell should be the bottom-most.
+        check(i == 0);
       }
     }
 
