@@ -1421,7 +1421,7 @@ func parse_rest_of_goto_statement_enum(p *ps, out *ast_statement_enum) parse_res
 
 func parse_rest_of_return_statement_enum(p *ps, out *ast_statement_enum) parse_result {
   if +try_skip_oper(p, ';') {
-    *out = Return({NotComputed, None});
+    *out = Return({None});
     return Success;
   }
   expr ast_expr;
@@ -1429,7 +1429,7 @@ func parse_rest_of_return_statement_enum(p *ps, out *ast_statement_enum) parse_r
        && +try_skip_oper(p, ';')) {
     return Fail;
   }
-  *out = Return({NotComputed, Has(embox(consume(&expr)))});
+  *out = Return({Has(embox(consume(&expr)))});
   return Success;
 }
 
@@ -1498,7 +1498,7 @@ func parse_rest_of_while_statement_enum(p *ps, out *ast_statement_enum) parse_re
        && +parse_bracebody(p, &body)) {
     return Fail;
   }
-  *out = While({mk_condition_discard_info(), mk_condition_discard_info(), condition, body});
+  *out = While({mk_condition_discard_info(), condition, body});
   return Success;
 }
 

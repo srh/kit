@@ -172,13 +172,10 @@ func check_discard_expr(es *framescope, x *ast_expr_discard, pt *te_typeexpr) np
 
 // For exprs that we use, but then discard.  Conditionals... and switches?  Kinda.
 func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info) np {
-  return check_consume_then_discard_expr(es, x, pt, later, None);
-}
-func check_consume_then_discard_expr(es *framescope, x *ast_expr_consume, pt *te_typeexpr, later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) np {
   if case Printed(pm) = check_expr_ai(es, AllowIncompleteNo, &x->expr, pt) {
     return Printed(pm);
   }
-  if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later, later2) {
+  if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, &x->expr, &x->after, later) {
     return Printed(pm);
   }
   return NoFail;
@@ -284,7 +281,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       bp breakpack = {tailnum, vars_in_scope(&bs->es), num, vars_in_scope(&bs->es)};
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
-      if case Printed(pm) = check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard_continue, Has(&b.condition_discard_exit)) {
+      if case Printed(pm) = check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard) {
         return Printed(pm);
       }
       body_ee entryexit;
@@ -367,9 +364,9 @@ struct swartch_checkobj {
   is_deref bool;
 }
 
-func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard_info, later2 opt[*ast_later_discard_info], checkobj_out *swartch_checkobj) np {
+func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard_info, checkobj_out *swartch_checkobj) np {
   unknown te_typeexpr = TeUnknown;
-  if case Printed(pm) = check_consume_then_discard_expr(es, a, &unknown, later, later2) {
+  if case Printed(pm) = check_consume_then_discard_expr(es, a, &unknown, later) {
     return Printed(pm);
   }
 
@@ -443,7 +440,7 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
 
 func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a *ast_switch_statement, num statement_num, exit_out *statement_num) np {
   chk swartch_checkobj;
-  if case Printed(pm) = check_swartch(&bs->es, oo(&a->swartch), &a->swartch_discard, None, &chk) {
+  if case Printed(pm) = check_swartch(&bs->es, oo(&a->swartch), &a->swartch_discard, &chk) {
     return Printed(pm);
   }
 
@@ -705,11 +702,6 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
   if case Has(ix size) = moved_var_ix {
     shifterase_elem(&vars, ix);
   }
-  destructions array[var_destruction];
-  if case Printed(pm) = make_destructions(&bs->es, &vars, &destructions) {
-    return Printed(pm);
-  }
-  annotate(&a->info, {destructions});
   *exit_out = add_statement(bs, None);
   return NoFail;
 }
@@ -745,22 +737,10 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
 }
 
 func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info) np {
-  return check_condition(es, swartch_vp, cond_vp, a, cd, None);
-}
-
-func cdi_later(cdo opt[*ast_condition_discard_info]) opt[*ast_later_discard_info] {
-  if case Has(p) = cdo {
-    return Has(&p->later);
-  } else {
-    return None;
-  }
-}
-
-func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition, cd *ast_condition_discard_info, cd2 opt[*ast_condition_discard_info]) np {
   switch a {
     case &ExprCondition(b box[ast_expr_consume]): {
       booltype cu_typeexpr = compute_prim(es->clq, primitive_bool_type(es->cs));
-      if case Printed(pm) = check_consume_then_discard_expr(es, oo(&b), &booltype.x, &cd->later, cdi_later(cd2)) {
+      if case Printed(pm) = check_consume_then_discard_expr(es, oo(&b), &booltype.x, &cd->later) {
         return Printed(pm);
       }
 
@@ -770,14 +750,11 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
         return Printed(pm);
       }
       annotate(&cd->virtual_cell_dead, None);
-      if case Has(p) = cd2 {
-        annotate(&p->virtual_cell_dead, None);
-      }
       return NoFail;
     }
     case &PatternCondition(b ast_pattern_assign): {
       chk swartch_checkobj;
-      if case Printed(pm) = check_swartch(es, oo(&b.rhs), &cd->later, cdi_later(cd2), &chk) {
+      if case Printed(pm) = check_swartch(es, oo(&b.rhs), &cd->later, &chk) {
         return Printed(pm);
       }
 
@@ -810,9 +787,6 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
         }
 
         annotate(&cd->virtual_cell_dead, Has(cell));
-        if case Has(p) = cd2 {
-          annotate(&p->virtual_cell_dead, Has(cell));
-        }
         vn var_number;
         if case Printed(pm) = es_push_var(es, cond_vp, cell, Has(&vd.name), ~chk.switchable_type_lifetime, &cu_expected_type, VarOverlay, &vn) {
           return Printed(pm);
@@ -827,9 +801,6 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
           return ERR(_u8("decl-free case pattern used with non-void case"));
         }
         annotate(&cd->virtual_cell_dead, None);
-        if case Has(p) = cd2 {
-          annotate(&p->virtual_cell_dead, None);
-        }
         ovn = None;
       }
       tag_value enum_tag_value = mk_enum_tag_value(decl_index);

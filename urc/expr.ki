@@ -1211,12 +1211,11 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
 
 
 // Annotates the disposal for a value we'll use but then discard.
-func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume], later *ast_later_discard_info, later2 opt[*ast_later_discard_info]) np {
+func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume], later *ast_later_discard_info) np {
   if case Printed(pm) = annotate_disposal_for_consume(es, a, after) {
     return Printed(pm);
   }
 
-  // TODO: Dedup this code or stop generating all cells at check-time.
   if true {
     info *ast_expr_complete_info = expr_complete_info(a);
     destroy ctor_desc;
@@ -1226,14 +1225,6 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
     annotate(&later->action, @[destroy_action]+{destroy, result_cell(un(after))});
   }
 
-  if case Has(p *ast_later_discard_info) = later2 {
-    info *ast_expr_complete_info = expr_complete_info(a);
-    destroy ctor_desc;
-    if case Printed(pm) = get_destroy_ctor(es->clq, &info->cu, &destroy) {
-      return Printed(pm);
-    }
-    annotate(&p->action, @[destroy_action]+{destroy, result_cell(un(after))});
-  }
   return NoFail;
 }
 
@@ -2158,7 +2149,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe, field_lifetime(fake_lifetime(es->cs))});
     ie_info_after nc[ast_expr_after_consume] = NotComputed;
     lhs_later ast_later_discard_info = mk_later();
-    if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later, None) {
+    if case Printed(pm) = annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later) {
       return Printed(pm);
     }
 

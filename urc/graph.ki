@@ -824,7 +824,6 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     initter_uw gr_num = gr_unwinding(gs, &un(&a->info)->initter_destructions);
     add(&exit_bu, initter_uw);
 
-    // TODO: This would be using the same cells in different nodes.
     loopexitgn gr_num = gr_later_discard(gs, &cond.discard);
     add(&exit_bu, loopexitgn);
 
@@ -865,18 +864,18 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   bp breakgrack = {&outflow, &top};
 
   body_bu sq_builder = mk_builder(gs);
-  if case Printed(pm) = gr_condition_body(gs, fb, Has(bp), &a->condition_discard_continue, &a->body, &body_bu) {
+  if case Printed(pm) = gr_condition_body(gs, fb, Has(bp), &a->condition_discard, &a->body, &body_bu) {
     return Printed(pm);
   }
 
-  loopcleanupgn gr_num = gr_condition_discard(gs, &a->condition_discard_continue);
+  loopcleanupgn gr_num = gr_condition_discard(gs, &a->condition_discard);
 
   add(&body_bu, loopcleanupgn);
   thengn sq_num = mut_connect(gs, &body_bu, &top);
 
   restore_celltrack(gs.ctr, &else_save);
 
-  loopexitgn gr_num = gr_condition_discard(gs, &a->condition_discard_exit);
+  loopexitgn gr_num = gr_condition_discard(gs, &a->condition_discard);
 
   // TODO: Would be kinda nice if break (or continue) targeted _before_ the condition discard.
   exitseq sq_num = uni_connect(gs, loopexitgn, &outflow);
@@ -1091,9 +1090,11 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
     add(bu, @[gr_xop]GrWriteConst({fb->return_cell, ConstInt(bigu(0))}));
     add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Nothing}));
   }
-  info *ast_return_statement_info = un(&a->info);
-  uw_op gr_num = gr_unwinding(gs, &info->destructions);
-  add(bu, uw_op);
+  unwind_bu sq_builder = mk_builder(gs);
+  if case Printed(pm) = gr_unwind(gs, fb->return_cell, &unwind_bu) {
+    return Printed(pm);
+  }
+  add(bu, done(&unwind_bu));
   append_and_nopq(bu, &fb->final_node, &saved);
   return NoFail;
 }
@@ -1713,6 +1714,8 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       add(bu, dgn);
       mgn gr_num = gr_move_action(gs, &smi.rhs_move, BiDeactivateSrc);
       add(bu, mgn);
+      // TODO: We could use whole_cell(oo(&a->rhs)) or something...
+      add(bu, @[gr_xop]GrDead({smi.rhs_move.x.src}));
     }
     case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info): {
       dgn gr_num = gr_destroy_action(gs, &scdi.target_destroy, DeadactAfterDestroyNo);
@@ -2044,11 +2047,7 @@ func gr_copy_action(gs gr_statep, x *copy_action, statechange bi_ctor_statechang
 }
 
 func gr_move_action(gs gr_statep, x *move_action, statechange bi_ctor_statechange) gr_num {
-  bu sq_builder = mk_builder(gs);
-  dep gr_num = gr_bi_ctor(gs, x->x.dest, x->x.src, &x->x.ctor, statechange);
-  add(&bu, dep);
-  add(&bu, @[gr_xop]GrDead({x->x.src}));
-  return done(&bu);
+  return gr_bi_ctor(gs, x->x.dest, x->x.src, &x->x.ctor, statechange);
 }
 
 enum uni_fun_statechange {

@@ -239,8 +239,7 @@ struct ast_ifthenelse_statement {
 }
 
 struct ast_while_statement {
-  condition_discard_continue ast_condition_discard_info;
-  condition_discard_exit ast_condition_discard_info;
+  condition_discard ast_condition_discard_info;
   condition ast_condition;
   body ast_bracebody;
 }
@@ -271,12 +270,7 @@ struct ast_switch_statement {
 }
 
 
-struct ast_return_statement_info {
-  destructions array[var_destruction];
-}
-
 struct ast_return_statement {
-  info nc[ast_return_statement_info];
   // If no expr, it returns void.
   expr opt[box[ast_expr_consume]];
 }
