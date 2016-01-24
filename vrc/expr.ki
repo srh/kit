@@ -184,8 +184,7 @@ func es_note_var_initter(es *framescope, vn var_number) np {
   if case &Has(desc ctor_desc) = &info->initter {
     return NoFail;
   }
-  desc ctor_desc;
-  #get_init_ctor(es->clq, &info->type, &desc);
+  desc ctor_desc = #get_init_ctor(es->clq, &info->type);
   info->initter = Has(desc);
   return NoFail;
 }
@@ -195,8 +194,7 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
   if case &Has(desc ctor_desc) = &info->destroyer {
     return NoFail;
   }
-  desc ctor_desc;
-  #get_destroy_ctor(es->clq, &info->type, &desc);
+  desc ctor_desc = #get_destroy_ctor(es->clq, &info->type);
   info->destroyer = Has(desc);
   return NoFail;
 }
@@ -387,10 +385,8 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
   meco magic_enum_construct_op;
   switch &rhs_props.move_behavior {
     case &DerivedMethodAbsent: {
-      copy_desc ctor_desc;
-      #behavior_to_desc(&rhs_props.copy_behavior, &copy_desc);
-      destroy_desc ctor_desc;
-      #behavior_to_desc(&rhs_props.destroy_behavior, &destroy_desc);
+      copy_desc ctor_desc = #behavior_to_desc(&rhs_props.copy_behavior);
+      destroy_desc ctor_desc = #behavior_to_desc(&rhs_props.destroy_behavior);
       meco = EnumConstructCopyDestroy({copy_desc, destroy_desc});
     }
     case &DerivedMethodExplicit(ip instpair): {
@@ -976,23 +972,16 @@ func check_expr_assignment(es *framescope, a *ast_assignment, pt *te_typeexpr, x
   }
 }
 
-func behavior_to_desc(b *derived_method_behavior, out *ctor_desc) np {
+func behavior_to_desc(b *derived_method_behavior) cr[ctor_desc] {
   switch b {
-    case &DerivedMethodAbsent: {
-      return ERR(_u8("Cannot find derived method."));
-    }
-    case &DerivedMethodExplicit(ip instpair): {
-      *out = FunCtor(ip);
-      return NoFail;
-    }
-    case &DerivedMethodNontrivial(ip instpair): {
-      *out = FunCtor(ip);
-      return NoFail;
-    }
-    case &DerivedMethodTrivial: {
-      *out = TrivialCtor;
-      return NoFail;
-    }
+  case &DerivedMethodAbsent:
+    return ERR(_u8("Cannot find derived method."));
+  case &DerivedMethodExplicit(ip instpair):
+    return NoFail(FunCtor(ip));
+  case &DerivedMethodNontrivial(ip instpair):
+    return NoFail(FunCtor(ip));
+  case &DerivedMethodTrivial:
+    return NoFail(TrivialCtor);
   }
 }
 
@@ -1000,28 +989,28 @@ func computed_ptr_type(clq *clqueue, t *cu_typeexpr) cu_typrop {
   return compute_prim(clq, ptr_type(clq->cs, t->x));
 }
 
-func get_init_ctor(clq *clqueue, t *cu_typeexpr, out *ctor_desc) np {
+func get_init_ctor(clq *clqueue, t *cu_typeexpr) cr[ctor_desc] {
   props type_properties;
   #compute_type_properties(clq, t, &props);
-  return behavior_to_desc(&props.init_behavior, out);
+  return behavior_to_desc(&props.init_behavior);
 }
 
-func get_copy_ctor(clq *clqueue, t *cu_typeexpr, out *ctor_desc) np {
+func get_copy_ctor(clq *clqueue, t *cu_typeexpr) cr[ctor_desc] {
   props type_properties;
   #compute_type_properties(clq, t, &props);
-  return behavior_to_desc(&props.copy_behavior, out);
+  return behavior_to_desc(&props.copy_behavior);
 }
 
-func get_move_ctor(clq *clqueue, t *cu_typeexpr, out *ctor_desc) np {
+func get_move_ctor(clq *clqueue, t *cu_typeexpr) cr[ctor_desc] {
   props type_properties;
   #compute_type_properties(clq, t, &props);
-  return behavior_to_desc(&props.move_behavior, out);
+  return behavior_to_desc(&props.move_behavior);
 }
 
-func get_destroy_ctor(clq *clqueue, t *cu_typeexpr, out *ctor_desc) np {
+func get_destroy_ctor(clq *clqueue, t *cu_typeexpr) cr[ctor_desc] {
   props type_properties;
   #compute_type_properties(clq, t, &props);
-  return behavior_to_desc(&props.destroy_behavior, out);
+  return behavior_to_desc(&props.destroy_behavior);
 }
 
 func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume]) np {
@@ -1038,10 +1027,8 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
       if whole_temporary(&desc) {
         annotate(after, mk_after(@[consume_actions]ConsumeByInPlace, desc.whole_num));
       } else {
-        copy ctor_desc;
-        #get_copy_ctor(es->clq, &info->cu, &copy);
-        destroy ctor_desc;
-        #get_destroy_ctor(es->clq, &ref_cell(es, desc.whole_num)->type, &destroy);
+        copy ctor_desc = #get_copy_ctor(es->clq, &info->cu);
+        destroy ctor_desc = #get_destroy_ctor(es->clq, &ref_cell(es, desc.whole_num)->type);
         dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
         annotate(after,
           mk_after(@[consume_actions]ConsumeByCopyDestroy({+{copy, dest, desc.partial_num},
@@ -1053,13 +1040,11 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
     case &IsLvalYes(desc lval_description): {
       dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
       if case Has(ix size) = find(movable_cells, Has(desc.num)) {
-        move ctor_desc;
-        #get_move_ctor(es->clq, &info->cu, &move);
+        move ctor_desc = #get_move_ctor(es->clq, &info->cu);
         annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]+{move, dest, desc.num}), dest));
         *moved_cell_ix_out = Has(ix);
       } else {
-        copy ctor_desc;
-        #get_copy_ctor(es->clq, &info->cu, &copy);
+        copy ctor_desc = #get_copy_ctor(es->clq, &info->cu);
         annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]+{copy, dest, desc.num}, desc.deadme)), dest));
         *moved_cell_ix_out = None;
       }
@@ -1073,8 +1058,7 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      destroy ctor_desc;
-      #get_destroy_ctor(es->clq, &ref_cell(es, desc.whole_num)->type, &destroy);
+      destroy ctor_desc = #get_destroy_ctor(es->clq, &ref_cell(es, desc.whole_num)->type);
       annotate(after, mk_after_discard(@[destroy_action]+{destroy, desc.whole_num}));
     }
     case &IsLvalYes(desc lval_description): {
@@ -1095,8 +1079,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
   #annotate_disposal_for_consume(es, a, after);
 
   info *ast_expr_complete_info = expr_complete_info(a);
-  destroy ctor_desc;
-  #get_destroy_ctor(es->clq, &info->cu, &destroy);
+  destroy ctor_desc = #get_destroy_ctor(es->clq, &info->cu);
   annotate(&later->action, @[destroy_action]+{destroy, result_cell(un(after))});
 
   return NoFail;
@@ -1120,21 +1103,17 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      target_destroy ctor_desc;
-      #get_destroy_ctor(es->clq, &ref_cell(es, dest)->type, &target_destroy);
+      target_destroy ctor_desc = #get_destroy_ctor(es->clq, &ref_cell(es, dest)->type);
       if whole_temporary(&desc) {
-        move ctor_desc;
-        #get_move_ctor(es->clq, &ref_cell(es, dest)->type, &move);
+        move ctor_desc = #get_move_ctor(es->clq, &ref_cell(es, dest)->type);
         annotate(&assignment->info,
           @[ast_assignment_info]
           SimpleMoveAssignment({@[destroy_action]+{target_destroy, dest},
                                 @[move_action]+{move, dest, desc.whole_num}}));
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
-        copy ctor_desc;
-        #get_copy_ctor(es->clq, &ref_cell(es, dest)->type, &copy);
-        destroy ctor_desc;
-        #get_destroy_ctor(es->clq, &ref_cell(es, desc.whole_num)->type, &destroy);
+        copy ctor_desc = #get_copy_ctor(es->clq, &ref_cell(es, dest)->type);
+        destroy ctor_desc = #get_destroy_ctor(es->clq, &ref_cell(es, desc.whole_num)->type);
 
         annotate(&assignment->info,
           @[ast_assignment_info]
@@ -1148,10 +1127,8 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         // Static self-assignment!
         annotate(&assignment->info, StaticSelfAssignment);
       } else {
-        target_destroy ctor_desc;
-        #get_destroy_ctor(es->clq, &ref_cell(es, dest)->type, &target_destroy);
-        copy ctor_desc;
-        #get_copy_ctor(es->clq, &ref_cell(es, dest)->type, &copy);
+        target_destroy ctor_desc = #get_destroy_ctor(es->clq, &ref_cell(es, dest)->type);
+        copy ctor_desc = #get_copy_ctor(es->clq, &ref_cell(es, dest)->type);
         do_conditional bool;
         switch &target_destroy {
         case &TrivialCtor:

@@ -1223,8 +1223,7 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       add(&case_bu, @[gr_xop]GrVirtualDead({info->return_tag_cell}));
 
       // TODO: Support treating types with move ctor more efficiently, when we can.  This is possible when the rhs is a whole-cell rval.
-      copy_ctor_desc ctor_desc;
-      #behavior_to_desc(&field_props.copy_behavior, &copy_ctor_desc);
+      copy_ctor_desc ctor_desc = #behavior_to_desc(&field_props.copy_behavior);
 
       copy_gn gr_num = gr_bi_ctor(gs, return_field_cell, field_cell, &copy_ctor_desc, BiCopy);
 
@@ -1300,8 +1299,7 @@ func gr_unwind(gs gr_statep, target_cell cell_num, bu *sq_builder) np {
     }
     if ent->active {
       ci *cell_info = ref_cell(gs.gr, cell);
-      destroy_ctor ctor_desc;
-      #behavior_to_desc(&ci->props.destroy_behavior, &destroy_ctor);
+      destroy_ctor ctor_desc = #behavior_to_desc(&ci->props.destroy_behavior);
       gn gr_num = gr_destroy_ctor(gs, cell, &destroy_ctor, DeadactAfterDestroyYes);
       add(bu, gn);
     } else {
