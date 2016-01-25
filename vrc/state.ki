@@ -185,7 +185,7 @@ func add_deftype_inst(cs *checkstate, val deftype_inst) deftype_inst_id {
 
 func add_fn_body(cs *checkstate, ent fn_body_entry) fn_body_id {
   id fn_body_id = ~count(&cs->fn_bodies);
-  push(&cs->fn_bodies, emshp(ent));
+  push(&cs->fn_bodies, emshp(move(&ent)));
   return id;
 }
 

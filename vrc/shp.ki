@@ -45,6 +45,6 @@ access shp[_] {
 
 inline func[T] emshp(val T) shp[T] {
   ret shp[T];
-  *oo(&ret) = val;
+  *oo(&ret) = move(&val);
   return ret;
 }
