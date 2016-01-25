@@ -1877,8 +1877,8 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
 
   ixtype *te_typeexpr;
-  is_arraytype bool;
-  if !decompose_indexable(es->cs, &lhs_info->cu.x, &ixtype, &is_arraytype) {
+  tech indexing_technique;
+  if !decompose_indexable(es->cs, &lhs_info->cu.x, &ixtype, &tech) {
     return ERR(_u8("indexing on non-indexable type"));
   }
 
@@ -1891,7 +1891,8 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   #compute_complete_type_properties(es->clq, ixtype, &props);
 
   lval is_lval;
-  if is_arraytype {
+  switch tech {
+  case ArrayIndexing:
     // TODO: This is totally duplicating field access logic.
     switch &lhs_info->lval {
       case &IsLvalYes(desc lval_description): {
@@ -1903,7 +1904,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     }
     // Nothing to dispose, it's a field access.
     annotate(&a->info, {None, rhs_later});
-  } else {
+  case PtrIndexing:
     // Dereferencing a pointer always makes an lvalue.
     lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe, field_lifetime(fake_lifetime(es->cs))});
     ie_info_after nc[ast_expr_after_consume] = NotComputed;
@@ -1917,14 +1918,19 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   return NoFail;
 }
 
-func decompose_indexable(cs *checkstate, t *te_typeexpr, out **te_typeexpr, is_arraytype_out *bool) bool {
+enum indexing_technique {
+  ArrayIndexing void;
+  PtrIndexing void;
+}
+
+func decompose_indexable(cs *checkstate, t *te_typeexpr, out **te_typeexpr, tech_out *indexing_technique) bool {
   // We specifically do _not_ support references here.  You can't index into a reference... you'd need a slice type or something like that.
   if decompose_typeapp(t, primitive_pointer_puretype(cs), out) {
-    *is_arraytype_out = false;
+    *tech_out = PtrIndexing;
     return true;
   }
   if decompose_arraytype(t, out) {
-    *is_arraytype_out = true;
+    *tech_out = ArrayIndexing;
     return true;
   }
   return false;
