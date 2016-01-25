@@ -121,9 +121,10 @@ func note_celltrack(targ *noted_celltrack, current *celltrack) void {
 }
 
 func ctr_find(ctr *celltrack, c cell_num) opt[size] {
+  p *celltrack_entry = data(&ctr->all);
   for i size = count(&ctr->all); i > 0; {
     i = i - 1;
-    if ref(&ctr->all, i)->cell == c {
+    if p[i].cell == c {
       return Has(i);
     }
   }
