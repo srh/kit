@@ -1869,26 +1869,25 @@ func compute_prim(clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type
 func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast_expr) np {
   unknown te_typeexpr = TeUnknown;
   #check_expr_ai(es, AllowIncompleteNo, oo(&a->lhs), &unknown);
-  sizetype cu_typeexpr = compute_prim(es->clq, primitive_size_type(es->cs));
-
-  rhs_later ast_later_discard_info = mk_later();
-  #check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.x, &rhs_later);
-
   lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
 
-  ixtype *te_typeexpr;
+  result_type *te_typeexpr;
   tech indexing_technique;
-  if !decompose_indexable(es->cs, &lhs_info->cu.x, &ixtype, &tech) {
+  if !decompose_indexable(es->cs, &lhs_info->cu.x, &result_type, &tech) {
     return ERR(_u8("indexing on non-indexable type"));
   }
 
   unified te_typeexpr;
-  if !unify_types(pt, ixtype, &unified) {
+  if !unify_types(pt, result_type, &unified) {
     return ERR(_u8("index expr returns wrong type"));
   }
 
+  sizetype cu_typeexpr = compute_prim(es->clq, primitive_size_type(es->cs));
+  rhs_later ast_later_discard_info = mk_later();
+  #check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.x, &rhs_later);
+
   props type_properties;
-  #compute_complete_type_properties(es->clq, ixtype, &props);
+  #compute_complete_type_properties(es->clq, result_type, &props);
 
   lval is_lval;
   switch tech {
@@ -1896,17 +1895,17 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     // TODO: This is totally duplicating field access logic.
     switch &lhs_info->lval {
       case &IsLvalYes(desc lval_description): {
-        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe, field_lifetime(desc.lifetime)});
+        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, props}), DeadMe, field_lifetime(desc.lifetime)});
       }
       case &IsLvalNo(desc rval_description): {
-        lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *ixtype, props})});
+        lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *result_type, props})});
       }
     }
     // Nothing to dispose, it's a field access.
     annotate(&a->info, {None, rhs_later});
   case PtrIndexing:
     // Dereferencing a pointer always makes an lvalue.
-    lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *ixtype, props}), DeadMe, field_lifetime(fake_lifetime(es->cs))});
+    lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, props}), DeadMe, field_lifetime(fake_lifetime(es->cs))});
     ie_info_after nc[ast_expr_after_consume] = NotComputed;
     lhs_later ast_later_discard_info = mk_later();
     #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
@@ -1914,7 +1913,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), rhs_later});
   }
 
-  annotate_info(x, CompleteCheck(mk(lval, ~ *ixtype, props)));
+  annotate_info(x, CompleteCheck(mk(lval, ~ *result_type, props)));
   return NoFail;
 }
 
