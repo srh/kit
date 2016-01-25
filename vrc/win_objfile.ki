@@ -268,7 +268,7 @@ func win_flatten(im *identmap, f *objfile) array[u8] {
     h.PointerToSymbolTable = ~end_of_section_headers;
     h.NumberOfSymbols = ~win_symbols_to_write(f);
     // Should be zero for an object file.
-    h.SizeOfOptionalHeader = ~ @[u16] ~ @[u32] 0;
+    h.SizeOfOptionalHeader = ~ @[u16] 0;
     h.Characteristics = ~ real_file_characteristics();
     append_reinterpret(&d, &h);
   }
@@ -361,7 +361,7 @@ func win_write_section_header(d *array[u8], s *objfile_section, name array[u8], 
   // We output no COFF line numbers.
   h.PointerToLineNumbers = ~ @[u32] 0;
   h.NumberOfRelocations = ~objfile_section_small_relocations_count(s);
-  h.NumberOfLineNumbers = ~ @[u16] ~ @[u32] 0;
+  h.NumberOfLineNumbers = ~ @[u16] 0;
   h.Characteristics = ~Characteristics;
 
   append_reinterpret(d, &h);
@@ -468,7 +468,7 @@ func win_append_section_symbols(d *array[u8], s *objfile_section, name array[u8]
     bufcopy(&standard.Name.u.ShortName[0], data(&name), count(&name));
     standard.Value = ~ @[u32] 0;
     standard.SectionNumber = ~ SectionNumber;
-    standard.Type = ~ @[u16] ~ @[u32] 0;
+    standard.Type = ~ @[u16] 0;
     standard.StorageClass = IMAGE_SYM_CLASS_STATIC;
     standard.NumberOfAuxSymbols = 1;
     append_reinterpret(d, &standard);
@@ -477,9 +477,9 @@ func win_append_section_symbols(d *array[u8], s *objfile_section, name array[u8]
     aux_sectiondef COFF_symbol_aux_sectiondef;
     aux_sectiondef.Length = ~ @[u32]~count(&s->raw);
     aux_sectiondef.NumberOfRelocations = ~objfile_section_small_relocations_count(s);
-    aux_sectiondef.NumberOfLineNumbers = ~ @[u16] ~ @[u32] 0;
+    aux_sectiondef.NumberOfLineNumbers = ~ @[u16] 0;
     aux_sectiondef.CheckSum = ~ @[u32] 0;
-    aux_sectiondef.Number = ~ @[u16] ~ @[u32] 0;
+    aux_sectiondef.Number = ~ @[u16] 0;
     aux_sectiondef.Selection = 0;
     // TODO: Assert that aux_sectiondef.Unused has size 3.
     fill(&aux_sectiondef.Unused[0], 3, 0);
