@@ -104,6 +104,7 @@ struct common_syms {
   postfix_decrsym sym;
   fakesym sym;
   quickreturnsym sym;
+  do_indexsym sym;
 }
 
 struct identmap {
@@ -159,6 +160,8 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.postfix_decrsym = intern(im, _s("--"));
   ret.fakesym = intern(im, _s("$fake"));
   ret.quickreturnsym = intern(im, _s("#"));
+  ret.do_indexsym = intern(im, _s("do_index"));
+  // TODO: Where's do_init, do_copy, etc?
   return ret;
 }
 

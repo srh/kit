@@ -1498,6 +1498,20 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
   }
 }
 
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr, twoparam_out **te_typeexpr, threeparam_out **te_typeexpr) bool {
+  params *shray[te_typeexpr];
+  if !decompose_typeapp(t, expected_puretype, &params) {
+    return false;
+  }
+  if count(params) != 3 {
+    return false;
+  }
+  *oneparam_out = ref(params, 0);
+  *twoparam_out = ref(params, 1);
+  *threeparam_out = ref(params, 2);
+  return true;
+}
+
 enum check_field_result {
   // Inherits the lvalue-ness of the thing it's a field of.  Includes the field's offset (in bnnos).
   InheritsLval u32;
@@ -1872,11 +1886,9 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
 
   result_type *te_typeexpr;
-  key_type cu_typeexpr;
+  key_type te_typeexpr;
   tech indexing_technique;
-  if !decompose_indexable(es->clq, &lhs_info->cu.x, &result_type, &key_type, &tech) {
-    return ERR(_u8("indexing on non-indexable type"));
-  }
+  #decompose_indexable(es->clq, &lhs_info->cu.x, &result_type, &key_type, &tech);
 
   unified te_typeexpr;
   if !unify_types(pt, result_type, &unified) {
@@ -1884,7 +1896,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   }
 
   rhs_later ast_later_discard_info = mk_later();
-  #check_consume_then_discard_expr(es, oo(&a->rhs), &key_type.x, &rhs_later);
+  #check_consume_then_discard_expr(es, oo(&a->rhs), &key_type, &rhs_later);
 
   props type_properties;
   #compute_complete_type_properties(es->clq, result_type, &props);
@@ -1911,6 +1923,8 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
 
     annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), rhs_later});
+  case FnIndexing(ip instpair):
+    return ERR(_u8("ICE: FnIndexing not implemented"));
   }
 
   annotate_info(x, CompleteCheck(mk(lval, ~ *result_type, props)));
@@ -1920,21 +1934,53 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
 enum indexing_technique {
   ArrayIndexing void;
   PtrIndexing void;
+  FnIndexing instpair;
 }
 
-func decompose_indexable(clq *clqueue, t *te_typeexpr, result_type_out **te_typeexpr, key_type_out *cu_typeexpr, tech_out *indexing_technique) bool {
+func decompose_indexable(clq *clqueue, t *te_typeexpr, result_type_out **te_typeexpr, key_type_out *te_typeexpr, tech_out *indexing_technique) np {
   // We specifically do _not_ support references here.  You can't index into a reference... you'd need a slice type or something like that.
   if decompose_typeapp(t, primitive_pointer_puretype(clq->cs), result_type_out) {
     *tech_out = PtrIndexing;
-    *key_type_out = compute_prim(clq, primitive_size_type(clq->cs));
-    return true;
+    *key_type_out = (@[cu_typeexpr]compute_prim(clq, primitive_size_type(clq->cs))).x;
+    return NoFail;
   }
+
   if decompose_arraytype(t, result_type_out) {
     *tech_out = ArrayIndexing;
-    *key_type_out = compute_prim(clq, primitive_size_type(clq->cs));
-    return true;
+    *key_type_out = (@[cu_typeexpr]compute_prim(clq, primitive_size_type(clq->cs))).x;
+    return NoFail;
   }
-  return false;
+
+  fntype te_typeexpr = fn_type(clq->cs, ptr_type(clq->cs, *t), TeUnknown, TeUnknown);
+  gp genparms = NoParms;
+  res match_def_res;
+  #match_def(clq->cs, clq->im->cym.do_indexsym, &gp, &fntype, &res);
+  switch &res {
+  case &NoMatch:
+    return ERR(_u8("indexing on non-indexable type"));
+  case &MultiMatch:
+    return ERR(_u8("indexing on type with multiple '"), lookup(clq->im, clq->im->cym.do_indexsym), _u8("' definitions"));
+  case &OneMatch(m ent_and_parms):
+    inst_id def_inst_id;
+    #make_inst(clq, m.ent, &m.parms, &inst_id);
+    ty *cu_typrop;
+    #ensure_def_inst_type_computed(clq->cs, clq, ref_def_entry(clq->cs, m.ent), inst_id, &ty);
+    arr_ptr_type *te_typeexpr;
+    key_type *te_typeexpr;
+    result_ptr_type *te_typeexpr;
+    if !decompose_typeapp(&ty->cu.x, primitive_function_puretype(clq->cs), &arr_ptr_type, &key_type, &result_ptr_type) {
+      // This failure can't happen because we constructed fntype to have 3 types.
+      return ERR(_u8("ICE: decompose_indexable cannot decompose match_def type"));
+    }
+    result_type *te_typeexpr;
+    if !decompose_typeapp(result_ptr_type, primitive_pointer_puretype(clq->cs), &result_type) {
+      return ERR(_u8("indexing function '"), lookup(clq->im, clq->im->cym.do_indexsym), _u8("' returns non-pointer type"));
+    }
+    *result_type_out = result_type;
+    *key_type_out = *key_type;
+    *tech_out = FnIndexing({m.ent, inst_id});
+    return NoFail;
+  }
 }
 
 func decompose_arraytype(t *te_typeexpr, out **te_typeexpr) bool {
