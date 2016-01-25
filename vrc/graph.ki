@@ -1481,19 +1481,24 @@ func parsed_inline_to_state_inline(a ast_isinline) should_inline {
 
 func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder) np {
   info *ast_index_expr_info = un(&a->info);
-  if case &Has(aft tup[ast_expr_after_consume, ast_later_discard_info]) = &info->lhs_after {
-    // It's a pointer.
-    name cell_num = ellval_cell(x);
-    flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
-    add(bu, @[gr_xop]GrLive({result_cell(&aft.car)}));
-    #gr_expr_and_consume(gs, oo(&a->lhs), &aft.car, bu);
-    #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
-    add(bu, @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
-    rhs_later gr_num = gr_later_discard(gs, &info->rhs_later);
-    add(bu, rhs_later);
-    lhs_later gr_num = gr_later_discard(gs, &aft.cdr);
-    add(bu, lhs_later);
-  } else {
+  switch info->tech {
+  case PtrIndexing:
+    if case &Has(aft tup[ast_expr_after_consume, ast_later_discard_info]) = &info->lhs_after {
+      // It's a pointer.
+      name cell_num = ellval_cell(x);
+      flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
+      add(bu, @[gr_xop]GrLive({result_cell(&aft.car)}));
+      #gr_expr_and_consume(gs, oo(&a->lhs), &aft.car, bu);
+      #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
+      add(bu, @[gr_xop]GrDeref({name, result_cell(&aft.car), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
+      rhs_later gr_num = gr_later_discard(gs, &info->rhs_later);
+      add(bu, rhs_later);
+      lhs_later gr_num = gr_later_discard(gs, &aft.cdr);
+      add(bu, lhs_later);
+    } else {
+      ice(_u8("gr_index_expr missing lhs_after info on pointer"));
+    }
+  case ArrayIndexing:
     #gr_expr(gs, oo(&a->lhs), bu);
     #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
     name cell_num = value_cell(x);
@@ -1511,6 +1516,8 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
     }
     rhs_later gr_num = gr_later_discard(gs, &info->rhs_later);
     add(bu, rhs_later);
+  case FnIndexing(ip instpair):
+    return ERR(_u8("ICE: gr_index_expr FnIndexing not implemented"));
   }
   return NoFail;
 }

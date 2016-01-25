@@ -1914,7 +1914,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       }
     }
     // Nothing to dispose, it's a field access.
-    annotate(&a->info, {None, rhs_later});
+    annotate(&a->info, {tech, None, rhs_later});
   case PtrIndexing:
     // Dereferencing a pointer always makes an lvalue.
     lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, props}), DeadMe, field_lifetime(fake_lifetime(es->cs))});
@@ -1922,9 +1922,21 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     lhs_later ast_later_discard_info = mk_later();
     #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
 
-    annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), rhs_later});
+    annotate(&a->info, {tech, Has({*un(&ie_info_after), lhs_later}), rhs_later});
   case FnIndexing(ip instpair):
-    return ERR(_u8("ICE: FnIndexing not implemented"));
+    // What this becomes is:
+    //   - If the lhs is an lvalue, we take its address, call ip, and deref the return value, which makes an lvalue.
+    //   - If the lhs is an rvalue, we take its address, call ip, and copy the return value to a new whole rvalue.  But WHAT IF an rvalue's partial_num was allowed to not be a subcell of whole_num?  Then we could just update partial_num.
+    //   - For now, if the lhs is an rvalue, we fail to compile.
+
+    switch &lhs_info->lval {
+    case &IsLvalYes(desc lval_description):
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, props}), DeadMe, fake_lifetime(es->cs)});
+    case &IsLvalNo(desc rval_description):
+      return ERR(_u8("User-defined array indexing only works on lvalues"));
+    }
+
+    annotate(&a->info, {tech, None, rhs_later});
   }
 
   annotate_info(x, CompleteCheck(mk(lval, ~ *result_type, props)));
