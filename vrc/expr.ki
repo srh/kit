@@ -1872,8 +1872,9 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
 
   result_type *te_typeexpr;
+  key_type cu_typeexpr;
   tech indexing_technique;
-  if !decompose_indexable(es->cs, &lhs_info->cu.x, &result_type, &tech) {
+  if !decompose_indexable(es->clq, &lhs_info->cu.x, &result_type, &key_type, &tech) {
     return ERR(_u8("indexing on non-indexable type"));
   }
 
@@ -1882,9 +1883,8 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     return ERR(_u8("index expr returns wrong type"));
   }
 
-  sizetype cu_typeexpr = compute_prim(es->clq, primitive_size_type(es->cs));
   rhs_later ast_later_discard_info = mk_later();
-  #check_consume_then_discard_expr(es, oo(&a->rhs), &sizetype.x, &rhs_later);
+  #check_consume_then_discard_expr(es, oo(&a->rhs), &key_type.x, &rhs_later);
 
   props type_properties;
   #compute_complete_type_properties(es->clq, result_type, &props);
@@ -1922,14 +1922,16 @@ enum indexing_technique {
   PtrIndexing void;
 }
 
-func decompose_indexable(cs *checkstate, t *te_typeexpr, out **te_typeexpr, tech_out *indexing_technique) bool {
+func decompose_indexable(clq *clqueue, t *te_typeexpr, result_type_out **te_typeexpr, key_type_out *cu_typeexpr, tech_out *indexing_technique) bool {
   // We specifically do _not_ support references here.  You can't index into a reference... you'd need a slice type or something like that.
-  if decompose_typeapp(t, primitive_pointer_puretype(cs), out) {
+  if decompose_typeapp(t, primitive_pointer_puretype(clq->cs), result_type_out) {
     *tech_out = PtrIndexing;
+    *key_type_out = compute_prim(clq, primitive_size_type(clq->cs));
     return true;
   }
-  if decompose_arraytype(t, out) {
+  if decompose_arraytype(t, result_type_out) {
     *tech_out = ArrayIndexing;
+    *key_type_out = compute_prim(clq, primitive_size_type(clq->cs));
     return true;
   }
   return false;
