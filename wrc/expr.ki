@@ -1358,7 +1358,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   check(nargs + 1 == count(computed_params));
   arg_cells array[cell_num];
   for i size = 0; i < nargs; i = i + 1 {
-    cu_param cu_typeexpr = ~(*computed_params)[i];
+    cu_param cu_typeexpr = ~computed_params[i];
     cu_param_props type_properties;
     #compute_type_properties(bs->clq, &cu_param, &cu_param_props);
     cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
