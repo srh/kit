@@ -1364,7 +1364,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
     cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
     push(&arg_cells, cell);
     vn var_number;
-    name *ast_ident = &ref(&a->args, i)->name;
+    name *ast_ident = &a->args[i].name;
     #es_push_var(&bs->es, &vp, cell, Has(name), ~varname_lifetime(bs->im, name->value), &cu_param, VarSelfContained, &vn);
     #es_note_var_destroyer(&bs->es, vn);
   }
