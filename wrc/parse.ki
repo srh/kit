@@ -870,7 +870,8 @@ func binop_info(t tokval) opt[binop_facts] {
         if c0 == '=' { return Has({{305, 305}, false}); }
         if c0 == '+' || c0 == '-' { return Has({{504, 506}, false}); }
         if c0 == '<' || c0 == '>' { return Has({{405, 405}, false}); }
-        if c0 == '*' || c0 == '/' { return Has({{604, 606}, false}); }
+        if c0 == '*' { return Has({{604, 606}, false}); }
+        if c0 == '/' { return Has({{604, 605}, false}); }
         if c0 == '%' { return Has({{605, 605}, false}); }
         if c0 == '^' || c0 == '&' || c0 == '|' { return Has({{405, 405}, false}); }
         return None;
@@ -1857,6 +1858,14 @@ func test_parse(verbose bool) bool {
     _u8("func foo() a { return x == y then 64 else hey & jay then feh else 45; }"));
   run_parse_negtest(&ctx, _u8("p062"),
     _u8("func `  + `() a { return b; }"));
+  run_parse_negtest(&ctx, _u8("p063"),
+    _u8("def blah i32 = 1 / 2 / 3;"));
+  run_parse_negtest(&ctx, _u8("p064"),
+    _u8("def blah i32 = 1 / 2 * 3;"));
+  run_parse_test(&ctx, _u8("p065"),
+    _u8("def blah i32 = 1 * 2 / 3;"));
+  run_parse_negtest(&ctx, _u8("p066"),
+    _u8("def blah i32 = 1 * 2 / 3 * 4;"));
   return ctx.failures == 0;
 }
 
