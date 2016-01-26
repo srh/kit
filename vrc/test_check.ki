@@ -380,24 +380,37 @@ func test_check_lambda_cases(ctx *check_ctx) void {
     _u8("def x i32 = 3;\n"
         "def y u32 = 3 + 4;\n"
         "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"));
-  // TODO: This should fail because you can't evaluate z(3) statically.  (We can't?)
   run_check_test(ctx, "c037-a",
     _u8("def x i32 = z(3);\n"
         "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"));
-  // TODO: Likewise, this should ostensibly fail.
   run_check_test(ctx, "c037-b",
     _u8("def x i32 = bar();\n"
         "func bar() i32 {\n"
         "  x i32 = 5;\n"
         "  return x;\n"
         "}\n"));
-  run_check_test(ctx, "c037-c",
+  run_check_test(ctx, "c037-c1",
     _u8("def x i32 = bar();\n"
         "def[T] fac fn[T, T] = func(x T) T {\n"
         "  if x == 0 {\n"
         "    return 1;\n"
         "  } else {\n"
         "    return x * fac(x - 1);\n"
+        "  }\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  x i32 = 5;\n"
+        "  return fac(x);\n"
+        "};\n"));
+  // Just to gratuitously use an ident unop.
+  run_check_test(ctx, "c037-c2",
+    _u8("def x i32 = bar();\n"
+        "def[T] fac fn[T, T] = func(x T) T {\n"
+        "  if x == 0 {\n"
+        "    return 1;\n"
+        "  } else {\n"
+        "    y T = x - 1;\n"
+        "    return fac! y * x;\n"
         "  }\n"
         "};\n"
         "def bar fn[i32] = func() i32 {\n"

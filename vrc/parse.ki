@@ -48,6 +48,8 @@ def kCommaPrec i32 = 205;
 // This is 305 because it would prevent assignment in conditionals, if it weren't otherwise banned (which it is).
 def kConditionPrec i32 = 305;
 def kConversionRightPrec i32 = 905;
+// Every unary operator has the same precedence.
+def kGeneralUnopRightPrec i32 = 905;
 
 func parse_file(p *ps, out *ast_file) parse_result {
   dbgparse("parse_file\n");
@@ -1131,6 +1133,17 @@ func parse_atomic_expr(p *ps, ab allow_braces, out *ast_expr) parse_result {
       ident_meta ast_meta = startend(p);
       step(p);
       return parse_finish_name_expr(p, {ident_meta, intern(p->im, ~identch)}, out);
+    case ExclIdent(identch shray[i32]):
+      m ast_meta = start(p);
+      ident_meta ast_meta = startend(p);
+      step(p);
+      rhs ast_expr;
+      if ! +parse_expr(p, kGeneralUnopRightPrec, ab, IsNotStatementExpr, &rhs) {
+        return Fail;
+      }
+      end(p, m);
+      *out = build_unop_expr(p->im, m, {ident_meta, intern(p->im, ~identch)}, rhs);
+      return Success;
     case Oper(operch smallstr):
       return parse_atomic_expr_upon_oper(p, ab, &operch, out);
     case Bad: {
@@ -1148,11 +1161,11 @@ func unop_info(operch *smallstr) opt[i32] {
     ch0 i32 = operch->vals[0];
     if ch0 == '~' || ch0 == '*' || ch0 == '&'
        || ch0 == '-' || ch0 == '!' || ch0 == '^' || ch0 == '+' || ch0 == '#' {
-      return Has(905);
+      return Has(kGeneralUnopRightPrec);
     }
   } else if nch == 2 {
     if operch->vals[0] == '&' && operch->vals[1] == '&' {
-      return Has(905);
+      return Has(kGeneralUnopRightPrec);
     }
   }
   return None;
@@ -1866,6 +1879,10 @@ func test_parse(verbose bool) bool {
     _u8("def blah i32 = 1 * 2 / 3;"));
   run_parse_negtest(&ctx, _u8("p066"),
     _u8("def blah i32 = 1 * 2 / 3 * 4;"));
+  run_parse_test(&ctx, _u8("p067"),
+    _u8("def blah i32 = foo!3;"));
+  run_parse_negtest(&ctx, _u8("p068"),
+    _u8("def blah i32 = foo!!3;"));
   return ctx.failures == 0;
 }
 

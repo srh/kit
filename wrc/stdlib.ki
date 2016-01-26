@@ -57,9 +57,9 @@ func[H, T] build_u8str(help H, r *array[u8], x **T) void {
 
 func[H] build_u8str(help H, r *array[u8], x *bool) void {
   if *x {
-    append(r, _u8("true"));
+    append(r, _u8!"true");
   } else {
-    append(r, _u8("false"));
+    append(r, _u8!"false");
   }
 }
 
@@ -144,7 +144,7 @@ func checkmalloc(n size) *void {
       ret = malloc(1);
     }
     if ret == null {
-      crash(_u8("checkmalloc fail"));
+      crash(_u8!"checkmalloc fail");
     }
   }
   return ret;
