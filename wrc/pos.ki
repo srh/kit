@@ -1,0 +1,25 @@
+import stdlib;
+import identmap;
+
+struct pos { x size; }
+
+inline func mk_pos(base_offset size, n size) pos {
+  p pos;
+  p.x = base_offset + n;
+  return p;
+}
+
+struct human_pos {
+  module sym;
+  line size;
+  column size;
+  bytes size;
+}
+
+func build_u8str(im *identmap, r *array[u8], hp *human_pos) void {
+  build_u8str(im, r, &hp->module);
+  append(r, _u8(".ki:"));
+  build_u8str(im, r, &hp->line);
+  push(r, ':');
+  build_u8str(im, r, &hp->column);
+}

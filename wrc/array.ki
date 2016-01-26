@@ -1,0 +1,497 @@
+import stdlib;
+
+defclass[T] move array {
+  count size;
+  cap size;
+  ptr *T;
+}
+
+access array[_] {
+  inline func[T] do_init(r *array[T]) void {
+    r->count = 0;
+    r->cap = 0;
+    r->ptr = null;
+  }
+
+  func[T] do_copy(dest *array[T], src *array[T]) void {
+    if src->count == 0 {
+      dest->count = 0;
+      dest->cap = 0;
+      dest->ptr = null;
+      return;
+    }
+    dest->count = src->count;
+    dest->cap = src->count;
+    destptr *T = cast(checkmalloc(src->count * sizeof@[T]));
+    dest->ptr = destptr;
+    srcptr *T = src->ptr;
+    e size = src->count;
+    for i size = 0; i < e; i = i + 1 {
+      copy(&destptr[i], &srcptr[i]);
+    }
+  }
+
+  func[T] do_destroy(r *array[T]) void {
+    rptr *T = r->ptr;
+    for i size = r->count; i > 0; {
+      i = i - 1;
+      destroy(&rptr[i]);
+    }
+    free(@[*void] cast(rptr));
+  }
+
+  func[T] grow(r *array[T], n size) void {
+    rn size = r->count;
+    newcount size = rn + n;
+    if newcount > r->cap {
+      change_cap_(r, max(8, max(rn * 2, newcount)));
+    }
+    rp *T = r->ptr;
+    for i size = rn; i < newcount; i = i + 1 {
+      init(&rp[i]);
+    }
+    r->count = newcount;
+  }
+
+  func[T] grow(r *array[T], n size, value T) void {
+    rn size = r->count;
+    newcount size = rn + n;
+    if newcount > r->cap {
+      change_cap_(r, max(8, max(rn * 2, newcount)));
+    }
+    rp *T = r->ptr;
+    for i size = rn; i < newcount; i = i + 1 {
+      copy(&rp[i], &value);
+    }
+    r->count = newcount;
+  }
+
+  func[T] repeat(n size, value T) array[T] {
+    if n == 0 {
+      ret array[T];
+      return ret;
+    }
+    ret array[T];
+    ret.count = n;
+    ret.cap = n;
+    ptr *T = cast(checkmalloc(n * sizeof@[T]));
+    ret.ptr = ptr;
+    for i size = 0; i < n; i = i + 1 {
+      copy(&ptr[i], &value);
+    }
+    return ret;
+  }
+
+  inline func[T] get(r *array[T], i size) T {
+    if i >= r->count {
+      crash();
+    }
+    return r->ptr[i];
+  }
+
+  inline func[T] ref(r *array[T], i size) *T {
+    if i >= r->count {
+      crash();
+    }
+    return &r->ptr[i];
+  }
+
+  inline func[T] count(r *array[T]) size {
+    return r->count;
+  }
+
+  func[T] change_cap_(r *array[T], newcap size) void {
+    check(newcap >= r->count);
+    p *T = cast(checkmalloc(newcap * sizeof@[T]));
+    rptr *T = r->ptr;
+    e size = r->count;
+    for i size = 0; i < e; i = i + 1 {
+      move(&p[i], &rptr[i]);
+    }
+    free(@[*void] cast(rptr));
+    r->ptr = p;
+    r->cap = newcap;
+  }
+
+  inline func[T] reserve(r *array[T], newcap size) void {
+    if newcap > r->cap {
+      change_cap_(r, newcap);
+    }
+  }
+
+  func[T] pop(r *array[T]) void {
+    if r->count == 0 {
+      crash();
+    }
+    r->count = r->count - 1;
+    destroy(&r->ptr[r->count]);
+  }
+
+  func[T] push(r *array[T], value T) void {
+    if r->count == r->cap {
+      change_cap_(r, max(8, r->cap * 2));
+    }
+    // This is not move() and init(&value) because without inlining... and where it materially affects performance, we'll use pushref or pushmove.
+    copy(&r->ptr[r->count], &value);
+    r->count = r->count + 1;
+  }
+
+  func[T] pushref(r *array[T], value *T) void {
+    if r->count == r->cap {
+      change_cap_(r, max(8, r->cap * 2));
+    }
+    copy(&r->ptr[r->count], value);
+    r->count = r->count + 1;
+  }
+
+  func[T] pushmove(r *array[T], value *T) void {
+    if r->count == r->cap {
+      change_cap_(r, max(8, r->cap * 2));
+    }
+    move(&r->ptr[r->count], value);
+    init(value);
+    r->count = r->count + 1;
+  }
+
+  inline func[T] append(r *array[T], s *array[T]) void {
+    append_raw(r, s->ptr, s->count);
+  }
+
+  func[T] append_raw(r *array[T], p *T, n size) void {
+    rn size = r->count;
+    newcount size = n + rn;
+    if newcount > r->cap {
+      change_cap_(r, max(8, max(rn * 2, newcount)));
+    }
+    rp *T = r->ptr;
+    for i size = 0; i < n; i = i + 1 {
+      copy(&rp[rn + i], &p[i]);
+    }
+    r->count = newcount;
+  }
+
+  inline func[T] data(r *array[T]) *T {
+    return r->ptr;
+  }
+
+  func[T, U] make(raw_arr U) array[T] {
+    ret array[T];
+    reserve(&ret, raw_arr.length);
+    append_raw(&ret, &raw_arr[0], raw_arr.length);
+    return ret;
+  }
+
+  inline func[T] swap(a *array[T], b *array[T]) void {
+    tmp size = a->count;
+    a->count = b->count;
+    b->count = tmp;
+    tmp = a->cap;
+    a->cap = b->cap;
+    b->cap = tmp;
+    p *T = a->ptr;
+    a->ptr = b->ptr;
+    b->ptr = p;
+  }
+
+  func[T] clear(a *array[T]) void {
+    b array[T];
+    swap(a, &b);
+  }
+}
+
+func[T] make_copy(p *T, n size) array[T] {
+  ret array[T];
+  reserve(&ret, n);
+  for i size = 0; i < n; i = i + 1 {
+    push(&ret, p[i]);
+  }
+  return ret;
+}
+
+func[T] truncate(a *array[T], n size) void {
+  m size = count(a);
+  check(n <= m);
+  while n < m {
+    pop(a);
+    m = m - 1;
+  }
+}
+
+func[T] array_equal(a *array[T], b *array[T]) bool {
+  n size = count(a);
+  if n != count(b) {
+    return false;
+  }
+  return raw_buf_equal(data(a), data(b), n);
+}
+
+func[T] ends_with(suffix array[T], a array[T]) bool {
+  n size = count(&suffix);
+  acount size = count(&a);
+  if acount < n {
+    return false;
+  }
+  for i size = 0; i < n; i = i + 1 {
+    if get(&a, acount - 1 - i) != get(&suffix, n - 1 - i) {
+      return false;
+    }
+  }
+  return true;
+}
+
+inline func u8_equal(a array[u8], b array[u8]) bool {
+  return array_equal(&a, &b);
+}
+
+func[T] raw_buf_equal(p *T, q *T, n size) bool {
+  for i size = 0; i < n; i = i + 1 {
+    if p[i] != q[i] {
+      return false;
+    }
+  }
+  return true;
+}
+
+inline func[T] append(a *array[T], b array[T]) void {
+  return append(a, &b);
+}
+
+func[T] sorted_has_dups(a *array[T]) bool {
+  p *T = data(a);
+  n size = count(a);
+  for i size = 1; i < n; i = i + 1 {
+    if !(p[i - 1] < p[i]) {
+      if p[i] < p[i - 1] {
+        crash(_u8("sorted_has_dups sees non-sorted"));
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+func[T] dedup_sorted(a *array[T]) void {
+  p *T = data(a);
+  n size = count(a);
+  if n == 0 {
+    return;
+  }
+  w size = 1;
+  for i size = 1; i < n; i = i + 1 {
+    if p[i - 1] < p[i] {
+      p[w] = p[i];
+      w = w + 1;
+    } else {
+      if p[i] < p[i - 1] {
+        crash(_u8("dedup_sorted sees non-sorted"));
+      }
+    }
+  }
+  truncate(a, w);
+}
+
+func[T] sorted_intersect(a *array[T], b *array[T]) bool {
+  p *T = data(a);
+  an size = count(a);
+  q *T = data(b);
+  bn size = count(b);
+  i size = 0;
+  j size = 0;
+  while i < an && j < bn {
+    if p[i] < q[j] {
+      i = i + 1;
+    } else if p[j] < q[i] {
+      j = j + 1;
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+
+func[T] reverse(a *array[T]) array[T] {
+  n size = count(a);
+  ret array[T];
+  reserve(&ret, n);
+  while n > 0 {
+    n = n - 1;
+    push(&ret, get(a, n));
+  }
+  return ret;
+}
+
+inline func[T] empty(a *array[T]) bool {
+  return count(a) == 0;
+}
+
+func[T] find(a *array[T], b T) opt[size] {
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    if *ref(a, i) == b {
+      return Has(i);
+    }
+  }
+  return None;
+}
+
+func[T] popval(a *array[T], val_out *T) bool {
+  n size = count(a);
+  if n == 0 {
+    return false;
+  }
+  *val_out = get(a, n - 1);
+  pop(a);
+  return true;
+}
+
+func[T] popval(a *array[T]) opt[T] {
+  val T;
+  if popval(a, &val) {
+    return Has(val);
+  } else {
+    return None;
+  }
+}
+
+func[H] build_u8str(help H, r *array[u8], a *array[u8]) void {
+  append(r, a);
+}
+
+func[T] is_strictly_increasing(x *array[T]) bool {
+  n size = count(x);
+  p *T = data(x);
+  for i size = 1; i < n; i = i + 1 {
+    if !(p[i - 1] < p[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+func[T] shifterase_elem(x *array[T], k size) void {
+  n size = count(x);
+  for i size = k + 1; i < n; i = i + 1 {
+    *ref(x, i - 1) = *ref(x, i);
+  }
+  pop(x);
+}
+
+func[T] overwrite_raw(x *array[T], offset size, p *T, n size) void {
+  check(n <= count(x) - offset);
+  w *T = ref(x, offset);
+  for i size = 0; i < n; i = i + 1 {
+    w[i] = p[i];
+  }
+}
+
+inline func[T] sort(x *array[T]) void {
+  sort(data(x), count(x));
+}
+
+func[T] sort(p *T, n size) void {
+  for ;; {
+    if n <= 1 {
+      return;
+    }
+    if n == 2 {
+      if p[1] < p[0] {
+        tmp T = p[0];
+        p[0] = p[1];
+        p[1] = tmp;
+      }
+      return;
+    }
+
+    pi size = n >> 1;
+    pival T = p[pi];
+    p[pi] = p[n - 1];
+    i size = 0;
+    j size = n - 1;
+    while i < j {
+      if p[i] < pival {
+        i = i + 1;
+      } else {
+        j = j - 1;
+        tmp T = p[j];
+        p[j] = p[i];
+        p[i] = tmp;
+      }
+    }
+    p[n - 1] = p[i];
+    p[i] = pival;
+
+    i1 size = i + 1;
+    if i < pi {
+      sort(p, i);
+      p = &p[i1];
+      n = n - i1;
+    } else {
+      sort(&p[i1], n - i1);
+      n = i;
+    }
+  }
+}
+
+func[T] append(x *array[T], a *opt[T]) void {
+  if case &Has(t T) = a {
+    push(x, t);
+  }
+}
+
+func[T, U] concat(a array[T], b U) array[T] {
+  ret array[T] = a;
+  append(&ret, &b);
+  return ret;
+}
+
+inline func[T] mk_array() array[T] {
+  ret array[T];
+  return ret;
+}
+
+func[T] mk_array(x0 T) array[T] {
+  ret array[T];
+  push(&ret, x0);
+  return ret;
+}
+
+func[T] mk_array(x0 T, x1 T) array[T] {
+  ret array[T];
+  push(&ret, x0);
+  push(&ret, x1);
+  return ret;
+}
+
+func[T] mk_array(x0 T, x1 T, x2 T) array[T] {
+  ret array[T];
+  push(&ret, x0);
+  push(&ret, x1);
+  push(&ret, x2);
+  return ret;
+}
+
+func[T] mk_array(x0 T, x1 T, x2 T, x3 T) array[T] {
+  ret array[T];
+  push(&ret, x0);
+  push(&ret, x1);
+  push(&ret, x2);
+  push(&ret, x3);
+  return ret;
+}
+
+func[T] mk_array(x0 T, x1 T, x2 T, x3 T, x4 T, x5 T, x6 T, x7 T) array[T] {
+  ret array[T];
+  reserve(&ret, 8);
+  push(&ret, x0);
+  push(&ret, x1);
+  push(&ret, x2);
+  push(&ret, x3);
+  push(&ret, x4);
+  push(&ret, x5);
+  push(&ret, x6);
+  push(&ret, x7);
+  return ret;
+}
+
+// Heh.
+def[T] _u8 fn[T, array[u8]] = make;

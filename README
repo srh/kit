@@ -20,18 +20,18 @@ or  (on OS X, with XCode tools (i.e. clang) installed)
 2. RUN INSTRUCTIONS
 
    # Run tests.
-   s3
+   s4
    # Run tests more verbosely.
-   s3 --build
+   s4 --build
    # Run tests verbosely, without the codegen phase.
-   s3 --no-build
+   s4 --no-build
 
    # Build modulename.ki and its imports for Windows, => modulename.obj
-   s3 <modulename>
+   s4 <modulename>
 
    # Build modulename.ki and its imports, => modulename.o
-   s3 --linux <modulename>
-   s3 --osx <modulename>
+   s4 --linux <modulename>
+   s4 --osx <modulename>
 
 3. FOR FREEBSD USERS
 
@@ -53,7 +53,8 @@ The current directory structure is:
 
    trc - s1, implemented in C.  Compiles s2.
    urc - s2, implemented in proto-Kit.  Compiles s2 and s3.
-   vrc - s3, implemented in proto-Kit.  Compiles s3 (and s2, probably).
+   vrc - s3, implemented in proto-Kit.  Compiles s3 and s4. (and s2, probably).
+   wrc - s4, implemented in proto-Kit.  Compiles s4 (and s2 and s3, probably).
    examples - examples to run, disorganized junk
 
   ABOUT THE VERSIONS
@@ -61,6 +62,8 @@ The current directory structure is:
 s1's language is merely "C, with templates, constructors and
 destructors, elementary encapsulation, tagged enum types, no
 implicit conversions."  s2's is very similar to s1's, but with some
-basic convenience enhancements that should be easy to backport to
-s1 -- the differences are described in FEATURES.  s3 defines a
-language with ever-more-advanced features.
+worthwhile enhancements that s1 does not support.  s3 uses s2's
+quick-return expressions.  s4 uses s3's generalize indexing
+expressions.  s1 will someday be capable of compiling s4 directly.
+At some point the highest-numbered version will use features that
+s1 will never support.  See FEATURES for more information.

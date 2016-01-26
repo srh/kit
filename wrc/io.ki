@@ -1,0 +1,56 @@
+import stdlib;
+import array;
+
+func read_file(path array[u8], out *array[u8]) bool {
+  push(&path, '\0');
+  rb0 array[u8] = make("rb\0");
+  fp *FILE = fopen(data(&path), data(&rb0));
+  if fp == null {
+    return false;
+  }
+
+  dat array[u8];
+  // Reserve size bigger than the largest .ki source file we have.
+  reserve(&dat, 131072);
+  totread size = 0;
+  done bool = false;
+  while !done {
+    growsize size = 16384;
+    grow(&dat, growsize);
+    nread size = fread(@[*void]cast(ref(&dat, totread)), 1, growsize, fp);
+    check(nread <= growsize);
+    totread = totread + nread;
+    if nread < growsize {
+      if 0 != feof(fp) {
+        truncate(&dat, totread);
+        done = true;
+      } else {
+        ign var = fclose(fp);
+        return false;
+      }
+    }
+  }
+
+  ign var = fclose(fp);
+  swap(&dat, out);
+  return true;
+}
+
+func write_file(path array[u8], buf *array[u8]) bool {
+  push(&path, '\0');
+  wb0 array[u8] = make("wb\0");
+  fp *FILE = fopen(data(&path), data(&wb0));
+  if fp == null {
+    return false;
+  }
+
+  nwrite size = fwrite(@[*void]cast(data(buf)), 1, count(buf), fp);
+  if (0 != fclose(fp)) {
+    return false;
+  }
+  if nwrite != count(buf) {
+    return false;
+  } else {
+    return true;
+  }
+}

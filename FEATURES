@@ -1,4 +1,4 @@
-Some feature differences between s1 and s2:
+Some feature/implementation differences between s1 and s2:
   Superset of s1:
   - s2 has gotos. (Won't be implemented in s1.)
   - s2 has o8, o16, o32, diff.
@@ -18,3 +18,6 @@ Some feature differences between s1 and s2:
   - s2 disallows whole field lookup.
   - s2 requires expression statements be void.
 
+Some feature/implementation differences between s2 and s3:
+  Superset of s2, necessary to compile s4:
+  - s3 has generalized array indexing.

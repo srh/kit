@@ -1,0 +1,494 @@
+import objfile;
+
+/* Beware: The endianness of these fields can depend on the endianness
+of the target platform.  This code assumes the target platform is
+little-endian.  Which, in the case of 32-bit OS X x86, it is. */
+
+struct mach32_header {
+  magic le_u32;
+  cputype le_u32;
+  cpusubtype le_u32;
+  filetype le_u32;
+  ncmds le_u32;
+  sizeofcmds le_u32;
+  flags le_u32;
+}
+
+struct mach32_segment_command {
+  cmd le_u32;
+  cmdsize le_u32;
+  segname ^[16]u8;
+  vmaddr le_u32;
+  vmsize le_u32;
+  fileoff le_u32;
+  filesize le_u32;
+  maxprot le_u32;
+  initprot le_u32;
+  nsects le_u32;
+  flags le_u32;
+}
+
+struct mach32_section {
+  sectname ^[16]u8;
+  segname ^[16]u8;
+  addr le_u32;
+  size le_u32;
+  offset le_u32;
+  align le_u32;
+  reloff le_u32;
+  nreloc le_u32;
+  flags le_u32;
+  reserved1 le_u32;
+  reserved2 le_u32;
+}
+
+struct mach32_symtab {
+  cmd le_u32;
+  cmdsize le_u32;
+  symoff le_u32;
+  nsyms le_u32;
+  stroff le_u32;
+  strsize le_u32;
+}
+
+struct mach32_relocation_info {
+  r_address le_i32;
+  r_mask le_u32;
+}
+
+struct mach32_scattered_relocation_info {
+  r_mask le_u32;
+  r_value le_i32;
+}
+
+struct mach32_nlist {
+  n_strx le_u32;
+  n_type u8;
+  n_sect u8;
+  n_desc le_i16;
+  n_value le_u32;
+}
+
+def MACH32_HEADER_MAGIC u32 = 0xfeedface;
+def MACH32_HEADER_I386_CPUTYPE u32 = 7;
+def MACH32_HEADER_I386_CPUSUBTYPE u32 = 3;
+def MACH32_HEADER_OBJFILE_FILETYPE u32 = 1;
+
+def MACH32_SEGMENT_COMMAND u32 = 1;
+def MACH32_SYMTAB_COMMAND u32 = 2;
+
+def MACH32_SECTION_TEXT_FLAGS u32 = 0x80000400;
+def MACH32_SECTION_CONST_FLAGS u32 = 0;
+def MACH32_SECTION_DATA_FLAGS u32 = 0;
+
+/* i.e. these values are sizeof(struct mach32_relocation_info). */
+def MACH32_RELOC_ALIGNMENT u32 = 8;
+def MACH32_RELOC_SIZE u32 = 8;
+
+/* mach32_nlist is 12 bytes. */
+def MACH32_SYMTAB_ALIGNMENT u32 = 4;
+
+/* More file format constants. */
+def MACH32_RELOCATION_SECTDIF u32 = 2;
+def MACH32_RELOCATION_PAIR u32 = 1;
+
+def kOSX32TextSectionNumber u32 = 1;
+def kOSX32RdataSectionNumber u32 = 2;
+def kOSX32DataSectionNumber u32 = 3;
+
+func to_str16(x array[u8]) ^[16]u8 {
+  n size = count(&x);
+  check(n <= 16);
+  ret ^[16]u8;
+  for i size = 0; i < n; i = i + 1 {
+    ret[i] = get(&x, i);
+  }
+  // Redundant with zero-initialization, I know.
+  for i size = n; i < 16; i = i + 1 {
+    ret[i] = 0;
+  }
+  return ret;
+}
+
+func mach32_r_mask(r_symbolnum u32, r_pcrel u32, r_length u32, r_extern u32, r_type u32) le_u32 {
+  /* We have these in some order:
+  r_symbolnum 24
+  r_pcrel 1
+  r_length 2
+  r_extern 1
+  r_type 4 */
+
+  /* This might not be correct for BIG ENDIAN mach-o files. */
+  check(r_symbolnum < @[u32](1 << 24));
+  check(r_pcrel < @[u32](1 << 1));
+  check(r_length < @[u32](1 << 2));
+  check(r_extern < @[u32](1 << 1));
+  check(r_type < @[u32](1 << 4));
+  x u32 = (((r_symbolnum | (r_pcrel << 24)) | (r_length << 25)) | (r_extern << 27)) | (r_type << 28);
+  return to_le(x);
+}
+
+func mach32_r_scattered_mask(r_address u32, r_type u32, r_length u32, r_pcrel u32, r_scattered u32) le_u32 {
+  /* We have these in some order:
+  r_address 24
+  r_type 4
+  r_length 2
+  r_pcrel 1
+  r_scattered 1
+  */
+  check(r_address < @[u32](1 << 24));
+  check(r_type < @[u32](1 << 4));
+  check(r_length < @[u32](1 << 2));
+  check(r_pcrel < @[u32](1 << 1));
+  check(r_scattered == 1);
+  x u32 = (((r_address | (r_type << 24)) | (r_length << 28)) | (r_pcrel << 30)) | (r_scattered << 31);
+  return to_le(x);
+}
+
+struct section_addrs {
+  data_addr u32;
+  rdata_addr u32;
+  text_addr u32;
+}
+
+func osx32_adjusted_addr(addrs section_addrs,
+                         section objfile_symbol_section,
+                         value u32) u32 {
+  switch section {
+  case SymbolSectionUndefined:
+    return value;
+  case SymbolSectionData:
+    return addrs.data_addr + value;
+  case SymbolSectionRdata:
+    return addrs.rdata_addr + value;
+  case SymbolSectionText:
+    return addrs.text_addr + value;
+  }
+}
+
+// We use to_le instead of naked "~" so we can refactor for big-endian targets.
+inline func to_le(n u32) le_u32 { return ~n; }
+inline func to_le(n i32) le_i32 { return ~n; }
+inline func to_le(n i16) le_i16 { return ~n; }
+
+func osx32_sect(sect objfile_symbol_section) u32 {
+  switch sect {
+  case SymbolSectionUndefined: return 0;
+  case SymbolSectionData: return kOSX32DataSectionNumber;
+  case SymbolSectionRdata: return kOSX32RdataSectionNumber;
+  case SymbolSectionText: return kOSX32TextSectionNumber;
+  }
+}
+
+func osx32_append_relocations_and_mutate_output(d *array[u8], f *objfile, s *objfile_section, addrs section_addrs, sect section, segment_file_offset u32) void {
+  n size = count(&s->relocs);
+  for i size = 0; i < n; i = i + 1 {
+    reloc *objfile_relocation = ref(&s->relocs, i);
+    symbol *objfile_symbol_record = ref(&f->symbol_table, ~reloc->symbol_table_index.x);
+    switch reloc->type {
+    case Dir32:
+      /* Globals use call/pop to get eip. */
+      crash(_u8("osx32 only uses rel32 relocations"));
+    case Rel32:
+      info mach32_relocation_info;
+      r_address u32 = osx32_adjusted_addr(addrs, ~sect, reloc->virtual_address);
+      info.r_address = to_le(@[i32]~r_address);
+      r_pcrel u32 = 1;
+      /* 1 << 2 */
+      r_length u32 = 2;
+      /* Everything is extern.  I _think_ this would be 0 if the value
+      was an inline, local reference (into this or section or another
+      section), to something that didn't have a symbol, that needed to
+      be relocated. */
+      r_extern u32;
+      r_symbolnum u32;
+      if case SymbolSectionUndefined = symbol->section {
+        r_extern = 1;
+        r_symbolnum = reloc->symbol_table_index.x;
+      } else {
+        r_extern = 0;
+        r_symbolnum = osx32_sect(symbol->section);
+      }
+      r_type u32 = 0;
+      info.r_mask = mach32_r_mask(r_symbolnum, r_pcrel, r_length, r_extern, r_type);
+      append_reinterpret(d, &info);
+
+      /* We even overwrite on external symbols, which mimics behavior
+      but might be reproducing an irrelevant implementation detail of
+      clang. */
+      target_offset i32 = ~osx32_adjusted_addr(addrs, symbol->section, symbol->value);
+      displacement i32 = target_offset - ~(r_address + 4);
+      le_displacement le_i32 = to_le(displacement);
+      overwrite_raw(d, ~(segment_file_offset + r_address), &le_displacement.buf[0], sizeof@[le_i32]);
+    case Diff32:
+      /* Notes for scattered diff32 reloc
+      - I don't know wtf "scattered" means or is for
+      - looks like first pair is address=relocated, value=target segment offset
+      - second pair is address=0? value=subtractive offset
+      */
+      virtual_address u32 = osx32_adjusted_addr(addrs, ~sect, reloc->virtual_address);
+      target_offset i32 = ~osx32_adjusted_addr(addrs, symbol->section, symbol->value);
+      subtracted_offset i32 = ~osx32_adjusted_addr(addrs, ~sect, reloc->subtracted_offset);
+
+      if true {
+        info1 mach32_scattered_relocation_info;
+        r_address u32 = virtual_address;
+        r_type u32 = MACH32_RELOCATION_SECTDIF;
+        r_length u32 = 2;  /* 1 << 2 */
+        r_pcrel u32 = 0;
+        r_scattered u32 = 1;
+        info1.r_mask = mach32_r_scattered_mask(r_address, r_type, r_length, r_pcrel, r_scattered);
+        info1.r_value = to_le(target_offset);
+        append_reinterpret(d, &info1);
+      }
+      if true {
+        info2 mach32_scattered_relocation_info;
+        /* Zero.  This is the PAIR value. */
+        r_address u32 = 0;
+        r_type u32 = MACH32_RELOCATION_PAIR;
+        r_length u32 = 2;  /* 1 << 2 */
+        r_pcrel u32 = 0;
+        r_scattered u32 = 1;
+        info2.r_mask = mach32_r_scattered_mask(r_address, r_type, r_length, r_pcrel, r_scattered);
+        r_value i32 = subtracted_offset;
+        info2.r_value = to_le(~r_value);
+        append_reinterpret(d, &info2);
+      }
+
+      displacement i32 = target_offset - subtracted_offset;
+      le_displacement le_i32 = to_le(displacement);
+      overwrite_raw(d, ~(segment_file_offset + virtual_address), &le_displacement.buf[0], sizeof@[le_i32]);
+    }
+  }
+}
+
+func osx32_write_symbols_and_strings(im *identmap, f *objfile, addrs section_addrs, symbols_out *array[u8], strings_out *array[u8]) void {
+  symbols array[u8];
+  strings array[u8];
+  n size = count(&f->symbol_table);
+  for i size = 0; i < n; i = i + 1 {
+    rec *objfile_symbol_record = ref(&f->symbol_table, i);
+    el mach32_nlist;
+    name string = lookup(im, rec->name);
+    offset u32 = strtab_add(&strings, zeroless_string_to_u8symbol(&name));
+    el.n_strx = to_le(offset);
+    /* We set the external bit, not the "private external" bit.  I
+    don't know what the "private external" bit is. */
+    n_type_sect_flags u8;
+    if case SymbolSectionUndefined = rec->section {
+      n_type_sect_flags = 0;
+    } else {
+      n_type_sect_flags = 0xe;
+    }
+    n_type_external_flag u8;
+    if case IsStaticYes = rec->is_static {
+      n_type_external_flag = 0;
+    } else {
+      n_type_external_flag = 1;
+    }
+    el.n_type = n_type_sect_flags | n_type_external_flag;
+    el.n_sect = ~osx32_sect(rec->section);
+    el.n_desc = to_le(~ @[u32]0);
+    n_value u32 = osx32_adjusted_addr(addrs, rec->section, rec->value);
+    el.n_value = to_le(n_value);
+
+    append_reinterpret(&symbols, &el);
+  }
+  swap(symbols_out, &symbols);
+  swap(strings_out, &strings);
+}
+
+func osx32_flatten(im *identmap, f *objfile) array[u8] {
+  d array[u8];
+  nsects u32 = 3;
+  sizeof_segment_cmd u32 = (~sizeof@[mach32_segment_command] + nsects * ~sizeof@[mach32_section]);
+  sizeof_symtab_cmd u32 = ~sizeof@[mach32_symtab];
+  ncmds u32 = 2;
+  sizeofcmds u32 = sizeof_segment_cmd + sizeof_symtab_cmd;
+  end_of_cmds u32 = ~sizeof@[mach32_header] + sizeofcmds;
+
+  if true {
+    h mach32_header;
+    h.magic = to_le(MACH32_HEADER_MAGIC);
+    h.cputype = to_le(MACH32_HEADER_I386_CPUTYPE);
+    h.cpusubtype = to_le(MACH32_HEADER_I386_CPUSUBTYPE);
+    h.filetype = to_le(MACH32_HEADER_OBJFILE_FILETYPE);
+    h.ncmds = to_le(ncmds);
+    h.sizeofcmds = to_le(sizeofcmds);
+    // We use 0 for flags.  Clang outputs 0x2000 (MH_SUBSECTIONS_VIA_SYMBOLS) which I don't completely understand.
+    h.flags = to_le(0);
+    append_reinterpret(&d, &h);
+  }
+
+  // TODO: Align to max of max_requested_alignments when computing segment_fileoff, and when appending.
+  /* The [addr, ceil_aligned(addr + size, align)) segments seem to
+  connect.  (That's what I observe in other mach-o files.) */
+  text_addr u32 = 0;
+  text_size u32 = ~count(&f->text.raw);
+  text_align u32 = f->text.max_requested_alignment;
+  rdata_align u32 = f->rdata.max_requested_alignment;
+  rdata_addr u32 = ceil_aligned(text_addr + text_size, rdata_align);
+  rdata_size u32 = ~count(&f->rdata.raw);
+  data_align u32 = f->data.max_requested_alignment;
+  data_addr u32 = ceil_aligned(rdata_addr + rdata_size, data_align);
+  data_size u32 = ~count(&f->data.raw);
+
+  addrs section_addrs = {data_addr, rdata_addr, text_addr};
+
+  vmsize u32 = data_addr + data_size;
+  segment_fileoff u32 = end_of_cmds;
+  segment_end_fileoff u32 = segment_fileoff + vmsize;
+  text_reloff u32 = ceil_aligned(segment_end_fileoff, MACH32_RELOC_ALIGNMENT);
+  /* OS X diff32 relocs use two pairs, so we count them twice (with
+  the 3 size_add's you see here). */
+  text_nreloc u32 = ~(count(&f->text.relocs) + f->text.diff32_count);
+
+  // TODO: Make these be static checks.
+  check(MACH32_RELOC_SIZE == ~sizeof@[mach32_relocation_info]);
+  check(MACH32_RELOC_SIZE == ~sizeof@[mach32_scattered_relocation_info]);
+  rdata_reloff u32 = text_reloff + text_nreloc * MACH32_RELOC_SIZE;
+  rdata_nreloc u32 = ~(count(&f->rdata.relocs) + f->rdata.diff32_count);
+  data_reloff u32 = rdata_reloff + rdata_nreloc * MACH32_RELOC_SIZE;
+  data_nreloc u32 = ~(count(&f->data.relocs) + f->data.diff32_count);
+  end_of_relocs u32 = data_reloff + data_nreloc * MACH32_RELOC_SIZE;
+  symoff u32 = ceil_aligned(end_of_relocs, MACH32_SYMTAB_ALIGNMENT);
+
+  symbols array[u8];
+  strings array[u8];
+  osx32_write_symbols_and_strings(im, f, addrs, &symbols, &strings);
+  nsyms u32 = ~count(&f->symbol_table);
+
+  stroff u32 = symoff + nsyms * ~sizeof@[mach32_nlist];
+  strsize u32 = ~count(&strings);
+  file_end_offset u32 = stroff + strsize;
+
+  // 1st load command
+  if true {
+    sc mach32_segment_command;
+    sc.cmd = to_le(MACH32_SEGMENT_COMMAND);
+    sc.cmdsize = to_le(sizeof_segment_cmd);
+    sc.segname = to_str16(_u8(""));
+    sc.vmaddr = to_le(0);
+    sc.vmsize = to_le(vmsize);
+    sc.fileoff = to_le(segment_fileoff);
+    /* Consistent with observed behavior, and totally sensible. */
+    sc.filesize = to_le(vmsize);
+    /* Segment's maximum and initial virtual memory protection?  I see
+    7 (r/w/x) being used. */
+    sc.maxprot = to_le(7);
+    sc.initprot = to_le(7);
+    sc.nsects = to_le(nsects);
+    /* No interesting flags. */
+    sc.flags = to_le(0);
+
+    append_reinterpret(&d, &sc);
+  }
+
+  text_offset u32 = segment_fileoff + text_addr;
+  // 1st section
+  if true {
+    check(kOSX32TextSectionNumber == 1);
+    se mach32_section;
+    se.sectname = to_str16(_u8("__text"));
+    se.segname = to_str16(_u8("__TEXT"));
+    se.addr = to_le(text_addr);
+    se.size = to_le(text_size);
+    se.offset = to_le(text_offset);
+    se.align = to_le(text_align);
+    se.reloff = to_le(text_reloff);
+    se.nreloc = to_le(text_nreloc);
+    se.flags = to_le(MACH32_SECTION_TEXT_FLAGS);
+    se.reserved1 = to_le(0);
+    se.reserved2 = to_le(0);
+
+    append_reinterpret(&d, &se);
+  }
+
+  rdata_offset u32 = segment_fileoff + rdata_addr;
+  // 2nd section
+  if true {
+    check(kOSX32RdataSectionNumber == 2);
+    se mach32_section;
+    se.sectname = to_str16(_u8("__const"));
+    se.segname = to_str16(_u8("__TEXT"));
+    se.addr = to_le(rdata_addr);
+    se.size = to_le(rdata_size);
+    se.offset = to_le(rdata_offset);
+    se.align = to_le(rdata_align);
+    se.reloff = to_le(rdata_reloff);
+    se.nreloc = to_le(rdata_nreloc);
+    se.flags = to_le(MACH32_SECTION_CONST_FLAGS);
+    se.reserved1 = to_le(0);
+    se.reserved2 = to_le(0);
+
+    append_reinterpret(&d, &se);
+  }
+
+  data_offset u32 = segment_fileoff + data_addr;
+  // 3rd section
+  if true {
+    check(kOSX32DataSectionNumber == 3);
+    se mach32_section;
+    se.sectname = to_str16(_u8("__data"));
+    se.segname = to_str16(_u8("__DATA"));
+    se.addr = to_le(data_addr);
+    se.size = to_le(data_size);
+    se.offset = to_le(data_offset);
+    se.align = to_le(data_align);
+    se.reloff = to_le(data_reloff);
+    se.nreloc = to_le(data_nreloc);
+    se.flags = to_le(MACH32_SECTION_DATA_FLAGS);
+    se.reserved1 = to_le(0);
+    se.reserved2 = to_le(0);
+
+    append_reinterpret(&d, &se);
+  }
+
+  // 2nd load command
+  if true {
+    st mach32_symtab;
+    st.cmd = to_le(MACH32_SYMTAB_COMMAND);
+    check(sizeof_symtab_cmd == ~sizeof@[mach32_symtab]);
+    st.cmdsize = to_le(sizeof_symtab_cmd);
+    st.symoff = to_le(symoff);
+    st.nsyms = to_le(nsyms);
+    st.stroff = to_le(stroff);
+    st.strsize = to_le(strsize);
+
+    append_reinterpret(&d, &st);
+  }
+
+  check(~count(&d) == segment_fileoff);
+  check(~count(&d) == text_offset);
+  append(&d, &f->text.raw);
+  append_to_alignment(&d, ~rdata_align, 0);
+
+  check(~count(&d) == rdata_offset);
+  append(&d, &f->rdata.raw);
+  append_to_alignment(&d, ~data_align, 0);
+
+  check(~count(&d) == data_offset);
+  append(&d, &f->data.raw);
+
+  check(~count(&d) == segment_end_fileoff);
+  append_to_alignment(&d, ~MACH32_RELOC_ALIGNMENT, 0);
+
+  check(~count(&d) == text_reloff);
+  osx32_append_relocations_and_mutate_output(&d, f, &f->text, addrs, SectionText, segment_fileoff + text_addr);
+  check(~count(&d) == rdata_reloff);
+  osx32_append_relocations_and_mutate_output(&d, f, &f->rdata, addrs, SectionRdata, segment_fileoff + rdata_addr);
+  check(~count(&d) == data_reloff);
+  osx32_append_relocations_and_mutate_output(&d, f, &f->data, addrs, SectionData, segment_fileoff + data_addr);
+  check(~count(&d) == end_of_relocs);
+
+  append_to_alignment(&d, ~MACH32_SYMTAB_ALIGNMENT, 0);
+  check(~count(&d) == symoff);
+  append(&d, &symbols);
+
+  check(~count(&d) == stroff);
+  append(&d, &strings);
+
+  check(~count(&d) == file_end_offset);
+
+  return d;
+}
