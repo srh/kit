@@ -645,7 +645,7 @@ func dumbly_gen_function_exit(f *objfile, h *frame) void {
       target u32 = *un(ref(&h->jmp_targets, p->target.x));
       diff i32 = @[i32]~target - @[i32]~p->relative_mathpoint;
       le le_i32 = ~diff;
-      overwrite_raw(&f->text, ~p->overwrite_location, &le.buf[0], 4);
+      overwrite_raw(&f->text, ~p->overwrite_location, ixcast(&le.buf[0]), 4);
     }
   }
 }
@@ -874,7 +874,7 @@ func x86_gen_placeholder_jmp(f *objfile, h *frame, target jmp_targetnum) void {
   b[2] = 0;
   b[3] = 0;
   b[4] = 0;
-  append_raw(&f->text, &b[0], 5);
+  append_raw(&f->text, ixcast(&b[0]), 5);
 
   push(&h->placeholder_jumps, {offset, offset + 4, target});
 }
@@ -888,7 +888,7 @@ func x86_gen_placeholder_jcc(f *objfile, h *frame, x86_jcc_code u8, target jmp_t
   b[3] = 0;
   b[4] = 0;
   b[5] = 0;
-  append_raw(&f->text, &b[0], 6);
+  append_raw(&f->text, ixcast(&b[0]), 6);
   push(&h->placeholder_jumps, {offset, offset + 4, target});
 }
 
@@ -901,7 +901,7 @@ func x86_gen_crash_jcc(f *objfile, h *frame, x86_jcc_code u8) void {
   b[3] = 0;
   b[4] = 0;
   b[5] = 0;
-  append_raw(&f->text, &b[0], 6);
+  append_raw(&f->text, ixcast(&b[0]), 6);
   push(&h->placeholder_jumps, {offset, offset + 4, frame_crash_targetnum(h)});
 }
 

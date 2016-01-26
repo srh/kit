@@ -415,7 +415,7 @@ inline func blank_idyrepls() idy_repls {
 func hash_compute_hash(x *idy_genparms) osize {
   accum osize = hash_compute_hash(&x->num_lifetime_types_used);
   n size = count(&x->repls.tys);
-  p *cu_typeexpr = data(&x->repls.tys);
+  p * ^[0]cu_typeexpr = data(&x->repls.tys);
   for i size = 0; i < n; i = i + 1 {
     accum = (accum * 33) ^ hash_compute_hash(&p[i]);
   }

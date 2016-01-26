@@ -62,7 +62,7 @@ func run_on_file(plat platform_info, modulename array[u8]) bool {
 }
 
 // TODO: c_int
-export func main(argc i32, argv **u8) i32 {
+export func main(argc i32, argv * ^[0]* ^[0]u8) i32 {
   args array[array[u8]];
   for i i32 = 0; i < argc; i = i + 1 {
     push(&args, lpz_as_u8str(argv[~i]));

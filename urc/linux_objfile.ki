@@ -333,7 +333,7 @@ func linux32_append_relocations_and_mutate_section(sti_map *array[u32], d *array
     rel.r_info = ~((new_sti << 8) | rel_type);
     append_reinterpret(d, &rel);
 
-    overwrite_raw(&s->raw, ~ @[u32] ~rel.r_offset, &addend_le.buf[0], sizeof@[le_i32]);
+    overwrite_raw(&s->raw, ~ @[u32] ~rel.r_offset, ixcast(&addend_le.buf[0]), sizeof@[le_i32]);
   }
 }
 

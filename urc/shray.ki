@@ -4,7 +4,7 @@ defclass[T] move shray {
   count size;
   cap size;
   refp *size;
-  ptr *T;
+  ptr * ^[0]T;
 }
 
 access shray[_] {
@@ -39,7 +39,7 @@ access shray[_] {
     refc size = *refp - 1;
     if refc == 0 {
       free(@[*void] cast(refp));
-      rptr *T = r->ptr;
+      rptr * ^[0]T = r->ptr;
       for i size = r->count; i > 0; {
         i = i - 1;
         destroy(&rptr[i]);
@@ -50,7 +50,7 @@ access shray[_] {
     *refp = refc;
   }
 
-  inline func[T] data(r *shray[T]) *T {
+  inline func[T] data(r *shray[T]) * ^[0]T {
     return r->ptr;
   }
 
@@ -102,7 +102,7 @@ access shray[_] {
     q *size = a->refp;
     a->refp = b->refp;
     b->refp = q;
-    p *T = a->ptr;
+    p * ^[0]T = a->ptr;
     a->ptr = b->ptr;
     b->ptr = p;
   }
@@ -121,7 +121,7 @@ func[T] repeat(n size, x T) shray[T] {
 func[T] mk_copy(x *shray[T]) array[T] {
   ret array[T];
   n size = count(x);
-  p *T = data(x);
+  p * ^[0]T = data(x);
   reserve(&ret, n);
   for i size = 0; i < n; i = i + 1 {
     push(&ret, p[i]);

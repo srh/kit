@@ -3,7 +3,7 @@ import identmap;
 import pos;
 
 struct ps {
-  data *u8;
+  data * ^[0]u8;
   length size;
   pos size;
 
@@ -20,7 +20,7 @@ struct ps {
   im *identmap;
 }
 
-func make_ps(im *identmap, posits *positionals, base_offset size, data *u8, length size) ps {
+func make_ps(im *identmap, posits *positionals, base_offset size, data * ^[0]u8, length size) ps {
   p ps;
   p.data = data;
   p.length = length;
@@ -755,7 +755,7 @@ inline func push(s *smallstr, x i32) void {
 
 func to_str(s *smallstr) string {
   ret array[i32];
-  append_raw(&ret, &s->vals[0], +s->len);
+  append_raw(&ret, ixcast(&s->vals[0]), +s->len);
   return ~freeze(&ret);
 }
 

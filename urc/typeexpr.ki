@@ -70,8 +70,8 @@ func idy_typeexpr_list_equal(a *shray[cu_typeexpr], b *shray[cu_typeexpr]) bool 
   if n != count(b) {
     return false;
   }
-  adata *cu_typeexpr = data(a);
-  bdata *cu_typeexpr = data(b);
+  adata * ^[0]cu_typeexpr = data(a);
+  bdata * ^[0]cu_typeexpr = data(b);
   for i size = 0; i < n; i = i + 1 {
     if !idy_typeexpr_equal(&adata[i], &bdata[i]) {
       return false;
@@ -150,8 +150,8 @@ func help_te_vardecl_list_equal(a *shray[te_vardecl], b *shray[te_vardecl]) bool
   if n != count(b) {
     return false;
   }
-  adata *te_vardecl = data(a);
-  bdata *te_vardecl = data(b);
+  adata * ^[0]te_vardecl = data(a);
+  bdata * ^[0]te_vardecl = data(b);
   for i size = 0; i < n; i = i + 1 {
     adecl *te_vardecl = &adata[i];
     bdecl *te_vardecl = &bdata[i];
@@ -304,7 +304,7 @@ func help_compute_hash(a *te_typeexpr) osize {
 
 func help_te_vardecl_list_compute_hash(a *shray[te_vardecl]) osize {
   n size = count(a);
-  adata *te_vardecl = data(a);
+  adata * ^[0]te_vardecl = data(a);
   accum osize = 0x84ac113;
   for i size = 0; i < n; i = i + 1 {
     adecl *te_vardecl = &adata[i];
