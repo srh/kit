@@ -1517,7 +1517,38 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
     rhs_later gr_num = gr_later_discard(gs, &info->rhs_later);
     add(bu, rhs_later);
   case FnIndexing(ip instpair):
-    return ERR(_u8("ICE: gr_index_expr FnIndexing not implemented"));
+    result_ptrtype cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, value_cell(x))->type);
+    result_ptr_cell cell_num = add_cell(gs.gr, {LocationStatic, result_ptrtype.cu, result_ptrtype.props});
+
+    collection_ptrtype cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, value_cell(oo(&a->lhs)))->type);
+    collection_ptr_cell cell_num = add_cell(gs.gr, {LocationStatic, collection_ptrtype.cu, collection_ptrtype.props});
+
+    fun_ptrtype cu_typrop = compute_prim(gs.clq, fn_type(gs.clq->cs, collection_ptrtype.cu.x, ref_cell(gs.gr, result_cell(oo(&a->rhs)))->type.x, result_ptrtype.cu.x));
+    funcell cell_num = add_cell(gs.gr, {LocationStatic, fun_ptrtype.cu, fun_ptrtype.props});
+
+    add(bu, @[gr_xop]GrLive({result_ptr_cell}));
+    add(bu, @[gr_xop]GrLive({funcell}));
+    add(bu, @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
+    add(bu, @[gr_xop]GrLive({collection_ptr_cell}));
+
+    #gr_expr(gs, oo(&a->lhs), bu);
+    #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
+
+    add(bu, @[gr_xop]GrAddressof({collection_ptr_cell, value_cell(oo(&a->lhs))}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(collection_ptr_cell), Nothing}));
+    desc *lval_description = ellval_desc(oo(&a->lhs));
+    if case DeadMe = desc->deadme {
+      add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->lhs))}));
+    }
+
+    add(bu, @[gr_xop]GrApply({funcell, mk_shray(collection_ptr_cell, result_cell(oo(&a->rhs))), result_ptr_cell, StandardApply}));
+    // Now I have a result pointer.  Ho ho ho!
+    add(bu, @[gr_xop]GrDeref({ellval_cell(x), result_ptr_cell, OffsetConst(0)}));
+    add(bu, @[gr_xop]GrActiveXop({Deactivate(result_ptr_cell), Nothing}));
+    add(bu, @[gr_xop]GrDead({result_ptr_cell}));
+
+    // TODO(): info->rhs_later is rightfully ignored here, but really there should be nothing to ignore.  Make the info an enum, make the typechecking not do consume_then_discard automatically.
   }
   return NoFail;
 }
