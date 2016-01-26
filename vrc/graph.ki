@@ -1480,64 +1480,86 @@ func parsed_inline_to_state_inline(a ast_isinline) should_inline {
 }
 
 func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder) np {
-  switch un(&a->info) {
-  case &PtrIndexingInfo(info ast_ptr_indexing_info):
-    name cell_num = ellval_cell(x);
-    flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
-    add(bu, @[gr_xop]GrLive({result_cell(&info.lhs_after)}));
-    #gr_expr_and_consume(gs, oo(&a->lhs), &info.lhs_after, bu);
-    #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
-    add(bu, @[gr_xop]GrDeref({name, result_cell(&info.lhs_after), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
-    rhs_later gr_num = gr_later_discard(gs, &info.rhs_later);
-    add(bu, rhs_later);
-    lhs_later gr_num = gr_later_discard(gs, &info.lhs_later);
-    add(bu, lhs_later);
-  case &ArrayIndexingInfo(info ast_array_indexing_info):
-    #gr_expr(gs, oo(&a->lhs), bu);
-    #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
-    name cell_num = value_cell(x);
-    flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
-    add(bu, @[gr_xop]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
-    gp gr_num;
-    // TODO: Dedup with local_field code?
-    switch &expr_complete_info(oo(&a->lhs))->lval {
-    case &IsLvalYes(desc lval_description):
-      if case DeadMe = desc.deadme {
-        add(bu, @[gr_xop]GrVirtualDead({desc.num}));
+  // TODO: This 2x2 has gotta be duplicating _something_.
+  info *ast_index_expr_info = un(&a->info);
+  switch &info->fn_info {
+  case &ArrayIndexingInfo(ai ast_array_indexing_info):
+    if case &Has(di ast_deref_indexing_info) = &info->deref {
+      name cell_num = ellval_cell(x);
+      flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
+      add(bu, @[gr_xop]GrLive({result_cell(&di.lhs_after)}));
+      #gr_expr_and_consume(gs, oo(&a->lhs), &di.lhs_after, bu);
+      #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
+      add(bu, @[gr_xop]GrDeref({name, result_cell(&di.lhs_after), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
+      rhs_later gr_num = gr_later_discard(gs, &ai.rhs_later);
+      add(bu, rhs_later);
+      lhs_later gr_num = gr_later_discard(gs, &di.lhs_later);
+      add(bu, lhs_later);
+    } else {
+      #gr_expr(gs, oo(&a->lhs), bu);
+      #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
+      name cell_num = value_cell(x);
+      flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
+      add(bu, @[gr_xop]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
+      gp gr_num;
+      // TODO: Dedup with local_field code?
+      switch &expr_complete_info(oo(&a->lhs))->lval {
+      case &IsLvalYes(desc lval_description):
+        if case DeadMe = desc.deadme {
+          add(bu, @[gr_xop]GrVirtualDead({desc.num}));
+        }
+      case &IsLvalNo(desc rval_description):
+        addo(bu, gr_maybe_virtualdead(gs, desc.partial_num));
       }
-    case &IsLvalNo(desc rval_description):
-      addo(bu, gr_maybe_virtualdead(gs, desc.partial_num));
+      rhs_later gr_num = gr_later_discard(gs, &ai.rhs_later);
+      add(bu, rhs_later);
     }
-    rhs_later gr_num = gr_later_discard(gs, &info.rhs_later);
-    add(bu, rhs_later);
   case &FnIndexingInfo(ip instpair):
     result_ptrtype cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, value_cell(x))->type);
     result_ptr_cell cell_num = add_cell(gs.gr, {LocationStatic, result_ptrtype.cu, result_ptrtype.props});
 
-    collection_ptrtype cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, value_cell(oo(&a->lhs)))->type);
-    collection_ptr_cell cell_num = add_cell(gs.gr, {LocationStatic, collection_ptrtype.cu, collection_ptrtype.props});
+    if case &Has(di ast_deref_indexing_info) = &info->deref {
+      // TODO: di.lhs_later is (rightfully) unused.
 
-    fun_ptrtype cu_typrop = compute_prim(gs.clq, fn_type(gs.clq->cs, collection_ptrtype.cu.x, ref_cell(gs.gr, result_cell(oo(&a->rhs)))->type.x, result_ptrtype.cu.x));
-    funcell cell_num = add_cell(gs.gr, {LocationStatic, fun_ptrtype.cu, fun_ptrtype.props});
+      fun_ptrtype cu_typrop = compute_prim(gs.clq, fn_type(gs.clq->cs, ref_cell(gs.gr, result_cell(&di.lhs_after))->type.x, ref_cell(gs.gr, result_cell(oo(&a->rhs)))->type.x, result_ptrtype.cu.x));
+      funcell cell_num = add_cell(gs.gr, {LocationStatic, fun_ptrtype.cu, fun_ptrtype.props});
 
-    add(bu, @[gr_xop]GrLive({result_ptr_cell}));
-    add(bu, @[gr_xop]GrLive({funcell}));
-    add(bu, @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
-    add(bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
-    add(bu, @[gr_xop]GrLive({collection_ptr_cell}));
+      add(bu, @[gr_xop]GrLive({result_ptr_cell}));
+      add(bu, @[gr_xop]GrLive({funcell}));
+      add(bu, @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
+      add(bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
 
-    #gr_expr(gs, oo(&a->lhs), bu);
-    #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
+      #gr_expr_and_consume(gs, oo(&a->lhs), &di.lhs_after, bu);
+      #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
 
-    add(bu, @[gr_xop]GrAddressof({collection_ptr_cell, value_cell(oo(&a->lhs))}));
-    add(bu, @[gr_xop]GrActiveXop({Activate(collection_ptr_cell), Nothing}));
-    desc *lval_description = ellval_desc(oo(&a->lhs));
-    if case DeadMe = desc->deadme {
-      add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->lhs))}));
+      add(bu, @[gr_xop]GrApply({funcell, mk_shray(result_cell(&di.lhs_after), result_cell(oo(&a->rhs))), result_ptr_cell, StandardApply}));
+      // Now I have a result pointer.  Ho ho ho!
+    } else {
+      collection_ptrtype cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, value_cell(oo(&a->lhs)))->type);
+      collection_ptr_cell cell_num = add_cell(gs.gr, {LocationStatic, collection_ptrtype.cu, collection_ptrtype.props});
+
+      fun_ptrtype cu_typrop = compute_prim(gs.clq, fn_type(gs.clq->cs, collection_ptrtype.cu.x, ref_cell(gs.gr, result_cell(oo(&a->rhs)))->type.x, result_ptrtype.cu.x));
+      funcell cell_num = add_cell(gs.gr, {LocationStatic, fun_ptrtype.cu, fun_ptrtype.props});
+
+      add(bu, @[gr_xop]GrLive({result_ptr_cell}));
+      add(bu, @[gr_xop]GrLive({funcell}));
+      add(bu, @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
+      add(bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
+      add(bu, @[gr_xop]GrLive({collection_ptr_cell}));
+
+      #gr_expr(gs, oo(&a->lhs), bu);
+      #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
+
+      add(bu, @[gr_xop]GrAddressof({collection_ptr_cell, value_cell(oo(&a->lhs))}));
+      add(bu, @[gr_xop]GrActiveXop({Activate(collection_ptr_cell), Nothing}));
+      desc *lval_description = ellval_desc(oo(&a->lhs));
+      if case DeadMe = desc->deadme {
+        add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->lhs))}));
+      }
+
+      add(bu, @[gr_xop]GrApply({funcell, mk_shray(collection_ptr_cell, result_cell(oo(&a->rhs))), result_ptr_cell, StandardApply}));
+      // Now I have a result pointer.  Ho ho ho!
     }
-
-    add(bu, @[gr_xop]GrApply({funcell, mk_shray(collection_ptr_cell, result_cell(oo(&a->rhs))), result_ptr_cell, StandardApply}));
-    // Now I have a result pointer.  Ho ho ho!
     add(bu, @[gr_xop]GrDeref({ellval_cell(x), result_ptr_cell, OffsetConst(0)}));
     add(bu, @[gr_xop]GrActiveXop({Deactivate(result_ptr_cell), Nothing}));
     add(bu, @[gr_xop]GrDead({result_ptr_cell}));
