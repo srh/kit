@@ -145,6 +145,7 @@ enum tokval {
   Num numlit;
   Oper smallstr;
   Ident shray[i32];
+  ExclIdent shray[i32];
   Grouper grouper;
   StringChar i32;
   Bad void;
@@ -183,6 +184,7 @@ func equal(a *tokval, b *tokval) bool {
   case &Num(j): { switch b { case &Num(k): { return equal(&j, &k); } } }
   case &Oper(j): { switch b { case &Oper(k): { return smallstr_equal(&j, &k); } } }
   case &Ident(j): { switch b { case &Ident(k): { return shray_equal(&j, &k); } } }
+  case &ExclIdent(j): { switch b { case &ExclIdent(k): { return shray_equal(&j, &k); } } }
   case &Grouper(j): { switch b { case &Grouper(k): { return j == k; } } }
   case &StringChar(j): { switch b { case &StringChar(k): { return j == k; } } }
   case &Bad(j): { return true; }
@@ -409,6 +411,15 @@ func grab_tok(p *ps) tok {
       push(&arr, ch);
       ps_step(p);
       ch = ps_peek(p);
+    }
+    if ch == '!' {
+      ps_step(p);
+      ch = ps_peek(p);
+      // Double-exclamation marks could be nasty.
+      if ch == '!' {
+        return {{left, ps_pos(p)}, Bad};
+      }
+      return mk_res(p, left, ExclIdent(freeze(&arr)));
     }
     if !is_ident_postchar(ch) {
       return {{left, ps_pos(p)}, Bad};
