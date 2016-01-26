@@ -3,7 +3,7 @@ import stdlib;
 defclass[T] move array {
   count size;
   cap size;
-  ptr *T;
+  ptr * ^[0]T;
 }
 
 access array[_] {
@@ -22,9 +22,9 @@ access array[_] {
     }
     dest->count = src->count;
     dest->cap = src->count;
-    destptr *T = cast(checkmalloc(src->count * sizeof@[T]));
+    destptr * ^[0]T = cast(checkmalloc(src->count * sizeof@[T]));
     dest->ptr = destptr;
-    srcptr *T = src->ptr;
+    srcptr * ^[0]T = src->ptr;
     e size = src->count;
     for i size = 0; i < e; i = i + 1 {
       copy(&destptr[i], &srcptr[i]);
@@ -32,7 +32,7 @@ access array[_] {
   }
 
   func[T] do_destroy(r *array[T]) void {
-    rptr *T = r->ptr;
+    rptr * ^[0]T = r->ptr;
     for i size = r->count; i > 0; {
       i = i - 1;
       destroy(&rptr[i]);
@@ -46,7 +46,7 @@ access array[_] {
     if newcount > r->cap {
       change_cap_(r, max(8, max(rn * 2, newcount)));
     }
-    rp *T = r->ptr;
+    rp * ^[0]T = r->ptr;
     for i size = rn; i < newcount; i = i + 1 {
       init(&rp[i]);
     }
@@ -59,7 +59,7 @@ access array[_] {
     if newcount > r->cap {
       change_cap_(r, max(8, max(rn * 2, newcount)));
     }
-    rp *T = r->ptr;
+    rp * ^[0]T = r->ptr;
     for i size = rn; i < newcount; i = i + 1 {
       copy(&rp[i], &value);
     }
@@ -74,7 +74,7 @@ access array[_] {
     ret array[T];
     ret.count = n;
     ret.cap = n;
-    ptr *T = cast(checkmalloc(n * sizeof@[T]));
+    ptr * ^[0]T = cast(checkmalloc(n * sizeof@[T]));
     ret.ptr = ptr;
     for i size = 0; i < n; i = i + 1 {
       copy(&ptr[i], &value);
@@ -109,8 +109,8 @@ access array[_] {
 
   func[T] change_cap_(r *array[T], newcap size) void {
     check(newcap >= r->count);
-    p *T = cast(checkmalloc(newcap * sizeof@[T]));
-    rptr *T = r->ptr;
+    p * ^[0]T = cast(checkmalloc(newcap * sizeof@[T]));
+    rptr * ^[0]T = r->ptr;
     e size = r->count;
     for i size = 0; i < e; i = i + 1 {
       move(&p[i], &rptr[i]);
@@ -164,27 +164,27 @@ access array[_] {
     append_raw(r, s->ptr, s->count);
   }
 
-  func[T] append_raw(r *array[T], p *T, n size) void {
+  func[T] append_raw(r *array[T], p * ^[0]T, n size) void {
     rn size = r->count;
     newcount size = n + rn;
     if newcount > r->cap {
       change_cap_(r, max(8, max(rn * 2, newcount)));
     }
-    rp *T = r->ptr;
+    rp * ^[0]T = r->ptr;
     for i size = 0; i < n; i = i + 1 {
       copy(&rp[rn + i], &p[i]);
     }
     r->count = newcount;
   }
 
-  inline func[T] data(r *array[T]) *T {
+  inline func[T] data(r *array[T]) * ^[0]T {
     return r->ptr;
   }
 
   func[T, U] make(raw_arr U) array[T] {
     ret array[T];
     reserve(&ret, raw_arr.length);
-    append_raw(&ret, &raw_arr[0], raw_arr.length);
+    append_raw(&ret, ixcast(&raw_arr[0]), raw_arr.length);
     return ret;
   }
 
@@ -195,7 +195,7 @@ access array[_] {
     tmp = a->cap;
     a->cap = b->cap;
     b->cap = tmp;
-    p *T = a->ptr;
+    p * ^[0]T = a->ptr;
     a->ptr = b->ptr;
     b->ptr = p;
   }
@@ -206,7 +206,7 @@ access array[_] {
   }
 }
 
-func[T] make_copy(p *T, n size) array[T] {
+func[T] make_copy(p * ^[0]T, n size) array[T] {
   ret array[T];
   reserve(&ret, n);
   for i size = 0; i < n; i = i + 1 {
@@ -278,7 +278,7 @@ func[T] sorted_has_dups(a *array[T]) bool {
 }
 
 func[T] dedup_sorted(a *array[T]) void {
-  p *T = data(a);
+  p * ^[0]T = data(a);
   n size = count(a);
   if n == 0 {
     return;
@@ -366,7 +366,7 @@ func[H] build_u8str(help H, r *array[u8], a *array[u8]) void {
 
 func[T] is_strictly_increasing(x *array[T]) bool {
   n size = count(x);
-  p *T = data(x);
+  p * ^[0]T = data(x);
   for i size = 1; i < n; i = i + 1 {
     if !(p[i - 1] < p[i]) {
       return false;
@@ -383,9 +383,9 @@ func[T] shifterase_elem(x *array[T], k size) void {
   pop(x);
 }
 
-func[T] overwrite_raw(x *array[T], offset size, p *T, n size) void {
+func[T] overwrite_raw(x *array[T], offset size, p * ^[0]T, n size) void {
   check(n <= count(x) - offset);
-  w *T = ref(x, offset);
+  w * ^[0]T = ixcast(ref(x, offset));
   for i size = 0; i < n; i = i + 1 {
     w[i] = p[i];
   }
@@ -395,7 +395,7 @@ inline func[T] sort(x *array[T]) void {
   sort(data(x), count(x));
 }
 
-func[T] sort(p *T, n size) void {
+func[T] sort(p * ^[0]T, n size) void {
   for ;; {
     if n <= 1 {
       return;
@@ -430,10 +430,10 @@ func[T] sort(p *T, n size) void {
     i1 size = i + 1;
     if i < pi {
       sort(p, i);
-      p = &p[i1];
+      p = ixcast(&p[i1]);
       n = n - i1;
     } else {
-      sort(&p[i1], n - i1);
+      sort(ixcast(&p[i1]), n - i1);
       n = i;
     }
   }

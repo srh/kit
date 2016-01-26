@@ -349,8 +349,8 @@ func win_write_section_header(d *array[u8], s *objfile_section, name array[u8], 
   check(~sizeof@[Section_Header] == Section_Header_EXPECTED_SIZE);
   name_len size = count(&name);
   check(name_len <= 8);
-  fill(&h.Name[0], 8, 0);
-  bufcopy(&h.Name[0], data(&name), name_len);
+  fill(ixcast(&h.Name[0]), 8, 0);
+  bufcopy(ixcast(&h.Name[0]), data(&name), name_len);
   // Should be set to zero for object files.
   h.VirtualSize = ~ @[u32] 0;
   // For simplicity, should be set to zero for object files.
@@ -396,8 +396,8 @@ func win_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *array[
 
     nameu8 array[u8] = win_string_to_u8symbol(&name_buf);
     if count(&nameu8) <= 8 {
-      fill(&standard.Name.u.ShortName[0], 8, 0);
-      bufcopy(&standard.Name.u.ShortName[0], data(&nameu8), count(&nameu8));
+      fill(ixcast(&standard.Name.u.ShortName[0]), 8, 0);
+      bufcopy(ixcast(&standard.Name.u.ShortName[0]), data(&nameu8), count(&nameu8));
     } else {
       /* The offset includes the leading 4 bytes -- the minimimum
          possible offset is 4. */
@@ -438,7 +438,7 @@ func win_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *array[
   win_append_all_section_symbols(&symbols, f);
 
   strings_size_le le_u32 = ~ @[u32] ~count(&strings);
-  overwrite_raw(&strings, 0, &strings_size_le.buf[0], 4);
+  overwrite_raw(&strings, 0, ixcast(&strings_size_le.buf[0]), 4);
 
   *symbols_out = symbols;
   *strings_out = strings;
@@ -464,8 +464,8 @@ func win_append_section_symbols(d *array[u8], s *objfile_section, name array[u8]
   if true {
     standard COFF_symbol_standard_record;
     check(count(&name) <= 8);
-    fill(&standard.Name.u.ShortName[0], 8, 0);
-    bufcopy(&standard.Name.u.ShortName[0], data(&name), count(&name));
+    fill(ixcast(&standard.Name.u.ShortName[0]), 8, 0);
+    bufcopy(ixcast(&standard.Name.u.ShortName[0]), data(&name), count(&name));
     standard.Value = ~ @[u32] 0;
     standard.SectionNumber = ~ SectionNumber;
     standard.Type = ~ @[u16] 0;
@@ -482,7 +482,7 @@ func win_append_section_symbols(d *array[u8], s *objfile_section, name array[u8]
     aux_sectiondef.Number = ~ @[u16] 0;
     aux_sectiondef.Selection = 0;
     // TODO: Assert that aux_sectiondef.Unused has size 3.
-    fill(&aux_sectiondef.Unused[0], 3, 0);
+    fill(ixcast(&aux_sectiondef.Unused[0]), 3, 0);
     append_reinterpret(d, &aux_sectiondef);
   }
 }

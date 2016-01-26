@@ -4,11 +4,11 @@ struct le_u32 {
 
 func `~`(x u32) le_u32 {
   ret le_u32;
-  write_le_u32(&ret.buf[0], x);
+  write_le_u32(ixcast(&ret.buf[0]), x);
   return ret;
 }
 
-func write_le_u32(dest *u8, x u32) void {
+func write_le_u32(dest * ^[0]u8, x u32) void {
   dest[0] = ~ (x & 0xFF);
   dest[1] = ~ ((x >> 8) & 0xFF);
   dest[2] = ~ ((x >> 16) & 0xFF);
@@ -26,11 +26,11 @@ struct le_i32 {
 
 func `~`(x i32) le_i32 {
   ret le_i32;
-  write_le_i32(&ret.buf[0], x);
+  write_le_i32(ixcast(&ret.buf[0]), x);
   return ret;
 }
 
-func write_le_i32(dest *u8, x i32) void {
+func write_le_i32(dest * ^[0]u8, x i32) void {
   dest[0] = ~ (x & 0xFF);
   dest[1] = ~ ((x >> 8) & 0xFF);
   dest[2] = ~ ((x >> 16) & 0xFF);
@@ -43,11 +43,11 @@ struct le_u16 {
 
 func `~`(x u16) le_u16 {
   ret le_u16;
-  write_le_u16(&ret.buf[0], x);
+  write_le_u16(ixcast(&ret.buf[0]), x);
   return ret;
 }
 
-func write_le_u16(dest *u8, x u16) void {
+func write_le_u16(dest * ^[0]u8, x u16) void {
   // TODO: s1 can't codegen a u16 numeric literal.  Likewise below.
   ff u16 = ~ @[u8] 0xFF;
   dest[0] = ~ (x & ff);
@@ -60,11 +60,11 @@ struct le_i16 {
 
 func `~`(x i16) le_i16 {
   ret le_i16;
-  write_le_i16(&ret.buf[0], x);
+  write_le_i16(ixcast(&ret.buf[0]), x);
   return ret;
 }
 
-func write_le_i16(dest *u8, x i16) void {
+func write_le_i16(dest * ^[0]u8, x i16) void {
   ff i16 = ~ @[u8] 0xFF;
   dest[0] = ~ (x & ff);
   dest[1] = ~ ((x >> ~ @[u8] 8) & ff);

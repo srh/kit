@@ -398,7 +398,7 @@ func[T] try_skip_specific_ident(p *ps, x T) parse_result {
     if count(&text) != x.length {
       return Fail;
     }
-    y *i32 = data(&text);
+    y * ^[0]i32 = data(&text);
     for i size = 0; i < x.length; i = i + 1 {
       if y[i] != ~x[i] {
         return Fail;
