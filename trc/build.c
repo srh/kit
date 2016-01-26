@@ -3749,7 +3749,6 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   struct ast_typeexpr *ptr_target = NULL;
   int is_ptr = view_ptr_target(&cs->cm, ast_expr_type(ie->lhs), &ptr_target);
 
-  uint32_t elem_size;
   /* Soon becomes dead/alive depending on is_ptr value. */
   struct expr_return lhs_er = open_expr_return();
   if (!gen_expr(cs, f, h, ie->lhs, &lhs_er)) {
@@ -3775,8 +3774,10 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
     wipe_temporaries(cs, f, h, &rhs_er, ast_expr_type(ie->rhs), &rhs_loc);
   }
 
+  uint32_t elem_size;
   if (is_ptr) {
-    elem_size = x86_sizeof(&cs->nt, ptr_target);
+    CHECK(ptr_target->tag == AST_TYPEEXPR_ARRAY);
+    elem_size = x86_sizeof(&cs->nt, ptr_target->u.arraytype.param);
 
     CHECK(lhs_loc.size == DWORD_SIZE);
     CHECK(rhs_loc.size == DWORD_SIZE);

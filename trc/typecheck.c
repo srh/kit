@@ -3928,6 +3928,12 @@ int check_index_expr(struct exprscope *es,
     }
 
     lhs_target = lhs_type->u.arraytype.param;
+  } else {
+    if (lhs_target->tag != AST_TYPEEXPR_ARRAY) {
+      METERR(es->cs, a->meta, "Indexing via pointer into a non-array type.%s", "\n");
+      goto fail;
+    }
+    lhs_target = lhs_target->u.arraytype.param;
   }
 
   if (!unify_directionally(es->cs->im, partial_type, lhs_target)) {
