@@ -96,6 +96,13 @@ access array[_] {
     return &r->ptr[i];
   }
 
+  inline func[T] do_index(r *array[T], i size) *T {
+    if i >= r->count {
+      crash();
+    }
+    return &r->ptr[i];
+  }
+
   inline func[T] count(r *array[T]) size {
     return r->count;
   }

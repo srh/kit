@@ -42,17 +42,17 @@ func check_module(cs *checkstate, mod_name sym) np {
   naccess_blocks size = count(&mod->access_blocks);
   for i size = 0; i < naccess_blocks; i = i + 1 {
     dti deftype_entry_id;
-    #get_accessible_deftype(cs, get(&mod->access_blocks, i), &dti);
+    #get_accessible_deftype(cs, mod->access_blocks[i], &dti);
   }
 
   ndefs size = count(&mod->defs);
   for i size = 0; i < ndefs; i = i + 1 {
-    #ensure_def_checked(cs, get(&mod->defs, i));
+    #ensure_def_checked(cs, mod->defs[i]);
   }
 
   ndeftypes size = count(&mod->deftypes);
   for i size = 0; i < ndeftypes; i = i + 1 {
-    #ensure_deftype_checked(cs, get(&mod->deftypes, i));
+    #ensure_deftype_checked(cs, mod->deftypes[i]);
   }
 
   // I guess that's everything.
@@ -78,7 +78,7 @@ func convert_typeexpr_list(cs *checkstate, arr *array[ast_typeexpr], out *shray[
   reserve(&build, n);
   for i size = 0; i < n; i = i + 1 {
     t te_typeexpr;
-    #convert_typeexpr(cs, ref(arr, i), &t);
+    #convert_typeexpr(cs, &(*arr)[i], &t);
     push(&build, t);
   }
   *out = freeze(&build);
@@ -91,7 +91,7 @@ func convert_vardecl_list(cs *checkstate, arr *array[ast_vardecl], out *array[te
   reserve(&build, n);
   for i size = 0; i < n; i = i + 1 {
     vd te_vardecl;
-    #convert_vardecl(cs, ref(arr, i), &vd);
+    #convert_vardecl(cs, &(*arr)[i], &vd);
     push(&build, vd);
   }
   swap(out, &build);
@@ -434,7 +434,7 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t *genparms, out *idy
       n size = count(&params);
       reserve(&cu_params, n);
       for i size = 0; i < n; i = i + 1 {
-        push(&cu_params, ~get(&params, i));
+        push(&cu_params, ~params[i]);
       }
       *out = {freeze(&cu_params)};
       return NoFail;
@@ -466,7 +466,7 @@ func check_and_compute_parms(clq *clqueue, t *genparms, out *idy_genparms) np {
       reserve(&cu_params, n);
       for i size = 0; i < n; i = i + 1 {
         canonicalized te_typeexpr;
-        canonicalize_idy_lifetimes(clq->im, &lifetime_names, ref(&params, i), &canonicalized);
+        canonicalize_idy_lifetimes(clq->im, &lifetime_names, &params[i], &canonicalized);
         push(&cu_params, ~canonicalized);
       }
       *out = {count(&lifetime_names), {freeze(&cu_params)}};
@@ -512,7 +512,7 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
 
     case &TeLifetime(a te_lifetime):
       if case Has(ix size) = find_lifetime_generic(g, a.name) {
-        *out = {true, ref(&parms->tys, ix)->x};
+        *out = {true, parms->tys[ix].x};
         return NoFail;
       }
       // Assume it's a valid lifetime in scope, because what else can we do, keep track of that?
@@ -546,7 +546,7 @@ func convert_to_u32(base i8, digits *shray[i8], out *u32) bool {
     if !try_mul(acc, @[u32]~base, &acc) {
       return false;
     }
-    if !try_add(acc, @[u32]~get(digits, i), &acc) {
+    if !try_add(acc, @[u32]~(*digits)[i], &acc) {
       return false;
     }
   }
@@ -572,9 +572,9 @@ func help_check_and_compute_fields(clq *clqueue, g *ast_generics, parms *idy_rep
   all_complete bool = true;
   all_computed array[te_vardecl];
   for i size = 0; i < n; i = i + 1 {
-    decl *te_vardecl = ref(a, i);
+    decl *te_vardecl = &(*a)[i];
     for j size = 0; j < i; j = j + 1 {
-      if ref(a, j)->name.x == decl->name.x {
+      if (*a)[j].name.x == decl->name.x {
         return ERR(_u8("Duplicate field name "), lookup(clq->im, decl->name));
       }
     }
@@ -692,7 +692,7 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_ty
     n size = count(arr);
     match opt[deftype_entry_id] = None;
     for i size = 0; i < n; i = i + 1 {
-      id deftype_entry_id = get(arr, i);
+      id deftype_entry_id = (*arr)[i];
       ent *deftype_entry = ref_deftype_entry(cs, id);
       if arity_matches(&ent->generics, params) {
         if case Has(alt_id) = match {
@@ -1493,7 +1493,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
     n size = count(arr);
     matches array[ent_and_parms];
     for i size = 0; i < n; i = i + 1 {
-      id def_entry_id = get(arr, i);
+      id def_entry_id = (*arr)[i];
       ent *def_entry = ref_def_entry(cs, id);
       ent_typeexpr *te_typeexpr;
       #def_converted_typeexpr(cs, ent, &ent_typeexpr);
@@ -1518,7 +1518,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
       *res_out = NoMatch;
       return NoFail;
     } else if num_matches == 1 {
-      *res_out = OneMatch(get(&matches, 0));
+      *res_out = OneMatch(matches[0]);
       return NoFail;
     } else {
       *res_out = MultiMatch;

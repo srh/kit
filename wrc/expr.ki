@@ -466,7 +466,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
 func es_find_current_local(es *framescope, name sym) opt[var_number] {
   n size = count(&es->current_vars);
   for i size = 0; i < n; i = i + 1 {
-    num var_number = get(&es->current_vars, i);
+    num var_number = es->current_vars[i];
     inf *var_info = ref_var(es, num);
     if case Has(s sym) = inf->name {
       if s == name {
@@ -1308,8 +1308,8 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     #compute_complete_type_properties(es->clq, pt, &props);
 
     for i size = 0; i < n; i = i + 1 {
-      p_i *ast_strinit_param = ref(&a->exprs, i);
-      annotate(&p_i->info, {get(&offsets, i)});
+      p_i *ast_strinit_param = &a->exprs[i];
+      annotate(&p_i->info, {offsets[i]});
     }
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
     return NoFail;
@@ -1339,7 +1339,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
 
   if true {
     nargs size = count(&a->args);
-    return_type cu_typeexpr = ~get(computed_params, nargs);
+    return_type cu_typeexpr = ~(*computed_params)[nargs];
     bs bodystate = mk(es->ds, &return_type);
     #help_check_lambda_body(&bs, a, computed_params);
   }
@@ -1358,7 +1358,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   check(nargs + 1 == count(computed_params));
   arg_cells array[cell_num];
   for i size = 0; i < nargs; i = i + 1 {
-    cu_param cu_typeexpr = ~get(computed_params, i);
+    cu_param cu_typeexpr = ~(*computed_params)[i];
     cu_param_props type_properties;
     #compute_type_properties(bs->clq, &cu_param, &cu_param_props);
     cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
@@ -1578,7 +1578,7 @@ func deftype_rhs_info_accessible(ds *defscope, id deftype_entry_id, result_out *
     case &ClassexprRhsSpec(crs classexpr_rhs_spec):
       n size = count(&ds->accessible);
       for i size = 0; i < n; i = i + 1 {
-        aid access_entry_id = get(&ds->accessible, i);
+        aid access_entry_id = ds->accessible[i];
         dti deftype_entry_id;
         #get_accessible_deftype(ds->cs, aid, &dti);
         if dti == id {

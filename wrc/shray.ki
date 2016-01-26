@@ -68,6 +68,11 @@ access shray[_] {
     return &r->ptr[i];
   }
 
+  inline func[T] do_index(r *shray[T], i size) *T {
+    check(i < r->count);
+    return &r->ptr[i];
+  }
+
   access array[_] {
     // Clears its parameter.
     func[T] freeze(r *array[T]) shray[T] {
