@@ -219,7 +219,7 @@ func osx32_append_relocations_and_mutate_output(d *array[u8], f *objfile, s *obj
       target_offset i32 = ~osx32_adjusted_addr(addrs, symbol->section, symbol->value);
       displacement i32 = target_offset - ~(r_address + 4);
       le_displacement le_i32 = to_le(displacement);
-      overwrite_raw(d, ~(segment_file_offset + r_address), &le_displacement.buf[0], sizeof@[le_i32]);
+      overwrite_raw(d, ~(segment_file_offset + r_address), ixcast(&le_displacement.buf[0]), sizeof@[le_i32]);
     case Diff32:
       /* Notes for scattered diff32 reloc
       - I don't know wtf "scattered" means or is for
@@ -257,7 +257,7 @@ func osx32_append_relocations_and_mutate_output(d *array[u8], f *objfile, s *obj
 
       displacement i32 = target_offset - subtracted_offset;
       le_displacement le_i32 = to_le(displacement);
-      overwrite_raw(d, ~(segment_file_offset + virtual_address), &le_displacement.buf[0], sizeof@[le_i32]);
+      overwrite_raw(d, ~(segment_file_offset + virtual_address), ixcast(&le_displacement.buf[0]), sizeof@[le_i32]);
     }
   }
 }

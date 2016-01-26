@@ -1260,7 +1260,7 @@ func modules_next_base_offset(cs *checkstate) size {
 }
 
 func absolute_to_linecol(buf *array[u8], absolute size) tup[size, size] {
-  d *u8 = data(buf);
+  d * ^[0]u8 = data(buf);
   n size = count(buf);
   check(absolute <= n);
 

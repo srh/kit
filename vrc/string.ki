@@ -5,7 +5,7 @@ struct string { x shray[i32]; }
 
 def `~` fn[shray[i32], string] = wrapconvert;
 
-inline func data(s *string) *i32 {
+inline func data(s *string) * ^[0]i32 {
   return data(&s->x);
 }
 
@@ -18,7 +18,7 @@ inline func count(s *string) size {
 }
 
 func hash_compute_hash(x *string) osize {
-  p *i32 = data(x);
+  p * ^[0]i32 = data(x);
   accum osize = 0x12345679;
   nx size = count(x);
   for i size = 0; i < nx; i = i + 1 {
@@ -31,8 +31,8 @@ func hash_equal(x *string, y *string) bool {
   if count(x) != count(y) {
     return false;
   }
-  px *i32 = data(x);
-  py *i32 = data(y);
+  px * ^[0]i32 = data(x);
+  py * ^[0]i32 = data(y);
   n size = count(x);
   for i size = 0; i < n; i = i + 1 {
     if px[i] != py[i] {
@@ -44,7 +44,7 @@ func hash_equal(x *string, y *string) bool {
 
 func[H] build_u8str(help H, r *array[u8], x *string) void {
   n size = count(x);
-  p *i32 = data(&x->x);
+  p * ^[0]i32 = data(&x->x);
   for i size = 0; i < n; i = i + 1 {
     push(r, ~p[i]);
   }
@@ -58,7 +58,7 @@ func from_u8(x *array[u8]) string {
   build array[i32];
   n size = count(x);
   reserve(&build, n);
-  p *u8 = data(x);
+  p * ^[0]u8 = data(x);
   for i size = 0; i < n; i = i + 1 {
     push(&build, ~p[i]);
   }
@@ -69,9 +69,8 @@ func[T] _s(arr T) string {
   build array[i32];
   n size = arr.length;
   reserve(&build, n);
-  p *u8 = &arr[0];
   for i size = 0; i < n; i = i + 1 {
-    push(&build, ~p[i]);
+    push(&build, + @[u8]arr[i]);
   }
   return ~freeze(&build);
 }

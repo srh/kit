@@ -15,7 +15,7 @@ extern fwrite fn[*void, size, size, *FILE, size];
 extern fclose fn[*FILE, i32];  // TODO: actually returns "int"
 extern feof fn[*FILE, i32];  // TODO: actually returns "int"
 // TODO: Add "char" as a built-in?
-extern fopen fn[*u8, *u8, *FILE];
+extern fopen fn[* ^[0]u8, * ^[0]u8, *FILE];
 extern fflush fn[*FILE, i32];   // TODO: actually returns "int"
 // TODO: Add platform-specific tests for stuff like "is EOF -1"
 def EOF i32 = -1;  // TODO: is actually "int"
@@ -41,7 +41,7 @@ func[T] debugstr(arr T) void {
   ign2 var = fflush(Stderr());
 }
 
-func lpz_as_u8str(s *u8) array[u8] {
+func lpz_as_u8str(s * ^[0]u8) array[u8] {
   n size = 0;
   while s[n] != '\0' {
     n = n + 1;
@@ -309,6 +309,12 @@ inline func[S, T] cast(p *S) *T {
   return u.q;
 }
 
+inline func[T] ixcast(p *T) * ^[0]T {
+  u union { p *T; q * ^[0]T; };
+  u.p = p;
+  return u.q;
+}
+
 def U32_MAX u32 = ^(@[u32]0);
 
 func try_mul(x u32, y u32, out *u32) bool {
@@ -372,13 +378,13 @@ inline func[T] enumnum(x *T) u32 {
 }
 
 // TODO: Somewhere in linux_objfile.ki we could use this func... for the magic's padding.
-func[T] fill(p *T, n size, value T) void {
+func[T] fill(p * ^[0]T, n size, value T) void {
   for i size = 0; i < n; i = i + 1 {
     p[i] = value;
   }
 }
 
-func[T] bufcopy(dest *T, src *T, n size) void {
+func[T] bufcopy(dest * ^[0]T, src * ^[0]T, n size) void {
   for i size = 0; i < n; i = i + 1 {
     dest[i] = src[i];
   }
