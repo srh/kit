@@ -221,6 +221,8 @@ const int unop_precedences[] = {
   [AST_UNOP_BITWISE_NOT] = 905,
 };
 
+static const int IDENT_UNOP_RIGHT_PRECEDENCE = 905;
+
 int unop_right_precedence(enum ast_unop op) {
   CHECK(0 <= op &&
         op < sizeof(unop_precedences) / sizeof(unop_precedences[0]));
@@ -314,7 +316,7 @@ int is_ident_midchar(int32_t ch) {
 }
 
 int is_ident_postchar(int32_t ch) {
-  return is_ws(ch) || is_operlike(ch) || is_parenlike(ch);
+  return is_ws(ch) || is_parenlike(ch) || is_operlike(ch);
 }
 
 int is_numeric_postchar(int32_t ch) {
@@ -1517,6 +1519,23 @@ int parse_rest_of_arglist(struct ps *p,
   return 0;
 }
 
+void build_nonmagic_unop_expr(struct ast_meta meta,
+                              struct ast_ident unop_name,
+                              struct ast_expr rhs,
+                              struct ast_expr *out) {
+  struct ast_expr func;
+  ast_expr_partial_init(&func, AST_EXPR_NAME, ast_expr_info_default());
+  ast_name_expr_init(&func.u.name, unop_name);
+
+  struct ast_exprcall *args = malloc_mul(sizeof(*args), 1);
+  ast_exprcall_init(&args[0], rhs);
+
+  ast_expr_partial_init(out, AST_EXPR_FUNCALL, ast_expr_info_default());
+
+  ast_funcall_init(&out->u.funcall, meta,
+                   ast_exprcall_make(func), args, 1);
+}
+
 void build_unop_expr(struct ast_meta meta,
                      struct ast_ident unop_name,
                      enum ast_unop unop,
@@ -1527,17 +1546,7 @@ void build_unop_expr(struct ast_meta meta,
     ast_expr_partial_init(out, AST_EXPR_UNOP, ast_expr_info_default());
     ast_unop_expr_init(&out->u.unop_expr, meta, unop, rhs);
   } else {
-    struct ast_expr func;
-    ast_expr_partial_init(&func, AST_EXPR_NAME, ast_expr_info_default());
-    ast_name_expr_init(&func.u.name, unop_name);
-
-    struct ast_exprcall *args = malloc_mul(sizeof(*args), 1);
-    ast_exprcall_init(&args[0], rhs);
-
-    ast_expr_partial_init(out, AST_EXPR_FUNCALL, ast_expr_info_default());
-
-    ast_funcall_init(&out->u.funcall, meta,
-                     ast_exprcall_make(func), args, 1);
+    build_nonmagic_unop_expr(meta, unop_name, rhs, out);
   }
 }
 
@@ -1816,6 +1825,18 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     if (!parse_ident(p, &ident)) {
       return 0;
     }
+    if (try_skip_char(p, '!')) {
+      if (is_operlike(ps_peek(p))) {
+        goto fail_ident;
+      }
+      struct ast_expr rhs;
+      if (!(skip_ws(p) && parse_expr(p, &rhs, IDENT_UNOP_RIGHT_PRECEDENCE))) {
+        goto fail_ident;
+      }
+      struct ast_meta meta = ast_meta_make(pos_start, ast_expr_pos_end(&rhs));
+      build_nonmagic_unop_expr(meta, ident, rhs, out);
+      return 1;
+    }
 
     skip_ws(p);
     if (!try_skip_char(p, '@')) {
@@ -1827,13 +1848,16 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
     size_t params_count;
     if (!(try_skip_char(p, '[')
           && parse_rest_of_type_param_list(p, ALLOW_BLANKS_NO, &params, &params_count))) {
-      ast_ident_destroy(&ident);
-      return 0;
+      goto fail_ident;
     }
 
     ast_name_expr_init_with_params(&out->u.name, ast_meta_make(pos_start, ps_pos(p)),
                                    ident, params, params_count);
     return 1;
+
+  fail_ident:
+    ast_ident_destroy(&ident);
+    return 0;
   }
 
   if (try_skip_char(p, '(')) {
@@ -2957,6 +2981,11 @@ int parse_test_defs(void) {
                          "  } else { }\n"
                          "}\n",
                          20);
+  pass &= run_count_test("def37",
+                         "func foo() void {\n"
+                         "  return bar!7;\n"
+                         "}\n",
+                         12);
   return pass;
 }
 
