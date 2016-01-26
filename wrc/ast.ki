@@ -470,11 +470,20 @@ struct ast_paren_expr {
   expr box[ast_expr];
 }
 
-struct ast_index_expr_info {
-  tech indexing_technique;
-  // isHas if the lhs needs consuming/discarding (if it's a ptr).
-  lhs_after opt[tup[ast_expr_after_consume, ast_later_discard_info]];
+struct ast_ptr_indexing_info {
+  lhs_after ast_expr_after_consume;
+  lhs_later ast_later_discard_info;
   rhs_later ast_later_discard_info;
+}
+
+struct ast_array_indexing_info {
+  rhs_later ast_later_discard_info;
+}
+
+enum ast_index_expr_info {
+  ArrayIndexingInfo ast_array_indexing_info;
+  PtrIndexingInfo ast_ptr_indexing_info;
+  FnIndexingInfo instpair;
 }
 
 struct ast_index_expr {
