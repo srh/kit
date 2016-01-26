@@ -2162,9 +2162,14 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
 
 func decompose_indexable(cs *checkstate, t *te_typeexpr, out **te_typeexpr, is_arraytype_out *bool) bool {
   // We specifically do _not_ support references here.  You can't index into a reference... you'd need a slice type or something like that.
-  if decompose_typeapp(t, primitive_pointer_puretype(cs), out) {
-    *is_arraytype_out = false;
-    return true;
+  pointee *te_typeexpr;
+  if decompose_typeapp(t, primitive_pointer_puretype(cs), &pointee) {
+    if decompose_arraytype(pointee, out) {
+      *is_arraytype_out = false;
+      return true;
+    } else {
+      return false;
+    }
   }
   if decompose_arraytype(t, out) {
     *is_arraytype_out = true;
