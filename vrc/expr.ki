@@ -1956,10 +1956,15 @@ enum indexing_technique {
 
 func decompose_indexable(clq *clqueue, t *te_typeexpr, result_type_out **te_typeexpr, key_type_out *te_typeexpr, tech_out *indexing_technique) np {
   // We specifically do _not_ support references here.  You can't index into a reference... you'd need a slice type or something like that.
-  if decompose_typeapp(t, primitive_pointer_puretype(clq->cs), result_type_out) {
-    *tech_out = PtrIndexing;
-    *key_type_out = (@[cu_typeexpr]compute_prim(clq, primitive_size_type(clq->cs))).x;
-    return NoFail;
+  pointee *te_typeexpr;
+  if decompose_typeapp(t, primitive_pointer_puretype(clq->cs), &pointee) {
+    if decompose_arraytype(pointee, result_type_out) {
+      *tech_out = PtrIndexing;
+      *key_type_out = (@[cu_typeexpr]compute_prim(clq, primitive_size_type(clq->cs))).x;
+      return NoFail;
+    } else {
+      return ERR(_u8("indexing on pointer to non-indexable type"));
+    }
   }
 
   if decompose_arraytype(t, result_type_out) {
