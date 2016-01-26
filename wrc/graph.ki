@@ -1529,6 +1529,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
       add(bu, @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
       add(bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
 
+      add(bu, @[gr_xop]GrLive({result_cell(&di.lhs_after)}));
       #gr_expr_and_consume(gs, oo(&a->lhs), &di.lhs_after, bu);
       #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
 

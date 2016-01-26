@@ -1339,7 +1339,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
 
   if true {
     nargs size = count(&a->args);
-    return_type cu_typeexpr = ~(*computed_params)[nargs];
+    return_type cu_typeexpr = ~computed_params[nargs];
     bs bodystate = mk(es->ds, &return_type);
     #help_check_lambda_body(&bs, a, computed_params);
   }
