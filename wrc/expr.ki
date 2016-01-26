@@ -1899,81 +1899,90 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   #compute_complete_type_properties(es->clq, result_type, &result_props);
 
   lval is_lval;
-  switch tech {
-  case ArrayIndexing:
+  switch tech.array {
+  case None:
     rhs_later ast_later_discard_info = mk_later();
     #check_consume_then_discard_expr(es, oo(&a->rhs), &key_type, &rhs_later);
 
-    // TODO: This is totally duplicating field access logic.
-    switch &lhs_info->lval {
-      case &IsLvalYes(desc lval_description): {
-        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}), DeadMe, field_lifetime(desc.lifetime)});
+    if !tech.deref {
+      // TODO: This is totally duplicating field access logic.
+      switch &lhs_info->lval {
+        case &IsLvalYes(desc lval_description): {
+          lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}), DeadMe, field_lifetime(desc.lifetime)});
+        }
+        case &IsLvalNo(desc rval_description): {
+          lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *result_type, result_props})});
+        }
       }
-      case &IsLvalNo(desc rval_description): {
-        lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *result_type, result_props})});
-      }
+      // Nothing to dispose, it's a field access.
+      annotate(&a->info, {None, ArrayIndexingInfo({rhs_later})});
+    } else {
+      // Dereferencing a pointer always makes an lvalue.
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}), DeadMe, field_lifetime(fake_lifetime(es->cs))});
+      ie_info_after nc[ast_expr_after_consume] = NotComputed;
+      lhs_later ast_later_discard_info = mk_later();
+      #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
+
+      annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), ArrayIndexingInfo({rhs_later})});
     }
-    // Nothing to dispose, it's a field access.
-    annotate(&a->info, @[ast_index_expr_info]ArrayIndexingInfo({rhs_later}));
-  case PtrIndexing:
-    rhs_later ast_later_discard_info = mk_later();
-    #check_consume_then_discard_expr(es, oo(&a->rhs), &key_type, &rhs_later);
 
-    // Dereferencing a pointer always makes an lvalue.
-    lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}), DeadMe, field_lifetime(fake_lifetime(es->cs))});
-    ie_info_after nc[ast_expr_after_consume] = NotComputed;
-    lhs_later ast_later_discard_info = mk_later();
-    #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
-
-    annotate(&a->info, @[ast_index_expr_info]PtrIndexingInfo({*un(&ie_info_after), lhs_later, rhs_later}));
-  case FnIndexing(ip instpair):
+  case Has(ip instpair):
     // What this becomes is:
-    //   - If the lhs is an lvalue, we take its address, call ip, and deref the return value, which makes an lvalue.
+    //   - If the lhs (possibly derefed) is an lvalue, we take its address, call ip, and deref the return value, which makes an lvalue.
     //   - If the lhs is an rvalue, we take its address, call ip, and copy the return value to a new whole rvalue.  But WHAT IF an rvalue's partial_num was allowed to not be a subcell of whole_num?  Then we could just update partial_num.
     //   - For now, if the lhs is an rvalue, we fail to compile.
 
-    #check_expr_consume(es, oo(&a->rhs), &key_type);
+    if !tech.deref {
+      #check_expr_consume(es, oo(&a->rhs), &key_type);
 
-    switch &lhs_info->lval {
-    case &IsLvalYes(desc lval_description):
+      switch &lhs_info->lval {
+      case &IsLvalYes(desc lval_description):
+        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}), DeadMe, fake_lifetime(es->cs)});
+      case &IsLvalNo(desc rval_description):
+        return ERR(_u8("User-defined array indexing only works on lvalues"));
+      }
+
+      annotate(&a->info, {None, FnIndexingInfo(ip)});
+    } else {
+      #check_expr_consume(es, oo(&a->rhs), &key_type);
+
       lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}), DeadMe, fake_lifetime(es->cs)});
-    case &IsLvalNo(desc rval_description):
-      return ERR(_u8("User-defined array indexing only works on lvalues"));
-    }
+      ie_info_after nc[ast_expr_after_consume] = NotComputed;
+      lhs_later ast_later_discard_info = mk_later();
+      #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
 
-    annotate(&a->info, @[ast_index_expr_info]FnIndexingInfo(ip));
+      annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), FnIndexingInfo(ip)});
+    }
   }
 
   annotate_info(x, CompleteCheck(mk(lval, ~ *result_type, result_props)));
   return NoFail;
 }
 
-enum indexing_technique {
-  ArrayIndexing void;
-  PtrIndexing void;
-  FnIndexing instpair;
+struct indexing_technique {
+  // None = raw array, Has(...) = fn indexing
+  array opt[instpair];
+  deref bool;
 }
 
-func decompose_indexable(clq *clqueue, t *te_typeexpr, result_type_out **te_typeexpr, key_type_out *te_typeexpr, tech_out *indexing_technique) np {
+func decompose_indexable(clq *clqueue, typ *te_typeexpr, result_type_out **te_typeexpr, key_type_out *te_typeexpr, tech_out *indexing_technique) np {
   // We specifically do _not_ support references here.  You can't index into a reference... you'd need a slice type or something like that.
-  pointee *te_typeexpr;
-  if decompose_typeapp(t, primitive_pointer_puretype(clq->cs), &pointee) {
-    if decompose_arraytype(pointee, result_type_out) {
-      *tech_out = PtrIndexing;
-      *key_type_out = (@[cu_typeexpr]compute_prim(clq, primitive_size_type(clq->cs))).x;
-      return NoFail;
-    } else {
-      return ERR(_u8("indexing on pointer to non-indexable type"));
-    }
+  indexable *te_typeexpr;
+  deref bool;
+  if decompose_typeapp(typ, primitive_pointer_puretype(clq->cs), &indexable) {
+    deref = true;
+  } else {
+    indexable = typ;
+    deref = false;
   }
 
-  if decompose_arraytype(t, result_type_out) {
-    *tech_out = ArrayIndexing;
+  if decompose_arraytype(indexable, result_type_out) {
+    *tech_out = {None, deref};
     *key_type_out = (@[cu_typeexpr]compute_prim(clq, primitive_size_type(clq->cs))).x;
     return NoFail;
   }
 
-  fntype te_typeexpr = fn_type(clq->cs, ptr_type(clq->cs, *t), TeUnknown, TeUnknown);
+  fntype te_typeexpr = fn_type(clq->cs, ptr_type(clq->cs, *indexable), TeUnknown, TeUnknown);
   gp genparms = NoParms;
   res match_def_res;
   #match_def(clq->cs, clq->im->cym.do_indexsym, &gp, &fntype, &res);
@@ -2000,7 +2009,7 @@ func decompose_indexable(clq *clqueue, t *te_typeexpr, result_type_out **te_type
     }
     *result_type_out = result_type;
     *key_type_out = *key_type;
-    *tech_out = FnIndexing({m.ent, inst_id});
+    *tech_out = {Has({m.ent, inst_id}), deref};
     return NoFail;
   }
 }
