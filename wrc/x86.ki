@@ -23,7 +23,6 @@ def X86_CH u8 = 5;
 def X86_DH u8 = 6;
 def X86_BH u8 = 7;
 
-// Only applicable for 0F-prefixed off32 instructions (I think).  (TODO: What's an off32 instruction?  Update this comment and same in s1.)
 def X86_SETCC_L u8 = 0x9C;
 def X86_SETCC_LE u8 = 0x9E;
 def X86_SETCC_G u8 = 0x9F;
@@ -36,6 +35,7 @@ def X86_SETCC_B u8 = 0x92;
 def X86_SETCC_BE u8 = 0x96;
 def X86_SETCC_Z u8 = 0x94;
 
+// Only applicable for 0F-prefixed off32 instructions (I think).
 def X86_JCC_O u8 = 0x80;
 def X86_JCC_Z u8 = 0x84;
 def X86_JCC_NE u8 = 0x85;
@@ -642,11 +642,6 @@ func x86_placeholder_lea32(f *objfile, srcdest u8) size {
   precount size = count(&f->text.raw);
   appendtext(f, 0x8D, encode_placeholder_reg_rm(srcdest, &reg_rm_reloc));
   return precount + 1 + reg_rm_reloc;
-}
-
-// TODO: What?  Why would we not use movzx?  Check s1.
-func x86_load8(f *objfile, dest u8, src_addr u8, src_disp i32) void {
-  appendtext(f, 0x8A, encode_reg_rm(dest, src_addr, src_disp));
 }
 
 func x86_store32(f *objfile, dest_addr u8, dest_disp i32, src u8) void {
