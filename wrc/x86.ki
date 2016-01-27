@@ -47,8 +47,7 @@ def X86_JCC_G u8 = 0x8F;
 def X86_JCC_L u8 = 0x8C;
 
 func mrr(mod u8, reg u8, rm u8) u8 {
-  // TODO: s1 won't parse associative bitwise ops.
-  return ((mod << 6) | (reg << 3)) | rm;
+  return (mod << 6) | (reg << 3) | rm;
 }
 
 def MOD00 u8 = 0;

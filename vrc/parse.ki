@@ -875,7 +875,9 @@ func binop_info(t tokval) opt[binop_facts] {
         if c0 == '*' { return Has({{604, 606}, false}); }
         if c0 == '/' { return Has({{604, 605}, false}); }
         if c0 == '%' { return Has({{605, 605}, false}); }
-        if c0 == '^' || c0 == '&' || c0 == '|' { return Has({{405, 405}, false}); }
+        if c0 == '|' { return Has({{425, 425}, false}); }
+        if c0 == '^' { return Has({{435, 435}, false}); }
+        if c0 == '&' { return Has({{445, 445}, false}); }
         return None;
       }
       if x.len == 2 {
@@ -884,7 +886,7 @@ func binop_info(t tokval) opt[binop_facts] {
         if c0 == '&' && c1 == '&' { return Has({{376, 374}, false}); }
         if c0 == '|' && c1 == '|' { return Has({{356, 354}, false}); }
         if (c0 == '<' && c1 == '<') || (c0 == '>' && c1 =='>') {
-          return Has({{405, 405}, false});
+          return Has({{415, 415}, false});
         }
         if c1 == '=' && (c0 == '=' || c0 == '<' || c0 == '>' || c0 == '!') {
           return Has({{405, 405}, false});
@@ -911,7 +913,31 @@ func binop_info(t tokval) opt[binop_facts] {
   }
 }
 
+// How precedence levels work:
+//   - See binop_info and unop_info.
+//   - Operators grab with a "binding strength" (a precedence level) and their left and right sides
+//   - If one operator beats the other by 2 or more, that operator wins.  Otherwise, they conflict (and we cannot parse).
+//   - As an exception, operators in the 410-499 range (bitwise ops) conflict with everything in the 400-699 range.  As an exception to the exception, if the precedence is in 410-414 or 416-499, the operator does _not_ conflict with identical binding strength -- it's left-associative instead.  (This is for associative bitwise operators: x ^ y ^ z is valid, but x ^ y & z is not.)
+//   - This is just a convoluted way to describe a partial ordering of binding strengths.
+//   - An exercise for the reader:  The right-side binding strength of '/' is 605, unlike '*' for which it is 604.  Why?
 func compare_prec(left i32, right i32) prec_cmp {
+  if left >= 410 && left < 500 {
+    if right >= 400 && right < 700 {
+      if left != 415 && left == right {
+        return PullsLeft;
+      } else {
+        return Conflicts;
+      }
+    }
+  } else if right >= 410 && right < 500 {
+    if left >= 400 && left < 700 {
+      if left != 415 && left == right {
+        return PullsLeft;
+      } else {
+        return Conflicts;
+      }
+    }
+  }
   if left + 1 < right { return PullsRight; }
   if right + 1 < left { return PullsLeft; }
   return Conflicts;
@@ -1883,6 +1909,14 @@ func test_parse(verbose bool) bool {
     _u8("def blah i32 = foo!3;"));
   run_parse_negtest(&ctx, _u8("p068"),
     _u8("def blah i32 = foo!!3;"));
+  run_parse_negtest(&ctx, _u8("p069"),
+    _u8("def blah i32 = 2 ^ 3 & 4;"));
+  run_parse_test(&ctx, _u8("p070"),
+    _u8("def blah i32 = 2 ^ 3 ^ 4;"));
+  run_parse_negtest(&ctx, _u8("p071"),
+    _u8("def blah i32 = 2 < 3 ^ 4;"));
+  run_parse_negtest(&ctx, _u8("p072"),
+    _u8("def blah i32 = 2 < 3 < 4;"));
   return ctx.failures == 0;
 }
 
