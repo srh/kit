@@ -3,8 +3,8 @@ import bar;
 extern malloc fn[size, *void];
 extern free fn[*void, void];
 
-func[T] alloc_array(n size) *T {
-  u union { vp *void; tp *T; };
+func[T] alloc_array(n size) * ^[0]T {
+  u union { vp *void; tp * ^[0]T; };
   u.vp = malloc(n * sizeof@[T]);
   for i size = 0; i < n; i = i + 1 {
     init(&u.tp[i]);
@@ -33,17 +33,17 @@ def free_u8_array = func(p *u8) void {
   free(u.vp);
 };
 
-defclass move string struct {
+defclass move string {
   size size;
   cap size;
-  buf *u8;
-};
+  buf * ^[0]u8;
+}
 
 access string {
   def do_init = func(p *string) void {
     p->size = 0;
     p->cap = 0;
-    buf *u8;
+    buf * ^[0]u8;
     p->buf = buf;
   };
 
@@ -108,6 +108,6 @@ access string {
 def print = func(p *string) void {
   for i size = 0; i < count(p); i = i + 1 {
     ch i32 = ~get(p, i);
-    putchar(ch);
+    ign var = putchar(ch);
   }
 };

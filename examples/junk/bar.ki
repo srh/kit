@@ -1,10 +1,9 @@
 extern putchar fn[i32, i32];
 extern flushstdout fn[i32];
 
-def print = func(x u32) u32 {
+def print = func(x u32) void {
   if (x == 0) {
-    putchar(48);
-    return 1;
+    ign var = putchar(48);
   } else {
     data ^[20]u8;
     i size = 0;
@@ -16,8 +15,7 @@ def print = func(x u32) u32 {
     printed u32 = ~i;
     while i > 0 {
       i = i - 1;
-      putchar(~(48 | data[i]));
+      ign var = putchar(~(48 | data[i]));
     }
-    return printed;
   }
 };

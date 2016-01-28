@@ -11,19 +11,19 @@ func fac(x i32) i32 {
   return acc;
 }
 
-deftype ty struct {
+struct ty {
   x i32;
   y i32;
-};
+}
 
 func[T] getsize() u32 {
   return ~sizeof@[T];
 }
 
-defclass kla struct {
+defclass kla {
   x u32;
   y u32;
-};
+}
 
 access kla {
   func do_destroy(p *kla) void {
@@ -40,38 +40,42 @@ access kla {
     a->y = c->y;
   }
 
-  func expose(p *kla) struct { x u32; y u32; } {
-    return p->~;
+  func expose(p *kla) u32pair {
+    return {p->x, p->y};
   }
 }
 
+struct u32pair { x u32; y u32; }
+
 func call_kla(x kla) void {
   print(expose(&x).x);
-  putchar(32);
+  ign var = putchar(32);
   print(expose(&x).y);
-  putchar(10);
+  ign = putchar(10);
 }
 
 func try_kla() void {
   k kla;
-  l struct { x u32; y u32; } = expose(&k);
+  l u32pair = expose(&k);
   print(l.x);
-  putchar(32);
+  ign var = putchar(32);
   print(l.y);
-  putchar(10);
+  ign = putchar(10);
   call_kla(k);
 }
 
-defenum enty {
+struct i32pair { p i32; q i32; }
+
+enum enty {
   c1 void;
-  c2 struct { p i32; q i32; };
+  c2 i32pair;
   c3 string;
-};
+}
 
 def blah_enty = func(x enty) enty {
   kraw enty;
   y enty = c1(void);
-  u struct { p i32; q i32; };
+  u i32pair;
   y = c2(u);
   switch &x {
     case &c1(a void): {
@@ -82,9 +86,9 @@ def blah_enty = func(x enty) enty {
       s string = lits("c2 ... ");
       print(&s);
       print(@[u32]~a.p);
-      putchar(32);
+      ign var = putchar(32);
       print(@[u32]~a.q);
-      putchar(10);
+      ign = putchar(10);
     }
     default: {
       s string = lits("a default case\n");
@@ -131,12 +135,12 @@ func try_osize() void {
   ox osize = 1;
   oy var = ox - 2;
   print(@[u32]~oy);
-  putchar(10);
+  ign var = putchar(10);
 }
 
-deftype['a] reffer struct {
+struct['a] reffer {
   r &'a osize;
-};
+}
 
 func['a] mk_reffer(x &'a osize) reffer['a] {
   return {x};
@@ -152,12 +156,12 @@ func try_ref2() void {
   x1 reffer[_] = mk_reffer(&&y);
   x2 reffer[_] = mk_reffer(&&z);
   diff osize = subtract_rs(&x1, &x2);
-  putchar('^');
+  ign var = putchar('^');
   print(@[u32]~diff);
   diff2 osize = subtract_rs(&x2, &x2);
-  putchar(' ');
+  ign = putchar(' ');
   print(@[u32]~diff2);
-  putchar(10);
+  ign = putchar(10);
 }
 
 func['a] un_ref(p &'a u32) u32 {
@@ -169,11 +173,11 @@ func try_ref1() void {
   x u32 = 666;
   z u32 = un_ref(&&x);
   print(z);
-  putchar(32);
+  ign var = putchar(32);
   z = z + 1;
   t u32 = un_ref(&&z);
   print(t);
-  putchar(10);
+  ign = putchar(10);
 }
 
 func try_ref() void {
@@ -181,34 +185,34 @@ func try_ref() void {
   try_ref2();
 }
 
-export func showfacs(p *ty, num *u16) ty {
+export func showfacs(p * ^[2]ty, num *u16) ty {
   try_kla();
   try_string();
   try_ref();
 
   k enty = blah_enty(c1(void));
-  vz struct { p i32; q i32; };
+  vz i32pair;
   vz.p = 125;
   vz.q = 343;
-  blah_enty(c2(vz));
-  blah_enty(c3(lits("just another string\n")));
+  ign2 var = blah_enty(c2(vz));
+  ign2 = blah_enty(c3(lits("just another string\n")));
 
   ret ty;
-  p->x = -5;
-  p->y = fac(7);
-  p->x = -p->x;
+  p[0].x = -5;
+  p[0].y = fac(7);
+  p[0].x = -p[0].x;
 
-  tmp u32 = ~fac(p->x);
-  y u32 = ~(*p).y;
+  tmp u32 = ~fac(p[0].x);
+  y u32 = ~(p[0]).y;
   print(tmp);
-  putchar(10);
+  ign var = putchar(10);
   print(y);
-  putchar(10);
+  ign = putchar(10);
 
-  yptr *i32 = &p->y;
+  yptr *i32 = &p[0].y;
   *yptr = 'M';  // 'M' is 77
-  xptr *i32 = &p->x;
-  xptr[0] = 99;
+  xptr *i32 = &p[0].x;
+  *xptr = 99;
 
   p[1] = { 33, ~(@[u16]~ @[u32] 22 + @[u16]~ @[u32]44) };
   *num = ~ @[u32]29;
@@ -222,11 +226,12 @@ export func showfacs(p *ty, num *u16) ty {
 
   void_value void;
 
-  naked struct { x i32; y i32; };
-  naked.x = p->x;
-  naked.y = ~getsize@[ty]();
+  naked i32pair;
+  naked.p = p[0].x;
+  naked.q = ~getsize@[ty]();
 
-  ret.~ = naked;
+  ret = {naked.p, naked.q};
+  ig var = flushstdout();
   return ret;
 }
 
