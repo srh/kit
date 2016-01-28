@@ -344,7 +344,8 @@ func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
       DerivedMethodTrivial,
       DerivedMethodTrivial,
       DerivedMethodTrivial,
-      IsScalarYes
+      IsScalarYes,
+      IsPow2AllTheWayDown
     }
   };
   instparms idy_genparms = blank_idyparms();
@@ -425,7 +426,8 @@ func add_pointer_primitive_type(cs *checkstate) void {
            DerivedMethodTrivial,
            DerivedMethodTrivial,
            DerivedMethodTrivial,
-           IsScalarYes
+           IsScalarYes,
+           IsPow2AllTheWayDown
          }}),
     mk_hash@[idy_genparms, deftype_inst_id]()
   };
@@ -450,7 +452,8 @@ func add_ref_primitive_type(cs *checkstate) void {
            DerivedMethodTrivial,
            DerivedMethodTrivial,
            DerivedMethodTrivial,
-           IsScalarYes
+           IsScalarYes,
+           IsPow2AllTheWayDown
          }}),
     mk_hash@[idy_genparms, deftype_inst_id]()
   };
@@ -474,7 +477,8 @@ func add_function_primitive(cs *checkstate) void {
            DerivedMethodTrivial,
            DerivedMethodTrivial,
            DerivedMethodTrivial,
-           IsScalarYes
+           IsScalarYes,
+           IsPow2AllTheWayDown
          }}),
     mk_hash@[idy_genparms, deftype_inst_id]()
   };

@@ -838,6 +838,7 @@ struct partial_struct_data {
   move_level behavior_level;
   copy_level behavior_level;
   destroy_level behavior_level;
+  is_pow2 pow2_turtles;
 
   // The length of this is the index of the search-for field (-- it doesn't have all the fields if we stopped early.)
   fields array[struct_field_info];
@@ -849,7 +850,7 @@ inline func psd_index(psd *partial_struct_data) size {
 
 // fields had better damn well be complete
 func compute_partial_struct_data(clq *clqueue, fields *shray[te_vardecl], name opt[sym], out *partial_struct_data) np {
-  ret partial_struct_data = {false, 0, 1, TrivialLevel, TrivialLevel, TrivialLevel, TrivialLevel, mk_array@[struct_field_info]()};
+  ret partial_struct_data = {false, 0, 1, TrivialLevel, TrivialLevel, TrivialLevel, TrivialLevel, IsPow2AllTheWayDown, mk_array@[struct_field_info]()};
   n size = count(fields);
   for i size = 0; i < n; i = i + 1 {
     vd *te_vardecl = ref(fields, i);
@@ -871,6 +872,7 @@ func compute_partial_struct_data(clq *clqueue, fields *shray[te_vardecl], name o
     ret.move_level = max(ret.move_level, to_level(&props.move_behavior));
     ret.copy_level = max(ret.copy_level, to_level(&props.copy_behavior));
     ret.destroy_level = max(ret.destroy_level, to_level(&props.destroy_behavior));
+    ret.is_pow2 = combine_pow2(ret.is_pow2, props.is_pow2);
   }
   *out = ret;
   return NoFail;
@@ -902,7 +904,8 @@ func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *
           level_to_derived(clq, CtorMove, 2, realtype, mask_level(constructor_mask, ComputeMove, psd.move_level)),
           level_to_derived(clq, CtorCopy, 2, realtype, mask_level(constructor_mask, ComputeCopy, psd.copy_level)),
           level_to_derived(clq, CtorDestroy, 1, realtype, mask_level(constructor_mask, ComputeDestroy, psd.destroy_level)),
-          IsScalarNo};
+          IsScalarNo,
+          psd.is_pow2};
   return NoFail;
 }
 
@@ -913,6 +916,7 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_t
   move_level behavior_level = TrivialLevel;
   copy_level behavior_level = TrivialLevel;
   destroy_level behavior_level = TrivialLevel;
+  is_pow2 pow2_turtles = IsPow2AllTheWayDown;
   n size = count(&et->constructors);
   for i size = 0; i < n; i = i + 1 {
     props type_properties;
@@ -923,6 +927,7 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_t
     move_level = max(move_level, to_level(&props.move_behavior));
     copy_level = max(copy_level, to_level(&props.copy_behavior));
     destroy_level = max(destroy_level, to_level(&props.destroy_behavior));
+    is_pow2 = combine_pow2(is_pow2, props.is_pow2);
   }
 
   // See TeUnion for explanation of final_size.
@@ -933,7 +938,8 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_t
           level_to_derived(clq, CtorMove, 2, realtype, move_level),
           level_to_derived(clq, CtorCopy, 2, realtype, copy_level),
           level_to_derived(clq, CtorDestroy, 1, realtype, destroy_level),
-          IsScalarNo};
+          IsScalarNo,
+          is_pow2};
   return NoFail;
 }
 
@@ -961,12 +967,14 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
     case &TeUnion(a te_union): {
       max_size u32 = 0;
       max_alignment u32 = 1;
+      is_pow2 pow2_turtles = IsPow2AllTheWayDown;
       n size = count(&a.fields);
       for i size = 0; i < n; i = i + 1 {
         props type_properties;
         #compute_complete_type_properties(clq, &ref(&a.fields, i)->type, &props);
         max_size = max(max_size, props.flat_size);
         max_alignment = max(max_alignment, props.flat_alignment);
+        is_pow2 = combine_pow2(is_pow2, props.is_pow2);
         if !(isTrivial(props.init_behavior) && isTrivial(props.move_behavior) && isTrivial(props.copy_behavior) && isTrivial(props.destroy_behavior)) {
           return ERR(_u8("union type has non-trivial field"));
         }
@@ -975,7 +983,7 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
       final_size u32 = ceil_aligned(max_size, max_alignment);
       *out = {final_size, max_alignment, DerivedMethodTrivial,
               DerivedMethodTrivial, DerivedMethodTrivial,
-              DerivedMethodTrivial, IsScalarNo};
+              DerivedMethodTrivial, IsScalarNo, is_pow2};
       return NoFail;
     }
 
@@ -984,13 +992,21 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
         props type_properties;
         #compute_complete_type_properties(clq, oo(&a.param), &props);
 
+        is_pow2 pow2_turtles;
+        if c == 0 || (c & (c - 1)) == 0 {
+          is_pow2 = props.is_pow2;
+        } else {
+          is_pow2 = HasNonPow2;
+        }
+
         // We _should_ maintain alignment for a zero-element array because the pointer to such an array might hack in tag-bit logic.
         *out = {props.flat_size * c, props.flat_alignment,
                 level_to_derived(clq, CtorInit, 1, t, to_level(&props.init_behavior)),
                 level_to_derived(clq, CtorMove, 2, t, to_level(&props.move_behavior)),
                 level_to_derived(clq, CtorCopy, 2, t, to_level(&props.copy_behavior)),
                 level_to_derived(clq, CtorDestroy, 1, t, to_level(&props.destroy_behavior)),
-                IsScalarNo};
+                IsScalarNo,
+                is_pow2};
         return NoFail;
       } else {
         ice(_u8("compute_type_properties called on incomplete arraytype."));

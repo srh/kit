@@ -246,6 +246,21 @@ enum type_scalarity {
   IsScalarYes void;
 }
 
+// Says if a type and _all_ its field all the way down are powers of 2 sizes.
+enum pow2_turtles {
+  HasNonPow2 void;
+  IsPow2AllTheWayDown void;
+}
+
+func combine_pow2(x pow2_turtles, y pow2_turtles) pow2_turtles {
+  switch x {
+  case IsPow2AllTheWayDown:
+    return y;
+  case HasNonPow2:
+    return HasNonPow2;
+  }
+}
+
 struct type_properties {
   flat_size u32;
   flat_alignment u32;
@@ -254,6 +269,7 @@ struct type_properties {
   copy_behavior derived_method_behavior;
   destroy_behavior derived_method_behavior;
   is_scalar type_scalarity;
+  is_pow2 pow2_turtles;
 }
 
 struct cu_typrop {
