@@ -19,6 +19,7 @@ int try_uint32_sub(uint32_t x, uint32_t y, uint32_t *out);
 int try_uint32_div(uint32_t x, uint32_t y, uint32_t *out);
 int try_uint32_mod(uint32_t x, uint32_t y, uint32_t *out);
 uint32_t uint32_ceil_aligned(uint32_t x, uint32_t m);
+uint32_t uint32_max(uint32_t x, uint32_t y);
 
 uint32_t size_to_uint32(size_t x);
 size_t uint32_to_size(uint32_t x);

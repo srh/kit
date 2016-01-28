@@ -400,28 +400,35 @@ void osx32_flatten(struct identmap *im, struct objfile *f, struct databuf **out)
   connect.  (That's what I observe in other mach-o files.) */
   const uint32_t text_addr = 0;
   const uint32_t text_size = size_to_uint32(f->text.raw.count);
-  const uint32_t text_align = f->text.max_requested_alignment;
+  const uint32_t text_align = uint32_max(16, f->text.max_requested_alignment);
+  const uint32_t text_ceil_size = uint32_ceil_aligned(text_size, text_align);
 
-  const uint32_t rdata_align = f->rdata.max_requested_alignment;
+  const uint32_t rdata_align = uint32_max(16, f->rdata.max_requested_alignment);
   const uint32_t rdata_addr = uint32_ceil_aligned(uint32_add(text_addr,
-                                                             text_size),
+                                                             text_ceil_size),
                                                   rdata_align);
   const uint32_t rdata_size = size_to_uint32(f->rdata.raw.count);
+  const uint32_t rdata_ceil_size = uint32_ceil_aligned(rdata_size, rdata_align);
 
-  const uint32_t data_align = f->data.max_requested_alignment;
+  const uint32_t data_align = uint32_max(16, f->data.max_requested_alignment);
   const uint32_t data_addr = uint32_ceil_aligned(uint32_add(rdata_addr,
-                                                            rdata_size),
+                                                            rdata_ceil_size),
                                                  data_align);
   const uint32_t data_size = size_to_uint32(f->data.raw.count);
+  const uint32_t data_ceil_size = uint32_ceil_aligned(data_size, data_align);
 
   struct section_addrs addrs = { 0, 0, 0 };
   addrs.data_addr = data_addr;
   addrs.rdata_addr = rdata_addr;
   addrs.text_addr = text_addr;
 
-  const uint32_t vmsize = uint32_add(data_addr, data_size);
+  const uint32_t segment_filealign
+    = uint32_max(text_align, uint32_max(rdata_align, data_align));
+  const uint32_t vmsize = uint32_ceil_aligned(uint32_add(data_addr,
+                                                         data_ceil_size),
+                                              segment_filealign);
 
-  const uint32_t segment_fileoff = end_of_cmds;
+  const uint32_t segment_fileoff = uint32_ceil_aligned(end_of_cmds, segment_filealign);
 
   const uint32_t segment_end_fileoff = uint32_add(segment_fileoff, vmsize);
   const uint32_t text_reloff = uint32_ceil_aligned(segment_end_fileoff,
@@ -487,7 +494,7 @@ void osx32_flatten(struct identmap *im, struct objfile *f, struct databuf **out)
     set_fixstr(se.sectname, "__text", sizeof(se.sectname));
     set_fixstr(se.segname, "__TEXT", sizeof(se.segname));
     se.addr = to_le_u32(text_addr);
-    se.size = to_le_u32(text_size);
+    se.size = to_le_u32(text_ceil_size);
     se.offset = to_le_u32(text_offset);
     se.align = to_le_u32(text_align);
     se.reloff = to_le_u32(text_reloff);
@@ -507,7 +514,7 @@ void osx32_flatten(struct identmap *im, struct objfile *f, struct databuf **out)
     set_fixstr(se.sectname, "__const", sizeof(se.sectname));
     set_fixstr(se.segname, "__TEXT", sizeof(se.segname));
     se.addr = to_le_u32(rdata_addr);
-    se.size = to_le_u32(rdata_size);
+    se.size = to_le_u32(rdata_ceil_size);
     se.offset = to_le_u32(rdata_offset);
     se.align = to_le_u32(rdata_align);
     se.reloff = to_le_u32(rdata_reloff);
@@ -527,7 +534,7 @@ void osx32_flatten(struct identmap *im, struct objfile *f, struct databuf **out)
     set_fixstr(se.sectname, "__data", sizeof(se.sectname));
     set_fixstr(se.segname, "__DATA", sizeof(se.segname));
     se.addr = to_le_u32(data_addr);
-    se.size = to_le_u32(data_size);
+    se.size = to_le_u32(data_ceil_size);
     se.offset = to_le_u32(data_offset);
     se.align = to_le_u32(data_align);
     se.reloff = to_le_u32(data_reloff);
@@ -553,17 +560,24 @@ void osx32_flatten(struct identmap *im, struct objfile *f, struct databuf **out)
     databuf_append(d, &st, sizeof(st));
   }
 
+  append_zeros_to_align(d, segment_filealign);
   CHECK(d->count == segment_fileoff);
   CHECK(d->count == text_offset);
   databuf_append(d, f->text.raw.buf, f->text.raw.count);
+  /* TODO: Assert that f->text is already to this alignment (pad after
+  funcs in codegen). */
+  /* TODO: This should be 0xCC?  No, do the assertion. */
+  append_zeros_to_align(d, text_align);
   append_zeros_to_align(d, rdata_align);
 
   CHECK(d->count == rdata_offset);
   databuf_append(d, f->rdata.raw.buf, f->rdata.raw.count);
+  append_zeros_to_align(d, rdata_align);
   append_zeros_to_align(d, data_align);
 
   CHECK(d->count == data_offset);
   databuf_append(d, f->data.raw.buf, f->data.raw.count);
+  append_zeros_to_align(d, segment_filealign);
 
   CHECK(d->count == segment_end_fileoff);
   append_zeros_to_align(d, MACH32_RELOC_ALIGNMENT);
