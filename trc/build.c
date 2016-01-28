@@ -648,6 +648,8 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
                                uint32_t *return_type_size_out) {
   struct type_attrs return_type_attrs = x86_attrsof(&cs->nt, return_type);
   switch (cs->platform) {
+    /* TODO: OSX isn't quite like Windows -- see the b3sb3 case. */
+  case TARGET_PLATFORM_OSX_32BIT: /* fallthrough */
   case TARGET_PLATFORM_WIN_32BIT: {
     uint32_t return_type_size = return_type_attrs.size;
     *return_type_size_out = return_type_size;
@@ -663,8 +665,7 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
       return traits.movable != TYPEEXPR_TRAIT_TRIVIALLY_HAD;
     }
   } break;
-  case TARGET_PLATFORM_LINUX_32BIT: /* fallthrough */
-  case TARGET_PLATFORM_OSX_32BIT: {
+  case TARGET_PLATFORM_LINUX_32BIT: {
     *return_type_size_out = return_type_attrs.size;
     return !return_type_attrs.is_primitive;
   } break;
@@ -3535,10 +3536,10 @@ void gen_primitive_op_behavior(struct checkstate *cs,
 
 int platform_can_return_in_eaxedx(struct checkstate *cs) {
   switch (cs->platform) {
+  case TARGET_PLATFORM_OSX_32BIT: /* fallthrough */
   case TARGET_PLATFORM_WIN_32BIT:
     return 1;
-  case TARGET_PLATFORM_LINUX_32BIT: /* fallthrough */
-  case TARGET_PLATFORM_OSX_32BIT:
+  case TARGET_PLATFORM_LINUX_32BIT:
     return 0;
   default:
     UNREACHABLE();
