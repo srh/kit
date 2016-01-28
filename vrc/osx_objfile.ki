@@ -325,18 +325,22 @@ func osx32_flatten(im *identmap, f *objfile) array[u8] {
   connect.  (That's what I observe in other mach-o files.) */
   text_addr u32 = 0;
   text_size u32 = ~count(&f->text.raw);
-  text_align u32 = f->text.max_requested_alignment;
-  rdata_align u32 = f->rdata.max_requested_alignment;
-  rdata_addr u32 = ceil_aligned(text_addr + text_size, rdata_align);
+  text_align u32 = max(16, f->text.max_requested_alignment);
+  text_ceil_size u32 = ceil_aligned(text_size, text_align);
+  rdata_align u32 = max(16, f->rdata.max_requested_alignment);
+  rdata_addr u32 = ceil_aligned(text_addr + text_ceil_size, rdata_align);
   rdata_size u32 = ~count(&f->rdata.raw);
-  data_align u32 = f->data.max_requested_alignment;
-  data_addr u32 = ceil_aligned(rdata_addr + rdata_size, data_align);
+  rdata_ceil_size u32 = ceil_aligned(rdata_size, rdata_align);
+  data_align u32 = max(16, f->data.max_requested_alignment);
+  data_addr u32 = ceil_aligned(rdata_addr + rdata_ceil_size, data_align);
   data_size u32 = ~count(&f->data.raw);
+  data_ceil_size u32 = ceil_aligned(data_size, data_align);
 
   addrs section_addrs = {data_addr, rdata_addr, text_addr};
 
-  vmsize u32 = data_addr + data_size;
-  segment_fileoff u32 = end_of_cmds;
+  segment_filealign u32 = max(text_align, max(rdata_align, data_align));
+  vmsize u32 = ceil_aligned(data_addr + data_ceil_size, segment_filealign);
+  segment_fileoff u32 = ceil_aligned(end_of_cmds, segment_filealign);
   segment_end_fileoff u32 = segment_fileoff + vmsize;
   text_reloff u32 = ceil_aligned(segment_end_fileoff, MACH32_RELOC_ALIGNMENT);
   /* OS X diff32 relocs use two pairs, so we count them twice (with
@@ -392,7 +396,7 @@ func osx32_flatten(im *identmap, f *objfile) array[u8] {
     se.sectname = to_str16(_u8("__text"));
     se.segname = to_str16(_u8("__TEXT"));
     se.addr = to_le(text_addr);
-    se.size = to_le(text_size);
+    se.size = to_le(text_ceil_size);
     se.offset = to_le(text_offset);
     se.align = to_le(text_align);
     se.reloff = to_le(text_reloff);
@@ -412,7 +416,7 @@ func osx32_flatten(im *identmap, f *objfile) array[u8] {
     se.sectname = to_str16(_u8("__const"));
     se.segname = to_str16(_u8("__TEXT"));
     se.addr = to_le(rdata_addr);
-    se.size = to_le(rdata_size);
+    se.size = to_le(rdata_ceil_size);
     se.offset = to_le(rdata_offset);
     se.align = to_le(rdata_align);
     se.reloff = to_le(rdata_reloff);
@@ -432,7 +436,7 @@ func osx32_flatten(im *identmap, f *objfile) array[u8] {
     se.sectname = to_str16(_u8("__data"));
     se.segname = to_str16(_u8("__DATA"));
     se.addr = to_le(data_addr);
-    se.size = to_le(data_size);
+    se.size = to_le(data_ceil_size);
     se.offset = to_le(data_offset);
     se.align = to_le(data_align);
     se.reloff = to_le(data_reloff);
@@ -458,17 +462,23 @@ func osx32_flatten(im *identmap, f *objfile) array[u8] {
     append_reinterpret(&d, &st);
   }
 
+  append_to_alignment(&d, ~segment_filealign, 0);
   check(~count(&d) == segment_fileoff);
   check(~count(&d) == text_offset);
   append(&d, &f->text.raw);
+  // TODO: Assert that f->text is already to this alignment (pad after funcs in codegen).
+  // TODO: This should be 0xCC?  No, do the assertion.
+  append_to_alignment(&d, ~text_align, 0);
   append_to_alignment(&d, ~rdata_align, 0);
 
   check(~count(&d) == rdata_offset);
   append(&d, &f->rdata.raw);
+  append_to_alignment(&d, ~rdata_align, 0);
   append_to_alignment(&d, ~data_align, 0);
 
   check(~count(&d) == data_offset);
   append(&d, &f->data.raw);
+  append_to_alignment(&d, ~segment_filealign, 0);
 
   check(~count(&d) == segment_end_fileoff);
   append_to_alignment(&d, ~MACH32_RELOC_ALIGNMENT, 0);
