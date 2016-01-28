@@ -1620,7 +1620,7 @@ func all_complete_computed(types *shray[te_typeexpr]) complete_computed {
   n size = count(types);
   all_computed bool = true;
   for i size = 0; i < n; i = i + 1 {
-    cc complete_computed = is_complete_computed(ref(types, i));
+    cc complete_computed = is_complete_computed(&types[i]);
     if !cc.complete {
       return {false, false};
     }
@@ -1633,7 +1633,7 @@ func all_complete_computed(decls *shray[te_vardecl]) complete_computed {
   n size = count(decls);
   all_computed bool = true;
   for i size = 0; i < n; i = i + 1 {
-    cc complete_computed = is_complete_computed(&ref(decls, i)->type);
+    cc complete_computed = is_complete_computed(&decls[i].type);
     if !cc.complete {
       return {false, false};
     }
