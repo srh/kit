@@ -62,6 +62,8 @@ struct f2 { float x; float y; };
 struct b3b { char x[3]; char y; };
 struct bwrap { char x; char y; char z; char t; char u; struct b3 v; };
 
+struct wraptwice { struct b3b a; struct b3b b; };
+
 
 /* These comments are about WINDOWS behavior. */
 
@@ -205,6 +207,11 @@ struct b3b b3bfunc(void) {
 struct bwrap bwrapfunc(void) {
   STATIC_CHECK(sizeof(struct bwrap) == 8);
   struct bwrap ret; ret.y = 7; return ret;
+}
+
+struct wraptwice wraptwicefunc(void) {
+  STATIC_CHECK(sizeof(struct wraptwice) == 8);
+  struct wraptwice ret; ret.a.y = 7; return ret;
 }
 
 struct d dfunc(void) {
