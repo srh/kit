@@ -483,20 +483,7 @@ func st_def_to_fnid(cs *checkstate, ip instpair) opt[fn_body_id] {
   }
 }
 
-// Props is the type properties of the return type.
-func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *type_properties) bool {
-  switch callconv_style(plat).reg_style {
-  case PrimitiveBased:
-    if case IsScalarNo = props->is_scalar {
-      return true;
-    } else {
-      return false;
-    }
-  case RecursiveSizeBased: {
-    // TODO: Actually implement RecursiveSizeBased (differently from SizeBased).
-  }
-  case SizeBased: { }
-  }
+func for_universal_cc_size_based_exists_hrp(props *type_properties) bool {
   n u32 = props->flat_size;
   if n <= 2 || n == 4 || n == 8 {
     if case &DerivedMethodTrivial = &props->move_behavior {
@@ -506,6 +493,27 @@ func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *typ
     }
   } else {
     return true;
+  }
+}
+
+// Props is the type properties of the return type.
+func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *type_properties) bool {
+  switch callconv_style(plat).reg_style {
+  case PrimitiveBased:
+    if case IsScalarNo = props->is_scalar {
+      return true;
+    } else {
+      return false;
+    }
+  case RecursiveSizeBased:
+    if !for_universal_cc_size_based_exists_hrp(props) {
+      if case IsPow2AllTheWayDown = props->is_pow2 {
+        return false;
+      }
+    }
+    return true;
+  case SizeBased:
+    return for_universal_cc_size_based_exists_hrp(props);
   }
 }
 
