@@ -93,15 +93,31 @@ struct platform_info {
   callconv universal_calling_convention;
 }
 
-enum callconv {
-  Gcc32Cdecl void;
-  Win32Cdecl void;
+enum callconv_reg_style {
+  // Size based, uses eax:edx for 0, 1, 2, 4, 8.
+  // TODO: This (on Windows) might be like RecursiveSizeBased, only arrays are treated as individual elements.
+  SizeBased void;
+  // Size based, uses eax:edx, but elems must be reg-style too, where an array "char x[3]" counts as a single elem (thus size 3 implies we must use HRP).
+  RecursiveSizeBased void;
+  // Uses HRP for any non-primitive type.
+  PrimitiveBased void;
+}
+
+// Do we do a ret4 when there's an HRP?
+enum callconv_ret_style {
+  Ret4Style void;
+  RetStyle void;
+}
+
+struct callconv {
+  reg_style callconv_reg_style;
+  ret_style callconv_ret_style;
 }
 
 func callconv_style(p *platform_info) callconv {
   switch p->opsys {
-  case Linux32: return Gcc32Cdecl;
-  case Win32: return Win32Cdecl;
-  case Osx32: return Gcc32Cdecl;
+  case Linux32: return {PrimitiveBased, Ret4Style};
+  case Win32: return {SizeBased, RetStyle};
+  case Osx32: return {RecursiveSizeBased, Ret4Style};
   }
 }

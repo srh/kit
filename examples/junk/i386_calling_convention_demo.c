@@ -43,7 +43,25 @@ struct bs { char x; short y; } PACK_ATTRIBUTE;
 struct sb { short x; char y; } PACK_ATTRIBUTE;
 struct bsb { char x; short y; char z; } PACK_ATTRIBUTE;
 struct b3sb3 { char x[3]; short y; char z[3]; } PACK_ATTRIBUTE;
+struct ssss { short x; short y; short z; short t; } PACK_ATTRIBUTE;
+struct b8again { char a; char b; char c; char d; char e; char f; char g; char h; } PACK_ATTRIBUTE;
+struct bsssb { char x; short y; short z; short t; char u; } PACK_ATTRIBUTE;
+struct bsbbsb { char x; short y; char z; char t; short u; char v; } PACK_ATTRIBUTE;
+struct bbbbss { char x; char y; char t; char u; short z; short w; } PACK_ATTRIBUTE;
+struct b4ss { char x[4]; short y; short w; } PACK_ATTRIBUTE;
+struct bbbsbbb { char x1; char x2; char x3; short y; char z1; char z2; char z3; } PACK_ATTRIBUTE;
+struct b3sbbb { char x[3]; short y; char z1; char z2; char z3; } PACK_ATTRIBUTE;
+struct bbbsb3 { char x1; char x2; char x3; short y; char z[3]; } PACK_ATTRIBUTE;
+struct bbbbbb3 { char x1; char x2; char x3; char x4; char y; char z[3]; } PACK_ATTRIBUTE;
+struct bbbbbbb2 { char x1; char x2; char x3; char x4; char y; char w; char z[2]; } PACK_ATTRIBUTE;
 PACK_POP
+struct d { double x; };
+struct f { float x; };
+struct f2 { float x; float y; };
+
+struct b3b { char x[3]; char y; };
+struct bwrap { char x; char y; char z; char t; char u; struct b3 v; };
+
 
 /* These comments are about WINDOWS behavior. */
 
@@ -122,6 +140,86 @@ struct bsb bsbfunc(void) {
 struct b3sb3 b3sb3func(void) {
   STATIC_CHECK(sizeof(struct b3sb3) == 8);
   struct b3sb3 ret; ret.y = 7; return ret;
+}
+
+struct ssss ssssfunc(void) {
+  STATIC_CHECK(sizeof(struct ssss) == 8);
+  struct ssss ret; ret.y = 7; return ret;
+}
+
+struct b8again b8againfunc(void) {
+  STATIC_CHECK(sizeof(struct b8again) == 8);
+  struct b8again ret; ret.b = 7; return ret;
+}
+
+struct bsssb bsssbfunc(void) {
+  STATIC_CHECK(sizeof(struct bsssb) == 8);
+  struct bsssb ret; ret.y = 7; return ret;
+}
+
+struct bsbbsb bsbbsbfunc(void) {
+  STATIC_CHECK(sizeof(struct bsbbsb) == 8);
+  struct bsbbsb ret; ret.y = 7; return ret;
+}
+
+struct bbbbss bbbbssfunc(void) {
+  STATIC_CHECK(sizeof(struct bbbbss) == 8);
+  struct bbbbss ret; ret.y = 7; return ret;
+}
+
+struct b4ss b4ssfunc(void) {
+  STATIC_CHECK(sizeof(struct b4ss) == 8);
+  struct b4ss ret; ret.y = 7; return ret;
+}
+
+struct bbbsbbb bbbsbbbfunc(void) {
+  STATIC_CHECK(sizeof(struct bbbsbbb) == 8);
+  struct bbbsbbb ret; ret.y = 7; return ret;
+}
+
+struct bbbsb3 bbbsb3func(void) {
+  STATIC_CHECK(sizeof(struct bbbsb3) == 8);
+  struct bbbsb3 ret; ret.y = 7; return ret;
+}
+
+struct b3sbbb b3sbbbfunc(void) {
+  STATIC_CHECK(sizeof(struct b3sbbb) == 8);
+  struct b3sbbb ret; ret.y = 7; return ret;
+}
+
+struct bbbbbb3 bbbbbb3func(void) {
+  STATIC_CHECK(sizeof(struct bbbbbb3) == 8);
+  struct bbbbbb3 ret; ret.y = 7; return ret;
+}
+
+struct bbbbbbb2 bbbbbbb2func(void) {
+  STATIC_CHECK(sizeof(struct bbbbbbb2) == 8);
+  struct bbbbbbb2 ret; ret.y = 7; return ret;
+}
+
+struct b3b b3bfunc(void) {
+  STATIC_CHECK(sizeof(struct b3b) == 4);
+  struct b3b ret; ret.y = 7; return ret;
+}
+
+struct bwrap bwrapfunc(void) {
+  STATIC_CHECK(sizeof(struct bwrap) == 8);
+  struct bwrap ret; ret.y = 7; return ret;
+}
+
+struct d dfunc(void) {
+  STATIC_CHECK(sizeof(struct d) == 8);
+  struct d ret; ret.x = 3.0; return ret;
+}
+
+struct f ffunc(void) {
+  STATIC_CHECK(sizeof(struct f) == 4);
+  struct f ret; ret.x = 3.0; return ret;
+}
+
+struct f2 f2func(void) {
+  STATIC_CHECK(sizeof(struct f2) == 8);
+  struct f2 ret; ret.x = 3.0; return ret;
 }
 
 /* Returns with the value flded. */
