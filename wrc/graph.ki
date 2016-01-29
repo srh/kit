@@ -297,15 +297,8 @@ func append(bu *sq_builder, enter_disposition gr_jmp_disposition, enter_rhs sq_n
   bu->last = rhs_nopq;
 }
 
-// Adds an unattached nopq afterward, with the given saved state restored (typically the variables-in-scope state before a return, break, continue, or goto statement).
-func append_and_nopq(bu *sq_builder, outflow *tracked_target, saved *gr_savetrack) void {
-  note_celltrack(&outflow->note, bu->ctr);
-  append(bu, Undescribed, outflow->sn, nopq(bu->gr));
-  restore_celltrack(bu->ctr, saved);
-}
-
-// Adds an unattached nopq afterward, with the given saved state restored (typically the variables-in-scope state before a return, break, continue, or goto statement).
-func append_and_nopq(bu *sq_builder, outflow sq_num, saved *gr_savetrack) void {
+// Adds an unattached nopq afterward, with the given saved state restored (typically the variables-in-scope state before a return, break, continue, or goto statement).  This naturally means we're "exiting normalcy".
+func append_and_nopq_exit_normalcy(bu *sq_builder, outflow sq_num, saved *gr_savetrack) void {
   reent sq_num = nopq(bu->gr);
   append(bu, @[gr_jmp_disposition]ExitNormalcy({reent}), outflow, reent);
   restore_celltrack(bu->ctr, saved);
@@ -561,7 +554,7 @@ func gr_fullbody(outer_gs gr_statep, x *ast_fullbody) cr[gr_num] {
   add(&bu, @[gr_xop]GrActiveXop({Activate(info->return_cell), Nothing}));
 
   // TODO: This is crazy nonsense.  Detect reachability in a conservative fashion (e.g. everything after a label is reachable, everything after a break/continue/return is not).
-  gn sq_num = mut_connect(gs, &bu, &fb.final_node, Undescribed);
+  gn sq_num = mut_connect(gs, &bu, &fb.final_node, JmpForward);
 
   return NoFail(gn.x);
 }
@@ -624,7 +617,7 @@ func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a
   info *ast_break_statement_info = un(&a->info);
   uw gr_num = gr_unwinding(gs, &info->destructions);
   uw_target sq_num = uni_connect(gs, uw, unHas(&obg)->break_target, ReenterNormalcy);
-  append_and_nopq(bu, uw_target, &saved);
+  append_and_nopq_exit_normalcy(bu, uw_target, &saved);
 }
 
 func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) void {
@@ -632,7 +625,7 @@ func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack]
   info *ast_continue_statement_info = un(&a->info);
   uw gr_num = gr_unwinding(gs, &info->destructions);
   uw_target sq_num = uni_connect(gs, uw, unHas(&obg)->continue_target, ReenterNormalcy);
-  append_and_nopq(bu, uw_target, &saved);
+  append_and_nopq_exit_normalcy(bu, uw_target, &saved);
 }
 
 func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, bu *sq_builder) void {
@@ -645,7 +638,7 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
   ww gr_num = gr_winding(gs, &info->initializations);
   add(&rewind_bu, ww);
   rewind_target sq_num = mut_connect(gs, &rewind_bu, jmp, ReenterNormalcy);
-  append_and_nopq(bu, rewind_target, &saved);
+  append_and_nopq_exit_normalcy(bu, rewind_target, &saved);
 }
 
 func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) void {
@@ -791,7 +784,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
   if case &Has(increment box[ast_expr_discard]) = &a->increment {
     incr_bu sq_builder = mk_builder(gs);
     #gr_expr_discard(gs, oo(&increment), &incr_bu);
-    totopgn sq_num = mut_connect(gs, &incr_bu, &top, Undescribed);
+    totopgn sq_num = mut_connect(gs, &incr_bu, &top, JmpForward);
     continue_target = totopgn;
     if case Has(gn gr_num) = loopcleanupgn {
       continuegn = seqq(gs.gr, {gn, totopgn});
@@ -808,9 +801,9 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     continue_target = top.sn;
   }
 
-  jmp_qnop_node(gs.gr, continue_nopq.sn, continue_target, Undescribed);
+  jmp_qnop_node(gs.gr, continue_nopq.sn, continue_target, JmpForward);
 
-  thengn sq_num = mut_connect(&body_bu, continuegn, Undescribed);
+  thengn sq_num = mut_connect(&body_bu, continuegn, JmpForward);
 
   jmp_qnop_node(gs.gr, body_entry_gn, thengn, JmpForward);
 
@@ -825,7 +818,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     loopexitgn gr_num = gr_later_discard(gs, &cond.discard);
     add(&exit_bu, loopexitgn);
 
-    exitseq sq_num = mut_connect(gs, &exit_bu, &outflow, Undescribed);
+    exitseq sq_num = mut_connect(gs, &exit_bu, &outflow, JmpForward);
 
     jmp_qnop_node(gs.gr, unHas(condition_else_gn), exitseq, JmpForward);
   } else {
@@ -864,7 +857,7 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   loopcleanupgn gr_num = gr_condition_discard(gs, &a->condition_discard);
 
   add(&body_bu, loopcleanupgn);
-  thengn sq_num = mut_connect(gs, &body_bu, &top, Undescribed);
+  thengn sq_num = mut_connect(gs, &body_bu, &top, JmpForward);
 
   restore_celltrack(gs.ctr, &else_save);
 
@@ -1062,8 +1055,8 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
   }
   unwind_bu sq_builder = mk_builder(gs);
   #gr_unwind(gs, fb->return_cell, &unwind_bu);
-  add(bu, done(&unwind_bu));
-  append_and_nopq(bu, &fb->final_node, &saved);
+  unwind_sn sq_num = mut_connect(gs, &unwind_bu, &fb->final_node, ReenterNormalcy);
+  append_and_nopq_exit_normalcy(bu, unwind_sn, &saved);
   return NoFail;
 }
 
@@ -1278,7 +1271,7 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       add(&case_bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(return_field_cell)}));
       add(&case_bu, @[gr_xop]GrVirtualDead({return_field_cell}));
 
-      case_target sq_num = mut_connect(gs, &case_bu, &unwind_join_target, Undescribed);
+      case_target sq_num = mut_connect(gs, &case_bu, &unwind_join_target, JmpForward);
       push(&cases, {ConstInt(~ mk_enum_tag_value(i).x), {case_target, AbnormalTarget}});
 
       restore_celltrack(gs.ctr, &saved_aftercond);
@@ -1316,8 +1309,8 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
     // Return cell should have been the first/last/outermost cell.
     check(count(&gs.ctr->all) == 1);
 
-    unwind_sn sq_num = mut_connect(gs, &unwind_bu, &fb->final_node, Undescribed);
-    jmp_qnop_node(gs.gr, unwind_join_target.sn, unwind_sn, Undescribed);
+    unwind_sn sq_num = mut_connect(gs, &unwind_bu, &fb->final_node, ReenterNormalcy);
+    jmp_qnop_node(gs.gr, unwind_join_target.sn, unwind_sn, JmpForward);
 
     restore_celltrack(gs.ctr, &saved_aftersuccess);
   }
@@ -1365,7 +1358,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   #gr_expr_consume(gs, oo(&a->then_clause), &then_bu);
   add(&then_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->then_clause)))}));
   add(&then_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->then_clause))}));
-  then_sn sq_num = mut_connect(gs, &then_bu, &join_target, Undescribed);
+  then_sn sq_num = mut_connect(gs, &then_bu, &join_target, JmpForward);
 
   restore_celltrack(gs.ctr, &postcond_save);
 
@@ -1374,7 +1367,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   #gr_expr_consume(gs, oo(&a->else_clause), &else_bu);
   add(&else_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->else_clause)))}));
   add(&else_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->else_clause))}));
-  else_sn sq_num = mut_connect(gs, &else_bu, &join_target, Undescribed);
+  else_sn sq_num = mut_connect(gs, &else_bu, &join_target, JmpForward);
 
   jmp_qnop_node(gs.gr, then_nop, then_sn, JmpForward);
   jmp_qnop_node(gs.gr, else_nop, else_sn, JmpForward);
@@ -2391,7 +2384,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
     }
   }
 
-  tie_gn sq_num = mut_connect(gs, &loop_bu, &top, Undescribed);
+  tie_gn sq_num = mut_connect(gs, &loop_bu, &top, JmpForward);
 
   deadseq_nopq sq_num = nopq(&gr);
   branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray({@[gr_const]ConstInt(bigu(terminal_case)), {deadseq_nopq, ForwardTarget}}), Has({tie_gn, LoopingTarget})}));
