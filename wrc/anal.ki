@@ -333,8 +333,6 @@ func adjust_disposition_for_inline(op_addend size, disposition gr_jmp_dispositio
     return ExitNormalcy({adjust(op_addend, ex.subsequent_normalcy)});
   case ReenterNormalcy:
     return ReenterNormalcy;
-  case Undescribed:
-    return Undescribed;
   }
 }
 

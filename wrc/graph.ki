@@ -243,6 +243,20 @@ func help_mut_qnop_node(gr *frame_graph, ix sq_num, newnode gr_qnode) void {
   }
 }
 
+func check_is_qnop_node(gr *frame_graph, ix sq_num) void {
+  node *gr_node = ref_node(gr, ix.x);
+  switch node {
+  case &XOp(xn gr_xnode):
+    ice(_u8("check_is_qnop_node sees XOp"));
+  case &QOp(qn gr_qnode):
+    if case &GrQNop = &qn.op {
+      // Do nothing.
+    } else {
+      ice(_u8("check_is_qnop_node sees non-nop node"));
+    }
+  }
+}
+
 struct sq_builder {
   // Stored here for "convenience," also ctr and gr being null means this object is dead.
   ctr *celltrack;
@@ -314,7 +328,8 @@ func help_mut_connect(bu *sq_builder, outflow sq_num, disposition gr_jmp_disposi
   return ret;
 }
 
-func mut_connect(bu *sq_builder, outflow sq_num, disposition gr_jmp_disposition) sq_num {
+// This is fine to use -- for when the in-degree of outflow is going to be 1.
+func mut_connect_untracked(bu *sq_builder, outflow sq_num, disposition gr_jmp_disposition) sq_num {
   return help_mut_connect(bu, outflow, disposition);
 }
 
@@ -454,8 +469,6 @@ enum gr_jmp_disposition {
 
   ExitNormalcy gr_jmp_exit_normalcy;
   ReenterNormalcy void;
-  // TODO(): Get rid of this Undescribed disposition.
-  Undescribed void;
 }
 
 struct gr_jmp {
@@ -644,8 +657,12 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
 func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) void {
   targ *tracked_target = ref(&fb->label_gn, un(&a->info)->label_number.x);
   note_celltrack(&targ->note, gs.ctr);
-  // TODO(): If targ is pointing _into_ the line instead of being _part_ of the line... we might have problems.
-  jmp_qnop_node(gs.gr, targ->sn, last(bu), Undescribed);
+
+  // It might become important (I predict) that the label target targ->sn is _in line_ with the control flow, and doesn't point _into_ the control flow.  That way, the ReenterNormaly annotations for goto statements point _in line_ instead of one node before the line.
+  // There's presently no downside to our having targ->sn be in line.
+
+  check_is_qnop_node(gs.gr, targ->sn);
+  append(bu, JmpForward, targ->sn, targ->sn);
 }
 
 func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_switch_statement, bu *sq_builder) np {
@@ -803,7 +820,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
 
   jmp_qnop_node(gs.gr, continue_nopq.sn, continue_target, JmpForward);
 
-  thengn sq_num = mut_connect(&body_bu, continuegn, JmpForward);
+  thengn sq_num = mut_connect_untracked(&body_bu, continuegn, JmpForward);
 
   jmp_qnop_node(gs.gr, body_entry_gn, thengn, JmpForward);
 
@@ -949,7 +966,7 @@ func gr_expr_condition(gs gr_statep, a *ast_expr_consume, then_target gr_branch_
   #gr_live_and_expr_consume(gs, a, &bu);
   cases shray[gr_branch_pair] = mk_shray({@[gr_const]ConstInt(bigu(0)), else_target});
   br var = addq(gs.gr, @[gr_qop]GrBranch({result_cell(a), cases, Has(then_target)}));
-  ret sq_num = mut_connect(&bu, br, JmpForward);
+  ret sq_num = mut_connect_untracked(&bu, br, JmpForward);
   return NoFail(ret);
 }
 
@@ -997,7 +1014,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_targe
             }
           }
           *thentrack_out = save_celltrack(gs.ctr);
-          thenseq sq_num = mut_connect(&case_bu, then_target.sn, JmpForward);
+          thenseq sq_num = mut_connect_untracked(&case_bu, then_target.sn, JmpForward);
           push(&cases, {@[gr_const]ConstInt(~tag.x), {thenseq, then_target.disposition}});
         } else {
           tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
@@ -1017,7 +1034,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_targe
       }
 
       br_point sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None}));
-      br sq_num = mut_connect(&bef_bu, br_point, JmpForward);
+      br sq_num = mut_connect_untracked(&bef_bu, br_point, JmpForward);
 
       return NoFail(br);
     }
@@ -1295,7 +1312,7 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       addo(&case_bu, gr_maybe_virtualdead(gs, desc.partial_num));
     }
 
-    case_target sq_num = mut_connect(&case_bu, success_nopq, JmpForward);
+    case_target sq_num = mut_connect_untracked(&case_bu, success_nopq, JmpForward);
     push(&cases, {ConstInt(bigu(~ mk_enum_tag_value(success_case_ix).x)), {case_target, ForwardTarget}});
   }
 
