@@ -304,6 +304,13 @@ func append_and_nopq(bu *sq_builder, outflow *tracked_target, saved *gr_savetrac
   restore_celltrack(bu->ctr, saved);
 }
 
+// Adds an unattached nopq afterward, with the given saved state restored (typically the variables-in-scope state before a return, break, continue, or goto statement).
+func append_and_nopq(bu *sq_builder, outflow sq_num, saved *gr_savetrack) void {
+  reent sq_num = nopq(bu->gr);
+  append(bu, @[gr_jmp_disposition]ExitNormalcy({reent}), outflow, reent);
+  restore_celltrack(bu->ctr, saved);
+}
+
 func help_mut_connect(bu *sq_builder, outflow sq_num, disposition gr_jmp_disposition) sq_num {
   gr *frame_graph = bu->gr;
   check(gr != null);
@@ -616,32 +623,35 @@ func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_break_statement_info = un(&a->info);
   uw gr_num = gr_unwinding(gs, &info->destructions);
-  add(bu, uw);
-  append_and_nopq(bu, unHas(&obg)->break_target, &saved);
+  uw_target sq_num = uni_connect(gs, uw, unHas(&obg)->break_target, ReenterNormalcy);
+  append_and_nopq(bu, uw_target, &saved);
 }
 
 func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) void {
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_continue_statement_info = un(&a->info);
   uw gr_num = gr_unwinding(gs, &info->destructions);
-  add(bu, uw);
-  append_and_nopq(bu, unHas(&obg)->continue_target, &saved);
+  uw_target sq_num = uni_connect(gs, uw, unHas(&obg)->continue_target, ReenterNormalcy);
+  append_and_nopq(bu, uw_target, &saved);
 }
 
 func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, bu *sq_builder) void {
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_goto_statement_info = un(&a->info);
   jmp *tracked_target = ref(&fb->label_gn, info->label_number.x);
+  rewind_bu sq_builder = mk_builder(gs);
   uw gr_num = gr_unwinding(gs, &info->destructions);
-  add(bu, uw);
+  add(&rewind_bu, uw);
   ww gr_num = gr_winding(gs, &info->initializations);
-  add(bu, ww);
-  append_and_nopq(bu, jmp, &saved);
+  add(&rewind_bu, ww);
+  rewind_target sq_num = mut_connect(gs, &rewind_bu, jmp, ReenterNormalcy);
+  append_and_nopq(bu, rewind_target, &saved);
 }
 
 func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) void {
   targ *tracked_target = ref(&fb->label_gn, un(&a->info)->label_number.x);
   note_celltrack(&targ->note, gs.ctr);
+  // TODO(): If targ is pointing _into_ the line instead of being _part_ of the line... we might have problems.
   jmp_qnop_node(gs.gr, targ->sn, last(bu), Undescribed);
 }
 
