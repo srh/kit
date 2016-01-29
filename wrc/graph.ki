@@ -286,44 +286,45 @@ func seqq(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
   return seqq(gs.gr, {gn, outflow->sn});
 }
 
-func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num) void {
-  help_mut_qnop_node(gr, ix, {@[gr_qop]GrJmp({outflow})});
+func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num, disposition gr_jmp_disposition) void {
+  help_mut_qnop_node(gr, ix, {@[gr_qop]GrJmp({outflow, disposition})});
 }
 
-func append(bu *sq_builder, enter_rhs sq_num, rhs_nopq sq_num) void {
+func append(bu *sq_builder, enter_disposition gr_jmp_disposition, enter_rhs sq_num, rhs_nopq sq_num) void {
   gr *frame_graph = bu->gr;
   check(gr != null);
-  jmp_qnop_node(gr, bu->last, enter_rhs);
+  jmp_qnop_node(gr, bu->last, enter_rhs, enter_disposition);
   bu->last = rhs_nopq;
 }
 
 // Adds an unattached nopq afterward, with the given saved state restored (typically the variables-in-scope state before a return, break, continue, or goto statement).
 func append_and_nopq(bu *sq_builder, outflow *tracked_target, saved *gr_savetrack) void {
   note_celltrack(&outflow->note, bu->ctr);
-  append(bu, outflow->sn, nopq(bu->gr));
+  append(bu, Undescribed, outflow->sn, nopq(bu->gr));
   restore_celltrack(bu->ctr, saved);
 }
 
-func help_mut_connect(bu *sq_builder, outflow sq_num) sq_num {
+func help_mut_connect(bu *sq_builder, outflow sq_num, disposition gr_jmp_disposition) sq_num {
   gr *frame_graph = bu->gr;
   check(gr != null);
-  jmp_qnop_node(gr, bu->last, outflow);
+  jmp_qnop_node(gr, bu->last, outflow, disposition);
   ret sq_num = bu->first;
   bu->gr = null;
   bu->ctr = null;
   return ret;
 }
 
-func mut_connect(bu *sq_builder, outflow sq_num) sq_num {
-  return help_mut_connect(bu, outflow);
+func mut_connect(bu *sq_builder, outflow sq_num, disposition gr_jmp_disposition) sq_num {
+  return help_mut_connect(bu, outflow, disposition);
 }
 
-func mut_connect(gs gr_statep, bu *sq_builder, outflow *tracked_target) sq_num {
+func mut_connect(gs gr_statep, bu *sq_builder, outflow *tracked_target, disposition gr_jmp_disposition) sq_num {
   note_celltrack(&outflow->note, gs.ctr);
-  return help_mut_connect(bu, outflow->sn);
+  return help_mut_connect(bu, outflow->sn, disposition);
 }
 
-func uni_connect(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
+func uni_connect(gs gr_statep, gn gr_num, outflow *tracked_target, disposition gr_jmp_disposition) sq_num {
+  // (Not sure if disposition is useful.)
   note_celltrack(&outflow->note, gs.ctr);
   return seqq(gs.gr, {gn, outflow->sn});
 }
@@ -442,8 +443,24 @@ struct gr_sequence {
   second sq_num;
 }
 
+struct gr_jmp_exit_normalcy {
+  // The sq_num of what "would be next" if we didn't have a goto/break/continue/return.
+  subsequent_normalcy sq_num;
+}
+
+enum gr_jmp_disposition {
+  // A bureaucratic jmp as we construct the graph.
+  JmpForward void;
+
+  ExitNormalcy gr_jmp_exit_normalcy;
+  ReenterNormalcy void;
+  // TODO(): Get rid of this Undescribed disposition.
+  Undescribed void;
+}
+
 struct gr_jmp {
   next sq_num;
+  disposition gr_jmp_disposition;
 }
 
 // Declares a cell to be live.  The cell may not have previously been live.  The cell location must be static -- otherwise, gr_deref or gr_subcell will make the cell live.
@@ -537,7 +554,7 @@ func gr_fullbody(outer_gs gr_statep, x *ast_fullbody) cr[gr_num] {
   add(&bu, @[gr_xop]GrActiveXop({Activate(info->return_cell), Nothing}));
 
   // TODO: This is crazy nonsense.  Detect reachability in a conservative fashion (e.g. everything after a label is reachable, everything after a break/continue/return is not).
-  gn sq_num = mut_connect(gs, &bu, &fb.final_node);
+  gn sq_num = mut_connect(gs, &bu, &fb.final_node, Undescribed);
 
   return NoFail(gn.x);
 }
@@ -625,7 +642,7 @@ func gr_goto_statement(gs gr_statep, fb *fullbody_state, a *ast_goto_statement, 
 func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement, bu *sq_builder) void {
   targ *tracked_target = ref(&fb->label_gn, un(&a->info)->label_number.x);
   note_celltrack(&targ->note, gs.ctr);
-  jmp_qnop_node(gs.gr, targ->sn, last(bu));
+  jmp_qnop_node(gs.gr, targ->sn, last(bu), Undescribed);
 }
 
 func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_switch_statement, bu *sq_builder) np {
@@ -672,13 +689,13 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
           #gr_bracebody(gs, fb, obg, &sc->body, &case_bu);
           add(&case_bu, @[gr_xop]GrVirtualDead({vi->cell}));
 
-          gn sq_num = mut_connect(gs, &case_bu, &exit_target);
+          gn sq_num = mut_connect(gs, &case_bu, &exit_target, JmpForward);
           set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         } else {
           case_bu sq_builder = mk_builder(gs);
           add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
           #gr_bracebody(gs, fb, obg, &sc->body, &case_bu);
-          gn sq_num = mut_connect(gs, &case_bu, &exit_target);
+          gn sq_num = mut_connect(gs, &case_bu, &exit_target, JmpForward);
           set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
         }
       }
@@ -687,7 +704,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
         add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
         #gr_bracebody(gs, fb, obg, &sc->body, &case_bu);
 
-        gn var = mut_connect(gs, &case_bu, &exit_target);
+        gn var = mut_connect(gs, &case_bu, &exit_target, JmpForward);
         set(&default_case, gn);
       }
     }
@@ -708,7 +725,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   br sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&branch_cases), None}));
 
   note_celltrack(&exit_target.note, gs.ctr);
-  append(bu, br, exit_target.sn);
+  append(bu, JmpForward, br, exit_target.sn);
 
   swartch_discard_gn gr_num = gr_later_discard(gs, &a->swartch_discard);
   add(bu, swartch_discard_gn);
@@ -764,7 +781,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
   if case &Has(increment box[ast_expr_discard]) = &a->increment {
     incr_bu sq_builder = mk_builder(gs);
     #gr_expr_discard(gs, oo(&increment), &incr_bu);
-    totopgn sq_num = mut_connect(gs, &incr_bu, &top);
+    totopgn sq_num = mut_connect(gs, &incr_bu, &top, Undescribed);
     continue_target = totopgn;
     if case Has(gn gr_num) = loopcleanupgn {
       continuegn = seqq(gs.gr, {gn, totopgn});
@@ -781,11 +798,11 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     continue_target = top.sn;
   }
 
-  jmp_qnop_node(gs.gr, continue_nopq.sn, continue_target);
+  jmp_qnop_node(gs.gr, continue_nopq.sn, continue_target, Undescribed);
 
-  thengn sq_num = mut_connect(&body_bu, continuegn);
+  thengn sq_num = mut_connect(&body_bu, continuegn, Undescribed);
 
-  jmp_qnop_node(gs.gr, body_entry_gn, thengn);
+  jmp_qnop_node(gs.gr, body_entry_gn, thengn, JmpForward);
 
   if case &Has(cond ast_expr_condition) = &a->condition {
     restore_celltrack(gs.ctr, &postcond_save);
@@ -798,14 +815,14 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
     loopexitgn gr_num = gr_later_discard(gs, &cond.discard);
     add(&exit_bu, loopexitgn);
 
-    exitseq sq_num = mut_connect(gs, &exit_bu, &outflow);
+    exitseq sq_num = mut_connect(gs, &exit_bu, &outflow, Undescribed);
 
-    jmp_qnop_node(gs.gr, unHas(condition_else_gn), exitseq);
+    jmp_qnop_node(gs.gr, unHas(condition_else_gn), exitseq, JmpForward);
   } else {
     restore_celltrack(gs.ctr, &pre_loop_save);
   }
 
-  append(bu, top.sn, outflow.sn);
+  append(bu, JmpForward, top.sn, outflow.sn);
   return NoFail;
 }
 
@@ -837,19 +854,19 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   loopcleanupgn gr_num = gr_condition_discard(gs, &a->condition_discard);
 
   add(&body_bu, loopcleanupgn);
-  thengn sq_num = mut_connect(gs, &body_bu, &top);
+  thengn sq_num = mut_connect(gs, &body_bu, &top, Undescribed);
 
   restore_celltrack(gs.ctr, &else_save);
 
   loopexitgn gr_num = gr_condition_discard(gs, &a->condition_discard);
 
   // TODO: Would be kinda nice if break (or continue) targeted _before_ the condition discard.
-  exitseq sq_num = uni_connect(gs, loopexitgn, &outflow);
+  exitseq sq_num = uni_connect(gs, loopexitgn, &outflow, JmpForward);
 
-  jmp_qnop_node(gs.gr, then_nop, thengn);
-  jmp_qnop_node(gs.gr, else_nop, exitseq);
+  jmp_qnop_node(gs.gr, then_nop, thengn, JmpForward);
+  jmp_qnop_node(gs.gr, else_nop, exitseq, JmpForward);
 
-  append(bu, top.sn, outflow.sn);
+  append(bu, JmpForward, top.sn, outflow.sn);
   return NoFail;
 }
 
@@ -868,17 +885,17 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
 
   then_bu sq_builder = mk_builder(gs);
   #gr_condition_body(gs, fb, obg, &a->condition_discard, &a->thenbody, &then_bu);
-  thengn sq_num = mut_connect(gs, &then_bu, &join_target);
+  thengn sq_num = mut_connect(gs, &then_bu, &join_target, JmpForward);
 
   restore_celltrack(gs.ctr, &else_save);
   else_bu sq_builder = mk_builder(gs);
   #gr_bracebody(gs, fb, obg, &a->elsebody, &else_bu);
-  elsegn sq_num = mut_connect(gs, &else_bu, &join_target);
+  elsegn sq_num = mut_connect(gs, &else_bu, &join_target, JmpForward);
 
-  jmp_qnop_node(gs.gr, then_nop, thengn);
-  jmp_qnop_node(gs.gr, else_nop, elsegn);
+  jmp_qnop_node(gs.gr, then_nop, thengn, JmpForward);
+  jmp_qnop_node(gs.gr, else_nop, elsegn, JmpForward);
 
-  append(bu, gn, join_target.sn);
+  append(bu, JmpForward, gn, join_target.sn);
 
   condition_discard_gn gr_num = gr_condition_discard(gs, &a->condition_discard);
   add(bu, condition_discard_gn);
@@ -909,15 +926,15 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 
   then_bu sq_builder = mk_builder(gs);
   #gr_condition_body(gs, fb, obg, &a->condition_discard, &a->body, &then_bu);
-  bodygn sq_num = mut_connect(gs, &then_bu, &join_target);
+  bodygn sq_num = mut_connect(gs, &then_bu, &join_target, JmpForward);
 
   restore_celltrack(gs.ctr, &else_save);
   note_celltrack(&join_target.note, gs.ctr);
 
-  jmp_qnop_node(gs.gr, then_nop, bodygn);
-  jmp_qnop_node(gs.gr, else_nop, join_target.sn);
+  jmp_qnop_node(gs.gr, then_nop, bodygn, JmpForward);
+  jmp_qnop_node(gs.gr, else_nop, join_target.sn, JmpForward);
 
-  append(bu, gn, join_target.sn);
+  append(bu, JmpForward, gn, join_target.sn);
 
   condition_discard_gn gr_num = gr_condition_discard(gs, &a->condition_discard);
   add(bu, condition_discard_gn);
@@ -929,7 +946,7 @@ func gr_expr_condition(gs gr_statep, a *ast_expr_consume, then_target gr_branch_
   #gr_live_and_expr_consume(gs, a, &bu);
   cases shray[gr_branch_pair] = mk_shray({@[gr_const]ConstInt(bigu(0)), else_target});
   br var = addq(gs.gr, @[gr_qop]GrBranch({result_cell(a), cases, Has(then_target)}));
-  ret sq_num = mut_connect(&bu, br);
+  ret sq_num = mut_connect(&bu, br, JmpForward);
   return NoFail(ret);
 }
 
@@ -977,7 +994,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_targe
             }
           }
           *thentrack_out = save_celltrack(gs.ctr);
-          thenseq sq_num = mut_connect(&case_bu, then_target.sn);
+          thenseq sq_num = mut_connect(&case_bu, then_target.sn, JmpForward);
           push(&cases, {@[gr_const]ConstInt(~tag.x), {thenseq, then_target.disposition}});
         } else {
           tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
@@ -997,7 +1014,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_targe
       }
 
       br_point sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None}));
-      br sq_num = mut_connect(&bef_bu, br_point);
+      br sq_num = mut_connect(&bef_bu, br_point, JmpForward);
 
       return NoFail(br);
     }
@@ -1251,7 +1268,7 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       add(&case_bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(return_field_cell)}));
       add(&case_bu, @[gr_xop]GrVirtualDead({return_field_cell}));
 
-      case_target sq_num = mut_connect(gs, &case_bu, &unwind_join_target);
+      case_target sq_num = mut_connect(gs, &case_bu, &unwind_join_target, Undescribed);
       push(&cases, {ConstInt(~ mk_enum_tag_value(i).x), {case_target, AbnormalTarget}});
 
       restore_celltrack(gs.ctr, &saved_aftercond);
@@ -1275,7 +1292,7 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       addo(&case_bu, gr_maybe_virtualdead(gs, desc.partial_num));
     }
 
-    case_target sq_num = mut_connect(&case_bu, success_nopq);
+    case_target sq_num = mut_connect(&case_bu, success_nopq, JmpForward);
     push(&cases, {ConstInt(bigu(~ mk_enum_tag_value(success_case_ix).x)), {case_target, ForwardTarget}});
   }
 
@@ -1289,15 +1306,15 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
     // Return cell should have been the first/last/outermost cell.
     check(count(&gs.ctr->all) == 1);
 
-    unwind_sn sq_num = mut_connect(gs, &unwind_bu, &fb->final_node);
-    jmp_qnop_node(gs.gr, unwind_join_target.sn, unwind_sn);
+    unwind_sn sq_num = mut_connect(gs, &unwind_bu, &fb->final_node, Undescribed);
+    jmp_qnop_node(gs.gr, unwind_join_target.sn, unwind_sn, Undescribed);
 
     restore_celltrack(gs.ctr, &saved_aftersuccess);
   }
 
   br sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&cases), None}));
 
-  append(bu, br, success_nopq);
+  append(bu, JmpForward, br, success_nopq);
   return NoFail;
 }
 
@@ -1338,7 +1355,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   #gr_expr_consume(gs, oo(&a->then_clause), &then_bu);
   add(&then_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->then_clause)))}));
   add(&then_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->then_clause))}));
-  then_sn sq_num = mut_connect(gs, &then_bu, &join_target);
+  then_sn sq_num = mut_connect(gs, &then_bu, &join_target, Undescribed);
 
   restore_celltrack(gs.ctr, &postcond_save);
 
@@ -1347,11 +1364,11 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   #gr_expr_consume(gs, oo(&a->else_clause), &else_bu);
   add(&else_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->else_clause)))}));
   add(&else_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->else_clause))}));
-  else_sn sq_num = mut_connect(gs, &else_bu, &join_target);
+  else_sn sq_num = mut_connect(gs, &else_bu, &join_target, Undescribed);
 
-  jmp_qnop_node(gs.gr, then_nop, then_sn);
-  jmp_qnop_node(gs.gr, else_nop, else_sn);
-  append(bu, cond_sn, join_target.sn);
+  jmp_qnop_node(gs.gr, then_nop, then_sn, JmpForward);
+  jmp_qnop_node(gs.gr, else_nop, else_sn, JmpForward);
+  append(bu, JmpForward, cond_sn, join_target.sn);
 
   // TODO: We do the condcleanup at the end instead of repeating it twice right after the branch... do it right after the branch.
   condcleanupgn gr_num = gr_later_discard(gs, &oo(&a->condition)->discard);
@@ -1699,7 +1716,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       add(&just_dead_bu, @[gr_xop]GrActiveXop({Deactivate(cmp_result), Nothing}));
       add(&just_dead_bu, @[gr_xop]GrDead({cmp_result}));
 
-      just_dead_sn sq_num = mut_connect(gs, &just_dead_bu, &exit_nopq);
+      just_dead_sn sq_num = mut_connect(gs, &just_dead_bu, &exit_nopq, JmpForward);
 
       restore_celltrack(gs.ctr, &postbranch_save);
 
@@ -1711,14 +1728,14 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       assign_copy gr_num = gr_copy_action(gs, &ci.conditional_copy, BiNothing);
       add(&do_assign_bu, assign_copy);
 
-      do_assign_sn sq_num = mut_connect(gs, &do_assign_bu, &exit_nopq);
+      do_assign_sn sq_num = mut_connect(gs, &do_assign_bu, &exit_nopq, JmpForward);
 
       cases shray[gr_branch_pair] = mk_shray({@[gr_const]ConstInt(bigu(0)), {do_assign_sn, ForwardTarget}}, {@[gr_const]ConstInt(bigu(1)), {just_dead_sn, ForwardTarget}});
 
       br sq_num = addq(gs.gr, @[gr_qop]GrBranch({cmp_result, cases, None}));
 
       // br is an expression node -- the cases attach to nopq's
-      append(bu, br, exit_nopq.sn);
+      append(bu, JmpForward, br, exit_nopq.sn);
       if case DeadMe = ci.rhs_deadme {
         addo(bu, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src));
       }
@@ -1760,7 +1777,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   add(&rhs_bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Deactivate(result_cell(oo(&a->rhs)))}));
   add(&rhs_bu, @[gr_xop]GrDead({result_cell(oo(&a->rhs))}));
 
-  rhs_sn sq_num = mut_connect(gs, &rhs_bu, &end_nopq);
+  rhs_sn sq_num = mut_connect(gs, &rhs_bu, &end_nopq, JmpForward);
 
   restore_celltrack(gs.ctr, &postbranch_save);
 
@@ -1769,7 +1786,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   add(&lhs_bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Deactivate(result_cell(oo(&a->lhs)))}));
   add(&lhs_bu, @[gr_xop]GrDead({result_cell(oo(&a->lhs))}));
 
-  lhs_sn sq_num = mut_connect(gs, &lhs_bu, &end_nopq);
+  lhs_sn sq_num = mut_connect(gs, &lhs_bu, &end_nopq, JmpForward);
 
   cases array[tup[gr_const, gr_num]];
   short_circuit_case gr_const;
@@ -1783,7 +1800,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
   }
 
   bn sq_num = addq(gs.gr, @[gr_qop]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, {lhs_sn, ForwardTarget}}, {eval_rhs_case, {rhs_sn, ForwardTarget}}), None}));
-  append(bu, bn, end_nopq.sn);
+  append(bu, JmpForward, bn, end_nopq.sn);
   return NoFail;
 }
 
@@ -2364,14 +2381,14 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
     }
   }
 
-  tie_gn sq_num = mut_connect(gs, &loop_bu, &top);
+  tie_gn sq_num = mut_connect(gs, &loop_bu, &top, Undescribed);
 
   deadseq_nopq sq_num = nopq(&gr);
   branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray({@[gr_const]ConstInt(bigu(terminal_case)), {deadseq_nopq, ForwardTarget}}), Has({tie_gn, LoopingTarget})}));
 
-  jmp_qnop_node(&gr, top.sn, branch_gn);
+  jmp_qnop_node(&gr, top.sn, branch_gn, JmpForward);
 
-  append(&bu, top.sn, deadseq_nopq);
+  append(&bu, JmpForward, top.sn, deadseq_nopq);
 
   for i size = nargs; i > 0; {
     i = i - 1;
@@ -2569,7 +2586,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   }
 
   br sq_num = addq(&gr, @[gr_qop]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None}));
-  append(&bu, br, join_target.sn);
+  append(&bu, JmpForward, br, join_target.sn);
   for i size = nargs; i > 0; {
     i = i - 1;
     add(&bu, @[gr_xop]GrVirtualDead({get(&pointeecells, i)}));

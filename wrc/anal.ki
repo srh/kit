@@ -274,7 +274,8 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
 
               // TODO: It'd be nice if we could undo the mark_cell_not_const of a.retcell (that happened when we processed GrApply in help_basic_analyze before).
 
-              *ref(&gr->ops, gn.x) = QOp({GrJmp({seqer})});
+              // This is definitely a forward jmp.
+              *ref(&gr->ops, gn.x) = QOp({GrJmp({seqer, JmpForward})});
 
               // And since there's no apply op, we update the arg/funcell cell_disps.
               // Actually, we don't update the funcell disp, so that we don't allocate/write its cell needlessly.
@@ -313,6 +314,19 @@ func adjust_active_op_for_inline(cm *array[cell_num], op gr_active_op) gr_active
     return Activate(get(cm, c.x));
   case Deactivate(c cell_num):
     return Deactivate(get(cm, c.x));
+  }
+}
+
+func adjust_disposition_for_inline(op_addend size, disposition gr_jmp_disposition) gr_jmp_disposition {
+  switch disposition {
+  case JmpForward:
+    return JmpForward;
+  case ExitNormalcy(ex gr_jmp_exit_normalcy):
+    return ExitNormalcy({~ ~(ex.subsequent_normalcy.x.x + op_addend)});
+  case ReenterNormalcy:
+    return ReenterNormalcy;
+  case Undescribed:
+    return Undescribed;
   }
 }
 
@@ -379,7 +393,7 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
     case &GrSequence(a gr_sequence):
       return QOp({GrSequence({~(a.first.x + op_addend), ~ ~(a.second.x.x + op_addend)})});
     case &GrJmp(a gr_jmp):
-      return QOp({GrJmp({~ ~(a.next.x.x + op_addend)})});
+      return QOp({GrJmp({~ ~(a.next.x.x + op_addend), adjust_disposition_for_inline(op_addend, a.disposition)})});
     case &GrQNop:
       return QOp({GrQNop});
     }
