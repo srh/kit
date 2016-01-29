@@ -415,10 +415,19 @@ struct gr_many_active_xop {
   ops shray[gr_active_op];
 }
 
+struct gr_branch_target {
+  sn sq_num;
+}
+
+struct gr_branch_pair {
+  value gr_const;
+  target gr_branch_target;
+}
+
 struct gr_branch {
   src cell_num;
-  cases shray[tup[gr_const, sq_num]];
-  default_case opt[sq_num];
+  cases shray[gr_branch_pair];
+  default_case opt[gr_branch_target];
 }
 
 struct gr_sequence {
@@ -677,14 +686,14 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
     }
   }
 
-  branch_cases array[tup[gr_const, sq_num]];
+  branch_cases array[gr_branch_pair];
   nconstructors size = count(&cases);
   for i size = 0; i < nconstructors; i = i + 1 {
     if case Has(sq sq_num) = get(&cases, i) {
-      push(&branch_cases, {ConstInt(bigu(mk_enum_tag_value(i).x)), sq});
+      push(&branch_cases, {ConstInt(bigu(mk_enum_tag_value(i).x)), {sq}});
     } else {
       if case Has(dq sq_num) = default_case {
-        push(&branch_cases, {ConstInt(bigu(mk_enum_tag_value(i).x)), dq});
+        push(&branch_cases, {ConstInt(bigu(mk_enum_tag_value(i).x)), {dq}});
       }
     }
   }
@@ -911,8 +920,8 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 func gr_expr_condition(gs gr_statep, a *ast_expr_consume, thengn sq_num, elsegn sq_num) cr[sq_num] {
   bu sq_builder = mk_builder(gs);
   #gr_live_and_expr_consume(gs, a, &bu);
-  cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(bigu(0)), elsegn});
-  br var = addq(gs.gr, @[gr_qop]GrBranch({result_cell(a), cases, Has(thengn)}));
+  cases shray[gr_branch_pair] = mk_shray({@[gr_const]ConstInt(bigu(0)), {elsegn}});
+  br var = addq(gs.gr, @[gr_qop]GrBranch({result_cell(a), cases, Has({thengn})}));
   ret sq_num = mut_connect(&bu, br);
   return NoFail(ret);
 }
@@ -940,7 +949,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
       }
       postcond_save gr_savetrack = save_celltrack(gs.ctr);
       saved_elsecase bool = false;
-      cases array[tup[gr_const, sq_num]];
+      cases array[gr_branch_pair];
       n size = info->deconstruct.num_enum_constructors;
       reserve(&cases, n);
       for i size = 0; i < n; i = i + 1 {
@@ -962,7 +971,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
           }
           *thentrack_out = save_celltrack(gs.ctr);
           thenseq sq_num = mut_connect(&case_bu, thengn);
-          push(&cases, {@[gr_const]ConstInt(~tag.x), thenseq});
+          push(&cases, {@[gr_const]ConstInt(~tag.x), {thenseq}});
         } else {
           tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
           elseseq sq_num = seqq(gs.gr, {tagdead, elsegn});
@@ -970,7 +979,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, thengn sq_
             *elsetrack_out = save_celltrack(gs.ctr);
             saved_elsecase = true;
           }
-          push(&cases, {@[gr_const]ConstInt(~tag.x), elseseq});
+          push(&cases, {@[gr_const]ConstInt(~tag.x), {elseseq}});
         }
       }
       if !saved_elsecase {
@@ -1190,7 +1199,7 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
 
   saved_aftercond gr_savetrack = save_celltrack(gs.ctr);
 
-  cases array[tup[gr_const, sq_num]];
+  cases array[gr_branch_pair];
 
   tag_ty cu_typrop = compute_prim(gs.clq, enum_tag_type(gs.clq->cs, &info->return_et));
   return_cell_size u32 = ref_cell(gs.gr, fb->return_cell)->props.flat_size;
@@ -1235,7 +1244,8 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       add(&case_bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(return_field_cell)}));
       add(&case_bu, @[gr_xop]GrVirtualDead({return_field_cell}));
 
-      push(&cases, {ConstInt(~ mk_enum_tag_value(i).x), mut_connect(gs, &case_bu, &unwind_join_target)});
+      case_target sq_num = mut_connect(gs, &case_bu, &unwind_join_target);
+      push(&cases, {ConstInt(~ mk_enum_tag_value(i).x), {case_target}});
 
       restore_celltrack(gs.ctr, &saved_aftercond);
     }
@@ -1258,7 +1268,8 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       addo(&case_bu, gr_maybe_virtualdead(gs, desc.partial_num));
     }
 
-    push(&cases, {ConstInt(bigu(~ mk_enum_tag_value(success_case_ix).x)), mut_connect(&case_bu, success_nopq)});
+    case_target sq_num = mut_connect(&case_bu, success_nopq);
+    push(&cases, {ConstInt(bigu(~ mk_enum_tag_value(success_case_ix).x)), {case_target}});
   }
 
   if case &Has(ct celltrack) = &unwind_join_target.note.ctr {
@@ -1695,7 +1706,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
 
       do_assign_sn sq_num = mut_connect(gs, &do_assign_bu, &exit_nopq);
 
-      cases shray[tup[gr_const, sq_num]] = mk_shray({@[gr_const]ConstInt(bigu(0)), do_assign_sn}, {@[gr_const]ConstInt(bigu(1)), just_dead_sn});
+      cases shray[gr_branch_pair] = mk_shray({@[gr_const]ConstInt(bigu(0)), {do_assign_sn}}, {@[gr_const]ConstInt(bigu(1)), {just_dead_sn}});
 
       br sq_num = addq(gs.gr, @[gr_qop]GrBranch({cmp_result, cases, None}));
 
@@ -1764,7 +1775,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
     eval_rhs_case = ConstInt(bigu(1));
   }
 
-  bn sq_num = addq(gs.gr, @[gr_qop]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, lhs_sn}, {eval_rhs_case, rhs_sn}), None}));
+  bn sq_num = addq(gs.gr, @[gr_qop]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, {lhs_sn}}, {eval_rhs_case, {rhs_sn}}), None}));
   append(bu, bn, end_nopq.sn);
   return NoFail;
 }
@@ -2349,7 +2360,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   tie_gn sq_num = mut_connect(gs, &loop_bu, &top);
 
   deadseq_nopq sq_num = nopq(&gr);
-  branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray({@[gr_const]ConstInt(bigu(terminal_case)), deadseq_nopq}), Has(tie_gn)}));
+  branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray({@[gr_const]ConstInt(bigu(terminal_case)), {deadseq_nopq}}), Has({tie_gn})}));
 
   jmp_qnop_node(&gr, top.sn, branch_gn);
 
@@ -2433,7 +2444,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   join_target tracked_target = mk_tracked(nopq(&gr));
   postbranch_save gr_savetrack = save_celltrack(gs.ctr);
 
-  cases_gn array[tup[gr_const, sq_num]];
+  cases_gn array[gr_branch_pair];
   nconstructors size = count(&et->constructors);
   for i size = 0; i < nconstructors; i = i + 1 {
     tagval enum_tag_value = mk_enum_tag_value(i);
@@ -2537,17 +2548,17 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     finalgn gr_num = done(&sub_bu);
 
     finalseqgn sq_num = seqq(gs, finalgn, &join_target);
-    push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), finalseqgn});
+    push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), {finalseqgn}});
   }
 
   restore_celltrack(gs.ctr, &postbranch_save);
   if case CtorDestroy = wc {
     note_celltrack(&join_target.note, gs.ctr);
-    push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), join_target.sn});
+    push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), {join_target.sn}});
   } else {
     ztgn gr_num = addx(gs, @[gr_xop]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))}));
     ztseq sq_num = seqq(gs, ztgn, &join_target);
-    push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), ztseq});
+    push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), {ztseq}});
   }
 
   br sq_num = addq(&gr, @[gr_qop]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None}));

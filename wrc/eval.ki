@@ -540,19 +540,19 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
         ncases size = count(&a.cases);
         found bool = false;
         for i size = 0; i < ncases && !found; i = i + 1 {
-          case_i *tup[gr_const, sq_num] = ref(&a.cases, i);
+          case_i *gr_branch_pair = ref(&a.cases, i);
           case_value st_value;
-          #st_const_compute(clq, &env->plat, &case_i->car, src_obj.count, &case_value);
+          #st_const_compute(clq, &env->plat, &case_i->value, src_obj.count, &case_value);
           case_matches bool;
           #st_values_selfcontained_equal(&env->plat, &src_value, &case_value, &case_matches);
           if case_matches {
-            push(&stack, case_i->cdr.x);
+            push(&stack, case_i->target.sn.x);
             found = true;
           }
         }
         if !found {
-          if case Has(default_gn sq_num) = a.default_case {
-            push(&stack, default_gn.x);
+          if case Has(default_target gr_branch_target) = a.default_case {
+            push(&stack, default_target.sn.x);
           } else {
             return ERR(_u8("GrBranch meets unhandled case"));
           }

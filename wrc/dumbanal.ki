@@ -152,17 +152,17 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
       combined_mut genexpr_result = NonTerminal;
       ncases size = count(&a.cases);
       for i size = 0; i < ncases; i = i + 1 {
-        cas *tup[gr_const, sq_num] = ref(&a.cases, i);
+        cas *gr_branch_pair = &a.cases[i];
         new_live celltrack = *ctr;
         casmut genexpr_result;
-        #dumbly_analyze_expression(h, gr, &new_live, cas->cdr.x, &casmut);
+        #dumbly_analyze_expression(h, gr, &new_live, cas->target.sn.x, &casmut);
         combine_branch_mut(&new_live, &combined_mut, casmut, &end_ctr);
       }
 
-      if case Has(def_gn sq_num) = a.default_case {
+      if case Has(def_target gr_branch_target) = a.default_case {
         new_live celltrack = *ctr;
         defcasmut genexpr_result;
-        #dumbly_analyze_expression(h, gr, &new_live, def_gn.x, &defcasmut);
+        #dumbly_analyze_expression(h, gr, &new_live, def_target.sn.x, &defcasmut);
         combine_branch_mut(&new_live, &combined_mut, defcasmut, &end_ctr);
       }
 
