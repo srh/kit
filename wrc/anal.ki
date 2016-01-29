@@ -317,12 +317,20 @@ func adjust_active_op_for_inline(cm *array[cell_num], op gr_active_op) gr_active
   }
 }
 
+inline func adjust(op_addend size, gn gr_num) gr_num {
+  return ~(gn.x + op_addend);
+}
+
+inline func adjust(op_addend size, sn sq_num) sq_num {
+  return ~ adjust(op_addend, sn.x);
+}
+
 func adjust_disposition_for_inline(op_addend size, disposition gr_jmp_disposition) gr_jmp_disposition {
   switch disposition {
   case JmpForward:
     return JmpForward;
   case ExitNormalcy(ex gr_jmp_exit_normalcy):
-    return ExitNormalcy({~ ~(ex.subsequent_normalcy.x.x + op_addend)});
+    return ExitNormalcy({adjust(op_addend, ex.subsequent_normalcy)});
   case ReenterNormalcy:
     return ReenterNormalcy;
   case Undescribed:
@@ -381,19 +389,19 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
       ncases size = count(&a.cases);
       for i size = 0; i < ncases; i = i + 1 {
         cas *gr_branch_pair = &a.cases[i];
-        push(&newcases, {cas->value, {~ ~(cas->target.sn.x.x + op_addend), cas->target.disposition}});
+        push(&newcases, {cas->value, {adjust(op_addend, cas->target.sn), cas->target.disposition}});
       }
       defaultcase opt[gr_branch_target];
       if case Has(def_target gr_branch_target) = a.default_case {
-        defaultcase = Has({~ @[gr_num]~(def_target.sn.x.x + op_addend), def_target.disposition});
+        defaultcase = Has({adjust(op_addend, def_target.sn), def_target.disposition});
       } else {
         defaultcase = None;
       }
       return QOp({GrBranch({get(cm, a.src.x), freeze(&newcases), defaultcase})});
     case &GrSequence(a gr_sequence):
-      return QOp({GrSequence({~(a.first.x + op_addend), ~ ~(a.second.x.x + op_addend)})});
+      return QOp({GrSequence({adjust(op_addend, a.first), adjust(op_addend, a.second)})});
     case &GrJmp(a gr_jmp):
-      return QOp({GrJmp({~ ~(a.next.x.x + op_addend), adjust_disposition_for_inline(op_addend, a.disposition)})});
+      return QOp({GrJmp({adjust(op_addend, a.next), adjust_disposition_for_inline(op_addend, a.disposition)})});
     case &GrQNop:
       return QOp({GrQNop});
     }
