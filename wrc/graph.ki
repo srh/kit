@@ -98,7 +98,6 @@ enum gr_xop {
   GrVirtualDead gr_virtual_dead;
   GrActiveXop gr_active_xop;
   GrManyActiveXop gr_many_active_xop;
-  // A debugging xop for compiler devs.
 }
 
 enum gr_qop {
