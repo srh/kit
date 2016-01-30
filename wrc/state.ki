@@ -664,7 +664,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym, &ret.init_behavior);
       *out = ret;
       return NoFail;
     }
@@ -675,9 +675,9 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior);
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, intern(cs->im, _s("do_copy")), &ret.copy_behavior);
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym, &ret.init_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym, &ret.copy_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym, &ret.destroy_behavior);
       *out = ret;
       return NoFail;
     }
@@ -688,10 +688,10 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_init")), &ret.init_behavior);
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, intern(cs->im, _s("do_move")), &ret.move_behavior);
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, intern(cs->im, _s("do_copy")), &ret.copy_behavior);
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, intern(cs->im, _s("do_destroy")), &ret.destroy_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym, &ret.init_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_movesym, &ret.move_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym, &ret.copy_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym, &ret.destroy_behavior);
       ret.is_scalar = IsScalarNo;
       *out = ret;
       return NoFail;
