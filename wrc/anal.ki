@@ -325,6 +325,14 @@ inline func adjust(op_addend size, sn sq_num) sq_num {
   return ~ adjust(op_addend, sn.x);
 }
 
+inline func adjust(op_addend size, osn opt[sq_num]) opt[sq_num] {
+  if case Has(sn sq_num) = osn {
+    return Has(adjust(op_addend, sn));
+  } else {
+    return None;
+  }
+}
+
 func adjust_disposition_for_inline(op_addend size, disposition gr_jmp_disposition) gr_jmp_disposition {
   switch disposition {
   case JmpForward:
@@ -395,7 +403,7 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
       } else {
         defaultcase = None;
       }
-      return QOp({GrBranch({get(cm, a.src.x), freeze(&newcases), defaultcase})});
+      return QOp({GrBranch({get(cm, a.src.x), freeze(&newcases), defaultcase, @[gr_branch_info]{adjust(op_addend, a.info.forward_join_point)}})});
     case &GrSequence(a gr_sequence):
       return QOp({GrSequence({adjust(op_addend, a.first), adjust(op_addend, a.second)})});
     case &GrJmp(a gr_jmp):
