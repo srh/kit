@@ -228,14 +228,14 @@ func addq(gr *frame_graph, op gr_qop) sq_num {
   return ~help_add_node(gr, @[gr_node]QOp({op}));
 }
 
-func help_mut_qnop_node(gr *frame_graph, ix sq_num, newnode gr_qnode) void {
+func help_mut_qnop_node(gr *frame_graph, ix sq_num, newop gr_qop) void {
   node *gr_node = ref_node(gr, ix.x);
   switch node {
   case &XOp(xn gr_xnode):
     ice(_u8("mut_qnop_node sees XOp"));
   case &QOp(qn gr_qnode):
     if case &GrQNop = &qn.op {
-      *node = QOp(newnode);
+      qn.op = newop;
     } else {
       ice(_u8("mut_qnop_node sees non-nop node"));
     }
@@ -273,7 +273,7 @@ func add(bu *sq_builder, gn gr_num) void {
   gr *frame_graph = bu->gr;
   check(gr != null);
   next sq_num = nopq(gr);
-  help_mut_qnop_node(gr, bu->last, {@[gr_qop]GrSequence({gn, next})});
+  help_mut_qnop_node(gr, bu->last, @[gr_qop]GrSequence({gn, next}));
   bu->last = next;
 }
 
@@ -300,7 +300,7 @@ func seqq(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
 }
 
 func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num, disposition gr_jmp_disposition) void {
-  help_mut_qnop_node(gr, ix, {@[gr_qop]GrJmp({outflow, disposition})});
+  help_mut_qnop_node(gr, ix, @[gr_qop]GrJmp({outflow, disposition}));
 }
 
 func append(bu *sq_builder, enter_disposition gr_jmp_disposition, enter_rhs sq_num, rhs_nopq sq_num) void {
