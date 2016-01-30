@@ -65,8 +65,14 @@ struct gr_xnode {
   op gr_xop;
 }
 
+// The "in-degree" is the number of qnodes flowing into this (not as the first elem of a gr_sequence).
+struct gr_qnode_indegree {
+  x u32;
+}
+
 struct gr_qnode {
   op gr_qop;
+  indegree gr_qnode_indegree;
 }
 
 struct gr_num { x size; }
@@ -224,17 +230,45 @@ func add(bu *sq_builder, op gr_xop) void {
   add(bu, num);
 }
 
+func incr_indegree(gr *frame_graph, sn sq_num) void {
+  switch ref_node(gr, sn.x) {
+  case &XOp(xn gr_xnode):
+    ice(_u8!"incr_indegree sees XOp");
+  case &QOp(qn gr_qnode):
+    qn.indegree.x++;
+  }
+}
+
+func incr_indegree_for_adding_qop(gr *frame_graph, op *gr_qop) void {
+  switch op {
+  case &GrBranch(a gr_branch):
+    n size = count(&a.cases);
+    for i size = 0; i < n; i++ {
+      incr_indegree(gr, a.cases[i].target.sn);
+    }
+    if case &Has(targ gr_branch_target) = &a.default_case {
+      incr_indegree(gr, targ.sn);
+    }
+  case &GrSequence(a gr_sequence):
+    incr_indegree(gr, a.second);
+  case &GrJmp(a gr_jmp):
+    incr_indegree(gr, a.next);
+  case &GrQNop: { }
+  }
+}
+
 func addq(gr *frame_graph, op gr_qop) sq_num {
-  return ~help_add_node(gr, @[gr_node]QOp({op}));
+  incr_indegree_for_adding_qop(gr, &op);
+  return ~help_add_node(gr, @[gr_node]QOp({op, @[gr_qnode_indegree]{0}}));
 }
 
 func help_mut_qnop_node(gr *frame_graph, ix sq_num, newop gr_qop) void {
-  node *gr_node = ref_node(gr, ix.x);
-  switch node {
+  switch ref_node(gr, ix.x) {
   case &XOp(xn gr_xnode):
     ice(_u8("mut_qnop_node sees XOp"));
   case &QOp(qn gr_qnode):
     if case &GrQNop = &qn.op {
+      incr_indegree_for_adding_qop(gr, &newop);
       qn.op = newop;
     } else {
       ice(_u8("mut_qnop_node sees non-nop node"));
