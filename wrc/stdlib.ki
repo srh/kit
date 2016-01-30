@@ -377,7 +377,6 @@ inline func[T] enumnum(x *T) u32 {
   return ret;
 }
 
-// TODO: Somewhere in linux_objfile.ki we could use this func... for the magic's padding.
 func[T] fill(p * ^[0]T, n size, value T) void {
   for i size = 0; i < n; i += 1 {
     p[i] = value;

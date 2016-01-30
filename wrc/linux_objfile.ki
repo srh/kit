@@ -174,9 +174,7 @@ func linux32_flatten(im *identmap, f *objfile) array[u8] {
     h.e_ident[8] = 0;  // EI_ABIVERSION (= 8): must use zero.
     // padding
     n_kEI_NIDENT size = ~kEI_NIDENT;
-    for i size = 9; i < n_kEI_NIDENT; i = i + 1 {
-      h.e_ident[i] = 0;
-    }
+    fill(ixcast(&h.e_ident[9]), ~(kEI_NIDENT - 9), 0);
 
     h.e_type = ~ @[u16] ~kET_REL;
     h.e_machine = ~ @[u16] ~kEM_386;
