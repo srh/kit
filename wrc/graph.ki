@@ -1120,12 +1120,7 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     gr_literal(gs, x, numeric_literal_value(&a), bu);
     return NoFail;
   case &BoolLiteral(a ast_bool_literal):
-    value bigint;
-    if a.value {
-      value = bigu(1);
-    } else {
-      value = bigu(0);
-    }
+    value bigint = bigu(@[u32](a.value then 1 else 0));
     gr_literal(gs, x, value, bu);
     return NoFail;
   case &VoidLiteral(a ast_void_literal):

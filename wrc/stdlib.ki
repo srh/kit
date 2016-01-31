@@ -288,19 +288,11 @@ func[T] check_mutate(p *T, old T, new T) void {
 }
 
 inline func[T] max(x T, y T) T {
-  if x < y {
-    return y;
-  } else {
-    return x;
-  }
+  return x < y then y else x;
 }
 
 inline func[T] min(x T, y T) T {
-  if x < y {
-    return x;
-  } else {
-    return y;
-  }
+  return x < y then x else y;
 }
 
 inline func[S, T] cast(p *S) *T {
@@ -340,7 +332,7 @@ func ceil_aligned(x u32, y u32) u32 {
   return x + (y - x % y);
 }
 
-func ceil_divide(x u32, y u32) u32 {
+func[T] ceil_divide(x T, y T) T {
   if x % y == 0 {
     return x / y;
   } else {
@@ -357,14 +349,6 @@ func floor_aligned(x i32, y u32) i32 {
     return x - (x % ~y);
   } else {
     return - @[i32] ~ceil_aligned(@[u32] ~ -x, y);
-  }
-}
-
-func ceil_divide(x size, y size) size {
-  if x % y == 0 {
-    return x / y;
-  } else {
-    return x / y + 1;
   }
 }
 
