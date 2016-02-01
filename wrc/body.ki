@@ -23,8 +23,6 @@ struct label_info {
 }
 
 struct statement_info {
-  // TODO: Nobody uses st.
-  st opt[*ast_statement];
   incoming array[statement_num];
   outgoing array[statement_num];
   marked_reachable bool;
@@ -58,9 +56,9 @@ struct statement_num { x size; }
 
 def `~` fn[size, statement_num] = wrapconvert;
 
-func add_statement(bs *bodystate, s opt[*ast_statement]) statement_num {
+func add_statement(bs *bodystate) statement_num {
   ret size = count(&bs->statements);
-  push(&bs->statements, {s, mk_array@[statement_num](), mk_array@[statement_num](), false});
+  push(&bs->statements, {mk_array@[statement_num](), mk_array@[statement_num](), false});
   return ~ret;
 }
 
@@ -76,7 +74,7 @@ struct entryexit { entry statement_num; exit statement_num; }
 
 func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *entryexit) np {
   nstatements size = count(&a->statements);
-  entry statement_num = add_statement(bs, None);
+  entry statement_num = add_statement(bs);
   exit statement_num = entry;
   vp varpopper;
   init_vp(&vp, &bs->es);
@@ -179,7 +177,7 @@ func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_s
 }
 
 func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) np {
-  num statement_num = add_statement(bs, Has(s));
+  num statement_num = add_statement(bs);
   switch &s->u {
     case &Expr(b ast_expr_discard): {
       // This is a bit restrictive and anal, especially for a language designed to interact with C API's that might have "helpful" but ignorable return values.
@@ -208,7 +206,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       #check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard);
       body_ee entryexit;
       #check_body(bs, obp, &b.body, &body_ee);
-      tailnum statement_num = add_statement(bs, None);
+      tailnum statement_num = add_statement(bs);
       connect_statements(bs, num, tailnum);
       connect_statements(bs, num, body_ee.entry);
       connect_statements(bs, body_ee.exit, tailnum);
@@ -227,7 +225,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       descope_vars(&cond_vp);
       else_ee entryexit;
       #check_body(bs, obp, &b.elsebody, &else_ee);
-      tailnum statement_num = add_statement(bs, None);
+      tailnum statement_num = add_statement(bs);
       connect_statements(bs, num, then_ee.entry);
       connect_statements(bs, num, else_ee.entry);
       connect_statements(bs, then_ee.exit, tailnum);
@@ -239,7 +237,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
       swartch_vp varpopper;
       init_vp(&swartch_vp, &bs->es);
 
-      tailnum statement_num = add_statement(bs, None);
+      tailnum statement_num = add_statement(bs);
       bp breakpack = {tailnum, vars_in_scope(&bs->es), num, vars_in_scope(&bs->es)};
       cond_vp varpopper;
       init_vp(&cond_vp, &bs->es);
@@ -270,7 +268,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
         #compute_destruct(bs, vars_in_scope(&bs->es), &bp->break_in_scope, &destructions);
         annotate(&b.info, {destructions});
         connect_statements(bs, num, bp->break_target);
-        *ee_out = {num, add_statement(bs, None)};
+        *ee_out = {num, add_statement(bs)};
       } else {
         return ERR(_u8("break statement in bad place."));
       }
@@ -281,7 +279,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
         #compute_destruct(bs, vars_in_scope(&bs->es), &bp->continue_in_scope, &destructions);
         annotate(&b.info, {destructions});
         connect_statements(bs, num, bp->continue_target);
-        *ee_out = {num, add_statement(bs, None)};
+        *ee_out = {num, add_statement(bs)};
       } else {
         return ERR(_u8("continue statement in bad place."));
       }
@@ -299,7 +297,7 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
 
     case &Goto(b ast_goto_statement): {
       push(&bs->gotos, {num, &b, b.target.value, vars_in_scope(&bs->es)});
-      *ee_out = {num, add_statement(bs, None)};
+      *ee_out = {num, add_statement(bs)};
     }
   }
   return NoFail;
@@ -386,7 +384,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
 
   // enum_type is complete, because check_swartch says so.
 
-  exitnum statement_num = add_statement(bs, None);
+  exitnum statement_num = add_statement(bs);
 
   et *enumspec = chk.enum_type;
 
@@ -467,7 +465,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
 
   initter_vp varpopper;
   init_vp(&initter_vp, &bs->es);
-  loopnum statement_num = add_statement(bs, None);
+  loopnum statement_num = add_statement(bs);
   if case &Has(initter box[ast_statement]) = &a->initializer {
     initter_ee entryexit;
     #check_statement(bs, &initter_vp, None, oo(&initter), &initter_ee);
@@ -478,7 +476,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
   }
   loop_in_scope array[var_number] = vars_in_scope(&bs->es);
 
-  exitnum statement_num = add_statement(bs, None);
+  exitnum statement_num = add_statement(bs);
   cond_vp varpopper;
   init_vp(&cond_vp, &bs->es);
   if case &Has(cond ast_expr_condition) = &a->condition {
@@ -599,7 +597,7 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
   if case Has(ix size) = moved_var_ix {
     shifterase_elem(&vars, ix);
   }
-  *exit_out = add_statement(bs, None);
+  *exit_out = add_statement(bs);
   return NoFail;
 }
 
