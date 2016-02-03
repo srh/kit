@@ -360,8 +360,7 @@ func check_pattern(es *framescope, chk *swartch_checkobj, et *enumspec, patt *as
 
 func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_type *te_typeexpr, vd *ast_vardecl, cu_expected_type_out *cu_typeexpr, varcell_out *cell_num) np {
   // TODO: Cache converted?
-  converted te_typeexpr;
-  #convert_typeexpr(&vd->type, &converted);
+  converted te_typeexpr = #convert_typeexpr(&vd->type);
 
   cac cac_typeexpr;
   #check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &cac);
@@ -506,8 +505,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
 
 func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np {
   // TODO: Cache converted... or something.
-  converted te_typeexpr;
-  #convert_typeexpr(&a->decl.type, &converted);
+  converted te_typeexpr = #convert_typeexpr(&a->decl.type);
 
   computed cac_typeexpr;
   #check_and_compute_typeexpr(bs->clq, bs->ds->generics, bs->ds->repls, &converted, &computed);

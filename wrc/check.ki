@@ -77,8 +77,7 @@ func convert_typeexpr_list(arr *array[ast_typeexpr], out *shray[te_typeexpr]) np
   n size = count(arr);
   reserve(&build, n);
   for i size = 0; i < n; i = i + 1 {
-    t te_typeexpr;
-    #convert_typeexpr(&arr[i], &t);
+    t te_typeexpr = #convert_typeexpr(&arr[i]);
     push(&build, t);
   }
   *out = freeze(&build);
@@ -119,14 +118,8 @@ func convert_defenum_constructor_list(arr *array[ast_defenum_constructor], decls
 }
 
 func convert_vardecl(a *ast_vardecl, out *te_vardecl) np {
-  type te_typeexpr;
-  #convert_typeexpr(&a->type, &type);
+  type te_typeexpr = #convert_typeexpr(&a->type);
   *out = {a->name.value, type};
-  return NoFail;
-}
-
-func convert_typeexpr(a *ast_typeexpr, out *te_typeexpr) np {
-  *out = #convert_typeexpr(a);
   return NoFail;
 }
 
@@ -156,7 +149,7 @@ func convert_typeexpr(a *ast_typeexpr) cr[te_typeexpr] {
       count = None;
     }
     param shp[te_typeexpr];
-    #convert_typeexpr(oo(&b.param), oo(&param));
+    *oo(&param) = #convert_typeexpr(oo(&b.param));
     return NoFail!@[te_typeexpr]TeArraytype({count, param});
   case &Lifetime(b ast_lifetime):
     return NoFail!@[te_typeexpr]TeLifetime({b.name.value});
@@ -176,12 +169,13 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) n
           return fake();
         }
         case &DefnHasRhs(np def_nonprim): {
-          converted te_typeexpr;
-          if case Printed(pm) = convert_typeexpr(&np.quick_typeexpr, &converted) {
+          switch convert_typeexpr(&np.quick_typeexpr) {
+          case Printed(pm):
             ent->converted_typeexpr = FailedComputation;
             return Printed(pm);
+          case NoFail(converted te_typeexpr):
+            ent->converted_typeexpr = Computed(converted);
           }
-          ent->converted_typeexpr = Computed(converted);
           if case &Computed(te te_typeexpr) = &ent->converted_typeexpr {
             *out = &te;
           } else {
