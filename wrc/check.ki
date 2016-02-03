@@ -59,7 +59,7 @@ func check_module(cs *checkstate, mod_name sym) np {
   return NoFail;
 }
 
-func convert_typefunc(cs *checkstate, a *ast_typeexpr, out *te_puretype) np {
+func convert_typefunc(a *ast_typeexpr, out *te_puretype) np {
   switch a {
   case &Name(b ast_ident):
     *out = TePureName(b.value);
@@ -72,33 +72,33 @@ func convert_typefunc(cs *checkstate, a *ast_typeexpr, out *te_puretype) np {
   }
 }
 
-func convert_typeexpr_list(cs *checkstate, arr *array[ast_typeexpr], out *shray[te_typeexpr]) np {
+func convert_typeexpr_list(arr *array[ast_typeexpr], out *shray[te_typeexpr]) np {
   build array[te_typeexpr];
   n size = count(arr);
   reserve(&build, n);
   for i size = 0; i < n; i = i + 1 {
     t te_typeexpr;
-    #convert_typeexpr(cs, &arr[i], &t);
+    #convert_typeexpr(&arr[i], &t);
     push(&build, t);
   }
   *out = freeze(&build);
   return NoFail;
 }
 
-func convert_vardecl_list(cs *checkstate, arr *array[ast_vardecl], out *array[te_vardecl]) np {
+func convert_vardecl_list(arr *array[ast_vardecl], out *array[te_vardecl]) np {
   build array[te_vardecl];
   n size = count(arr);
   reserve(&build, n);
   for i size = 0; i < n; i = i + 1 {
     vd te_vardecl;
-    #convert_vardecl(cs, &arr[i], &vd);
+    #convert_vardecl(&arr[i], &vd);
     push(&build, vd);
   }
   swap(out, &build);
   return NoFail;
 }
 
-func convert_defenum_constructor_list(cs *checkstate, arr *array[ast_defenum_constructor], decls_out *array[te_vardecl], success_case_ix_out *opt[size]) np {
+func convert_defenum_constructor_list(arr *array[ast_defenum_constructor], decls_out *array[te_vardecl], success_case_ix_out *opt[size]) np {
   build array[te_vardecl];
   n size = count(arr);
   reserve(&build, n);
@@ -106,7 +106,7 @@ func convert_defenum_constructor_list(cs *checkstate, arr *array[ast_defenum_con
   for i size = 0; i < n; i = i + 1 {
     elem *ast_defenum_constructor = ref(arr, i);
     vd te_vardecl;
-    #convert_vardecl(cs, &elem->decl, &vd);
+    #convert_vardecl(&elem->decl, &vd);
     if case SuccessCase = elem->disposition {
       // Parsing's supposed to only allow one success case, this assert verifies.
       set(&success_case_ix, i);
@@ -118,32 +118,32 @@ func convert_defenum_constructor_list(cs *checkstate, arr *array[ast_defenum_con
   return NoFail;
 }
 
-func convert_vardecl(cs *checkstate, a *ast_vardecl, out *te_vardecl) np {
+func convert_vardecl(a *ast_vardecl, out *te_vardecl) np {
   type te_typeexpr;
-  #convert_typeexpr(cs, &a->type, &type);
+  #convert_typeexpr(&a->type, &type);
   *out = {a->name.value, type};
   return NoFail;
 }
 
-func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) np {
-  *out = #convert_typeexpr(cs, a);
+func convert_typeexpr(a *ast_typeexpr, out *te_typeexpr) np {
+  *out = #convert_typeexpr(a);
   return NoFail;
 }
 
 // NOTE: This could probably lookup names, check arity, in a defscope, etc.
-func convert_typeexpr(cs *checkstate, a *ast_typeexpr) cr[te_typeexpr] {
+func convert_typeexpr(a *ast_typeexpr) cr[te_typeexpr] {
   switch a {
   case &Name(b ast_ident):
     return NoFail!@[te_typeexpr]TeName({b.value, None});
   case &App(b ast_typeapp):
     typefunc te_puretype;
     params shray[te_typeexpr];
-    #convert_typefunc(cs, oo(&b.typefunc), &typefunc);
-    #convert_typeexpr_list(cs, &b.params, &params);
+    #convert_typefunc(oo(&b.typefunc), &typefunc);
+    #convert_typeexpr_list(&b.params, &params);
     return NoFail!@[te_typeexpr]TeApp({typefunc, params, None});
   case &Union(b ast_union):
     fields array[te_vardecl];
-    #convert_vardecl_list(cs, &b.fields, &fields);
+    #convert_vardecl_list(&b.fields, &fields);
     return NoFail!@[te_typeexpr]TeUnion({freeze(&fields)});
 
   case &Arraytype(b ast_arraytype):
@@ -156,7 +156,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr) cr[te_typeexpr] {
       count = None;
     }
     param shp[te_typeexpr];
-    #convert_typeexpr(cs, oo(&b.param), oo(&param));
+    #convert_typeexpr(oo(&b.param), oo(&param));
     return NoFail!@[te_typeexpr]TeArraytype({count, param});
   case &Lifetime(b ast_lifetime):
     return NoFail!@[te_typeexpr]TeLifetime({b.name.value});
@@ -165,6 +165,7 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr) cr[te_typeexpr] {
   }
 }
 
+// TODO: Nothing uses cs.  (So remove it.)
 func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) np {
   switch &ent->converted_typeexpr {
     case &NotComputed: {
@@ -176,7 +177,7 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) n
         }
         case &DefnHasRhs(np def_nonprim): {
           converted te_typeexpr;
-          if case Printed(pm) = convert_typeexpr(cs, &np.quick_typeexpr, &converted) {
+          if case Printed(pm) = convert_typeexpr(&np.quick_typeexpr, &converted) {
             ent->converted_typeexpr = FailedComputation;
             return Printed(pm);
           }
@@ -211,6 +212,7 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) n
   }
 }
 
+// TODO: cs is not used.  (So remove it?)
 func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rhs_spec) np {
   switch &np->rhs {
     case &NotComputed: {
@@ -218,7 +220,7 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
       switch &np->tl->rhs {
       case &ClassexprRhs(a ast_classexpr_rhs):
         fields array[te_vardecl];
-        if case Printed(pm) = convert_vardecl_list(cs, &a.fields, &fields) {
+        if case Printed(pm) = convert_vardecl_list(&a.fields, &fields) {
           np->rhs = FailedComputation;
           return Printed(pm);
         }
@@ -231,7 +233,7 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
         return NoFail;
       case &DefstructRhs(a ast_defstruct_rhs):
         fields array[te_vardecl];
-        if case Printed(pm) = convert_vardecl_list(cs, &a.fields, &fields) {
+        if case Printed(pm) = convert_vardecl_list(&a.fields, &fields) {
           np->rhs = FailedComputation;
           return Printed(pm);
         }
@@ -245,7 +247,7 @@ func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rh
       case &DefenumRhs(a ast_defenum_rhs):
         success_case_ix opt[size];
         constructors array[te_vardecl];
-        if case Printed(pm) = convert_defenum_constructor_list(cs, &a.constructors, &constructors, &success_case_ix) {
+        if case Printed(pm) = convert_defenum_constructor_list(&a.constructors, &constructors, &success_case_ix) {
           np->rhs = FailedComputation;
           return Printed(pm);
         }
