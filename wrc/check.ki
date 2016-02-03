@@ -125,49 +125,43 @@ func convert_vardecl(cs *checkstate, a *ast_vardecl, out *te_vardecl) np {
   return NoFail;
 }
 
-// NOTE: Callers of this might expect this function to also lookup names, check arity, etc.  Or they need to do such things themselves.
 func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) np {
-  switch a {
-    case &Name(b ast_ident): {
-      *out = TeName({b.value, None});
-      return NoFail;
-    }
-    case &App(b ast_typeapp): {
-      typefunc te_puretype;
-      params shray[te_typeexpr];
-      #convert_typefunc(cs, oo(&b.typefunc), &typefunc);
-      #convert_typeexpr_list(cs, &b.params, &params);
-      *out = TeApp({typefunc, params, None});
-      return NoFail;
-    }
-    case &Union(b ast_union): {
-      fields array[te_vardecl];
-      #convert_vardecl_list(cs, &b.fields, &fields);
-      *out = TeUnion({freeze(&fields)});
-      return NoFail;
-    }
-    case &Arraytype(b ast_arraytype): {
-      count opt[u32];
-      if case &Has(bo box[ast_expr]) = &b.count {
-        num u32;
-        #fake_eval_arraytype_count(oo(&bo), &num);
-        count = Has(num);
-      } else {
-        count = None;
-      }
-      param shp[te_typeexpr];
-      #convert_typeexpr(cs, oo(&b.param), oo(&param));
-      *out = TeArraytype({count, param});
-      return NoFail;
-    }
-    case &Lifetime(b ast_lifetime):
-      *out = TeLifetime({b.name.value});
-      return NoFail;
+  *out = #convert_typeexpr(cs, a);
+  return NoFail;
+}
 
-    case &Unknown(b ast_unknown): {
-      *out = TeUnknown;
-      return NoFail;
+// NOTE: This could probably lookup names, check arity, in a defscope, etc.
+func convert_typeexpr(cs *checkstate, a *ast_typeexpr) cr[te_typeexpr] {
+  switch a {
+  case &Name(b ast_ident):
+    return NoFail!@[te_typeexpr]TeName({b.value, None});
+  case &App(b ast_typeapp):
+    typefunc te_puretype;
+    params shray[te_typeexpr];
+    #convert_typefunc(cs, oo(&b.typefunc), &typefunc);
+    #convert_typeexpr_list(cs, &b.params, &params);
+    return NoFail!@[te_typeexpr]TeApp({typefunc, params, None});
+  case &Union(b ast_union):
+    fields array[te_vardecl];
+    #convert_vardecl_list(cs, &b.fields, &fields);
+    return NoFail!@[te_typeexpr]TeUnion({freeze(&fields)});
+
+  case &Arraytype(b ast_arraytype):
+    count opt[u32];
+    if case &Has(bo box[ast_expr]) = &b.count {
+      num u32;
+      #fake_eval_arraytype_count(oo(&bo), &num);
+      count = Has(num);
+    } else {
+      count = None;
     }
+    param shp[te_typeexpr];
+    #convert_typeexpr(cs, oo(&b.param), oo(&param));
+    return NoFail!@[te_typeexpr]TeArraytype({count, param});
+  case &Lifetime(b ast_lifetime):
+    return NoFail!@[te_typeexpr]TeLifetime({b.name.value});
+  case &Unknown(b ast_unknown):
+    return NoFail!@[te_typeexpr]TeUnknown;
   }
 }
 
