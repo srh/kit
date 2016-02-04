@@ -200,7 +200,7 @@ func parse_rest_of_func(p *ps, is_export ast_isexport, is_inline ast_isinline, o
   end(p, lambda_expr_meta);
 
   *out = Def({is_export, IsNotVar, generics, name, None,
-              consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({is_inline, params, return_type, {NotComputed, body}})))});
+              consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({is_inline, move(&params), return_type, {NotComputed, move(&body)}})))});
   return Success;
 }
 
@@ -223,7 +223,7 @@ func parse_rest_of_def(p *ps, is_export ast_isexport, is_var ast_isvar, out *ast
   #parse_expr(p, kSemicolonPrec, AllowBracesYes, IsNotStatementExpr, &rhs);
   #try_skip_oper(p, ';');
 
-  *out = Def({is_export, is_var, generics, name, typeexpr, consume(&rhs)});
+  *out = Def({is_export, is_var, generics, name, typeexpr, consume(move(&rhs))});
   return Success;
 }
 
@@ -262,7 +262,7 @@ func parse_rest_of_defclass(p *ps, out *ast_toplevel) parse_result {
   fields array[ast_vardecl];
   #parse_ident(p, &name);
   #parse_braced_fields(p, &fields);
-  *out = TypeDef({generics, name, ClassexprRhs({disposition, fields})});
+  *out = TypeDef({generics, name, ClassexprRhs({disposition, move(&fields)})});
   return Success;
 }
 
@@ -273,7 +273,7 @@ func parse_rest_of_defstruct(p *ps, out *ast_toplevel) parse_result {
   #parse_generics_if_present(p, &generics);
   #parse_ident(p, &name);
   #parse_braced_fields(p, &fields);
-  *out = TypeDef({generics, name, DefstructRhs({fields})});
+  *out = TypeDef({generics, name, DefstructRhs({move(&fields)})});
   return Success;
 }
 
@@ -284,7 +284,7 @@ func parse_rest_of_defenum(p *ps, out *ast_toplevel) parse_result {
   #parse_generics_if_present(p, &generics);
   #parse_ident(p, &name);
   #parse_defenum_constructors(p, &constructors);
-  *out = TypeDef({generics, name, DefenumRhs({constructors})});
+  *out = TypeDef({generics, name, DefenumRhs({move(&constructors)})});
   return Success;
 }
 
@@ -315,7 +315,7 @@ func parse_rest_of_access(p *ps, out *ast_toplevel) parse_result {
   #try_skip_token(p, @[tokval]Grouper(LBrace));
   #parse_toplevels(p, @[tokval]Grouper(RBrace), &toplevels);
   #try_skip_token(p, @[tokval]Grouper(RBrace));
-  *out = Access({name, arity, toplevels});
+  *out = Access({name, arity, move(&toplevels)});
   return Success;
 }
 
@@ -423,7 +423,7 @@ func parse_generics_if_present(p *ps, out *ast_generics) parse_result {
   }
   for ;; {
     if +try_skip_token(p, @[tokval]Grouper(RBracket)) {
-      *out = HasGenerics(args);
+      *out = HasGenerics(move(&args));
       return Success;
     }
     if count(&args) != 0 {
@@ -453,7 +453,7 @@ func parse_args_list(p *ps, out *array[ast_vardecl]) parse_result {
   args array[ast_vardecl];
   for ;; {
     if +try_skip_token(p, @[tokval]Grouper(RParen)) {
-      *out = args;
+      swap(out, &args);
       return Success;
     }
     if count(&args) != 0 {
@@ -472,14 +472,14 @@ func triparse_bracebody(p *ps, out *ast_bracebody) triparse_result {
   statements array[ast_statement];
   for ;; {
     if +try_skip_token(p, @[tokval]Grouper(RBrace)) {
-      *out = {NotComputed, statements};
+      *out = {NotComputed, move(&statements)};
       return Success;
     }
     statement ast_statement;
     if ! +parse_statement(p, &statement) {
       return Error;
     }
-    push(&statements, statement);
+    pushmove(&statements, &statement);
   }
 }
 
@@ -577,14 +577,14 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_lifetimes, out *ast
     return Error;
   }
   // NOTE: Allow arbitrarily many type applications?
-  *out = App({embox(lhs), args});
+  *out = App({embox(lhs), move(&args)});
   return Success;
 }
 
 func parse_rest_of_union(p *ps, out *ast_typeexpr) parse_result {
   fields array[ast_vardecl];
   #parse_braced_fields(p, &fields);
-  *out = Union({fields});
+  *out = Union({move(&fields)});
   return Success;
 }
 
@@ -649,7 +649,7 @@ func parse_rest_of_type_param_list(p *ps, ab allow_blanks, out *array[ast_typeex
   args array[ast_typeexpr];
   for ;; {
     if +try_skip_token(p, @[tokval]Grouper(RBracket)) {
-      *out = args;
+      swap(out, &args);
       return Success;
     }
 
@@ -669,7 +669,7 @@ func parse_braced_fields(p *ps, out *array[ast_vardecl]) parse_result {
   fields array[ast_vardecl];
   for ;; {
     if +try_skip_token(p, @[tokval]Grouper(RBrace)) {
-      *out = fields;
+      swap(out, &fields);
       return Success;
     }
 
@@ -751,13 +751,13 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       params array[ast_expr_consume];
       #parse_rest_of_param_list(p, &params);
       m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]Funcall({embox(consume(&lhs)), params}));
+      lhs = mk(m, @[ast_expr_enum]Funcall({embox(consume(move(&lhs))), move(&params)}));
     } else if +try_skip_token(p, @[tokval]Grouper(LBracket)) {
       arg ast_expr;
       #parse_expr(p, kCommaPrec, AllowBracesYes, IsNotStatementExpr, &arg);
       #try_skip_token(p, @[tokval]Grouper(RBracket));
       m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]IndexExpr(mk(embox(lhs), embox(consume(&arg)))));
+      lhs = mk(m, @[ast_expr_enum]IndexExpr(mk(embox(lhs), embox(consume(move(&arg))))));
     } else if +try_skip_oper(p, '.') {
       fieldname ast_ident;
       #parse_ident(p, &fieldname);
@@ -767,7 +767,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       fieldname ast_ident;
       #parse_ident(p, &fieldname);
       m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed, mk_later(), embox(consume(&lhs)), {fieldname}}));
+      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed, mk_later(), embox(consume(move(&lhs))), {fieldname}}));
     } else if is_keyw(&peek(p)->val, Then) {
       switch compare_prec(prec_ctx, thenexpr_then_prec().left) {
       case Conflicts:
@@ -783,7 +783,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
         else_clause ast_expr;
         #parse_expr(p, thenexpr_else_right_prec, ab, IsNotStatementExpr, &else_clause);
         m ast_meta = copyend(p, lhs.meta);
-        lhs = mk(m, @[ast_expr_enum]Ternary({embox(@[ast_expr_condition]{mk_later(), embox(consume(&lhs))}), embox(consume(&then_clause)), embox(consume(&else_clause))}));
+        lhs = mk(m, @[ast_expr_enum]Ternary({embox(@[ast_expr_condition]{mk_later(), embox(consume(move(&lhs)))}), embox(consume(move(&then_clause))), embox(consume(move(&else_clause)))}));
       }
     } else if case Has(is_incr bool) = is_postfix_incrdecr(peek(p)->val) {
       oper_meta ast_meta = startend(p);
@@ -956,11 +956,11 @@ func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_e
   } else if op.value == im->cym.refofsym {
     return mk(m, @[ast_expr_enum]RefOf({embox(rhs)}));
   } else if op.value == im->cym.derefsym {
-    return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(&rhs))}));
+    return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(move(&rhs)))}));
   } else if op.value == im->cym.quickreturnsym {
     return mk(m, @[ast_expr_enum]QuickReturn({NotComputed, embox(rhs)}));
   } else {
-    return mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))), mk_array(consume(&rhs))}));
+    return mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))), mk_array(consume(move(&rhs)))}));
   }
 }
 
@@ -976,9 +976,9 @@ func build_binop_expr(p *ps, se statement_expr, m ast_meta, user_assignment bool
     }
     *out = mk(m, @[ast_expr_enum]Assignment({NotComputed, embox(lhs), embox(rhs)}));
   } else if op.value == p->im->cym.logical_and_sym {
-    *out = mk(m, @[ast_expr_enum]LogicalConjunction({false, embox(consume(&lhs)), embox(consume(&rhs))}));
+    *out = mk(m, @[ast_expr_enum]LogicalConjunction({false, embox(consume(move(&lhs))), embox(consume(move(&rhs)))}));
   } else if op.value == p->im->cym.logical_or_sym {
-    *out = mk(m, @[ast_expr_enum]LogicalConjunction({true, embox(consume(&lhs)), embox(consume(&rhs))}));
+    *out = mk(m, @[ast_expr_enum]LogicalConjunction({true, embox(consume(move(&lhs))), embox(consume(move(&rhs)))}));
   } else {
     if user_assignment {
       if case IsNotStatementExpr = se {
@@ -986,10 +986,10 @@ func build_binop_expr(p *ps, se statement_expr, m ast_meta, user_assignment bool
       }
       note_original(p, m, UserAssignment);
       *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
-         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(&rhs))})))}));
+         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(move(&rhs)))})))}));
     } else {
       *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))),
-                                            mk_array(consume(&lhs), consume(&rhs))}));
+                                            mk_array(consume(move(&lhs)), consume(move(&rhs)))}));
     }
   }
   return Success;
@@ -1003,7 +1003,7 @@ func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) parse_result 
         args array[ast_typeexpr];
         #try_skip_token(p, @[tokval]Grouper(LBracket));
         #parse_rest_of_type_param_list(p, AllowBlanksNo, &args);
-        *out = mk(ident.meta, NameExpr(mk(ident, Has(args))));
+        *out = mk(ident.meta, NameExpr(mk(ident, Has(move(&args)))));
         return Success;
       }
     }
@@ -1213,7 +1213,7 @@ func parse_rest_of_lambda(p *ps, lambda_expr_meta ast_meta, out *ast_expr) parse
   body ast_bracebody;
   #parse_lambdaspec(p, &args, &return_type, &body);
   end(p, lambda_expr_meta);
-  *out = mk(lambda_expr_meta, @[ast_expr_enum]Lambda({IsNotInline, args, return_type, {NotComputed, body}}));
+  *out = mk(lambda_expr_meta, @[ast_expr_enum]Lambda({IsNotInline, move(&args), return_type, {NotComputed, move(&body)}}));
   return Success;
 }
 
@@ -1247,7 +1247,7 @@ func parse_rest_of_expr_list(p *ps, ab allow_braces, stop grouper, out *array[as
     }
     expr ast_expr;
     #parse_expr(p, kCommaPrec, ab, IsNotStatementExpr, &expr);
-    push(&exprs, consume(&expr));
+    push(&exprs, consume(move(&expr)));
   }
 }
 
@@ -1342,7 +1342,7 @@ func parse_rest_of_return_statement_enum(p *ps, out *ast_statement_enum) parse_r
   expr ast_expr;
   #parse_expr(p, kSemicolonPrec, AllowBracesYes, IsNotStatementExpr, &expr);
   #try_skip_oper(p, ';');
-  *out = Return({Has(embox(consume(&expr)))});
+  *out = Return({Has(embox(consume(move(&expr))))});
   return Success;
 }
 
@@ -1354,12 +1354,12 @@ func parse_condition(p *ps, ab allow_braces, out *ast_condition) parse_result {
     #parse_rest_of_constructor_pattern(p, m, &conspatt);
     #try_skip_oper(p, '=');
     #parse_expr(p, kConditionPrec, ab, IsNotStatementExpr, &rhs);
-    *out = PatternCondition({NotComputed, conspatt, embox(consume(&rhs))});
+    *out = PatternCondition({NotComputed, conspatt, embox(consume(move(&rhs)))});
     return Success;
   } else {
     condition ast_expr;
     #parse_expr(p, kConditionPrec, ab, IsNotStatementExpr, &condition);
-    *out = ExprCondition(embox(consume(&condition)));
+    *out = ExprCondition(embox(consume(move(&condition))));
     return Success;
   }
 }
@@ -1375,7 +1375,7 @@ func parse_rest_of_if_statement_enum(p *ps, out *ast_statement_enum) parse_resul
   #parse_bracebody(p, &thenbody);
 
   if ! +try_skip_keyw(p, Else) {
-    *out = IfThen({mk_condition_discard_info(), condition, thenbody});
+    *out = IfThen({mk_condition_discard_info(), condition, move(&thenbody)});
     return Success;
   }
 
@@ -1385,12 +1385,12 @@ func parse_rest_of_if_statement_enum(p *ps, out *ast_statement_enum) parse_resul
     #parse_rest_of_if_statement_enum(p, &elseif_u);
     end(p, m);
     elseif ast_statement = {m, elseif_u};
-    *out = IfThenElse({mk_condition_discard_info(), condition, thenbody, {NotComputed, mk_array(elseif)}});
+    *out = IfThenElse({mk_condition_discard_info(), move(&condition), move(&thenbody), {NotComputed, mk_array(elseif)}});
     return Success;
   }
   elsebody ast_bracebody;
   #parse_bracebody(p, &elsebody);
-  *out = IfThenElse({mk_condition_discard_info(), condition, thenbody, elsebody});
+  *out = IfThenElse({mk_condition_discard_info(), move(&condition), move(&thenbody), move(&elsebody)});
   return Success;
 }
 
@@ -1399,7 +1399,7 @@ func parse_rest_of_while_statement_enum(p *ps, out *ast_statement_enum) parse_re
   body ast_bracebody;
   #parse_condition(p, AllowBracesNo, &condition);
   #parse_bracebody(p, &body);
-  *out = While({mk_condition_discard_info(), condition, body});
+  *out = While({mk_condition_discard_info(), condition, move(&body)});
   return Success;
 }
 
@@ -1421,7 +1421,7 @@ func parse_rest_of_for_statement_enum(p *ps, out *ast_statement_enum) parse_resu
     expr ast_expr;
     #parse_expr(p, kConditionPrec, AllowBracesNo, IsNotStatementExpr, &expr);
     #try_skip_oper(p, ';');
-    condition = Has({mk_later(), embox(consume(&expr))});
+    condition = Has({mk_later(), embox(consume(move(&expr)))});
   }
   increment opt[box[ast_expr_discard]];
   lbrace tokval = Grouper(LBrace);
@@ -1430,12 +1430,12 @@ func parse_rest_of_for_statement_enum(p *ps, out *ast_statement_enum) parse_resu
   } else {
     expr ast_expr;
     #parse_expr(p, kSemicolonPrec, AllowBracesNo, IsStatementExpr, &expr);
-    increment = Has(embox(discard(&expr)));
+    increment = Has(embox(discard(move(&expr))));
   }
 
   body ast_bracebody;
   #parse_bracebody(p, &body);
-  *out = For({NotComputed, initializer, condition, increment, body});
+  *out = For({NotComputed, initializer, condition, increment, move(&body)});
   return Success;
 }
 
@@ -1447,12 +1447,12 @@ func parse_rest_of_switch_statement_enum(p *ps, out *ast_statement_enum) parse_r
   cases array[ast_switch_case];
   for ;; {
     if +try_skip_token(p, @[tokval]Grouper(RBrace)) {
-      *out = Switch({NotComputed, mk_later(), embox(consume(&swartch)), cases});
+      *out = Switch({NotComputed, mk_later(), embox(consume(move(&swartch))), move(&cases)});
       return Success;
     }
     cas ast_switch_case;
     #parse_switch_case(p, &cas);
-    push(&cases, cas);
+    pushmove(&cases, &cas);
   }
 }
 
@@ -1475,18 +1475,18 @@ func parse_switch_case(p *ps, out *ast_switch_case) parse_result {
           if count(&statements) == 0 {
             return Fail;
           }
-          body = {NotComputed, statements};
+          body = {NotComputed, move(&statements)};
           done = true;
         } else {
           st ast_statement;
           #parse_statement(p, &st);
-          push(&statements, st);
+          pushref(&statements, &st);
         }
       }
     case Error:
       return Fail;
   }
-  *out = {pattern, body};
+  *out = {pattern, move(&body)};
   return Success;
 }
 
@@ -1545,7 +1545,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
     expr ast_expr;
     #parse_expr(p, kSemicolonPrec, ab, IsStatementExpr, &expr);
     #try_skip_oper(p, ';');
-    *out = Expr(discard(&expr));
+    *out = Expr(discard(move(&expr)));
     return Success;
   }
 
@@ -1558,7 +1558,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
     whole_expr ast_expr;
     #parse_after_atomic_expr(p, kSemicolonPrec, ab, IsStatementExpr, lhs, &whole_expr);
     #try_skip_oper(p, ';');
-    *out = Expr(discard(&whole_expr));
+    *out = Expr(discard(move(&whole_expr)));
     return Success;
   } else {
     type ast_typeexpr;
@@ -1569,7 +1569,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
         whole_expr ast_expr;
         #parse_after_atomic_expr(p, kSemicolonPrec, ab, IsStatementExpr, lhs, &whole_expr);
         #try_skip_oper(p, ';');
-        *out = Expr(discard(&whole_expr));
+        *out = Expr(discard(move(&whole_expr)));
         return Success;
       }
       case Error: {
@@ -1597,7 +1597,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
   #try_skip_oper(p, '=');
   #parse_expr(p, kSemicolonPrec, ab, IsNotStatementExpr, &rhs);
   #try_skip_oper(p, ';');
-  *out = Var({NotComputed, decl, HasExpr(embox(consume(&rhs)))});
+  *out = Var({NotComputed, decl, HasExpr(embox(consume(move(&rhs))))});
   return Success;
 }
 
@@ -1635,7 +1635,7 @@ func parse_rest_of_string_literal(p *ps, m ast_meta, out *ast_expr) parse_result
     }
   }
   end(p, m);
-  *out = mk(m, @[ast_expr_enum]StringLiteral({specs}));
+  *out = mk(m, @[ast_expr_enum]StringLiteral({move(&specs)}));
   return Success;
 }
 
@@ -1667,10 +1667,10 @@ func parse_rest_of_char_literal(p *ps, m ast_meta, out *ast_expr) parse_result {
   }
 }
 
-func see_if_parse(file array[u8]) bool {
+func see_if_parse(file *array[u8]) bool {
   im identmap = make_im();
   posits positionals = mk_positionals();
-  p ps = make_ps(&im, &posits, 0, data(&file), count(&file));
+  p ps = make_ps(&im, &posits, 0, data(file), count(file));
   out ast_file;
   ret bool = +parse_file(&p, &out);
   if !ret {
@@ -1683,20 +1683,20 @@ func see_if_parse(file array[u8]) bool {
 }
 
 func run_parse_negtest(ctx *parse_test_ctx, test_name array[u8], file array[u8]) void {
-  help_run_parse_test(ctx, test_name, file, false);
+  help_run_parse_test(ctx, &test_name, &file, false);
 }
 
 func run_parse_test(ctx *parse_test_ctx, test_name array[u8], file array[u8]) void {
-  help_run_parse_test(ctx, test_name, file, true);
+  help_run_parse_test(ctx, &test_name, &file, true);
 }
 
-func help_run_parse_test(ctx *parse_test_ctx, test_name array[u8], file array[u8], expected_success bool) void {
+func help_run_parse_test(ctx *parse_test_ctx, test_name *array[u8], file *array[u8], expected_success bool) void {
   if ctx->verbose {
     print(Stdout(), _u8("test "));
     if !expected_success {
       print(Stdout(), _u8("!"));
     }
-    print(Stdout(), test_name);
+    print(Stdout(), *test_name);
     print(Stdout(), _u8("..."));
     ign var = fflush(Stdout());
   }

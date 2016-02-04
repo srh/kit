@@ -762,13 +762,8 @@ struct ast_expr_consume {
   expr ast_expr;
 }
 
-// TODO: Remove once we can costlessly pass by value.
-func consume(expr *ast_expr) ast_expr_consume {
-  return {NotComputed, *expr};
-}
-
 func consume(expr ast_expr) ast_expr_consume {
-  return {NotComputed, expr};
+  return {NotComputed, move(&expr)};
 }
 
 struct ast_expr_discard {
@@ -776,13 +771,8 @@ struct ast_expr_discard {
   expr ast_expr;
 }
 
-// TODO: Remove once we can costlessly pass by value.
-func discard(expr *ast_expr) ast_expr_discard {
-  return {NotComputed, *expr};
-}
-
 func discard(expr ast_expr) ast_expr_discard {
-  return {NotComputed, expr};
+  return {NotComputed, move(&expr)};
 }
 
 // Variadic generics doesn't support lifetime generics (for no particular reason, other than that we have no need for it) yet.  NOTE: type_from_inst assumes the fact that this doesn't support lifetime generics.
