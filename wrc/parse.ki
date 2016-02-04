@@ -55,7 +55,7 @@ func parse_file(p *ps, out *ast_file) parse_result {
   dbgparse("parse_file\n");
   arr array[ast_toplevel];
   #parse_toplevels(p, Eof, &arr);
-  *out = {arr};
+  *out = {move(&arr)};
   return Success;
 }
 
@@ -64,12 +64,12 @@ func parse_toplevels(p *ps, stop tokval, out *array[ast_toplevel]) parse_result 
   ret array[ast_toplevel];
   for ;; {
     if equal(&peek(p)->val, &stop) {
-      *out = ret;
+      swap(out, &ret);
       return Success;
     }
     top ast_toplevel;
     #parse_toplevel(p, &top);
-    push(&ret, top);
+    pushmove(&ret, &top);
   }
 }
 
