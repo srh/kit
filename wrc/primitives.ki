@@ -213,27 +213,28 @@ func add_primitives(cs *checkstate) void {
 func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool {
   // TODO: This implementation should work on complete types, use proper scoping rules (once we get scoping rules).
   if case &TeName(a te_name) = pt {
-    if a.value == cs->im->cym.i8sym {
+    im *identmap = cs->im;
+    if a.value == im->cym.i8sym {
       *out = cs->plat.i8traits.numeric;
-    } else if a.value == cs->im->cym.u8sym {
+    } else if a.value == im->cym.u8sym {
       *out = cs->plat.u8traits.numeric;
-    } else if a.value == cs->im->cym.o8sym {
+    } else if a.value == im->cym.o8sym {
       *out = cs->plat.o8traits.numeric;
-    } else if a.value == cs->im->cym.i16sym {
+    } else if a.value == im->cym.i16sym {
       *out = cs->plat.i16traits.numeric;
-    } else if a.value == cs->im->cym.u16sym {
+    } else if a.value == im->cym.u16sym {
       *out = cs->plat.u16traits.numeric;
-    } else if a.value == cs->im->cym.o16sym {
+    } else if a.value == im->cym.o16sym {
       *out = cs->plat.o16traits.numeric;
-    } else if a.value == cs->im->cym.i32sym {
+    } else if a.value == im->cym.i32sym {
       *out = cs->plat.i32traits.numeric;
-    } else if a.value == cs->im->cym.u32sym {
+    } else if a.value == im->cym.u32sym {
       *out = cs->plat.u32traits.numeric;
-    } else if a.value == cs->im->cym.o32sym {
+    } else if a.value == im->cym.o32sym {
       *out = cs->plat.o32traits.numeric;
-    } else if a.value == cs->im->cym.sizesym {
+    } else if a.value == im->cym.sizesym {
       *out = cs->plat.sizetraits.numeric;
-    } else if a.value == cs->im->cym.osizesym {
+    } else if a.value == im->cym.osizesym {
       *out = cs->plat.osizetraits.numeric;
     } else {
       return false;
