@@ -17,6 +17,7 @@ enum genexpr_result {
 
 
 func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num) cr[genexpr_result] {
+for ;; {
   gnc *gn_annot = ref_annot(h, gn);
   if case &Computed(checksum celltrack_checksum) = &gnc->plainly_live {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
@@ -155,15 +156,18 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
 
     case &GrSequence(a gr_sequence):
       #dumbly_analyze_returning_expression(h, gr, ctr, a.first);
-      return dumbly_analyze_expression(h, gr, ctr, a.second.x);
+      gn = a.second.x;
+      // Loop around.
 
     case &GrJmp(a gr_jmp):
-      return dumbly_analyze_expression(h, gr, ctr, a.next.x);
+      gn = a.next.x;
+      // Loop around.
 
     case &GrQNop:
       return NoFail(Terminal);
     }
   }
+}
 }
 
 func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *celltrack) void {
