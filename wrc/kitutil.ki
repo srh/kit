@@ -42,33 +42,55 @@ func[R, T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) cr[R] { DBG(x, y, z,
 func[R, T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) cr[R] { DBG(x, y, z, p, q, r, s); return Printed(false); }
 func[R, T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) cr[R] { DBG(x, y, z, p, q, r, s, t); return Printed(false); }
 
+func[T, U, V, W, X, Y, Z, A] consup(x T, y U, z V, p W, q X, r Y, s Z, t A) tup[tup[tup[T, U], tup[V, W]], tup[tup[X, Y], tup[Z, A]]] {
+  return {{{x, y}, {z, p}}, {{q, r}, {s, t}}};
+}
+func[T, U, V, W, X, Y, Z] consup(x T, y U, z V, p W, q X, r Y, s Z) tup[tup[tup[T, U], tup[V, W]], tup[tup[X, Y], Z]] {
+  return {{{x, y}, {z, p}}, {{q, r}, s}};
+}
+func[T, U, V, W, X, Y] consup(x T, y U, z V, p W, q X, r Y) tup[tup[tup[T, U], tup[V, W]], tup[X, Y]] {
+  return {{{x, y}, {z, p}}, {q, r}};
+}
+func[T, U, V, W, X] consup(x T, y U, z V, p W, q X) tup[tup[tup[T, U], tup[V, W]], X] {
+  return {{{x, y}, {z, p}}, q};
+}
+func[T, U, V, W] consup(x T, y U, z V, p W) tup[tup[T, U], tup[V, W]] {
+  return {{x, y}, {z, p}};
+}
+func[T, U, V] consup(x T, y U, z V) tup[tup[T, U], V] {
+  return {{x, y}, z};
+}
+func[T, U] consup(x T, y U) tup[T, U] {
+  return {x, y};
+}
+
 
 func[T, U, V, W, X, Y, Z, A] DBG(x T, y U, z V, p W, q X, r Y, s Z, t A) void {
-  DBG(cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), cons(s, t))));
+  DBG(consup(x, y, z, p, q, r, s, t));
 }
 
 func[T, U, V, W, X, Y, Z] DBG(x T, y U, z V, p W, q X, r Y, s Z) void {
-  DBG(cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), s)));
+  DBG(consup(x, y, z, p, q, r, s));
 }
 
 func[T, U, V, W, X, Y] DBG(x T, y U, z V, p W, q X, r Y) void {
-  DBG(cons(cons(cons(x, y), cons(z, p)), cons(q, r)));
+  DBG(consup(x, y, z, p, q, r));
 }
 
 func[T, U, V, W, X] DBG(x T, y U, z V, p W, q X) void {
-  DBG(cons(cons(cons(x, y), cons(z, p)), q));
+  DBG(consup(x, y, z, p, q));
 }
 
 func[T, U, V, W] DBG(x T, y U, z V, p W) void {
-  DBG(cons(cons(x, y), cons(z, p)));
+  DBG(consup(x, y, z, p));
 }
 
 func[T, U, V] DBG(x T, y U, z V) void {
-  DBG(cons(cons(x, y), z));
+  DBG(consup(x, y, z));
 }
 
 func[T, U] DBG(x T, y U) void {
-  DBG(cons(x, y));
+  DBG(consup(x, y));
 }
 
 func[T] DBG(x T) void {
@@ -80,31 +102,31 @@ func[T] DBG(x T) void {
 }
 
 func[T, U, V, W, X, Y, Z, A] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z, t A) np {
-  return MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), cons(s, t))));
+  return MERR(cs, m, consup(x, y, z, p, q, r, s, t));
 }
 
 func[T, U, V, W, X, Y, Z] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z) np {
-  return MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(cons(q, r), s)));
+  return MERR(cs, m, consup(x, y, z, p, q, r, s));
 }
 
 func[T, U, V, W, X, Y] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y) np {
-  return MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), cons(q, r)));
+  return MERR(cs, m, consup(x, y, z, p, q, r));
 }
 
 func[T, U, V, W, X] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X) np {
-  return MERR(cs, m, cons(cons(cons(x, y), cons(z, p)), q));
+  return MERR(cs, m, consup(x, y, z, p, q));
 }
 
 func[T, U, V, W] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W) np {
-  return MERR(cs, m, cons(cons(x, y), cons(z, p)));
+  return MERR(cs, m, consup(x, y, z, p));
 }
 
 func[T, U, V] MERR(cs *checkstate, m ast_meta, x T, y U, z V) np {
-  return MERR(cs, m, cons(cons(x, y), z));
+  return MERR(cs, m, consup(x, y, z));
 }
 
 func[T, U] MERR(cs *checkstate, m ast_meta, x T, y U) np {
-  return MERR(cs, m, cons(x, y));
+  return MERR(cs, m, consup(x, y));
 }
 
 func[T] MERR(cs *checkstate, m ast_meta, x T) np {

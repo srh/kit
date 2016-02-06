@@ -227,10 +227,6 @@ struct[S, T] tup {
   cdr T;
 }
 
-inline func[S, T] cons(s S, t T) tup[S, T] {
-  return {s, t};
-}
-
 inline func[S, T] `==`(x tup[S, T], y tup[S, T]) bool {
   return x.car == y.car && x.cdr == y.cdr;
 }

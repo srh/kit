@@ -1031,7 +1031,7 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
         *moved_cell_ix_out = Has(ix);
       } else {
         copy ctor_desc = #get_copy_ctor(es->clq, &info->cu);
-        annotate(after, mk_after(@[consume_actions]ConsumeByCopy(cons(@[copy_action]+{copy, dest, desc.num}, desc.deadme)), dest));
+        annotate(after, mk_after(@[consume_actions]ConsumeByCopy({@[copy_action]+{copy, dest, desc.num}, desc.deadme}), dest));
         *moved_cell_ix_out = None;
       }
     }
