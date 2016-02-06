@@ -74,12 +74,52 @@ func vt_xops(c cgt, gn gr_num) cr[gr_num] {
         case JmpForward:
           gn = a.next.x;
         case ExitNormalcy(b gr_jmp_exit_normalcy):
-          return NoFail(gn);
+          saved_state vt_state = c.track->current;
+          #vt_abnormal_excursion(c, a.next.x);
+          c.track->current = saved_state;
+          gn = b.subsequent_normalcy.x;
+          // loop around
         case ReenterNormalcy:
           ice(_u8("vt_xops sees GrJmp ReenterNormalcy"));
         }
       case &GrQNop:
         return NoFail(gn);
+      }
+    }
+  }
+}
+
+func vt_abnormal_excursion(c cgt, gn gr_num) np {
+  for ;; {
+    switch ref_node(c.gr, gn) {
+    case &XOp(xn gr_xnode):
+      ice(_u8("vt_abnormal_excursion sees a xop."));
+    case &QOp(qn gr_qnode):
+      // Abnormal excursions could merge together, yes.
+      if qn.indegree.x > 1 {
+        if Stale == #unify_vt_state(&ref(&c.track->annot, gn.x)->savestate, &c.track->current) {
+          return NoFail;
+        }
+      }
+      switch &qn.op {
+      case &GrBranch(a gr_branch):
+        ice(_u8("vt_abnormal_excursion sees a branch"));
+      case &GrSequence(a gr_sequence):
+        #vt_single_xop(c, a.first);
+        gn = a.second.x;
+      case &GrJmp(a gr_jmp):
+        switch a.disposition {
+        case JmpForward:
+          gn = a.next.x;
+        case ExitNormalcy(b gr_jmp_exit_normalcy):
+          ice(_u8("vt_abnormal_excursion sees an ExitNormalcy"));
+        case ReenterNormalcy:
+          // TODO(): If not stale, we need to create a "to-retrack-from" marking.
+          fr freshness = #unify_vt_state(&ref(&c.track->annot, a.next.x.x)->savestate, &c.track->current);
+          return NoFail;
+        }
+      case &GrQNop:
+        ice(_u8("vt_abnormal_excursion sees a QNop (is it final_node?)"));
       }
     }
   }
