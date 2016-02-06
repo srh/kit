@@ -1,0 +1,27 @@
+struct vt_state {  }
+
+enum freshness {
+  Stale void;
+  // There's a change in the information formed by unification.
+  Fresh void;
+}
+
+func `==`(x freshness, y freshness) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+
+// Returns whether "onto" changed.
+func unify_vt_state(onto *opt[vt_state], from *vt_state) cr[freshness] {
+  if case &Has(s vt_state) = onto {
+    return unify_vt_state(&s, from);
+  } else {
+    *onto = Has(*from);
+    return NoFail(Fresh);
+  }
+}
+
+// Returns whether "onto" changed.
+func unify_vt_state(onto *vt_state, from *vt_state) cr[freshness] {
+  // do nothing, vt_state is an empty struct.
+  return NoFail(Stale);
+}

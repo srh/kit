@@ -1,4 +1,5 @@
 import graph;
+import valstate;
 
 struct vt_track {
   current vt_state;
@@ -10,11 +11,9 @@ struct vt_track {
 func mk_track(gr *frame_graph) vt_track {
   return {
     @[vt_state]{ },
-    repeat(count(&gr->cells), {None})
+    repeat(count(&gr->ops), {None})
   };
 }
-
-struct vt_state {  }
 
 struct vt_annot {
   savestate opt[vt_state];
@@ -57,8 +56,9 @@ func vt_xops(c cgt, gn gr_num) cr[gr_num] {
       ice(_u8("vt_xops sees an xop."));
     case &QOp(qn gr_qnode):
       if qn.indegree.x > 1 {
-        // TODO(): Presumably we should handle in-degree more appropriately?
-        return NoFail(gn);
+        if Stale == #unify_vt_state(&ref(&c.track->annot, gn.x)->savestate, &c.track->current) {
+          return NoFail(gn);
+        }
       }
       switch &qn.op {
       case &GrBranch(a gr_branch):
