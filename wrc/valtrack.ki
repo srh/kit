@@ -1,0 +1,6 @@
+import graph;
+
+func ensure_def_inst_valtracked(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) np {
+  #ensure_def_inst_graphed(clq, ent_id, inst_id);
+  return NoFail;
+}
