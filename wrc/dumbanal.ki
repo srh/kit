@@ -1,8 +1,7 @@
 import state;
 
 func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num) np {
-  mbmut genexpr_result;
-  #dumbly_analyze_expression(h, gr, ctr, gn, &mbmut);
+  mbmut genexpr_result = #dumbly_analyze_expression(h, gr, ctr, gn);
   switch &mbmut {
   case &Terminal:
     return NoFail;
@@ -17,15 +16,14 @@ enum genexpr_result {
 }
 
 
-func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num, out *genexpr_result) np {
+func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num) cr[genexpr_result] {
   gnc *gn_annot = ref_annot(h, gn);
   if case &Computed(checksum celltrack_checksum) = &gnc->plainly_live {
     // TODO: We should also check that we're part of the same sequential _family_ of exprs.
     if !matches_checksum(ctr, &checksum) {
       return ERR(_u8("ICE: Inconsistent liveness/active state when revisiting node ("), gn.x, _u8("), celltrack="), *ctr);
     }
-    *out = NonTerminal;
-    return NoFail;
+    return NoFail(NonTerminal);
   }
 
   annotate(&gnc->plainly_live, get_checksum(ctr));
@@ -59,8 +57,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
       for i size = 0; i < nparams; i = i + 1 {
         deaden(ctr, get(&a.params, i));
       }
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
 
     case &GrPrimApply(a gr_prim_apply):
       expect_live(ctr, a.retcell);
@@ -74,73 +71,61 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
       for i size = 0; i < nparams; i = i + 1 {
         deaden(ctr, get(&a.params, i));
       }
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
 
     case &GrMemCopy(a gr_memcopy):
       expect_live(ctr, a.dest);
       expect_live(ctr, a.src);
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
 
     case &GrWriteConst(a gr_writeconst):
       expect_live(ctr, a.dest);
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
 
     case &GrAddressof(a gr_addressof):
       expect_live(ctr, a.addressee);
       expect_live(ctr, a.dest);
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
 
     case &GrDeref(a gr_deref):
       expect_live(ctr, a.pointer);
       check(!isLocationStatic(ref_cell(gr, a.name)->location));
       create(h, ctr, a.name);
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
 
     case &GrSubcell(a gr_subcell):
       expect_live(ctr, a.partof);
       check(!isLocationStatic(ref_cell(gr, a.name)->location));
       create(h, ctr, a.name);
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
 
     case &GrLive(a gr_live):
       create(h, ctr, a.cell);
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
 
     case &GrAssertLive(a gr_assert_live):
       expect_live(ctr, a.cell);
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
 
     case &GrDead(a gr_dead):
       deaden(ctr, a.cell);
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
 
     case &GrVirtualDead(a gr_virtual_dead):
       deaden(ctr, a.cell);
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
 
     case &GrActiveXop(a gr_active_xop):
       gr_track_active_op(ctr, a.op1);
       gr_track_active_op(ctr, a.op2);
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
 
     case &GrManyActiveXop(a gr_many_active_xop):
       nops size = count(&a.ops);
       for i size = 0; i < nops; i = i + 1 {
         gr_track_active_op(ctr, get(&a.ops, i));
       }
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
     }
 
   case &QOp(qn gr_qnode):
@@ -154,33 +139,29 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
       for i size = 0; i < ncases; i = i + 1 {
         cas *gr_branch_pair = &a.cases[i];
         new_live celltrack = *ctr;
-        casmut genexpr_result;
-        #dumbly_analyze_expression(h, gr, &new_live, cas->target.sn.x, &casmut);
+        casmut genexpr_result = #dumbly_analyze_expression(h, gr, &new_live, cas->target.sn.x);
         combine_branch_mut(&new_live, &combined_mut, casmut, &end_ctr);
       }
 
       if case Has(def_target gr_branch_target) = a.default_case {
         new_live celltrack = *ctr;
-        defcasmut genexpr_result;
-        #dumbly_analyze_expression(h, gr, &new_live, def_target.sn.x, &defcasmut);
+        defcasmut genexpr_result = #dumbly_analyze_expression(h, gr, &new_live, def_target.sn.x);
         combine_branch_mut(&new_live, &combined_mut, defcasmut, &end_ctr);
       }
 
       // Yes this is empty of it's NonTerminal -- it doesn't matter.
       *ctr = end_ctr;
-      *out = combined_mut;
-      return NoFail;
+      return NoFail(combined_mut);
 
     case &GrSequence(a gr_sequence):
       #dumbly_analyze_returning_expression(h, gr, ctr, a.first);
-      return dumbly_analyze_expression(h, gr, ctr, a.second.x, out);
+      return dumbly_analyze_expression(h, gr, ctr, a.second.x);
 
     case &GrJmp(a gr_jmp):
-      return dumbly_analyze_expression(h, gr, ctr, a.next.x, out);
+      return dumbly_analyze_expression(h, gr, ctr, a.next.x);
 
     case &GrQNop:
-      *out = Terminal;
-      return NoFail;
+      return NoFail(Terminal);
     }
   }
 }
