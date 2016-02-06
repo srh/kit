@@ -1,16 +1,23 @@
 import graph;
 
 struct vt_track {
+  current vt_state;
+
   // Indexed by gr_num.
   annot array[vt_annot];
 }
 
 func mk_track(gr *frame_graph) vt_track {
-  return {repeat(count(&gr->cells), { })};
+  return {
+    @[vt_state]{ },
+    repeat(count(&gr->cells), {None})
+  };
 }
 
-struct vt_annot {
+struct vt_state {  }
 
+struct vt_annot {
+  savestate opt[vt_state];
 }
 
 struct cgt {
