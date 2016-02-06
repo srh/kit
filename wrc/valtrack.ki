@@ -2,5 +2,18 @@ import graph;
 
 func ensure_def_inst_valtracked(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) np {
   #ensure_def_inst_graphed(clq, ent_id, inst_id);
+  #valtrack_regraphed(clq, un(&ref_inst(clq->cs, inst_id)->graph));
   return NoFail;
 }
+
+func valtrack_regraphed(clq *clqueue, gr *frame_regraphed) np {
+  // TODO()
+  return NoFail;
+}
+
+func valtrack_graph(clq *clqueue, gr *frame_graph) np {
+  // TODO()
+  return NoFail;
+}
+
+
