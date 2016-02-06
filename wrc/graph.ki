@@ -1553,7 +1553,7 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda) cr[gr_num] {
   gr_deaden(&lambda_ctr, info->return_cell);
   gr_check_empty(&lambda_ctr);
 
-  #vt_graph(gs.clq, &lambda_gr);
+  #vt_graph(gs.clq, &lambda_gr, fullbody_gn);
 
   id fn_body_id = add_fn_body(gs.clq->cs, {gs.gr->informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {move(&lambda_gr), fullbody_gn, info->return_cell}, info->arg_cells, parsed_inline_to_state_inline(a->is_inline), NotComputed})});
   bu sq_builder = mk_builder(gs);

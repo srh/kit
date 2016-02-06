@@ -1,5 +1,24 @@
 import graph;
 
+struct vt_track {
+  // Indexed by gr_num.
+  annot array[vt_annot];
+}
+
+func mk_track(gr *frame_graph) vt_track {
+  return {repeat(count(&gr->cells), { })};
+}
+
+struct vt_annot {
+
+}
+
+struct cgt {
+  clq *clqueue;
+  gr *frame_graph;
+  track *vt_track;
+}
+
 func ensure_def_inst_valtracked(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) np {
   #ensure_def_inst_graphed(clq, ent_id, inst_id);
   #vt_regraphed(clq, un(&ref_inst(clq->cs, inst_id)->graph));
@@ -11,9 +30,48 @@ func vt_regraphed(clq *clqueue, gr *frame_regraphed) np {
   return NoFail;
 }
 
-func vt_graph(clq *clqueue, gr *frame_graph) np {
+func vt_graph(clq *clqueue, gr *frame_graph, gn gr_num) np {
+  // This uses a different traversal algorithm than some other graph-traversing code.  Metadata that tells us about the AST's structure make us revisit alternate branches more "locally," and more importantly, in a defined order that can be described in terms of the original AST.
+
+  track vt_track = mk_track(gr);
+
+  new_gn gr_num = #vt_xops({clq, gr, &track}, gn);
+
+
   // TODO()
   return NoFail;
 }
 
-
+func vt_xops(c cgt, gn gr_num) cr[gr_num] {
+  for ;; {
+    switch ref_node(c.gr, gn) {
+    case &XOp(xn gr_xnode):
+      // We should be chasing a qop chain.
+      ice(_u8("vt_xops sees an xop."));
+    case &QOp(qn gr_qnode):
+      if qn.indegree.x > 1 {
+        // TODO(): Presumably we should handle in-degree more appropriately?
+        return NoFail(gn);
+      }
+      switch &qn.op {
+      case &GrBranch(a gr_branch):
+        return NoFail(gn);  // TODO()
+      case &GrSequence(a gr_sequence):
+        // TODO(): Do the .first.
+        gn = a.second.x;
+        // loop around
+      case &GrJmp(a gr_jmp):
+        switch a.disposition {
+        case JmpForward:
+          gn = a.next.x;
+        case ExitNormalcy(b gr_jmp_exit_normalcy):
+          return NoFail(gn);
+        case ReenterNormalcy:
+          ice(_u8("vt_xops sees GrJmp ReenterNormalcy"));
+        }
+      case &GrQNop:
+        return NoFail(gn);
+      }
+    }
+  }
+}
