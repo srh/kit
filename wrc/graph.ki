@@ -3041,13 +3041,13 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
         case &InstRhsPrim(op primitive_op): {
           id fn_body_id = add_prim_fn_body(clq, ent->def_name, &inst_typrop->cu, op);
           frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
-          inst->graph = Computed(Has(frg));
+          inst->graph = Computed(frg);
           return NoFail;
         }
         case &InstRhsExtern: {
           id fn_body_id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
           frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
-          inst->graph = Computed(Has(frg));
+          inst->graph = Computed(frg);
           return NoFail;
         }
         case &InstRhsExpr(dire def_inst_rhs_expr): {
@@ -3072,7 +3072,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           gr_deaden(&ctr, rcell);
           gr_check_empty(&ctr);
 
-          inst->graph = Computed(Has(@[frame_regraphed]{gr, gn, rcell}));
+          inst->graph = Computed(@[frame_regraphed]{gr, gn, rcell});
           return NoFail;
         }
 
@@ -3081,12 +3081,12 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           case &NonMagicCtor(wnmc which_non_magic_ctor):
             info *non_magic_ctor_info = un(&wnmc.nmc.info);
             frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstDef(info->ip));
-            inst->graph = Computed(Has(frg));
+            inst->graph = Computed(frg);
             return NoFail;
           case &NonMagicProp(nmp non_magic_prop):
             info u32 = *un(&nmp.info);
             frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typrop->cu, &inst_typrop->props, @[gr_const]ConstInt(~info));
-            inst->graph = Computed(Has(frg));
+            inst->graph = Computed(frg);
             return NoFail;
           }
         }
@@ -3104,7 +3104,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           }
 
           frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
-          inst->graph = Computed(Has(frg));
+          inst->graph = Computed(frg);
           return NoFail;
         }
       }
@@ -3116,7 +3116,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
     case &FailedComputation: {
       return ERR(_u8("ensure_def_inst_graphed fails again on same def"));
     }
-    case &Computed(odr opt[frame_regraphed]): {
+    case &Computed(odr frame_regraphed): {
       return NoFail;
     }
   }

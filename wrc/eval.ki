@@ -315,12 +315,8 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
   check(is_defwise_trivial(&inst_ty->props));
 
   fg *frame_regraphed;
-  if case &Computed(ofg opt[frame_regraphed]) = &inst->graph {
-    if case &Has(fg2 frame_regraphed) = &ofg {
-      fg = &fg2;
-    } else {
-      ice(_u8("st_eval_def on prim or extern def "), defname);
-    }
+  if case &Computed(fg2 frame_regraphed) = &inst->graph {
+    fg = &fg2;
   } else {
     ice(_u8("Evaling def whose graph we have not computed."));
   }

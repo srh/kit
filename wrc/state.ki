@@ -506,8 +506,7 @@ struct def_inst {
   // TODO: Many needless uses of unHas, also some of the users of this could stand to take one cu_typrop parameter instead of its fields separately.
   typrop nbfc[cu_typrop];
   rhs_status def_inst_rhs_status;
-  // This is None for InstRhsExtern.
-  graph nbfc[opt[frame_regraphed]];
+  graph nbfc[frame_regraphed];
   evaled_value nbfc[st_value];
 }
 
