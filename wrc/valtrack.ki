@@ -64,7 +64,14 @@ func vt_xops(c cgt, gn gr_num) cr[gr_num] {
       }
       switch &qn.op {
       case &GrBranch(a gr_branch):
-        return NoFail(gn);  // TODO()
+        switch a.info.disposition {
+        case ForwardBranch(join_target sq_num):
+          return NoFail(gn);  // TODO()
+        case LoopingBranch:
+          return NoFail(gn);  // TODO()
+        case ExceptionalBranch:
+          return NoFail(gn);  // TODO()
+        }
       case &GrSequence(a gr_sequence):
         #vt_single_xop(c, a.first);
         gn = a.second.x;
