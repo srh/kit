@@ -480,9 +480,18 @@ struct gr_branch_pair {
   target gr_branch_target;
 }
 
+// This could be computed from the bucket counts seen in the set of branch target dispositions... I think.
+enum gr_branch_disposition {
+  // An if/then/else branch, or switch, for which there's a join point, all ForwardTargets.
+  ForwardBranch sq_num;
+  // A branch with one ForwardTarget and one LoopingTarget.
+  LoopingBranch void;
+  // A branch with one success path and one abnormal path.
+  ExceptionalBranch void;
+}
+
 struct gr_branch_info {
-  // For branches with multiple forward targets (i/t/e, switch, other non-loops), we annotate where those branches join.
-  forward_join_point opt[sq_num];
+  disposition gr_branch_disposition;
 }
 
 struct gr_branch {
@@ -782,7 +791,7 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
     }
   }
 
-  br sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&branch_cases), None, @[gr_branch_info]{Has(exit_target.sn)}}));
+  br sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&branch_cases), None, @[gr_branch_info]{ForwardBranch(exit_target.sn)}}));
 
   note_celltrack(&exit_target.note, gs.ctr);
   append(bu, JmpForward, br, exit_target.sn);
@@ -810,7 +819,7 @@ func gr_for_statement(gs gr_statep, fb *fullbody_state, a *ast_for_statement, bu
 
   if case &Has(cond ast_expr_condition) = &a->condition {
     else_gn sq_num = nopq(gs.gr);
-    top.sn = #gr_expr_condition(gs, oo(&cond.expr), {body_entry_gn, LoopingTarget}, {else_gn, ForwardTarget}, None);
+    top.sn = #gr_expr_condition(gs, oo(&cond.expr), {body_entry_gn, LoopingTarget}, {else_gn, ForwardTarget}, LoopingBranch);
     condition_else_gn = Has(else_gn);
   } else {
     top.sn= body_entry_gn;
@@ -902,7 +911,7 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
 
   top tracked_target;
   top.note = mk_noted(gs);
-  top.sn = #gr_condition(gs, fb, &a->condition, {then_nop, LoopingTarget}, {else_nop, ForwardTarget}, &then_save, &else_save, None);
+  top.sn = #gr_condition(gs, fb, &a->condition, {then_nop, LoopingTarget}, {else_nop, ForwardTarget}, &then_save, &else_save, LoopingBranch);
 
   restore_celltrack(gs.ctr, &then_save);
 
@@ -939,7 +948,7 @@ func gr_ifthenelse_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrac
   then_save gr_savetrack;
   else_save gr_savetrack;
 
-  gn sq_num = #gr_condition(gs, fb, &a->condition, {then_nop, ForwardTarget}, {else_nop, ForwardTarget}, &then_save, &else_save, Has(join_target.sn));
+  gn sq_num = #gr_condition(gs, fb, &a->condition, {then_nop, ForwardTarget}, {else_nop, ForwardTarget}, &then_save, &else_save, ForwardBranch(join_target.sn));
 
   restore_celltrack(gs.ctr, &then_save);
 
@@ -980,7 +989,7 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   then_save gr_savetrack;
   else_save gr_savetrack;
 
-  gn sq_num = #gr_condition(gs, fb, &a->condition, {then_nop, ForwardTarget}, {else_nop, ForwardTarget}, &then_save, &else_save, Has(join_target.sn));
+  gn sq_num = #gr_condition(gs, fb, &a->condition, {then_nop, ForwardTarget}, {else_nop, ForwardTarget}, &then_save, &else_save, ForwardBranch(join_target.sn));
 
   restore_celltrack(gs.ctr, &then_save);
 
@@ -1001,20 +1010,20 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   return NoFail;
 }
 
-func gr_expr_condition(gs gr_statep, a *ast_expr_consume, then_target gr_branch_target, else_target gr_branch_target, forward_join_point opt[sq_num]) cr[sq_num] {
+func gr_expr_condition(gs gr_statep, a *ast_expr_consume, then_target gr_branch_target, else_target gr_branch_target, disposition gr_branch_disposition) cr[sq_num] {
   bu sq_builder = mk_builder(gs);
   #gr_live_and_expr_consume(gs, a, &bu);
   cases shray[gr_branch_pair] = mk_shray({@[gr_const]ConstInt(bigu(0)), else_target});
-  br var = addq(gs.gr, @[gr_qop]GrBranch({result_cell(a), cases, Has(then_target), @[gr_branch_info]{forward_join_point}}));
+  br var = addq(gs.gr, @[gr_qop]GrBranch({result_cell(a), cases, Has(then_target), @[gr_branch_info]{disposition}}));
   ret sq_num = mut_connect_untracked(&bu, br, JmpForward);
   return NoFail(ret);
 }
 
 // Leaves the celltrack state in a garbage state -- caller needs to restore thentrack or elsetrack, depending on which it processes first.
-func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_target gr_branch_target, else_target gr_branch_target, thentrack_out *gr_savetrack, elsetrack_out *gr_savetrack, forward_join_point opt[sq_num]) cr[sq_num] {
+func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_target gr_branch_target, else_target gr_branch_target, thentrack_out *gr_savetrack, elsetrack_out *gr_savetrack, disposition gr_branch_disposition) cr[sq_num] {
   switch a {
     case &ExprCondition(bec box[ast_expr_consume]): {
-      ret sq_num = #gr_expr_condition(gs, oo(&bec), then_target, else_target, forward_join_point);
+      ret sq_num = #gr_expr_condition(gs, oo(&bec), then_target, else_target, disposition);
       *thentrack_out = save_celltrack(gs.ctr);
       *elsetrack_out = save_celltrack(gs.ctr);
       return NoFail(ret);
@@ -1073,7 +1082,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_targe
         *elsetrack_out = save_celltrack(gs.ctr);
       }
 
-      br_point sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None, @[gr_branch_info]{forward_join_point}}));
+      br_point sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None, @[gr_branch_info]{disposition}}));
       br sq_num = mut_connect_untracked(&bef_bu, br_point, JmpForward);
 
       return NoFail(br);
@@ -1372,7 +1381,7 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
     restore_celltrack(gs.ctr, &saved_aftersuccess);
   }
 
-  br sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&cases), None, @[gr_branch_info]{None}}));
+  br sq_num = addq(gs.gr, @[gr_qop]GrBranch({info->tag_cell, freeze(&cases), None, @[gr_branch_info]{ExceptionalBranch}}));
 
   append(bu, JmpForward, br, success_nopq);
   return NoFail;
@@ -1406,7 +1415,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
 
   then_nop sq_num = nopq(gs.gr);
   else_nop sq_num = nopq(gs.gr);
-  cond_sn sq_num = #gr_expr_condition(gs, oo(&oo(&a->condition)->expr), {then_nop, ForwardTarget}, {else_nop, ForwardTarget}, Has(join_target.sn));
+  cond_sn sq_num = #gr_expr_condition(gs, oo(&oo(&a->condition)->expr), {then_nop, ForwardTarget}, {else_nop, ForwardTarget}, ForwardBranch(join_target.sn));
 
   postcond_save gr_savetrack = save_celltrack(gs.ctr);
 
@@ -1794,7 +1803,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
 
       cases shray[gr_branch_pair] = mk_shray({@[gr_const]ConstInt(bigu(0)), {do_assign_sn, ForwardTarget}}, {@[gr_const]ConstInt(bigu(1)), {just_dead_sn, ForwardTarget}});
 
-      br sq_num = addq(gs.gr, @[gr_qop]GrBranch({cmp_result, cases, None, @[gr_branch_info]{Has(exit_nopq.sn)}}));
+      br sq_num = addq(gs.gr, @[gr_qop]GrBranch({cmp_result, cases, None, @[gr_branch_info]{ForwardBranch(exit_nopq.sn)}}));
 
       // br is an expression node -- the cases attach to nopq's
       append(bu, JmpForward, br, exit_nopq.sn);
@@ -1861,7 +1870,7 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
     eval_rhs_case = ConstInt(bigu(1));
   }
 
-  bn sq_num = addq(gs.gr, @[gr_qop]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, {lhs_sn, ForwardTarget}}, {eval_rhs_case, {rhs_sn, ForwardTarget}}), None, @[gr_branch_info]{Has(end_nopq.sn)}}));
+  bn sq_num = addq(gs.gr, @[gr_qop]GrBranch({result_cell(oo(&a->lhs)), mk_shray({short_circuit_case, {lhs_sn, ForwardTarget}}, {eval_rhs_case, {rhs_sn, ForwardTarget}}), None, @[gr_branch_info]{ForwardBranch(end_nopq.sn)}}));
   append(bu, JmpForward, bn, end_nopq.sn);
   return NoFail;
 }
@@ -2446,7 +2455,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   tie_gn sq_num = mut_connect(gs, &loop_bu, &top, JmpForward);
 
   deadseq_nopq sq_num = nopq(&gr);
-  branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray({@[gr_const]ConstInt(bigu(terminal_case)), {deadseq_nopq, ForwardTarget}}), Has({tie_gn, LoopingTarget}), @[gr_branch_info]{None}}));
+  branch_gn sq_num = addq(&gr, @[gr_qop]GrBranch({indexcell, mk_shray({@[gr_const]ConstInt(bigu(terminal_case)), {deadseq_nopq, ForwardTarget}}), Has({tie_gn, LoopingTarget}), @[gr_branch_info]{LoopingBranch}}));
 
   jmp_qnop_node(&gr, top.sn, branch_gn, JmpForward);
 
@@ -2647,7 +2656,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), {ztseq, ForwardTarget}});
   }
 
-  br sq_num = addq(&gr, @[gr_qop]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None, @[gr_branch_info]{Has(join_target.sn)}}));
+  br sq_num = addq(&gr, @[gr_qop]GrBranch({get(&tagcells, nargs - 1), freeze(&cases_gn), None, @[gr_branch_info]{ForwardBranch(join_target.sn)}}));
   append(&bu, JmpForward, br, join_target.sn);
   for i size = nargs; i > 0; {
     i = i - 1;
