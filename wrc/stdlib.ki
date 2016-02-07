@@ -377,6 +377,10 @@ func[T] move(x *T) T {
   return ret;
 }
 
+func[T] fromBool(x bool) T {
+  return x then 1 else 0;
+}
+
 inline func[T] `++`(x *T) void { *x = *x + 1; }
 inline func[T] `--`(x *T) void { *x = *x - 1; }
 inline func[T] `+=`(x *T, y T) void { *x = *x + y; }

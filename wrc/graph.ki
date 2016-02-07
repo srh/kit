@@ -581,6 +581,22 @@ func mk_noted(gs gr_statep) noted_celltrack {
   return mk_noted(gs.ctr);
 }
 
+// This and branch_target_ref are helpers to dumbly iterate over branch targets.
+func branch_target_count(a *gr_branch) size {
+  n size = count(&a->cases);
+  return n + fromBool(isHas(&a->default_case));
+}
+
+func branch_target_ref(a *gr_branch, ix size) *gr_branch_target {
+  ccount size = count(&a->cases);
+  if ix < ccount {
+    return &ref(&a->cases, ix)->target;
+  } else {
+    check(ix == ccount);
+    return unHas(&a->default_case);
+  }
+}
+
 struct fullbody_state {
   // all_vars and labels is from the ast_fullbody_info.
   // We use the cell field, to know the name of the var's cell.

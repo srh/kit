@@ -136,18 +136,12 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
 
         end_ctr celltrack;
         combined_mut genexpr_result = NonTerminal;
-        ncases size = count(&a.cases);
-        for i size = 0; i < ncases; i = i + 1 {
-          cas *gr_branch_pair = &a.cases[i];
+        ntargets size = branch_target_count(&a);
+        for i size = 0; i < ntargets; i++ {
+          target *gr_branch_target = branch_target_ref(&a, i);
           new_live celltrack = *ctr;
-          casmut genexpr_result = #dumbly_analyze_expression(h, gr, &new_live, cas->target.sn.x);
+          casmut genexpr_result = #dumbly_analyze_expression(h, gr, &new_live, target->sn.x);
           combine_branch_mut(&new_live, &combined_mut, casmut, &end_ctr);
-        }
-
-        if case Has(def_target gr_branch_target) = a.default_case {
-          new_live celltrack = *ctr;
-          defcasmut genexpr_result = #dumbly_analyze_expression(h, gr, &new_live, def_target.sn.x);
-          combine_branch_mut(&new_live, &combined_mut, defcasmut, &end_ctr);
         }
 
         // Yes this is empty of it's NonTerminal -- it doesn't matter.
