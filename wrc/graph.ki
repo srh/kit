@@ -70,6 +70,17 @@ struct gr_qnode_indegree {
   x u32;
 }
 
+struct gr_beginseg {
+  partof sq_num;
+  end sq_num;
+}
+
+enum gr_qnode_seginfo {
+  PartofSeg sq_num;
+  BeginSeg gr_beginseg;
+  EndSeg sq_num;
+}
+
 struct gr_qnode {
   op gr_qop;
   indegree gr_qnode_indegree;
