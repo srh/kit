@@ -333,21 +333,21 @@ struct segmarker {
 }
 
 func begin_segment(bu *sq_builder) segmarker {
-  beg sq_num = bu->last;
-  qn *gr_qnode = access_qnode(bu->gr, bu->last);
-  if case &PartofSeg(osn opt[sq_num]) = &qn->seginfo {
-    check(osn == bu->curseg->osn);
-    end sq_num = nopq(bu->gr, EndSeg(beg));
-    qn->seginfo = BeginSeg({osn, end});
-    bu->curseg->osn = Has(beg);
-    return {osn, beg, end};
-  } else {
-    ice(_u8("mark_segbegin sees marked node"));
-    return fake();
-  }
+  // beg starts with a placeholder value.
+  // end gets connected to the bu and the rest of the graph in end_segment.
+  beg sq_num = nopq(bu->gr, @[gr_seginfo]PartofSeg(None));
+  end sq_num = nopq(bu->gr, EndSeg(beg));
+
+  qn *gr_qnode = access_qnode(bu->gr, beg);
+  osn opt[sq_num] = bu->curseg->osn;
+  qn->seginfo = BeginSeg({osn, end});
+  append(bu, JmpForward, beg, beg);
+  bu->curseg->osn = Has(beg);
+  return {osn, beg, end};
 }
 
 func end_segment(bu *sq_builder, mark segmarker) void {
+  check(bu->curseg->osn == Has(mark.begin));
   append(bu, JmpForward, mark.end, mark.end);
   bu->curseg->osn = mark.partof;
 }
