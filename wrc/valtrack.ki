@@ -38,9 +38,8 @@ func ensure_def_inst_valtracked(clq *clqueue, ent_id def_entry_id, inst_id def_i
   return NoFail;
 }
 
-func vt_regraphed(clq *clqueue, gr *frame_regraphed) np {
-  // TODO()
-  return NoFail;
+func vt_regraphed(clq *clqueue, fg *frame_regraphed) np {
+  return vt_graph(clq, &fg->gr, fg->gn);
 }
 
 func vt_graph(clq *clqueue, gr *frame_graph, gn gr_num) np {
