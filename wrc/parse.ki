@@ -1477,6 +1477,7 @@ func parse_rest_of_foreach_statement_enum(p *ps, out *ast_statement_enum) parse_
 
   iteree_var_st ast_var_statement = {NotComputed, @[ast_vardecl]{{m, iteree_var_name}, Unknown({})}, HasExpr(embox(consume(iteree)))};
   iter_var_st ast_var_statement = {NotComputed, @[ast_vardecl]{{m, iter_var_name}, Unknown({})}, HasExpr(embox(consume(wrapapply(m, p->im->cym.do_iter_mk, iteree_var_name))))};
+  decl_var_st ast_var_statement = {NotComputed, decl, HasExpr(embox(consume(wrapapply(m, p->im->cym.do_iter_access, wrapaddressof(m, iter_var_name)))))};
 
   *out = Block({@[ast_bracebody]{
     NotComputed,
@@ -1487,7 +1488,12 @@ func parse_rest_of_foreach_statement_enum(p *ps, out *ast_statement_enum) parse_
         Has(embox(@[ast_statement]{m, Var(iter_var_st)})),
         Has({mk_later(), embox(consume(wrapapply(m, p->im->cym.do_iter_done, wrapaddressof(m, iter_var_name))))}),
         Has(embox(discard(wrapapply(m, p->im->cym.do_iter_step, wrapaddressof(m, iter_var_name))))),
-        move(&body)})}
+        @[ast_bracebody]{
+          NotComputed,
+          mk_array@[ast_statement](
+            {m, Var(decl_var_st)},
+            {m, Block({move(&body)})})
+        }})}
     )
   }});
 
