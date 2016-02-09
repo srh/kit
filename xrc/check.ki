@@ -39,19 +39,18 @@ func check_module(cs *checkstate, mod_name sym) np {
   id module_id = #process_module(cs, mod_name);
   mod *module = ref_module(cs, id);
 
-  foreach aid *access_entry_id in refs(&mod->access_blocks) {
+  foreach id access_entry_id in elems(&mod->access_blocks) {
     dti deftype_entry_id;
-    #get_accessible_deftype(cs, *aid, &dti);
+    #get_accessible_deftype(cs, id, &dti);
   }
 
-  ndefs size = count(&mod->defs);
-  for i size = 0; i < ndefs; i = i + 1 {
-    #ensure_def_checked(cs, mod->defs[i]);
+  foreach id def_entry_id in elems(&mod->defs) {
+    #ensure_def_checked(cs, id);
   }
 
   ndeftypes size = count(&mod->deftypes);
-  for i size = 0; i < ndeftypes; i = i + 1 {
-    #ensure_deftype_checked(cs, mod->deftypes[i]);
+  foreach id in elems(&mod->deftypes) {
+    #ensure_deftype_checked(cs, id);
   }
 
   // I guess that's everything.
@@ -71,10 +70,9 @@ func convert_typefunc(a *ast_typeexpr) cr[te_puretype] {
 
 func convert_typeexpr_list(arr *array[ast_typeexpr]) cr[shray[te_typeexpr]] {
   build array[te_typeexpr];
-  n size = count(arr);
-  reserve(&build, n);
-  for i size = 0; i < n; i = i + 1 {
-    t te_typeexpr = #convert_typeexpr(&arr[i]);
+  reserve(&build, count(arr));
+  foreach a *ast_typeexpr in refs(arr) {
+    t te_typeexpr = #convert_typeexpr(a);
     push(&build, t);
   }
   return NoFail!freeze(&build);

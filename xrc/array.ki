@@ -526,3 +526,28 @@ inline func[T] do_iter_again(a *array_refs_iter[T]) bool { return a->i < a->n; }
 inline func[T] do_iter_step(a *array_refs_iter[T]) void { a->i++; }
 inline func[T] do_iter_access(a *array_refs_iter[T]) *T { return ref(a->arr, a->i); }
 
+
+
+// A near copy/paste of array_refs.
+struct[T] array_elems {
+  arr *array[T];
+}
+
+inline func[T] elems(a *array[T]) array_elems[T] {
+  return {a};
+}
+
+struct[T] array_elems_iter {
+  i size;
+  n size;
+  arr *array[T];
+}
+
+inline func[T] do_iter_mk(a array_elems[T]) array_elems_iter[T] {
+  return {0, count(a.arr), a.arr};
+}
+
+inline func[T] do_iter_again(a *array_elems_iter[T]) bool { return a->i < a->n; }
+inline func[T] do_iter_step(a *array_elems_iter[T]) void { a->i++; }
+inline func[T] do_iter_access(a *array_elems_iter[T]) T { return *ref(a->arr, a->i); }
+
