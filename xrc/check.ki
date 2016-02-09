@@ -611,10 +611,9 @@ func check_and_compute_app_type(clq *clqueue, g *ast_generics, parms *idy_repls,
         // TODO: This is quite duplicated with check_and_compute_parms.  With the changes we're making we should definitely dedup this code.
         lifetime_names array[sym];
         canonical array[cu_typeexpr];
-        n size = count(&params);
-        for i size = 0; i < n; i = i + 1 {
+        foreach param *te_typeexpr in refs(&params) {
           canonicalized te_typeexpr;
-          canonicalize_idy_lifetimes(clq->im, &lifetime_names, ref(&params, i), &canonicalized);
+          canonicalize_idy_lifetimes(clq->im, &lifetime_names, param, &canonicalized);
           push(&canonical, ~canonicalized);
         }
         hp idy_genparms = {count(&lifetime_names), {freeze(&canonical)}};

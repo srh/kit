@@ -220,3 +220,52 @@ func[T] mk_shray(x T, y T, z T, t T) shray[T] {
   push(&ret, t);
   return freeze(&ret);
 }
+
+
+struct[T] shray_refs {
+  arr *shray[T];
+}
+
+inline func[T] refs(a *shray[T]) shray_refs[T] {
+  return {a};
+}
+
+struct[T] shray_refs_iter {
+  i size;
+  n size;
+  arr *shray[T];
+}
+
+inline func[T] do_iter_mk(a shray_refs[T]) shray_refs_iter[T] {
+  return {0, count(a.arr), a.arr};
+}
+
+inline func[T] do_iter_again(a *shray_refs_iter[T]) bool { return a->i < a->n; }
+inline func[T] do_iter_step(a *shray_refs_iter[T]) void { a->i++; }
+inline func[T] do_iter_access(a *shray_refs_iter[T]) *T { return ref(a->arr, a->i); }
+
+
+
+// A near copy/paste of shray_refs.
+struct[T] shray_elems {
+  arr *shray[T];
+}
+
+inline func[T] elems(a *shray[T]) shray_elems[T] {
+  return {a};
+}
+
+struct[T] shray_elems_iter {
+  i size;
+  n size;
+  arr *shray[T];
+}
+
+inline func[T] do_iter_mk(a shray_elems[T]) shray_elems_iter[T] {
+  return {0, count(a.arr), a.arr};
+}
+
+inline func[T] do_iter_again(a *shray_elems_iter[T]) bool { return a->i < a->n; }
+inline func[T] do_iter_step(a *shray_elems_iter[T]) void { a->i++; }
+inline func[T] do_iter_access(a *shray_elems_iter[T]) T { return *ref(a->arr, a->i); }
+
