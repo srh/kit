@@ -44,6 +44,7 @@ func vt_regraphed(clq *clqueue, fg *frame_regraphed) np {
 
 func vt_graph(clq *clqueue, gr *frame_graph, gn gr_num) np {
   // This uses a different traversal algorithm than some other graph-traversing code.  Metadata that tells us about the AST's structure make us revisit alternate branches more "locally," and more importantly, in a defined order that can be described in terms of the original AST.
+  // TODO: Make the above comment be true.
 
   track vt_track = mk_track(gr);
 
