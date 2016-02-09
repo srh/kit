@@ -105,9 +105,12 @@ enum keyw {
   Extern void;
   False void;
   For void;
+  // TODO: Don't forget that we want to get rid of foreach and just use for.
+  Foreach void;
   Func void;
   Goto void;
   If void;
+  In void;
   Import void;
   Label void;
   Null void;
@@ -379,9 +382,11 @@ func grab_tok(p *ps) tok {
         if ch < 'r' {
           if grab_keyword(p, "false", False, &ret)
              || grab_keyword(p, "for", For, &ret)
+             || grab_keyword(p, "foreach", Foreach, &ret)
              || grab_keyword(p, "func", Func, &ret)
              || grab_keyword(p, "goto", Goto, &ret)
              || grab_keyword(p, "if", If, &ret)
+             || grab_keyword(p, "in", In, &ret)
              || grab_keyword(p, "import", Import, &ret)
              || grab_keyword(p, "label", Label, &ret)
              || grab_keyword(p, "null", Null, &ret) {

@@ -1280,6 +1280,10 @@ func parse_statement_enum(p *ps, out *ast_statement_enum) parse_result {
           step(p);
           return parse_rest_of_for_statement_enum(p, out);
         }
+        case Foreach: {
+          step(p);
+          return parse_rest_of_foreach_statement_enum(p, out);
+        }
         case Switch: {
           step(p);
           return parse_rest_of_switch_statement_enum(p, out);
@@ -1436,6 +1440,18 @@ func parse_rest_of_for_statement_enum(p *ps, out *ast_statement_enum) parse_resu
   body ast_bracebody;
   #parse_bracebody(p, &body);
   *out = For({NotComputed, initializer, condition, increment, move(&body)});
+  return Success;
+}
+
+func parse_rest_of_foreach_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  decl ast_vardecl;
+  #parse_vardecl(p, AllowBlanksYes, &decl);
+  #try_skip_keyw(p, In);
+  iteree ast_expr;
+  #parse_expr(p, kConditionPrec, AllowBracesNo, IsNotStatementExpr, &iteree);
+  body ast_bracebody;
+  #parse_bracebody(p, &body);
+  *out = Foreach({decl, embox(iteree), move(&body)});
   return Success;
 }
 

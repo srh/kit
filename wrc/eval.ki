@@ -168,8 +168,8 @@ func obj_read(env *st_env, oref st_obj_ref, out *st_value) np {
   return NoFail;
 }
 
-func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in *st_value) void {
-  if ncount != in->length {
+func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in_ *st_value) void {
+  if ncount != in_->length {
     ice(_u8("value_write sees non-matching length"));
   }
   end u32 = offset + ncount;
@@ -189,8 +189,8 @@ func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in 
     }
   }
   truncate(&val->symbolrefs, w);
-  for i size = 0; i < count(&in->symbolrefs); i = i + 1 {
-    sref *tup[u32, st_symbolref] = ref(&in->symbolrefs, i);
+  for i size = 0; i < count(&in_->symbolrefs); i = i + 1 {
+    sref *tup[u32, st_symbolref] = ref(&in_->symbolrefs, i);
     push(&val->symbolrefs, {sref->car + offset, sref->cdr});
   }
 
@@ -206,22 +206,22 @@ func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in 
     }
   }
   truncate(&val->objrefs, w);
-  for i size = 0; i < count(&in->objrefs); i = i + 1 {
-    iref *tup[u32, st_pointer] = ref(&in->objrefs, i);
+  for i size = 0; i < count(&in_->objrefs); i = i + 1 {
+    iref *tup[u32, st_pointer] = ref(&in_->objrefs, i);
     push(&val->objrefs, {iref->car + offset, iref->cdr});
   }
 
-  copy_bnnos(plat, &in->words, 0, in->length, &val->words, offset);
-  copy_bnnos(plat, &in->datas, 0, in->length, &val->datas, offset);
+  copy_bnnos(plat, &in_->words, 0, in_->length, &val->words, offset);
+  copy_bnnos(plat, &in_->datas, 0, in_->length, &val->datas, offset);
 }
 
-func obj_write(env *st_env, oref st_obj_ref, in *st_value) np {
-  if oref.count != in->length {
-    ice(_u8("static eval writing object with non-matching length (oref.count="), oref.count, _u8(", in->length="), in->length, _u8(")"));
+func obj_write(env *st_env, oref st_obj_ref, in_ *st_value) np {
+  if oref.count != in_->length {
+    ice(_u8("static eval writing object with non-matching length (oref.count="), oref.count, _u8(", in_->length="), in_->length, _u8(")"));
   }
   val *st_value;
   #ref_obj(env, oref.num, &val);
-  value_write(&env->plat, val, oref.offset, oref.count, in);
+  value_write(&env->plat, val, oref.offset, oref.count, in_);
   return NoFail;
 }
 
