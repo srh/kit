@@ -262,12 +262,6 @@ struct ast_for_statement {
   body ast_bracebody;
 }
 
-struct ast_foreach_statement {
-  decl ast_vardecl;
-  iteree box[ast_expr];
-  body ast_bracebody;
-}
-
 struct ast_block_statement {
   body ast_bracebody;
 }
@@ -338,7 +332,6 @@ enum ast_statement_enum {
   IfThenElse ast_ifthenelse_statement;
   While ast_while_statement;
   For ast_for_statement;
-  Foreach ast_foreach_statement;
   // TODO: Actually expose this in parsing?
   Block ast_block_statement;
   Switch ast_switch_statement;

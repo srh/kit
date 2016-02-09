@@ -1443,6 +1443,25 @@ func parse_rest_of_for_statement_enum(p *ps, out *ast_statement_enum) parse_resu
   return Success;
 }
 
+func wrapname(m ast_meta, name sym) ast_expr {
+  return {m, NoInfo, NameExpr({NotComputed, {m, name}, None})};
+}
+
+func wrapapply(m ast_meta, funcname sym, argvar sym) ast_expr {
+  return wrapapply(m, funcname, wrapname(m, argvar));
+}
+
+func wrapapply(m ast_meta, funcname sym, arg ast_expr) ast_expr {
+  return {m, NoInfo, Funcall({
+    embox(consume(wrapname(m, funcname))),
+    mk_array(consume(arg))
+  })};
+}
+
+func wrapaddressof(m ast_meta, argvar sym) ast_expr {
+  return {m, NoInfo, AddressOf({embox(wrapname(m, argvar))})};
+}
+
 func parse_rest_of_foreach_statement_enum(p *ps, out *ast_statement_enum) parse_result {
   m ast_meta = startend(p);
   decl ast_vardecl;
@@ -1452,7 +1471,26 @@ func parse_rest_of_foreach_statement_enum(p *ps, out *ast_statement_enum) parse_
   #parse_expr(p, kConditionPrec, AllowBracesNo, IsNotStatementExpr, &iteree);
   body ast_bracebody;
   #parse_bracebody(p, &body);
-  *out = Foreach({decl, embox(iteree), move(&body)});
+
+  iteree_var_name sym = gensym(p->im, _u8("iteree"));
+  iter_var_name sym = gensym(p->im, _u8("iterator"));
+
+  iteree_var_st ast_var_statement = {NotComputed, @[ast_vardecl]{{m, iteree_var_name}, Unknown({})}, HasExpr(embox(consume(iteree)))};
+  iter_var_st ast_var_statement = {NotComputed, @[ast_vardecl]{{m, iter_var_name}, Unknown({})}, HasExpr(embox(consume(wrapapply(m, p->im->cym.do_iter_mk, iteree_var_name))))};
+
+  *out = Block({@[ast_bracebody]{
+    NotComputed,
+    mk_array@[ast_statement](
+      {m, Var(iteree_var_st)},
+      {m, For({
+        NotComputed,
+        Has(embox(@[ast_statement]{m, Var(iter_var_st)})),
+        Has({mk_later(), embox(consume(wrapapply(m, p->im->cym.do_iter_done, wrapaddressof(m, iter_var_name))))}),
+        Has(embox(discard(wrapapply(m, p->im->cym.do_iter_step, wrapaddressof(m, iter_var_name))))),
+        move(&body)})}
+    )
+  }});
+
   return Success;
 }
 
@@ -1934,6 +1972,18 @@ func test_parse(verbose bool) bool {
     _u8("def blah i32 = 2 < 3 ^ 4;"));
   run_parse_negtest(&ctx, _u8("p072"),
     _u8("def blah i32 = 2 < 3 < 4;"));
+  run_parse_test(&ctx, _u8("p073"),
+    _u8("func foo() a {\n"
+        "  foreach x y in z {\n"
+        "    blah;\n"
+        "  }\n"
+        "}\n"));
+  run_parse_test(&ctx, _u8("p073"),
+    _u8("func foo() a {\n"
+        "  foreach x in z {\n"
+        "    blah;\n"
+        "  }\n"
+        "}\n"));
   return ctx.failures == 0;
 }
 
