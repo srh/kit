@@ -82,6 +82,15 @@ enum gr_seginfo {
   EndSeg sq_num;
 }
 
+// Says the seginfo's the value returned by garbage_seg().  It could be a non-garbage value.
+// TODO: Make garbage seg values be separate from the rest of the seg values.
+func could_be_garbage(x gr_seginfo) bool {
+  if case &PartofSeg(a opt[sq_num]) = &x {
+    return isNone(&a);
+  }
+  return false;
+}
+
 inline func garbage_seg() gr_seginfo {
   return PartofSeg(None);
 }
@@ -313,17 +322,7 @@ func help_mut_qnop_node(gr *frame_graph, ix sq_num, newop gr_qop) void {
 }
 
 func check_is_qnop_node(gr *frame_graph, ix sq_num) void {
-  node *gr_node = ref_node(gr, ix.x);
-  switch node {
-  case &XOp(xn gr_xnode):
-    ice(_u8("check_is_qnop_node sees XOp"));
-  case &QOp(qn gr_qnode):
-    if case &GrQNop = &qn.op {
-      // Do nothing.
-    } else {
-      ice(_u8("check_is_qnop_node sees non-nop node"));
-    }
-  }
+  node *gr_qnode = access_qnop(gr, ix);
 }
 
 struct segmarker {
@@ -335,7 +334,7 @@ struct segmarker {
 func begin_segment(bu *sq_builder) segmarker {
   // beg starts with a placeholder value.
   // end gets connected to the bu and the rest of the graph in end_segment.
-  beg sq_num = nopq(bu->gr, @[gr_seginfo]PartofSeg(None));
+  beg sq_num = nopq(bu->gr, garbage_seg());
   end sq_num = nopq(bu->gr, EndSeg(beg));
 
   qn *gr_qnode = access_qnode(bu->gr, beg);
@@ -699,8 +698,7 @@ func gr_fullbody(outer_gs gr_statep, x *ast_fullbody) cr[gr_num] {
   label_gn array[tracked_target];
   n size = count(&info->labels);
   for i size = 0; i < n; i = i + 1 {
-    // TODO(): Update these label nodes so that they're part of the right segment.
-    push(&label_gn, mk_tracked(nopq(outer_gs)));
+    push(&label_gn, mk_tracked(nopq(outer_gs.gr, garbage_seg())));
   }
 
   fb fullbody_state = {info->all_vars, mk_tracked(nopq(outer_gs)), label_gn, info->return_cell};
@@ -812,7 +810,9 @@ func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement
   // It might become important (I predict) that the label target targ->sn is _in line_ with the control flow, and doesn't point _into_ the control flow.  That way, the ReenterNormaly annotations for goto statements point _in line_ instead of one node before the line.
   // There's presently no downside to our having targ->sn be in line.
 
-  check_is_qnop_node(gs.gr, targ->sn);
+  qn *gr_qnode = access_qnop(gs.gr, targ->sn);
+  check(could_be_garbage(qn->seginfo));
+  qn->seginfo = partof(gs);
   append(bu, JmpForward, targ->sn, targ->sn);
 }
 
