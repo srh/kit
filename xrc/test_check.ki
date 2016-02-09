@@ -2127,7 +2127,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c168",
     _u8("struct range { lo size; hi size; }\n"
         "func do_iter_mk(x range) range { return x; }\n"
-        "func do_iter_done(x *range) bool { return x->lo >= x->hi; }\n"
+        "func do_iter_again(x *range) bool { return x->lo >= x->hi; }\n"
         "func do_iter_step(x *range) void { x->lo = x->lo + 1; }\n"
         "func do_iter_access(x *range) size { return x->lo; }\n"
         "func foo() size {\n"

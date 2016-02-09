@@ -1486,7 +1486,7 @@ func parse_rest_of_foreach_statement_enum(p *ps, out *ast_statement_enum) parse_
       {m, For({
         NotComputed,
         Has(embox(@[ast_statement]{m, Var(iter_var_st)})),
-        Has({mk_later(), embox(consume(wrapapply(m, p->im->cym.do_iter_done, wrapaddressof(m, iter_var_name))))}),
+        Has({mk_later(), embox(consume(wrapapply(m, p->im->cym.do_iter_again, wrapaddressof(m, iter_var_name))))}),
         Has(embox(discard(wrapapply(m, p->im->cym.do_iter_step, wrapaddressof(m, iter_var_name))))),
         @[ast_bracebody]{
           NotComputed,

@@ -111,7 +111,7 @@ struct common_syms {
   do_destroysym sym;
   do_iter_mk sym;
   do_iter_step sym;
-  do_iter_done sym;
+  do_iter_again sym;
   do_iter_access sym;
 }
 
@@ -176,7 +176,7 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.do_destroysym = intern(im, _s!"do_destroy");
   ret.do_iter_mk = intern(im, _s!"do_iter_mk");
   ret.do_iter_step = intern(im, _s!"do_iter_step");
-  ret.do_iter_done = intern(im, _s!"do_iter_done");
+  ret.do_iter_again = intern(im, _s!"do_iter_again");
   ret.do_iter_access = intern(im, _s!"do_iter_access");
   return ret;
 }
