@@ -259,6 +259,12 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
     case &Foreach(b ast_foreach_statement):
       return TODO();
 
+    case &Block(b ast_block_statement):
+      body_ee entryexit;
+      #check_body(bs, obp, &b.body, &body_ee);
+      connect_statements(bs, num, body_ee.entry);
+      *ee_out = {num, body_ee.exit};
+
     case &Switch(b ast_switch_statement): {
       exitnum statement_num;
       #check_switch_statement(bs, vp, obp, &b, num, &exitnum);

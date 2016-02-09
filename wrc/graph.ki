@@ -758,6 +758,8 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
     return gr_for_statement(gs, fb, &a, bu);
   case &Foreach(a ast_foreach_statement):
     return TODO();
+  case &Block(a ast_block_statement):
+    return gr_bracebody(gs, fb, obg, &a.body, bu);
   case &Switch(a ast_switch_statement):
     return gr_switch_statement(gs, fb, obg, &a, bu);
 

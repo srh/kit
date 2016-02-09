@@ -1444,6 +1444,7 @@ func parse_rest_of_for_statement_enum(p *ps, out *ast_statement_enum) parse_resu
 }
 
 func parse_rest_of_foreach_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  m ast_meta = startend(p);
   decl ast_vardecl;
   #parse_vardecl(p, AllowBlanksYes, &decl);
   #try_skip_keyw(p, In);

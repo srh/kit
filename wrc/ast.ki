@@ -268,6 +268,10 @@ struct ast_foreach_statement {
   body ast_bracebody;
 }
 
+struct ast_block_statement {
+  body ast_bracebody;
+}
+
 struct ast_switch_statement {
   info nc[ast_enum_deconstruction_info];
   swartch_discard ast_later_discard_info;
@@ -335,6 +339,8 @@ enum ast_statement_enum {
   While ast_while_statement;
   For ast_for_statement;
   Foreach ast_foreach_statement;
+  // TODO: Actually expose this in parsing?
+  Block ast_block_statement;
   Switch ast_switch_statement;
   Break ast_break_statement;
   Continue ast_continue_statement;
