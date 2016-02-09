@@ -1,0 +1,1995 @@
+import tok;
+
+enum allow_blanks {
+  AllowBlanksNo void;
+  AllowBlanksYes void;
+}
+
+// This isn't passed recursively -- "No" is used whenever parsing always expects a concrete type anyway.
+enum allow_lifetimes {
+  AllowLifetimesNo void;
+  AllowLifetimesYes void;
+}
+
+enum force_assignment {
+  ForceAssignmentNo void;
+  ForceAssignmentYes void;
+}
+
+enum parse_result {
+  #Success void;
+  Fail void;
+}
+
+// NOTE: This can fail if x is unininitialized.  Should this be "~"?  In the long run the uninitialized value should be impossible.  If that does not happen, this should be changed to "~".
+func `+`(x parse_result) bool {
+  switch x {
+  case Fail: return false;
+  case Success: return true;
+  }
+}
+
+struct prec_pair {
+  left i32;
+  right i32;
+}
+
+enum prec_cmp {
+  Conflicts void;
+  PullsLeft void;
+  PullsRight void;
+}
+
+// def[T] dbgparse fn[T, void] = debugstr;
+inline func[T] dbgparse(x T) void { }
+
+def kSemicolonPrec i32 = 205;
+def kCommaPrec i32 = 205;
+// This is 305 because it would prevent assignment in conditionals, if it weren't otherwise banned (which it is).
+def kConditionPrec i32 = 305;
+def kConversionRightPrec i32 = 905;
+// Every unary operator has the same precedence.
+def kGeneralUnopRightPrec i32 = 905;
+
+func parse_file(p *ps, out *ast_file) parse_result {
+  dbgparse("parse_file\n");
+  arr array[ast_toplevel];
+  #parse_toplevels(p, Eof, &arr);
+  *out = {move(&arr)};
+  return Success;
+}
+
+func parse_toplevels(p *ps, stop tokval, out *array[ast_toplevel]) parse_result {
+  dbgparse("parse_toplevels\n");
+  ret array[ast_toplevel];
+  for ;; {
+    if equal(&peek(p)->val, &stop) {
+      swap(out, &ret);
+      return Success;
+    }
+    top ast_toplevel;
+    #parse_toplevel(p, &top);
+    pushmove(&ret, &top);
+  }
+}
+
+func try_parse_keyw(p *ps, expected keyw) opt[ast_meta] {
+  if case &Keyw(k keyw) = &peek(p)->val {
+    if k == expected {
+      meta ast_meta = startend(p);
+      step(p);
+      return Has(meta);
+    }
+  }
+  return None;  // Fail
+}
+
+func try_skip_keyw(p *ps, expected keyw) parse_result {
+  if case &Keyw(k keyw) = &peek(p)->val {
+    if k == expected {
+      step(p);
+      return Success;
+    }
+  }
+  return Fail;
+}
+
+func try_parse_token(p *ps, expected tokval) opt[ast_meta] {
+  if equal(&peek(p)->val, &expected) {
+    meta ast_meta = startend(p);
+    step(p);
+    return Has(meta);
+  }
+  return None;  // Fail
+}
+
+func try_skip_token(p *ps, expected tokval) parse_result {
+  if equal(&peek(p)->val, &expected) {
+    step(p);
+    return Success;
+  }
+  return Fail;
+}
+
+func try_parse_oper(p *ps, expected i32, out *ast_ident) parse_result {
+  if case &Oper(arr smallstr) = &peek(p)->val {
+    if arr.len == 1 && arr.vals[0] == expected {
+      m ast_meta = startend(p);
+      *out = {m, intern(p->im, to_str(&arr))};
+      step(p);
+      return Success;
+    }
+  }
+  return Fail;
+}
+func try_skip_oper(p *ps, expected i32) parse_result {
+  if case &Oper(arr smallstr) = &peek(p)->val {
+    if arr.len == 1 && arr.vals[0] == expected {
+      step(p);
+      return Success;
+    }
+  }
+  return Fail;
+}
+func try_skip_oper(p *ps, exp0 i32, exp1 i32) parse_result {
+  if case &Oper(arr smallstr) = &peek(p)->val {
+    if arr.len == 2 && arr.vals[0] == exp0 && arr.vals[1] == exp1 {
+      step(p);
+      return Success;
+    }
+  }
+  return Fail;
+}
+func try_skip_oper(p *ps, exp0 i32, exp1 i32, exp2 i32) parse_result {
+  if case &Oper(arr smallstr) = &peek(p)->val {
+    if arr.len == 3 && arr.vals[0] == exp0 && arr.vals[1] == exp1 && arr.vals[2] == exp2 {
+      step(p);
+      return Success;
+    }
+  }
+  return Fail;
+}
+
+func parse_toplevel(p *ps, out *ast_toplevel) parse_result {
+  dbgparse("parse_toplevel\n");
+  if +try_skip_keyw(p, Func) {
+    return parse_rest_of_func(p, IsNotExport, IsNotInline, out);
+  } else if +try_skip_keyw(p, Def) {
+    return parse_rest_of_def(p, IsNotExport, IsNotVar, out);
+  } else if +try_skip_keyw(p, Var) {
+    return parse_rest_of_def(p, IsNotExport, IsVar, out);
+  } else if +try_skip_keyw(p, Export) {
+    if +try_skip_keyw(p, Func) {
+      return parse_rest_of_func(p, IsExport, IsNotInline, out);
+    } else if +try_skip_keyw(p, Var) {
+      return parse_rest_of_def(p, IsExport, IsVar, out);
+    } else if +try_skip_keyw(p, Def) {
+      return parse_rest_of_def(p, IsExport, IsNotVar, out);
+    }
+    return Fail;
+  } else if +try_skip_keyw(p, Extern) {
+    return parse_rest_of_extern_def(p, out);
+  } else if +try_skip_keyw(p, Import) {
+    return parse_rest_of_import(p, out);
+  } else if +try_skip_keyw(p, Struct) {
+    return parse_rest_of_defstruct(p, out);
+  } else if +try_skip_keyw(p, Defclass) {
+    return parse_rest_of_defclass(p, out);
+  } else if +try_skip_keyw(p, Enum) {
+    return parse_rest_of_defenum(p, out);
+  } else if +try_skip_keyw(p, Access) {
+    return parse_rest_of_access(p, out);
+  } else if +try_skip_specific_ident(p, "inline") {
+    #try_skip_keyw(p, Func);
+    return parse_rest_of_func(p, IsNotExport, IsInline, out);
+  } else {
+    return Fail;
+  }
+}
+
+// NOTE: Have a specific AST datatype for funcs instead of munging them into ast_def.  (Why?)
+func parse_rest_of_func(p *ps, is_export ast_isexport, is_inline ast_isinline, out *ast_toplevel) parse_result {
+  generics ast_generics;
+  name ast_ident;
+  params array[ast_vardecl];
+  return_type ast_typeexpr;
+  body ast_bracebody;
+  #parse_def_generics_and_name(p, is_export, IsNotVar, &generics, &name);
+  lambda_expr_meta ast_meta = start(p);
+  #parse_lambdaspec(p, &params, &return_type, &body);
+  end(p, lambda_expr_meta);
+
+  *out = Def({is_export, IsNotVar, generics, name, None,
+              consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({is_inline, move(&params), return_type, {NotComputed, move(&body)}})))});
+  return Success;
+}
+
+func parse_rest_of_def(p *ps, is_export ast_isexport, is_var ast_isvar, out *ast_toplevel) parse_result {
+  generics ast_generics;
+  name ast_ident;
+  #parse_def_generics_and_name(p, is_export, is_var, &generics, &name);
+
+  typeexpr opt[ast_typeexpr];
+  if +try_skip_oper(p, '=') {
+    typeexpr = None;
+  } else {
+    t ast_typeexpr;
+    #parse_typeexpr(p, &t);
+    #try_skip_oper(p, '=');
+    typeexpr = Has(t);
+  }
+
+  rhs ast_expr;
+  #parse_expr(p, kSemicolonPrec, AllowBracesYes, IsNotStatementExpr, &rhs);
+  #try_skip_oper(p, ';');
+
+  *out = Def({is_export, is_var, generics, name, typeexpr, consume(move(&rhs))});
+  return Success;
+}
+
+func parse_rest_of_extern_def(p *ps, out *ast_toplevel) parse_result {
+  name ast_ident;
+  #parse_ident(p, &name);
+  type ast_typeexpr;
+  #parse_typeexpr(p, &type);
+  #try_skip_oper(p, ';');
+  *out = ExternDef({name, type});
+  return Success;
+}
+
+func parse_rest_of_import(p *ps, out *ast_toplevel) parse_result {
+  dbgparse("parse_rest_of_import\n");
+  name ast_ident;
+  #parse_ident(p, &name);
+  #try_skip_oper(p, ';');
+  *out = Import({name});
+  return Success;
+}
+
+func parse_rest_of_defclass(p *ps, out *ast_toplevel) parse_result {
+  generics ast_generics;
+  #parse_generics_if_present(p, &generics);
+  disposition ast_defclass_disposition;
+  // NOTE: Honestly this is bad syntax, now that copy and move aren't keywords.
+  if +try_skip_specific_ident(p, "copy") {
+    disposition = DefaultMoveCopyDestroy;
+  } else if +try_skip_specific_ident(p, "move") {
+    disposition = DefaultMove;
+  } else {
+    disposition = NoDefaults;
+  }
+  name ast_ident;
+  fields array[ast_vardecl];
+  #parse_ident(p, &name);
+  #parse_braced_fields(p, &fields);
+  *out = TypeDef({generics, name, ClassexprRhs({disposition, move(&fields)})});
+  return Success;
+}
+
+func parse_rest_of_defstruct(p *ps, out *ast_toplevel) parse_result {
+  generics ast_generics;
+  name ast_ident;
+  fields array[ast_vardecl];
+  #parse_generics_if_present(p, &generics);
+  #parse_ident(p, &name);
+  #parse_braced_fields(p, &fields);
+  *out = TypeDef({generics, name, DefstructRhs({move(&fields)})});
+  return Success;
+}
+
+func parse_rest_of_defenum(p *ps, out *ast_toplevel) parse_result {
+  generics ast_generics;
+  name ast_ident;
+  constructors array[ast_defenum_constructor];
+  #parse_generics_if_present(p, &generics);
+  #parse_ident(p, &name);
+  #parse_defenum_constructors(p, &constructors);
+  *out = TypeDef({generics, name, DefenumRhs({move(&constructors)})});
+  return Success;
+}
+
+func parse_rest_of_access(p *ps, out *ast_toplevel) parse_result {
+  name ast_ident;
+  #parse_ident(p, &name);
+  arity ast_access_arity;
+  if ! +try_skip_token(p, @[tokval]Grouper(LBracket)) {
+    arity = AccessArityNone;
+  } else {
+    counter u32 = 0;
+    done bool = false;
+    while !done {
+      if +try_skip_token(p, @[tokval]Grouper(RBracket)) {
+        done = true;
+      } else {
+        if counter != 0 {
+          #try_skip_oper(p, ',');
+        }
+        #try_skip_keyw(p, Underscore);
+        counter = counter + 1;
+      }
+    }
+    arity = AccessArityFinite(counter);
+  }
+
+  toplevels array[ast_toplevel];
+  #try_skip_token(p, @[tokval]Grouper(LBrace));
+  #parse_toplevels(p, @[tokval]Grouper(RBrace), &toplevels);
+  #try_skip_token(p, @[tokval]Grouper(RBrace));
+  *out = Access({name, arity, move(&toplevels)});
+  return Success;
+}
+
+func parse_def_generics_and_name(p *ps, is_export ast_isexport, is_var ast_isvar,
+                                 generics_out *ast_generics, name_out *ast_ident) parse_result {
+  switch is_export {
+  case IsExport:
+    *generics_out = NoGenerics;
+  case IsNotExport:
+    switch is_var {
+      case IsVar: {
+        *generics_out = NoGenerics;
+      }
+      case IsNotVar: {
+        #parse_generics_if_present(p, generics_out);
+      }
+    }
+  }
+  #parse_ident(p, name_out);
+  return Success;
+}
+
+func parse_lambdaspec(p *ps, params_out *array[ast_vardecl], return_type_out *ast_typeexpr, body_out *ast_bracebody) parse_result {
+  #parse_args_list(p, params_out);
+  #parse_typeexpr(p, return_type_out);
+  #parse_bracebody(p, body_out);
+  return Success;
+}
+
+func parse_typeexpr(p *ps, out *ast_typeexpr) parse_result {
+  return help_parse_typeexpr(p, AllowBlanksNo, AllowLifetimesNo, out);
+}
+
+func parse_ident(p *ps, out *ast_ident) parse_result {
+  if case Success = triparse_ident(p, out) {
+    return Success;
+  } else {
+    return Fail;
+  }
+}
+
+func parse_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) parse_result {
+  backquote_step(p);
+  switch peek(p)->val {
+  default:
+    return Fail;
+  // NOTE: "Opers" such as "@" or maybe even "=" shouldn't really be allowed here -- only functional opers allowed.
+  case Oper(operch smallstr):
+    backquote_step(p);
+    #try_skip_token(p, @[tokval]Grouper(Backtick));
+    end(p, ident_meta);
+    *out = {ident_meta, intern(p->im, to_str(&operch))};
+    return Success;
+  }
+}
+
+func triparse_ident(p *ps, out *ast_ident) triparse_result {
+  dbgparse("triparse_ident\n");
+  switch peek(p)->val {
+  case Ident(text shray[i32]):
+    m ast_meta = startend(p);
+    step(p);
+    *out = {m, intern(p->im, ~text)};
+    return Success;
+  case Grouper(g grouper):
+    if case Backtick = g {
+      ident_meta ast_meta = start(p);
+      return success_or_fail(parse_backtick_ident(p, ident_meta, out));
+    } else {
+      return Quickfail;
+    }
+  default:
+    return Quickfail;
+  }
+}
+
+// Takes a [_]u8.
+func[T] try_skip_specific_ident(p *ps, x T) parse_result {
+  dbgparse("try_skip_specific_ident\n");
+  switch peek(p)->val {
+  case Ident(text shray[i32]):
+    if count(&text) != x.length {
+      return Fail;
+    }
+    y * ^[0]i32 = data(&text);
+    for i size = 0; i < x.length; i = i + 1 {
+      if y[i] != ~x[i] {
+        return Fail;
+      }
+    }
+    m ast_meta = startend(p);
+    step(p);
+    return Success;
+  default:
+    // No caller expects a backtick ident.
+    return Fail;
+  }
+}
+
+func parse_generics_if_present(p *ps, out *ast_generics) parse_result {
+  args array[ast_generik];
+  if ! +try_skip_token(p, @[tokval]Grouper(LBracket)) {
+    *out = NoGenerics;
+    return Success;
+  }
+  for ;; {
+    if +try_skip_token(p, @[tokval]Grouper(RBracket)) {
+      *out = HasGenerics(move(&args));
+      return Success;
+    }
+    if count(&args) != 0 {
+      #try_skip_oper(p, ',');
+    }
+    arg ast_generik;
+    #parse_generik(p, &arg);
+    push(&args, arg);
+  }
+}
+
+func parse_generik(p *ps, out *ast_generik) parse_result {
+  if +try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
+    name ast_ident;
+    #parse_ident(p, &name);
+    *out = LifetimeGeneric(name);
+    return Success;
+  }
+  name ast_ident;
+  #parse_ident(p, &name);
+  *out = PlainGeneric(name);
+  return Success;
+}
+
+func parse_args_list(p *ps, out *array[ast_vardecl]) parse_result {
+  #try_skip_token(p, @[tokval]Grouper(LParen));
+  args array[ast_vardecl];
+  for ;; {
+    if +try_skip_token(p, @[tokval]Grouper(RParen)) {
+      swap(out, &args);
+      return Success;
+    }
+    if count(&args) != 0 {
+      #try_skip_oper(p, ',');
+    }
+    decl ast_vardecl;
+    #parse_vardecl(p, AllowBlanksNo, &decl);
+    push(&args, decl);
+  }
+}
+
+func triparse_bracebody(p *ps, out *ast_bracebody) triparse_result {
+  if ! +try_skip_token(p, @[tokval]Grouper(LBrace)) {
+    return Quickfail;
+  }
+  statements array[ast_statement];
+  for ;; {
+    if +try_skip_token(p, @[tokval]Grouper(RBrace)) {
+      *out = {NotComputed, move(&statements)};
+      return Success;
+    }
+    statement ast_statement;
+    if ! +parse_statement(p, &statement) {
+      return Error;
+    }
+    pushmove(&statements, &statement);
+  }
+}
+
+func parse_bracebody(p *ps, out *ast_bracebody) parse_result {
+  switch triparse_bracebody(p, out) {
+  case Success: return Success;
+  default: return Fail;
+  }
+}
+
+func try_underscore_if_allowed(p *ps, ab allow_blanks, out *ast_typeexpr) parse_result {
+  switch ab {
+    case AllowBlanksYes: {
+      if +try_skip_keyw(p, Underscore) {
+        *out = Unknown({});
+        return Success;
+      }
+      return Fail;
+    }
+    case AllowBlanksNo: {
+      return Fail;
+    }
+  }
+}
+
+func help_parse_typeexpr(p *ps, ab allow_blanks, al allow_lifetimes, out *ast_typeexpr) parse_result {
+  switch help_triparse_typeexpr(p, ab, al, out) {
+    case Success: { return Success; }
+    default: { return Fail; }
+  }
+}
+
+inline func success_or_fail(res parse_result) triparse_result {
+  switch res {
+  case Success:
+    return Success;
+  case Fail:
+    return Error;
+  }
+}
+
+func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_lifetimes, out *ast_typeexpr) triparse_result {
+  voidmeta ast_meta;
+  if case Has(m ast_meta) = try_parse_keyw(p, Void) {
+    *out = Name({m, p->im->cym.voidsym});
+    return Success;
+  }
+  if +try_skip_keyw(p, Union) {
+    return success_or_fail(parse_rest_of_union(p, out));
+  }
+  oper ast_ident;
+  if +try_parse_oper(p, '*', &oper) {
+    return success_or_fail(parse_rest_of_pointer(p, ab, oper, out));
+  }
+  if +try_parse_oper(p, '&', &oper) {
+    return success_or_fail(parse_rest_of_reference(p, ab, oper, out));
+  }
+  if +try_skip_oper(p, '^') {
+    if ! +try_skip_token(p, @[tokval]Grouper(LBracket)) {
+      return Error;
+    }
+    return success_or_fail(parse_rest_of_arraytype(p, ab, out));
+  }
+
+  if case AllowLifetimesYes = al {
+    lifetime ast_lifetime;
+    switch triparse_lifetime(p, &lifetime) {
+    case Success:
+      *out = Lifetime(lifetime);
+      return Success;
+    case Quickfail: { }
+    case Error:
+      return Error;
+    }
+  }
+
+  lhs ast_typeexpr;
+  if ! +try_underscore_if_allowed(p, ab, &lhs) {
+    name ast_ident;
+    switch triparse_ident(p, &name) {
+    case Success: { }
+    case Quickfail:
+      return Quickfail;
+    case Error:
+      return Error;
+    }
+    lhs = Name(name);
+  }
+  if ! +try_skip_token(p, @[tokval]Grouper(LBracket)) {
+    *out = lhs;
+    return Success;
+  }
+  args array[ast_typeexpr];
+  if ! +parse_rest_of_type_param_list(p, ab, &args) {
+    return Error;
+  }
+  // NOTE: Allow arbitrarily many type applications?
+  *out = App({embox(lhs), move(&args)});
+  return Success;
+}
+
+func parse_rest_of_union(p *ps, out *ast_typeexpr) parse_result {
+  fields array[ast_vardecl];
+  #parse_braced_fields(p, &fields);
+  *out = Union({move(&fields)});
+  return Success;
+}
+
+func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) parse_result {
+  switch ab {
+    case AllowBlanksYes: {
+      if +try_skip_keyw(p, Underscore) {
+        param box[ast_typeexpr];
+        #try_skip_token(p, @[tokval]Grouper(RBracket));
+        #help_parse_typeexpr(p, ab, AllowLifetimesNo, oo(&param));
+
+        *out = Arraytype({None, param});
+        return Success;
+      }
+    }
+    default: { }
+  }
+
+  count box[ast_expr];
+  param box[ast_typeexpr];
+  #parse_expr(p, kSemicolonPrec, AllowBracesYes, IsNotStatementExpr, oo(&count));
+  #try_skip_token(p, @[tokval]Grouper(RBracket));
+  #parse_typeexpr(p, oo(&param));
+
+  *out = Arraytype({Has(count), param});
+  return Success;
+}
+
+func parse_rest_of_pointer(p *ps, ab allow_blanks, oper ast_ident, out *ast_typeexpr) parse_result {
+  arg ast_typeexpr;
+  #help_parse_typeexpr(p, ab, AllowLifetimesNo, &arg);
+  *out = App({embox(Name(oper)),
+              mk_array(arg)});
+  return Success;
+}
+
+func parse_rest_of_reference(p *ps, ab allow_blanks, oper ast_ident, out *ast_typeexpr) parse_result {
+  lifetime_arg ast_lifetime;
+  if case Success = triparse_lifetime(p, &lifetime_arg) {
+    arg ast_typeexpr;
+    #help_parse_typeexpr(p, ab, AllowLifetimesNo, &arg);
+    *out = App({embox(Name(oper)), mk_array(Lifetime(lifetime_arg), arg)});
+    return Success;
+  } else {
+    return Fail;
+  }
+}
+
+func triparse_lifetime(p *ps, out *ast_lifetime) triparse_result {
+  if ! +try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
+    return Quickfail;
+  }
+  name ast_ident;
+  if ! +parse_ident(p, &name) {
+    return Error;
+  }
+  *out = {name};
+  return Success;
+}
+
+func parse_rest_of_type_param_list(p *ps, ab allow_blanks, out *array[ast_typeexpr]) parse_result {
+  args array[ast_typeexpr];
+  for ;; {
+    if +try_skip_token(p, @[tokval]Grouper(RBracket)) {
+      swap(out, &args);
+      return Success;
+    }
+
+    if count(&args) != 0 {
+      #try_skip_oper(p, ',');
+    }
+
+    typeexpr ast_typeexpr;
+    #help_parse_typeexpr(p, ab, AllowLifetimesYes, &typeexpr);
+    push(&args, typeexpr);
+  }
+}
+
+
+func parse_braced_fields(p *ps, out *array[ast_vardecl]) parse_result {
+  #try_skip_token(p, @[tokval]Grouper(LBrace));
+  fields array[ast_vardecl];
+  for ;; {
+    if +try_skip_token(p, @[tokval]Grouper(RBrace)) {
+      swap(out, &fields);
+      return Success;
+    }
+
+    field ast_vardecl;
+    #parse_vardecl(p, AllowBlanksNo, &field);
+    #try_skip_oper(p, ';');
+    push(&fields, field);
+  }
+}
+
+func parse_defenum_constructors(p *ps, out *array[ast_defenum_constructor]) parse_result {
+  #try_skip_token(p, @[tokval]Grouper(LBrace));
+  seen_success_disposition bool = false;
+  constructors array[ast_defenum_constructor];
+  for ;; {
+    if +try_skip_token(p, @[tokval]Grouper(RBrace)) {
+      swap(out, &constructors);
+      return Success;
+    }
+
+    disposition ast_defenum_constructor_disposition;
+    if +try_skip_oper(p, '#') {
+      if seen_success_disposition {
+        return Fail;
+      }
+      seen_success_disposition = true;
+      disposition = SuccessCase;
+    } else {
+      disposition = GeneralCase;
+    }
+
+    decl ast_vardecl;
+    #parse_vardecl(p, AllowBlanksNo, &decl);
+    #try_skip_oper(p, ';');
+    push(&constructors, {disposition, decl});
+  }
+}
+
+func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) parse_result {
+  name ast_ident;
+  #parse_ident(p, &name);
+
+  switch ab {
+    case AllowBlanksYes: {
+      type ast_typeexpr;
+      switch help_triparse_typeexpr(p, ab, AllowLifetimesNo, &type) {
+        case Success: {
+          *out = {name, type};
+          return Success;
+        }
+        case Quickfail: {
+          *out = {name, Unknown({})};
+          return Success;
+        }
+        case Error: {
+          return Fail;
+        }
+      }
+    }
+    case AllowBlanksNo: {
+      type ast_typeexpr;
+      #help_parse_typeexpr(p, ab, AllowLifetimesNo, &type);
+      *out = {name, type};
+      return Success;
+    }
+  }
+}
+
+func parse_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_expr, out *ast_expr) parse_result {
+  lhs ast_expr;
+  #parse_atomic_expr(p, ab, &lhs);
+
+  return parse_after_atomic_expr(p, prec_ctx, ab, se, lhs, out);
+}
+
+func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_expr, lhs ast_expr, out *ast_expr) parse_result {
+  for ;; {
+    if +try_skip_token(p, @[tokval]Grouper(LParen)) {
+      params array[ast_expr_consume];
+      #parse_rest_of_param_list(p, &params);
+      m ast_meta = copyend(p, lhs.meta);
+      lhs = mk(m, @[ast_expr_enum]Funcall({embox(consume(move(&lhs))), move(&params)}));
+    } else if +try_skip_token(p, @[tokval]Grouper(LBracket)) {
+      arg ast_expr;
+      #parse_expr(p, kCommaPrec, AllowBracesYes, IsNotStatementExpr, &arg);
+      #try_skip_token(p, @[tokval]Grouper(RBracket));
+      m ast_meta = copyend(p, lhs.meta);
+      lhs = mk(m, @[ast_expr_enum]IndexExpr(mk(embox(lhs), embox(consume(move(&arg))))));
+    } else if +try_skip_oper(p, '.') {
+      fieldname ast_ident;
+      #parse_ident(p, &fieldname);
+      m ast_meta = copyend(p, lhs.meta);
+      lhs = mk(m, @[ast_expr_enum]LocalField(@[ast_local_field]mk(embox(lhs), {fieldname})));
+    } else if +try_skip_oper(p, '-', '>') {
+      fieldname ast_ident;
+      #parse_ident(p, &fieldname);
+      m ast_meta = copyend(p, lhs.meta);
+      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed, mk_later(), embox(consume(move(&lhs))), {fieldname}}));
+    } else if is_keyw(&peek(p)->val, Then) {
+      switch compare_prec(prec_ctx, thenexpr_then_prec().left) {
+      case Conflicts:
+        return Fail;
+      case PullsLeft:
+        *out = lhs;
+        return Success;
+      case PullsRight:
+        step(p);
+        then_clause ast_expr;
+        #parse_expr(p, thenexpr_then_prec().right, ab, IsNotStatementExpr, &then_clause);
+        #try_skip_keyw(p, Else);
+        else_clause ast_expr;
+        #parse_expr(p, thenexpr_else_right_prec, ab, IsNotStatementExpr, &else_clause);
+        m ast_meta = copyend(p, lhs.meta);
+        lhs = mk(m, @[ast_expr_enum]Ternary({embox(@[ast_expr_condition]{mk_later(), embox(consume(move(&lhs)))}), embox(consume(move(&then_clause))), embox(consume(move(&else_clause)))}));
+      }
+    } else if case Has(is_incr bool) = is_postfix_incrdecr(peek(p)->val) {
+      oper_meta ast_meta = startend(p);
+      if case IsNotStatementExpr = se {
+        return Fail;
+      }
+      step(p);
+      m ast_meta = copyend(p, lhs.meta);
+      note_original(p, m, IncrDecr);
+      // (NOTE: Is expanding out this funcall/typed/addressof expr the best software design choice?  I think so, we can add layover information saying this is an incr expr, later.  Likewise with user assignment ops.)
+      *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
+         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))))})))}));
+      return Success;
+    } else if case Has(op_facts binop_facts) = binop_info(peek(p)->val) {
+      op tok = *peek(p);
+      switch compare_prec(prec_ctx, op_facts.op_prec.left) {
+        case Conflicts: {
+          return Fail;
+        }
+        case PullsLeft: {
+          *out = lhs;
+          return Success;
+        }
+        case PullsRight: {
+          oparr smallstr = oper_arr(op.val);
+          oper ast_ident = {startend(p), intern(p->im, to_str(&oparr))};
+          step(p);
+          rhs ast_expr;
+          #parse_expr(p, op_facts.op_prec.right, ab, IsNotStatementExpr, &rhs);
+          m ast_meta = copyend(p, lhs.meta);
+          // NOTE: This is fragile.  What if we had a statement, "x = y ! z;", where "!" is a lower-precedence operator than "="?  Right now no such operators exist (besides comma, which doesn't work in expressions) so we're okay.
+          #build_binop_expr(p, se, m, op_facts.user_assignment, oper, lhs, rhs, &lhs);
+        }
+      }
+    } else {
+      *out = lhs;
+      return Success;
+    }
+  }
+}
+
+func is_postfix_incrdecr(t tokval) opt[bool] {
+  if case &Oper(x smallstr) = &t {
+    if x.len == 2 {
+      ch0 i32 = x.vals[0];
+      if ch0 == '+' {
+        if x.vals[1] == '+' {
+          return Has(true);
+        }
+      } else if ch0 == '-' {
+        if x.vals[1] == '-' {
+          return Has(false);
+        }
+      }
+    }
+  }
+  return None;
+}
+
+func incrdecr_sym(im *identmap, is_incr bool) sym {
+  if is_incr {
+    return im->cym.postfix_incrsym;
+  } else {
+    return im->cym.postfix_decrsym;
+  }
+}
+
+inline func thenexpr_then_prec() prec_pair {
+  return {316, 314};
+}
+
+// Lower than anything... except another then-expr.
+def thenexpr_else_right_prec i32 = 314;
+
+struct binop_facts {
+  op_prec prec_pair;
+  user_assignment bool;
+}
+
+func binop_info(t tokval) opt[binop_facts] {
+  switch t {
+    default: { return None; }
+    case Oper(x smallstr): {
+      if x.len == 1 {
+        c0 i32 = x.vals[0];
+        if c0 == '=' { return Has({{305, 305}, false}); }
+        if c0 == '+' || c0 == '-' { return Has({{504, 506}, false}); }
+        if c0 == '<' || c0 == '>' { return Has({{405, 405}, false}); }
+        if c0 == '*' { return Has({{604, 606}, false}); }
+        if c0 == '/' { return Has({{604, 605}, false}); }
+        if c0 == '%' { return Has({{605, 605}, false}); }
+        if c0 == '|' { return Has({{425, 425}, false}); }
+        if c0 == '^' { return Has({{435, 435}, false}); }
+        if c0 == '&' { return Has({{445, 445}, false}); }
+        return None;
+      }
+      if x.len == 2 {
+        c0 i32 = x.vals[0];
+        c1 i32 = x.vals[1];
+        if c0 == '&' && c1 == '&' { return Has({{376, 374}, false}); }
+        if c0 == '|' && c1 == '|' { return Has({{356, 354}, false}); }
+        if (c0 == '<' && c1 == '<') || (c0 == '>' && c1 =='>') {
+          return Has({{415, 415}, false});
+        }
+        if c1 == '=' && (c0 == '=' || c0 == '<' || c0 == '>' || c0 == '!') {
+          return Has({{405, 405}, false});
+        }
+        if c1 == '=' && (c0 == '%' || c0 == '&' || c0 == '*'
+                         || c0 == '-' || c0 == '+' || c0 == '|'
+                         || c0 == '/') {
+          return Has({{305, 305}, true});
+        }
+        return None;
+      }
+      if x.len == 3 {
+        c0 i32 = x.vals[0];
+        c1 i32 = x.vals[1];
+        c2 i32 = x.vals[2];
+        if c2 == '=' && ((c0 == '<' && c1 == '<')
+                         || (c0 == '>' && c1 == '>')) {
+          return Has({{305, 305}, true});
+        }
+        return None;
+      }
+      return None;
+    }
+  }
+}
+
+// How precedence levels work:
+//   - See binop_info and unop_info.
+//   - Operators grab with a "binding strength" (a precedence level) and their left and right sides
+//   - If one operator beats the other by 2 or more, that operator wins.  Otherwise, they conflict (and we cannot parse).
+//   - As an exception, operators in the 410-499 range (bitwise ops) conflict with everything in the 400-699 range.  As an exception to the exception, if the precedence is in 410-414 or 416-499, the operator does _not_ conflict with identical binding strength -- it's left-associative instead.  (This is for associative bitwise operators: x ^ y ^ z is valid, but x ^ y & z is not.)
+//   - This is just a convoluted way to describe a partial ordering of binding strengths.
+//   - An exercise for the reader:  The right-side binding strength of '/' is 605, unlike '*' for which it is 604.  Why?
+func compare_prec(left i32, right i32) prec_cmp {
+  if left >= 410 && left < 500 {
+    if right >= 400 && right < 700 {
+      if left != 415 && left == right {
+        return PullsLeft;
+      } else {
+        return Conflicts;
+      }
+    }
+  } else if right >= 410 && right < 500 {
+    if left >= 400 && left < 700 {
+      if left != 415 && left == right {
+        return PullsLeft;
+      } else {
+        return Conflicts;
+      }
+    }
+  }
+  if left + 1 < right { return PullsRight; }
+  if right + 1 < left { return PullsLeft; }
+  return Conflicts;
+}
+
+func oper_arr(tv tokval) smallstr {
+  switch tv {
+    case Oper(arr smallstr): { return arr; }
+    default: { check(false); return fake(); }
+  }
+}
+
+func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_expr {
+  if op.value == im->cym.addressofsym {
+    return mk(m, @[ast_expr_enum]AddressOf({embox(rhs)}));
+  } else if op.value == im->cym.refofsym {
+    return mk(m, @[ast_expr_enum]RefOf({embox(rhs)}));
+  } else if op.value == im->cym.derefsym {
+    return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(move(&rhs)))}));
+  } else if op.value == im->cym.quickreturnsym {
+    return mk(m, @[ast_expr_enum]QuickReturn({NotComputed, embox(rhs)}));
+  } else {
+    return mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))), mk_array(consume(move(&rhs)))}));
+  }
+}
+
+enum statement_expr {
+  IsNotStatementExpr void;
+  IsStatementExpr void;
+}
+
+func build_binop_expr(p *ps, se statement_expr, m ast_meta, user_assignment bool, op ast_ident, lhs ast_expr, rhs ast_expr, out *ast_expr) parse_result {
+  if op.value == p->im->cym.assignmentsym {
+    if case IsNotStatementExpr = se {
+      return Fail;
+    }
+    *out = mk(m, @[ast_expr_enum]Assignment({NotComputed, embox(lhs), embox(rhs)}));
+  } else if op.value == p->im->cym.logical_and_sym {
+    *out = mk(m, @[ast_expr_enum]LogicalConjunction({false, embox(consume(move(&lhs))), embox(consume(move(&rhs)))}));
+  } else if op.value == p->im->cym.logical_or_sym {
+    *out = mk(m, @[ast_expr_enum]LogicalConjunction({true, embox(consume(move(&lhs))), embox(consume(move(&rhs)))}));
+  } else {
+    if user_assignment {
+      if case IsNotStatementExpr = se {
+        return Fail;
+      }
+      note_original(p, m, UserAssignment);
+      *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
+         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(move(&rhs)))})))}));
+    } else {
+      *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))),
+                                            mk_array(consume(move(&lhs)), consume(move(&rhs)))}));
+    }
+  }
+  return Success;
+}
+
+func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) parse_result {
+  switch peek(p)->val {
+    case Oper(operch smallstr): {
+      if is_at_sign(&operch) {
+        step(p);
+        args array[ast_typeexpr];
+        #try_skip_token(p, @[tokval]Grouper(LBracket));
+        #parse_rest_of_type_param_list(p, AllowBlanksNo, &args);
+        *out = mk(ident.meta, NameExpr(mk(ident, Has(move(&args)))));
+        return Success;
+      }
+    }
+    default: { }
+  }
+  *out = mk(ident.meta, NameExpr(mk(ident, None)));
+  return Success;
+}
+
+func parse_atomic_expr_upon_keyw(p *ps, k keyw, out *ast_expr) parse_result {
+  switch k {
+    case Func: {
+      m ast_meta = start(p);
+      step(p);
+      return parse_rest_of_lambda(p, m, out);
+    }
+    case True: {
+      m ast_meta = startend(p);
+      step(p);
+      *out = mk(m, @[ast_expr_enum]BoolLiteral({m, true}));
+      return Success;
+    }
+    case False: {
+      m ast_meta = startend(p);
+      step(p);
+      *out = mk(m, @[ast_expr_enum]BoolLiteral({m, false}));
+      return Success;
+    }
+    case Void: {
+      m ast_meta = startend(p);
+      step(p);
+      *out = mk(m, @[ast_expr_enum]VoidLiteral({m}));
+      return Success;
+    }
+    case Null: {
+      m ast_meta = startend(p);
+      step(p);
+      *out = mk(m, @[ast_expr_enum]NullLiteral({m}));
+      return Success;
+    }
+    default: {
+      return Fail;
+    }
+  }
+}
+
+func parse_atomic_expr_upon_num(p *ps, n *numlit, out *ast_expr) parse_result {
+  num_meta ast_meta = startend(p);
+  switch n {
+    case &DecNum(arr shray[i8]): {
+      step(p);
+      *out = mk(num_meta, @[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]DecLiteral({num_meta, arr})));
+      return Success;
+    }
+    case &HexNum(arr shray[i8]): {
+      step(p);
+      *out = mk(num_meta, @[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]HexLiteral({num_meta, arr})));
+      return Success;
+    }
+  }
+}
+
+enum allow_braces {
+  AllowBracesNo void;
+  AllowBracesYes void;
+}
+
+func parse_atomic_expr_upon_grouper(p *ps, ab allow_braces, g grouper, out *ast_expr) parse_result {
+  m ast_meta = start(p);
+  switch g {
+    case LParen: {
+      step(p);
+      expr ast_expr;
+      #parse_expr(p, kSemicolonPrec, AllowBracesYes, IsNotStatementExpr, &expr);
+      #try_skip_token(p, @[tokval]Grouper(RParen));
+      end(p, m);
+      *out = mk(m, @[ast_expr_enum]ParenExpr({embox(expr)}));
+      return Success;
+    }
+    case LBrace: {
+      if case AllowBracesNo = ab {
+        return Fail;
+      }
+      step(p);
+      return parse_rest_of_strinit(p, m, out);
+    }
+    case DoubleQuote:
+      return parse_atomic_expr_upon_stringdelim(p, '\"', out);
+    case SingleQuote:
+      return parse_atomic_expr_upon_stringdelim(p, '\'', out);
+    case Backtick:
+      ident ast_ident;
+      #parse_backtick_ident(p, m, &ident);
+      return parse_finish_name_expr(p, ident, out);
+    default:
+      return Fail;
+  }
+}
+
+func parse_atomic_expr_upon_oper(p *ps, ab allow_braces, operch *smallstr, out *ast_expr) parse_result {
+  m ast_meta = start(p);
+  if is_at_sign(operch) {
+    step(p);
+    type ast_typeexpr;
+    expr ast_expr;
+    #try_skip_token(p, @[tokval]Grouper(LBracket));
+    #help_parse_typeexpr(p, AllowBlanksYes, AllowLifetimesYes, &type);
+    #try_skip_token(p, @[tokval]Grouper(RBracket));
+    #parse_expr(p, kConversionRightPrec, ab, IsNotStatementExpr, &expr);
+    end(p, m);
+    *out = mk(m, @[ast_expr_enum]TypedExpr({type, embox(expr)}));
+    return Success;
+  } else {
+    switch unop_info(operch) {
+      case None: { return Fail; }
+      case Has(rightprec i32): {
+        oper_meta ast_meta = startend(p);
+        step(p);
+        rhs ast_expr;
+        #parse_expr(p, rightprec, ab, IsNotStatementExpr, &rhs);
+        end(p, m);
+        *out = build_unop_expr(p->im, m, {oper_meta, intern(p->im, to_str(operch))}, rhs);
+        return Success;
+      }
+    }
+  }
+}
+
+func parse_atomic_expr_upon_stringdelim(p *ps, ch i32, out *ast_expr) parse_result {
+  if ch == '\"' {
+    m ast_meta = start(p);
+    string_step(p, '\"');
+    return parse_rest_of_string_literal(p, m, out);
+  } else if ch == '\'' {
+    m ast_meta = start(p);
+    string_step(p, '\'');
+    return parse_rest_of_char_literal(p, m, out);
+  } else {
+    ice(_u8("StringDelim with bad ch"));
+    return fake();
+  }
+}
+
+func parse_atomic_expr(p *ps, ab allow_braces, out *ast_expr) parse_result {
+  switch peek(p)->val {
+    case Keyw(k keyw):
+      return parse_atomic_expr_upon_keyw(p, k, out);
+    case Num(n numlit):
+      return parse_atomic_expr_upon_num(p, &n, out);
+    case Grouper(g grouper):
+      return parse_atomic_expr_upon_grouper(p, ab, g, out);
+    case Ident(identch shray[i32]):
+      ident_meta ast_meta = startend(p);
+      step(p);
+      return parse_finish_name_expr(p, {ident_meta, intern(p->im, ~identch)}, out);
+    case ExclIdent(identch shray[i32]):
+      m ast_meta = start(p);
+      ident_meta ast_meta = startend(p);
+      step(p);
+      rhs ast_expr;
+      if ! +parse_expr(p, kGeneralUnopRightPrec, ab, IsNotStatementExpr, &rhs) {
+        return Fail;
+      }
+      end(p, m);
+      *out = build_unop_expr(p->im, m, {ident_meta, intern(p->im, ~identch)}, rhs);
+      return Success;
+    case Oper(operch smallstr):
+      return parse_atomic_expr_upon_oper(p, ab, &operch, out);
+    case Bad: {
+      return Fail;
+    }
+    case Eof: {
+      return Fail;
+    }
+  }
+}
+
+func unop_info(operch *smallstr) opt[i32] {
+  nch size = +operch->len;
+  if nch == 1 {
+    ch0 i32 = operch->vals[0];
+    if ch0 == '~' || ch0 == '*' || ch0 == '&'
+       || ch0 == '-' || ch0 == '!' || ch0 == '^' || ch0 == '+' || ch0 == '#' {
+      return Has(kGeneralUnopRightPrec);
+    }
+  } else if nch == 2 {
+    if operch->vals[0] == '&' && operch->vals[1] == '&' {
+      return Has(kGeneralUnopRightPrec);
+    }
+  }
+  return None;
+}
+
+func is_equal(arr *smallstr, v0 i32) bool {
+  return arr->len == 1 && arr->vals[0] == v0;
+}
+
+func is_at_sign(operch *smallstr) bool {
+  return is_equal(operch, at_sign);
+}
+
+def at_sign i32 = '@';
+
+func parse_rest_of_lambda(p *ps, lambda_expr_meta ast_meta, out *ast_expr) parse_result {
+  args array[ast_vardecl];
+  return_type ast_typeexpr;
+  body ast_bracebody;
+  #parse_lambdaspec(p, &args, &return_type, &body);
+  end(p, lambda_expr_meta);
+  *out = mk(lambda_expr_meta, @[ast_expr_enum]Lambda({IsNotInline, move(&args), return_type, {NotComputed, move(&body)}}));
+  return Success;
+}
+
+func parse_rest_of_strinit(p *ps, m ast_meta, out *ast_expr) parse_result {
+  ecs array[ast_expr_consume];
+  #parse_rest_of_expr_list(p, AllowBracesYes, RBrace, &ecs);
+  params array[ast_strinit_param];
+  necs size = count(&ecs);
+  for i size = 0; i < necs; i = i + 1 {
+    push(&params, {NotComputed, get(&ecs, i)});
+  }
+  end(p, m);
+  *out = mk(m, @[ast_expr_enum]Strinit({m, params}));
+  return Success;
+}
+
+func parse_rest_of_param_list(p *ps, out *array[ast_expr_consume]) parse_result {
+  return parse_rest_of_expr_list(p, AllowBracesYes, RParen, out);
+}
+
+// ab is always "Yes" here but it's still a param because it's not this function's place to decide.
+func parse_rest_of_expr_list(p *ps, ab allow_braces, stop grouper, out *array[ast_expr_consume]) parse_result {
+  exprs array[ast_expr_consume];
+  for ;; {
+    if +try_skip_token(p, @[tokval]Grouper(stop)) {
+      *out = exprs;
+      return Success;
+    }
+    if count(&exprs) != 0 {
+      #try_skip_oper(p, ',');
+    }
+    expr ast_expr;
+    #parse_expr(p, kCommaPrec, ab, IsNotStatementExpr, &expr);
+    push(&exprs, consume(move(&expr)));
+  }
+}
+
+func parse_statement(p *ps, out *ast_statement) parse_result {
+  m ast_meta = start(p);
+  u ast_statement_enum;
+  #parse_statement_enum(p, &u);
+  end(p, m);
+  *out = {m, u};
+  return Success;
+}
+
+func parse_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  switch peek(p)->val {
+    case Keyw(k): {
+      switch k {
+        case Return: {
+          step(p);
+          return parse_rest_of_return_statement_enum(p, out);
+        }
+        case If: {
+          step(p);
+          return parse_rest_of_if_statement_enum(p, out);
+        }
+        case While: {
+          step(p);
+          return parse_rest_of_while_statement_enum(p, out);
+        }
+        case For: {
+          step(p);
+          return parse_rest_of_for_statement_enum(p, out);
+        }
+        case Foreach: {
+          step(p);
+          return parse_rest_of_foreach_statement_enum(p, out);
+        }
+        case Switch: {
+          step(p);
+          return parse_rest_of_switch_statement_enum(p, out);
+        }
+        case Break:
+          step(p);
+          return parse_rest_of_break_statement_enum(p, out);
+        case Continue:
+          step(p);
+          return parse_rest_of_continue_statement_enum(p, out);
+        case Label: {
+          step(p);
+          return parse_rest_of_label_statement_enum(p, out);
+        }
+        case Goto: {
+          step(p);
+          return parse_rest_of_goto_statement_enum(p, out);
+        }
+        default: { }
+      }
+    }
+    default: { }
+  }
+  return parse_naked_var_or_expr_statement_enum(p, AllowBracesYes, ForceAssignmentNo, out);
+}
+
+func parse_rest_of_continue_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  #try_skip_oper(p, ';');
+  *out = Continue({NotComputed});
+  return Success;
+}
+
+func parse_rest_of_break_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  #try_skip_oper(p, ';');
+  *out = Break({NotComputed});
+  return Success;
+}
+
+func parse_rest_of_label_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  name ast_ident;
+  #parse_ident(p, &name);
+  #try_skip_oper(p, ';');
+  *out = Label({NotComputed, name});
+  return Success;
+}
+
+func parse_rest_of_goto_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  target ast_ident;
+  #parse_ident(p, &target);
+  #try_skip_oper(p, ';');
+  *out = Goto({NotComputed, target});
+  return Success;
+}
+
+func parse_rest_of_return_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  if +try_skip_oper(p, ';') {
+    *out = Return({None});
+    return Success;
+  }
+  expr ast_expr;
+  #parse_expr(p, kSemicolonPrec, AllowBracesYes, IsNotStatementExpr, &expr);
+  #try_skip_oper(p, ';');
+  *out = Return({Has(embox(consume(move(&expr))))});
+  return Success;
+}
+
+func parse_condition(p *ps, ab allow_braces, out *ast_condition) parse_result {
+  m ast_meta = start(p);
+  if +try_skip_keyw(p, Case) {
+    conspatt ast_constructor_pattern;
+    rhs ast_expr;
+    #parse_rest_of_constructor_pattern(p, m, &conspatt);
+    #try_skip_oper(p, '=');
+    #parse_expr(p, kConditionPrec, ab, IsNotStatementExpr, &rhs);
+    *out = PatternCondition({NotComputed, conspatt, embox(consume(move(&rhs)))});
+    return Success;
+  } else {
+    condition ast_expr;
+    #parse_expr(p, kConditionPrec, ab, IsNotStatementExpr, &condition);
+    *out = ExprCondition(embox(consume(move(&condition))));
+    return Success;
+  }
+}
+
+func mk_condition_discard_info() ast_condition_discard_info {
+  return {NotComputed, mk_later()};
+}
+
+func parse_rest_of_if_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  condition ast_condition;
+  thenbody ast_bracebody;
+  #parse_condition(p, AllowBracesNo, &condition);
+  #parse_bracebody(p, &thenbody);
+
+  if ! +try_skip_keyw(p, Else) {
+    *out = IfThen({mk_condition_discard_info(), condition, move(&thenbody)});
+    return Success;
+  }
+
+  if +try_skip_keyw(p, If) {
+    m ast_meta = start(p);
+    elseif_u ast_statement_enum;
+    #parse_rest_of_if_statement_enum(p, &elseif_u);
+    end(p, m);
+    elseif ast_statement = {m, elseif_u};
+    *out = IfThenElse({mk_condition_discard_info(), move(&condition), move(&thenbody), {NotComputed, mk_array(elseif)}});
+    return Success;
+  }
+  elsebody ast_bracebody;
+  #parse_bracebody(p, &elsebody);
+  *out = IfThenElse({mk_condition_discard_info(), move(&condition), move(&thenbody), move(&elsebody)});
+  return Success;
+}
+
+func parse_rest_of_while_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  condition ast_condition;
+  body ast_bracebody;
+  #parse_condition(p, AllowBracesNo, &condition);
+  #parse_bracebody(p, &body);
+  *out = While({mk_condition_discard_info(), condition, move(&body)});
+  return Success;
+}
+
+func parse_rest_of_for_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  initializer opt[box[ast_statement]];
+  if +try_skip_oper(p, ';') {
+    initializer = None;
+  } else {
+    m ast_meta = start(p);
+    u ast_statement_enum;
+    #parse_naked_var_or_expr_statement_enum(p, AllowBracesNo, ForceAssignmentYes, &u);
+    end(p, m);
+    initializer = Has(embox(@[ast_statement]{m, u}));
+  }
+  condition opt[ast_expr_condition];
+  if +try_skip_oper(p, ';') {
+    condition = None;
+  } else {
+    expr ast_expr;
+    #parse_expr(p, kConditionPrec, AllowBracesNo, IsNotStatementExpr, &expr);
+    #try_skip_oper(p, ';');
+    condition = Has({mk_later(), embox(consume(move(&expr)))});
+  }
+  increment opt[box[ast_expr_discard]];
+  lbrace tokval = Grouper(LBrace);
+  if equal(&peek(p)->val, &lbrace) {
+    increment = None;
+  } else {
+    expr ast_expr;
+    #parse_expr(p, kSemicolonPrec, AllowBracesNo, IsStatementExpr, &expr);
+    increment = Has(embox(discard(move(&expr))));
+  }
+
+  body ast_bracebody;
+  #parse_bracebody(p, &body);
+  *out = For({NotComputed, initializer, condition, increment, move(&body)});
+  return Success;
+}
+
+func wrapname(m ast_meta, name sym) ast_expr {
+  return {m, NoInfo, NameExpr({NotComputed, {m, name}, None})};
+}
+
+func wrapapply(m ast_meta, funcname sym, argvar sym) ast_expr {
+  return wrapapply(m, funcname, wrapname(m, argvar));
+}
+
+func wrapapply(m ast_meta, funcname sym, arg ast_expr) ast_expr {
+  return {m, NoInfo, Funcall({
+    embox(consume(wrapname(m, funcname))),
+    mk_array(consume(arg))
+  })};
+}
+
+func wrapaddressof(m ast_meta, argvar sym) ast_expr {
+  return {m, NoInfo, AddressOf({embox(wrapname(m, argvar))})};
+}
+
+func parse_rest_of_foreach_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  m ast_meta = startend(p);
+  decl ast_vardecl;
+  #parse_vardecl(p, AllowBlanksYes, &decl);
+  #try_skip_keyw(p, In);
+  iteree ast_expr;
+  #parse_expr(p, kConditionPrec, AllowBracesNo, IsNotStatementExpr, &iteree);
+  body ast_bracebody;
+  #parse_bracebody(p, &body);
+
+  iteree_var_name sym = gensym(p->im, _u8("iteree"));
+  iter_var_name sym = gensym(p->im, _u8("iterator"));
+
+  iteree_var_st ast_var_statement = {NotComputed, @[ast_vardecl]{{m, iteree_var_name}, Unknown({})}, HasExpr(embox(consume(iteree)))};
+  iter_var_st ast_var_statement = {NotComputed, @[ast_vardecl]{{m, iter_var_name}, Unknown({})}, HasExpr(embox(consume(wrapapply(m, p->im->cym.do_iter_mk, iteree_var_name))))};
+  decl_var_st ast_var_statement = {NotComputed, decl, HasExpr(embox(consume(wrapapply(m, p->im->cym.do_iter_access, wrapaddressof(m, iter_var_name)))))};
+
+  *out = Block({@[ast_bracebody]{
+    NotComputed,
+    mk_array@[ast_statement](
+      {m, Var(iteree_var_st)},
+      {m, For({
+        NotComputed,
+        Has(embox(@[ast_statement]{m, Var(iter_var_st)})),
+        Has({mk_later(), embox(consume(wrapapply(m, p->im->cym.do_iter_done, wrapaddressof(m, iter_var_name))))}),
+        Has(embox(discard(wrapapply(m, p->im->cym.do_iter_step, wrapaddressof(m, iter_var_name))))),
+        @[ast_bracebody]{
+          NotComputed,
+          mk_array@[ast_statement](
+            {m, Var(decl_var_st)},
+            {m, Block({move(&body)})})
+        }})}
+    )
+  }});
+
+  return Success;
+}
+
+func parse_rest_of_switch_statement_enum(p *ps, out *ast_statement_enum) parse_result {
+  swartch ast_expr;
+  #parse_expr(p, kConditionPrec, AllowBracesNo, IsNotStatementExpr, &swartch);
+  #try_skip_token(p, @[tokval]Grouper(LBrace));
+
+  cases array[ast_switch_case];
+  for ;; {
+    if +try_skip_token(p, @[tokval]Grouper(RBrace)) {
+      *out = Switch({NotComputed, mk_later(), embox(consume(move(&swartch))), move(&cases)});
+      return Success;
+    }
+    cas ast_switch_case;
+    #parse_switch_case(p, &cas);
+    pushmove(&cases, &cas);
+  }
+}
+
+func parse_switch_case(p *ps, out *ast_switch_case) parse_result {
+  pattern ast_case_pattern;
+  body ast_bracebody;
+  #parse_case_pattern(p, &pattern);
+  #try_skip_oper(p, ':');
+  switch triparse_bracebody(p, &body) {
+    case Success: { }
+    case Quickfail:
+      statements array[ast_statement];
+      done bool = false;
+      casekeyw tokval = Keyw(Case);
+      defaultkeyw tokval = Keyw(Default);
+      rbrace tokval = Grouper(RBrace);
+      while !done {
+        if equal(&peek(p)->val, &casekeyw) || equal(&peek(p)->val, &defaultkeyw) || equal(&peek(p)->val, &rbrace) {
+          // We disallow empty non-braced switch cases -- they look too much like fallthrough cases.
+          if count(&statements) == 0 {
+            return Fail;
+          }
+          body = {NotComputed, move(&statements)};
+          done = true;
+        } else {
+          st ast_statement;
+          #parse_statement(p, &st);
+          pushref(&statements, &st);
+        }
+      }
+    case Error:
+      return Fail;
+  }
+  *out = {pattern, move(&body)};
+  return Success;
+}
+
+func parse_rest_of_constructor_pattern(p *ps, m ast_meta,
+                                       out *ast_constructor_pattern) parse_result {
+  addressof_oper ast_ident;
+  addressof_constructor opt[ast_ident];
+  if +try_parse_oper(p, '&', &addressof_oper) {
+    addressof_constructor = Has(addressof_oper);
+  } else {
+    addressof_constructor = None;
+  }
+  constructor_name ast_ident;
+  #parse_ident(p, &constructor_name);
+  decl opt[ast_vardecl];
+  if +try_skip_token(p, @[tokval]Grouper(LParen)) {
+    vd ast_vardecl;
+    #parse_vardecl(p, AllowBlanksYes, &vd);
+    #try_skip_token(p, @[tokval]Grouper(RParen));
+    decl = Has(vd);
+  } else {
+    decl = None;
+  }
+  end(p, m);
+  *out = {m, NotComputed, addressof_constructor, constructor_name, decl};
+  return Success;
+}
+
+func parse_case_pattern(p *ps, out *ast_case_pattern) parse_result {
+  if +try_skip_keyw(p, Default) {
+    *out = Default;
+    return Success;
+  }
+  conspatt ast_constructor_pattern;
+  m ast_meta = start(p);
+  #try_skip_keyw(p, Case);
+  #parse_rest_of_constructor_pattern(p, m, &conspatt);
+  *out = Case(conspatt);
+  return Success;
+}
+
+enum triparse_result {
+  Success void;
+  Quickfail void;
+  Error void;
+}
+
+func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_assignment, out *ast_statement_enum) parse_result {
+  name ast_ident;
+  switch triparse_ident(p, &name) {
+  case Success: { }
+  case Error:
+    return Fail;
+  case Quickfail:
+    // (The force_assignment argument only matters for var statements.)
+    expr ast_expr;
+    #parse_expr(p, kSemicolonPrec, ab, IsStatementExpr, &expr);
+    #try_skip_oper(p, ';');
+    *out = Expr(discard(move(&expr)));
+    return Success;
+  }
+
+  decl ast_vardecl;
+  if +try_skip_keyw(p, Var) {
+    decl = {name, Unknown({})};
+  } else if +try_skip_oper(p, at_sign) {
+    lhs ast_expr;
+    #parse_finish_name_expr(p, name, &lhs);
+    whole_expr ast_expr;
+    #parse_after_atomic_expr(p, kSemicolonPrec, ab, IsStatementExpr, lhs, &whole_expr);
+    #try_skip_oper(p, ';');
+    *out = Expr(discard(move(&whole_expr)));
+    return Success;
+  } else {
+    type ast_typeexpr;
+    switch help_triparse_typeexpr(p, AllowBlanksYes, AllowLifetimesNo, &type) {
+      case Quickfail: {
+        m ast_meta = copystart(p, name.meta);
+        lhs ast_expr = mk(name.meta, NameExpr(mk(name, None)));
+        whole_expr ast_expr;
+        #parse_after_atomic_expr(p, kSemicolonPrec, ab, IsStatementExpr, lhs, &whole_expr);
+        #try_skip_oper(p, ';');
+        *out = Expr(discard(move(&whole_expr)));
+        return Success;
+      }
+      case Error: {
+        return Fail;
+      }
+      case Success: {
+        decl = {name, type};
+      }
+    }
+  }
+
+  semicolon tokval = mk_oper(';');
+  if equal(&peek(p)->val, &semicolon) {
+    switch fa {
+      case ForceAssignmentYes: { return Fail; }
+      case ForceAssignmentNo: {
+        step(p);
+        *out = Var({NotComputed, decl, AutoInit(None)});
+        return Success;
+      }
+    }
+  }
+
+  rhs ast_expr;
+  #try_skip_oper(p, '=');
+  #parse_expr(p, kSemicolonPrec, ab, IsNotStatementExpr, &rhs);
+  #try_skip_oper(p, ';');
+  *out = Var({NotComputed, decl, HasExpr(embox(consume(move(&rhs))))});
+  return Success;
+}
+
+func parse_rest_of_string_literal(p *ps, m ast_meta, out *ast_expr) parse_result {
+  specs array[ast_charspec];
+  again bool = true;
+  while again {
+    done bool = false;
+    while !done {
+      switch peek(p)->val {
+        case Grouper(g grouper): {
+          if case DoubleQuote = g {
+            step(p);
+            done = true;
+          } else {
+            ice(_u8("String literal expected to end in double quote"));
+          }
+        }
+        case StringChar(ch i32): {
+          push(&specs, {ch});
+          string_step(p, '\"');
+        }
+        default: {
+          return Fail;
+        }
+      }
+    }
+
+    again = false;
+    if case Grouper(g grouper) = peek(p)->val {
+      if case DoubleQuote = g {
+        string_step(p, '\"');
+        again = true;
+      }
+    }
+  }
+  end(p, m);
+  *out = mk(m, @[ast_expr_enum]StringLiteral({move(&specs)}));
+  return Success;
+}
+
+func parse_rest_of_char_literal(p *ps, m ast_meta, out *ast_expr) parse_result {
+  value i32;
+  switch peek(p)->val {
+    case StringChar(ch i32): {
+      value = ch;
+      string_step(p, '\'');
+    }
+    default: {
+      return Fail;
+    }
+  }
+  switch peek(p)->val {
+    case Grouper(g grouper): {
+      if case SingleQuote = g {
+        step(p);
+        end(p, m);
+        *out = mk(m, @[ast_expr_enum]CharLiteral({{value}}));
+        return Success;
+      } else {
+        return Fail;
+      }
+    }
+    default: {
+      return Fail;
+    }
+  }
+}
+
+func see_if_parse(file *array[u8]) bool {
+  im identmap = make_im();
+  posits positionals = mk_positionals();
+  p ps = make_ps(&im, &posits, 0, data(file), count(file));
+  out ast_file;
+  ret bool = +parse_file(&p, &out);
+  if !ret {
+    print(Stdout(), _u8("at offset "));
+    print(Stdout(), to_u8str(peek(&p)->interval.left.x));
+    print(Stdout(), _u8("..."));
+    ign var = fflush(Stdout());
+  }
+  return ret;
+}
+
+func run_parse_negtest(ctx *parse_test_ctx, test_name array[u8], file array[u8]) void {
+  help_run_parse_test(ctx, &test_name, &file, false);
+}
+
+func run_parse_test(ctx *parse_test_ctx, test_name array[u8], file array[u8]) void {
+  help_run_parse_test(ctx, &test_name, &file, true);
+}
+
+func help_run_parse_test(ctx *parse_test_ctx, test_name *array[u8], file *array[u8], expected_success bool) void {
+  if ctx->verbose {
+    print(Stdout(), _u8("test "));
+    if !expected_success {
+      print(Stdout(), _u8("!"));
+    }
+    print(Stdout(), *test_name);
+    print(Stdout(), _u8("..."));
+    ign var = fflush(Stdout());
+  }
+  if expected_success != see_if_parse(file) {
+    print(Stdout(), _u8("FAIL\n"));
+    ign var = fflush(Stdout());
+    ctx->failures = ctx->failures + 1;
+  } else {
+    if ctx->verbose {
+      print(Stdout(), _u8("PASS\n"));
+      ign var = fflush(Stdout());
+    }
+  }
+}
+
+struct parse_test_ctx {
+  verbose bool;
+  failures u32;
+}
+
+func test_parse(verbose bool) bool {
+  ctx parse_test_ctx = {verbose, 0};
+  run_parse_test(&ctx, _u8("p001"), _u8("import foo;"));
+  run_parse_test(&ctx, _u8("p002"), _u8("def a int = 0;"));
+  run_parse_test(&ctx, _u8("p003"), _u8("def abc int = 1;\n"));
+  run_parse_test(&ctx, _u8("p004"), _u8("def _ab int =0x1;\n"));
+  run_parse_test(&ctx, _u8("p005"), _u8("def ab_ int = 0x1AF2;\n"));
+  run_parse_test(&ctx, _u8("p006"), _u8("def a_b int=\n0x1AF2 ;\n"));
+  run_parse_test(&ctx, _u8("p007"), _u8("def a int=0x1AF2 ;"));
+  run_parse_test(&ctx, _u8("p008"), _u8("def a fn[int, int] = 1;"));
+  run_parse_test(&ctx, _u8("p009"),
+                 _u8("def a b = func(x int, y int) int { 3; };"));
+  run_parse_test(&ctx, _u8("p010"),
+                 _u8("def a = func(x int, y int) int { return 3; };"));
+  run_parse_test(&ctx, _u8("p011"),
+                 _u8("def a =\n"
+                     "\tfunc(x int, y int) int { *x; };"));
+  run_parse_test(&ctx, _u8("p012"),
+                 _u8("def foo bar = 2 + 3;"));
+  run_parse_test(&ctx, _u8("p013"),
+                 _u8("def foo bar = 2+*3-4;"));
+  run_parse_test(&ctx, _u8("p014"),
+                 _u8("def foo bar = (2 ^ 3) - 4 && x -> quux;"));
+  run_parse_negtest(&ctx, _u8("p015"),
+                 _u8("def[] foo fn[int] = func() int {\n"
+                     "var x int = 3;\n"
+                     "  return x;};"));
+  run_parse_negtest(&ctx, _u8("p016-a-a"),
+                 _u8("def[] foo/*heh*/fn[int] = func() int {\n"
+                     "//blah blah\n"
+                     "  var x int =-3;return x;};"));
+  run_parse_test(&ctx, _u8("p016-a-b"),
+                 _u8("def[] foo/*heh*/fn[int] = func() int {\n"
+                     "//blah blah\n"
+                     "  x int =-3;return x;};"));
+  run_parse_test(&ctx, _u8("p016-b"),
+                 _u8("def[] foo fn[int] = func() int {\n"
+                     "  x var = -3;\n"
+                     "};"));
+  run_parse_test(&ctx, _u8("p017"),
+                 _u8("def a b = 1 == 1 || 2 == 1;\n"));
+  run_parse_test(&ctx, _u8("p018"),
+                 _u8("def a b = 1 + - 1;"));
+  run_parse_test(&ctx, _u8("p019"),
+                 _u8("def a b = 1 + -1;"));
+  run_parse_test(&ctx, _u8("p020"),
+                 _u8("def a b = 1 +- 1;"));
+  run_parse_test(&ctx, _u8("p021"),
+                 _u8("def a b = 1 +-1;"));
+  run_parse_negtest(&ctx, _u8("p022"),
+                 _u8("func a() int {var x int;}"));
+  run_parse_test(&ctx, _u8("p023"),
+                 _u8("func a() int {\n"
+                     "  (x+3)[y(z)] = 3;\n"
+                     "  return x[y];  }"));
+  run_parse_test(&ctx, _u8("p024"),
+                 _u8("func a() int {\n"
+                     "  x[y(z)] = 3;\n"
+                     "  return x[y];  }"));
+  run_parse_test(&ctx, _u8("p025"),
+                 _u8("func a() int {\n"
+                     "  x *^[y(z)]t = 3;\n"
+                     "  return x[y]; }"));
+  run_parse_test(&ctx, _u8("p026"),
+                 _u8("func a() int {\n"
+                     "  x ^[y(z)]^[1]^[2]t = 3;\n"
+                     "  return x[y]; }"));
+  run_parse_test(&ctx, _u8("p027"),
+                 _u8("func a() int {\n"
+                     "  x [y(z)][1][2] = 3;\n"
+                     "  return x[y]; }"));
+  run_parse_test(&ctx, _u8("p028"),
+                 _u8("func a() int {\n"
+                     "  x [y(z)][1][2];\n"
+                     "  return x[y];  }"));
+  run_parse_negtest(&ctx, _u8("p029-a"),
+                 _u8("func a() int {\n"
+                     "  for var i i32 = 3; i < 3; i = i + 1 {}}"));
+  run_parse_test(&ctx, _u8("p029-b"),
+                 _u8("func a() int {\n"
+                     "  for i i32 = 3; i < 3; i = i + 1 {}}"));
+  run_parse_test(&ctx, _u8("p030"),
+                 _u8("func a() int {\n"
+                     "  for i i32 = 3; i < 3; i = i + 1 { x = 2; }}"));
+  run_parse_test(&ctx, _u8("p031"),
+                 _u8("def foo = baz@[a, b](1, 2, 3);"));
+  run_parse_test(&ctx, _u8("p032-a"),
+                 _u8("def foo u8 = 'a';\n"));
+  run_parse_test(&ctx, _u8("p032-b"),
+                 _u8("var foo u8 = 'a';\n"));
+  run_parse_test(&ctx, _u8("p033"),
+                 _u8("def foo u8 = '\\n';\n"));
+  run_parse_test(&ctx, _u8("p034"),
+                 _u8("def foo u8 = '\\x2A';\n"));
+  run_parse_test(&ctx, _u8("p035-a"),
+                 _u8("def foo u8 = \"\\x2Azq\";\n"));
+  run_parse_test(&ctx, _u8("p035-b"),
+                 _u8("def foo u8 = \"\";\n"));
+  run_parse_test(&ctx, _u8("p035-c"),
+                 _u8("def foo u8 = \"abc\" \"def\";\n"));
+  run_parse_test(&ctx, _u8("p036-a"),
+                 _u8("func a() b { switch c { case e(f g): { } case h(i): { j; } default: { } } }"));
+  run_parse_test(&ctx, _u8("p036-b"),
+                 _u8("func a() b { switch c { case &e(f g): { } case h(i): { j; } default: { } } }"));
+  run_parse_negtest(&ctx, _u8("p036-c"),
+                 _u8("func a() b { switch c { case &e(f g): case h(i): j; default: } }"));
+  run_parse_test(&ctx, _u8("p037"),
+                 _u8("func `~`(x u32) size { }"));
+  run_parse_test(&ctx, _u8("p038"),
+                 _u8("func foo() a { x int; }"));
+  run_parse_test(&ctx, _u8("p039"),
+                 _u8("func foo() a { x int = 3; }"));
+  run_parse_test(&ctx, _u8("p040"),
+                 _u8("func foo() a { for i i32 = 3; i < 3; i = i + 1 { } }"));
+  run_parse_test(&ctx, _u8("p041"),
+                 _u8("func foo() a { if x { } else if y { } else { } }"));
+  run_parse_test(&ctx, _u8("p042"),
+                 _u8("func foo() a { label foo; goto bar; }"));
+  run_parse_test(&ctx, _u8("p043"),
+                 _u8("func foo() a { y union { }; }"));
+  run_parse_test(&ctx, _u8("p046-a"),
+                 _u8("struct foo { x y; z int; t fn[beh]; }"));
+  run_parse_test(&ctx, _u8("p046-b"),
+                 _u8("enum foo { x y; z int; t fn[beh]; }"));
+  run_parse_test(&ctx, _u8("p046-c"),
+                 _u8("enum foo { x y; z int; t fn[beh]; }"));
+  run_parse_test(&ctx, _u8("p046-d"),
+                 _u8("enum foo { x y; #z int; t fn[beh]; }"));
+  run_parse_negtest(&ctx, _u8("p046-e"),
+                    _u8("enum foo { x y; #z int; #t fn[beh]; }"));
+  run_parse_test(&ctx, _u8("p048-a"),
+                 _u8("struct[] foo {x bar [quux]; }\n"));
+  run_parse_negtest(&ctx, _u8("p048-b"),
+                    _u8("struct[] foo {x bar [quux]; };\n"));
+  run_parse_test(&ctx, _u8("p049-a"),
+                 _u8("struct[] foo {x ^[2 + 3]bar; }\n"));
+  run_parse_test(&ctx, _u8("p049-b"),
+                 _u8("struct[T, U] foo {x ^[2 + 3]bar; }\n"));
+  run_parse_test(&ctx, _u8("p050-a"),
+                 _u8("defclass move foo { field ^[7]bar; }\n"
+                     "struct[T] foo { count u32; p ^[3]T; }\n"));
+  run_parse_test(&ctx, _u8("p050-b"),
+                 _u8("defclass move foo { field ^[7]bar; }\n"
+                     "struct[T] foo { count u32; p ^[3]T; }\n"));
+  run_parse_test(&ctx, _u8("p051"),
+                 _u8("defclass copy foo { field bar; }"));
+  run_parse_test(&ctx, _u8("p052"),
+                 _u8("extern putchar fn[i32, i32];"));
+  run_parse_test(&ctx, _u8("p053-a"),
+                 _u8("export def blah fn[i32, i32] = 3;"));
+  run_parse_test(&ctx, _u8("p053-b"),
+                 _u8("export var blah fn[i32, i32] = 3;"));
+  run_parse_test(&ctx, _u8("p054"),
+                 _u8("access string { def foo i32 = 3; }\n"));
+  run_parse_test(&ctx, _u8("p054"),
+                 _u8("access vec[_] { def foo i32 = 3; }\n"));
+  run_parse_test(&ctx, _u8("p055"),
+                 _u8("func foo() a { if case foo(x) = bar { } else if y { } else { } }"));
+  run_parse_test(&ctx, _u8("p056"),
+    _u8("func foo() a { if x == 0 { return 1; } else { return 2; } }"));
+  run_parse_negtest(&ctx, _u8("p057-a"),
+    _u8("func foo() a { if a = 3 { } }"));
+  run_parse_negtest(&ctx, _u8("p057-b"),
+    _u8("func foo() a { (a = 3); }"));
+  run_parse_test(&ctx, _u8("p057-c"),
+    _u8("func foo() a { a = 3; }"));
+  run_parse_negtest(&ctx, _u8("p058-a"),
+    _u8("func foo() a { if a == {1, 2} { return; } }"));
+  run_parse_test(&ctx, _u8("p058-b"),
+    _u8("func foo() a { if a == ({1, 2}) { return; } }"));
+  run_parse_test(&ctx, _u8("p058-c"),
+    _u8("func foo() a { if (a == {1, 2}) { return; } }"));
+  run_parse_test(&ctx, _u8("p059"),
+    _u8("func foo() a { return x == y then 23 else 45; }"));
+  run_parse_test(&ctx, _u8("p060"),
+    _u8("func foo() a { return x == y then blarg then 23 else 64 else 45; }"));
+  run_parse_test(&ctx, _u8("p061"),
+    _u8("func foo() a { return x == y then 64 else hey & jay then feh else 45; }"));
+  run_parse_negtest(&ctx, _u8("p062"),
+    _u8("func `  + `() a { return b; }"));
+  run_parse_negtest(&ctx, _u8("p063"),
+    _u8("def blah i32 = 1 / 2 / 3;"));
+  run_parse_negtest(&ctx, _u8("p064"),
+    _u8("def blah i32 = 1 / 2 * 3;"));
+  run_parse_test(&ctx, _u8("p065"),
+    _u8("def blah i32 = 1 * 2 / 3;"));
+  run_parse_negtest(&ctx, _u8("p066"),
+    _u8("def blah i32 = 1 * 2 / 3 * 4;"));
+  run_parse_test(&ctx, _u8("p067"),
+    _u8("def blah i32 = foo!3;"));
+  run_parse_negtest(&ctx, _u8("p068"),
+    _u8("def blah i32 = foo!!3;"));
+  run_parse_negtest(&ctx, _u8("p069"),
+    _u8("def blah i32 = 2 ^ 3 & 4;"));
+  run_parse_test(&ctx, _u8("p070"),
+    _u8("def blah i32 = 2 ^ 3 ^ 4;"));
+  run_parse_negtest(&ctx, _u8("p071"),
+    _u8("def blah i32 = 2 < 3 ^ 4;"));
+  run_parse_negtest(&ctx, _u8("p072"),
+    _u8("def blah i32 = 2 < 3 < 4;"));
+  run_parse_test(&ctx, _u8("p073"),
+    _u8("func foo() a {\n"
+        "  foreach x y in z {\n"
+        "    blah;\n"
+        "  }\n"
+        "}\n"));
+  run_parse_test(&ctx, _u8("p073"),
+    _u8("func foo() a {\n"
+        "  foreach x in z {\n"
+        "    blah;\n"
+        "  }\n"
+        "}\n"));
+  return ctx.failures == 0;
+}
+

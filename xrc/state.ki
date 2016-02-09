@@ -1,0 +1,699 @@
+import anal;
+import ast;
+import box;
+import deferred;
+import identmap;
+import kitutil;
+import magic;
+import objfile;
+import platform;
+import shp;
+import typeexpr;
+import u8ast;
+
+struct cs_primitives {
+  ptr_eq opt[def_entry_id];
+}
+
+struct meta_datum {
+  left opt[pos];
+  right opt[pos];
+  original_syntax opt[ast_original_syntax];
+}
+
+// TODO: Don't just give ps and tok.ki code direct access to this?
+struct positionals {
+  metas array[meta_datum];
+}
+
+func mk_positionals() positionals {
+  // Add an unused entry so that the zero ast_meta value is "invalid."
+  p positionals;
+  nilmeta meta_datum = {None, None, None};
+  push(&p.metas, nilmeta);
+  return p;
+}
+
+struct checkstate {
+  im *identmap;
+  instantiation_depth u32;
+  plat platform_info;
+  loader_ctx *void;
+  loader fn[*checkstate, sym, *array[u8], bool];
+
+  posits positionals;
+
+  modules array[shp[module]];
+  modules_by_name hash[sym, module_id];
+
+  instantiations array[shp[def_inst]];
+  type_instantiations array[shp[deftype_inst]];
+
+  deftypes array[shp[deftype_entry]];
+  deftypes_by_name hash[sym, array[deftype_entry_id]];
+
+  defs array[shp[def_entry]];
+  defs_by_name hash[sym, array[def_entry_id]];
+
+  fn_bodies array[shp[fn_body_entry]];
+
+  access_blocks array[shp[access_entry]];
+
+  kit_name_counter u32;
+
+  prims cs_primitives;
+}
+
+func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader fn[*checkstate, sym, *array[u8], bool]) checkstate {
+  ret checkstate = {
+    im,
+    0,
+    plat,
+    loader_ctx,
+    loader,
+    mk_positionals(),
+    mk_array(),
+    mk_hash(),
+    mk_array(),
+    mk_array(),
+    mk_array(),
+    mk_hash(),
+    mk_array(),
+    mk_hash(),
+    mk_array(),
+    mk_array(),
+    0,
+    // TODO: s1 doesn't require this initialization -- I think its "if case ..." code tolerates uninitialized values.
+    {None}
+  };
+  return ret;
+}
+
+// An index into checkstate's modules array.
+struct module_id { x size; }
+def `~` fn[size, module_id] = wrapconvert;
+
+// An index into checkstate's instantiations array.
+struct def_inst_id { x size; }
+def `~` fn[size, def_inst_id] = wrapconvert;
+
+// An index into checkstate's type_instantiations array.
+struct deftype_inst_id { x size; }
+def `~` fn[size, deftype_inst_id] = wrapconvert;
+
+// An index into checkstate's defs array.
+struct def_entry_id { x size; }
+def `~` fn[size, def_entry_id] = wrapconvert;
+
+// An index into checkstate's deftypes array.
+struct deftype_entry_id { x size; }
+def `~` fn[size, deftype_entry_id] = wrapconvert;
+def `==` fn[deftype_entry_id, deftype_entry_id, bool] = wrapequate;
+
+// An index into checkstate's fn_bodies array.
+struct fn_body_id { x size; }
+def `~` fn[size, fn_body_id] = wrapconvert;
+def `==` fn[fn_body_id, fn_body_id, bool] = wrapequate;
+
+// An index into checkstate's access_blocks array.
+struct access_entry_id { x size; }
+def `~` fn[size, access_entry_id] = wrapconvert;
+
+func ref_module(cs *checkstate, id module_id) *module {
+  return oo(ref(&cs->modules, id.x));
+}
+
+func ref_def_entry(cs *checkstate, id def_entry_id) *def_entry {
+  return oo(ref(&cs->defs, id.x));
+}
+
+func ref_deftype_entry(cs *checkstate, id deftype_entry_id) *deftype_entry {
+  return oo(ref(&cs->deftypes, id.x));
+}
+
+func ref_fn_body(cs *checkstate, id fn_body_id) *fn_body_entry {
+  return oo(ref(&cs->fn_bodies, id.x));
+}
+
+func ref_access_entry(cs *checkstate, id access_entry_id) *access_entry {
+  return oo(ref(&cs->access_blocks, id.x));
+}
+
+func ref_inst(cs *checkstate, id def_inst_id) *def_inst {
+  return oo(ref(&cs->instantiations, id.x));
+}
+
+func ref_deftype_inst(cs *checkstate, id deftype_inst_id) *deftype_inst {
+  return oo(ref(&cs->type_instantiations, id.x));
+}
+
+func add_def_entry(cs *checkstate, shent shp[def_entry]) def_entry_id {
+  id def_entry_id = ~count(&cs->defs);
+  push(&cs->defs, shent);
+  arr *array[def_entry_id] = try_insert_lookup(&cs->defs_by_name, &oo(&shent)->def_name, mk_array());
+  push(arr, id);
+  return id;
+}
+
+func add_deftype_entry(cs *checkstate, ent deftype_entry) deftype_entry_id {
+  shent shp[deftype_entry] = emshp(ent);
+  id deftype_entry_id = ~count(&cs->deftypes);
+  push(&cs->deftypes, shent);
+  arr *array[deftype_entry_id] = try_insert_lookup(&cs->deftypes_by_name, &oo(&shent)->name, mk_array());
+  push(arr, id);
+  return id;
+}
+
+func add_access_entry(cs *checkstate, ent access_entry) access_entry_id {
+  shent shp[access_entry] = emshp(ent);
+  id access_entry_id = ~count(&cs->access_blocks);
+  push(&cs->access_blocks, shent);
+  return id;
+}
+
+func add_inst(cs *checkstate, val def_inst) def_inst_id {
+  id def_inst_id = ~count(&cs->instantiations);
+  push(&cs->instantiations, emshp(val));
+  return id;
+}
+
+func add_deftype_inst(cs *checkstate, val deftype_inst) deftype_inst_id {
+  id deftype_inst_id = ~count(&cs->type_instantiations);
+  push(&cs->type_instantiations, emshp(val));
+  return id;
+}
+
+func add_fn_body(cs *checkstate, ent fn_body_entry) fn_body_id {
+  id fn_body_id = ~count(&cs->fn_bodies);
+  push(&cs->fn_bodies, emshp(move(&ent)));
+  return id;
+}
+
+enum module_process_state {
+  Unprocessed void;
+  Processing void;
+  DoneProcessing void;
+}
+
+func `==`(a module_process_state, b module_process_state) bool {
+  return enumnum(&a) == enumnum(&b);
+}
+
+struct module {
+  module_name sym;
+  file ast_file;
+  // Used for reconstructing pos information.
+  base_offset size;
+  buf array[u8];
+  process_state module_process_state;
+  // vvv  Valid when process_state == DoneProcessing.  vvv
+  defs array[def_entry_id];
+  deftypes array[deftype_entry_id];
+  access_blocks array[access_entry_id];
+}
+
+// Describes the behavior of init/copy/move/destroy methods.
+enum derived_method_behavior {
+  // Behavior would be explicitly defined by a method, but it doesn't exist -- behavior is not allowed.
+  DerivedMethodAbsent void;
+  // Behavior's explicitly defined by a method.
+  DerivedMethodExplicit instpair;
+  // Behavior's derived structurally, and one of its fields/constructors has an explicit method call.  Maybe the method doesn't exist, because one of its fields' doesn't.
+  DerivedMethodNontrivial instpair;
+  // Behavior's derived from the type definition (or it's primitive) and it's trivial. init: Fills with zero.  copy/move: memcpy.  destroy: no-op.
+  DerivedMethodTrivial void;
+}
+
+func isTrivial(behav derived_method_behavior) bool {
+  if case DerivedMethodTrivial = behav {
+    return true;
+  }
+  return false;
+}
+
+enum behavior_level {
+  TrivialLevel void;
+  NontrivialLevel void;
+  AbsentLevel void;
+}
+
+func `<`(x behavior_level, y behavior_level) bool {
+  return enumnum(&x) < enumnum(&y);
+}
+
+enum type_scalarity {
+  IsScalarNo void;
+  IsScalarYes void;
+}
+
+// Says if a type and _all_ its field all the way down are powers of 2 sizes.
+enum pow2_turtles {
+  HasNonPow2 void;
+  IsPow2AllTheWayDown void;
+}
+
+func combine_pow2(x pow2_turtles, y pow2_turtles) pow2_turtles {
+  switch x {
+  case IsPow2AllTheWayDown:
+    return y;
+  case HasNonPow2:
+    return HasNonPow2;
+  }
+}
+
+struct type_properties {
+  flat_size u32;
+  flat_alignment u32;
+  init_behavior derived_method_behavior;
+  move_behavior derived_method_behavior;
+  copy_behavior derived_method_behavior;
+  destroy_behavior derived_method_behavior;
+  is_scalar type_scalarity;
+  is_pow2 pow2_turtles;
+}
+
+struct cu_typrop {
+  cu cu_typeexpr;
+  props type_properties;
+}
+
+// structspec and enumspec have to be "value types" like the te_... types.
+struct structspec {
+  fields shray[te_vardecl];
+}
+
+// enumspec has to be a "value type" like the te_... types.  See how it's used in ast.ki.
+struct enumspec {
+  constructors shray[te_vardecl];
+  success_case_ix opt[size];
+}
+
+enum deftype_inst_rhs_info {
+  // Also used for defclasses.
+  RhsStructInfo structspec;
+  RhsEnumInfo enumspec;
+}
+
+struct deftype_inst_info {
+  // This is None if the type is primitive.
+  rhs opt[deftype_inst_rhs_info];
+  props type_properties;
+}
+
+struct deftype_inst {
+  parms idy_genparms;
+  info nbfc[deftype_inst_info];
+}
+
+struct classexpr_rhs_spec {
+  disposition ast_defclass_disposition;
+  drs structspec;
+}
+
+enum deftype_rhs_spec {
+  ClassexprRhsSpec classexpr_rhs_spec;
+  DefstructRhsSpec structspec;
+  DefenumRhsSpec enumspec;
+}
+
+struct deftype_nonprim {
+  tl *ast_type_def;
+  rhs nbfc[deftype_rhs_spec];
+}
+
+struct deftype_entry {
+  module_name sym;
+  name sym;
+  accessible array[access_entry_id];
+  generics ast_generics;
+  // nonprim/default_info are mutually exclusive Has-havers.
+  // Info relevant for non-primitive types.
+  nonprim opt[deftype_nonprim];
+  // Info for primitive types.
+  default_info opt[deftype_inst_info];
+  insts hash[idy_genparms, deftype_inst_id];
+}
+
+func mk(module_name sym, name sym, accessible array[access_entry_id], g ast_generics, tl *ast_type_def) deftype_entry {
+  return {module_name, name, accessible, g, Has({tl, NotComputed}), None, mk_hash@[idy_genparms, deftype_inst_id]()};
+}
+
+enum fn_body_spec {
+  // Points to the annotated lambda within the def_inst rhs sub-expr.
+  FnBodyLambda *ast_lambda;
+  // Likewise, points to the checked def_magic within the def_inst definition.
+  FnBodyMagic *def_magic;
+  FnBodyPrim primitive_op;
+}
+
+enum should_inline {
+  // We ALWAYS inline this function.  End of discussion.  For primitive ops.
+  InlineMust void;
+  // Nobody said anything about inlining this function.
+  InlineYawn void;
+}
+
+struct graphed_fn_body {
+  spec fn_body_spec;
+  graph frame_regraphed;
+  // The return cell is graph.cell.
+  argcells array[cell_num];
+  // TODO: I think this should go _outside_ graphed_fn_body.
+  // How should/shouldn't we inline this?
+  inline should_inline;
+  // Whether we've inlined (or begun inlining) graph.  This is used for all fn bodies -- it's about the def inlining other functions, not about stuff inlining this fn body (which is what "inline" is about) -- but it's only useful to prevent recursive inlining.
+  inline_state nbfc[basic_analyze_state];
+}
+
+struct extern_fn_body {
+  // The name of the extern fn body.
+  name sym;
+}
+
+enum fn_body_entry_enum {
+  GraphedFnBody graphed_fn_body;
+  ExternFnBody extern_fn_body;
+}
+
+struct fn_body_entry {
+  informal_name sym;
+  symbol_table_index nc[sti];
+  body_text_offset nc[u32];
+  u fn_body_entry_enum;
+}
+
+struct access_entry {
+  name sym;
+  arity ast_access_arity;
+  ent_id nbfc[deftype_entry_id];
+}
+
+func mk(name sym, arity ast_access_arity) access_entry {
+  return {name, arity, NotComputed};
+}
+
+enum genparms {
+  NoParms void;
+  HasParms shray[te_typeexpr];
+}
+
+struct idy_genparms {
+  // When we create an instantiation, some of the types in "repls" could have lifetime parameters.  We don't want the actual template instantiation to use actual realized values for those lifetime parameters -- they'd be stuff like "the lifetime of the variable x" and such -- so they're renamed, ordered by first appearance in the left-to-right traversal of repls, and named with the deterministic sequence '$0, '$1, '$2, and so on (or something like that).
+  //
+  // The canonicalization of the order prevents many spurious template instantiations from happening -- for example, if you have a func[T, U] and T = foo['a], U = bar['b], we will only have one instantiation for foo['$0], bar['$1].  However, we could also have an instantiation for foo['$0], bar['$0], where the lifetime parameters are equal.  In general we can have up to B_n instantiations, where B_n is the nth Bell number, the number of ways to divide a set up into non-empty equivalence classes.  Thus, we have this to-do comment:
+  //
+  // The canonicalization also happens for the lifetime types that replace lifetime type parameters.  So all lifetime types in repls are of a canonicalized lifetime vaulue.
+  //
+  //   TODO: Improve this by noting which equivalences are actually used/required, avoid all duplicate implementations, thus precisely create the set of instantiations that are needed.
+  //
+  // The implementation of that feature might get hairy, especially if function lookup gets more complicated.  So it makes sense to put off implementing that feature.  (Also, in general, if we get rid of commonplace template instantiation, it might end up moot.)
+
+  // The number of distinct lifetime types used in repls.
+  num_lifetime_types_used size;
+
+  // If the ast_generics is NoGenerics, this is of course empty.
+  // Entries that line up with lifetime parameters will be some canonicalized lifetime.
+  repls idy_repls;
+}
+
+inline func blank_idyparms() idy_genparms {
+  return {0, {mk_shray()}};
+}
+
+struct idy_repls {
+  tys shray[cu_typeexpr];
+}
+
+inline func blank_idyrepls() idy_repls {
+  return {mk_shray()};
+}
+
+func hash_compute_hash(x *idy_genparms) osize {
+  accum osize = hash_compute_hash(&x->num_lifetime_types_used);
+  n size = count(&x->repls.tys);
+  p * ^[0]cu_typeexpr = data(&x->repls.tys);
+  for i size = 0; i < n; i = i + 1 {
+    accum = (accum * 33) ^ hash_compute_hash(&p[i]);
+  }
+  return accum;
+}
+
+func hash_equal(x *idy_genparms, y *idy_genparms) bool {
+  return x->num_lifetime_types_used == y->num_lifetime_types_used && idy_typeexpr_list_equal(&x->repls.tys, &y->repls.tys);
+}
+
+enum def_inst_type_status {
+  DidNotStartComputingType void;
+  BeganComputingType void;
+  FinishedComputingType void;
+}
+
+func `==`(x def_inst_type_status, y def_inst_type_status) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+
+func `!=`(x def_inst_type_status, y def_inst_type_status) bool {
+  return !(x == y);
+}
+
+enum def_inst_rhs_status {
+  DidNotCheckRhs void;
+  BeganCheckingRhs void;
+  FinishedCheckingRhs void;
+}
+
+func `==`(x def_inst_rhs_status, y def_inst_rhs_status) bool {
+  return enumnum(&x) == enumnum(&y);
+}
+
+func `!=`(x def_inst_rhs_status, y def_inst_rhs_status) bool {
+  return !(x == y);
+}
+
+struct frame_info {
+  // This becomes None when we begin to fully build the graph.
+  incomplete_graph opt[frame_graph];
+}
+
+struct def_inst_rhs_expr {
+  ec ast_expr_consume;
+  // This becomes Computed(...) when the def_inst status == FinishedCheckingRhs.
+  frame_info nc[frame_info];
+}
+
+enum def_inst_rhs {
+  // Prim defs... don't have an rhs to check.
+  InstRhsPrim primitive_op;
+  // Extern defs don't have an rhs.
+  InstRhsExtern void;
+  InstRhsExpr def_inst_rhs_expr;
+  InstRhsNonMagic def_non_magic;
+  InstRhsMagic def_magic;
+}
+
+struct frame_regraphed {
+  gr frame_graph;
+  gn gr_num;
+  // This cell is something that ought to be verifiable by looking at fg and finding which rigid/flex cells aren't "dead" -- there should just be one: this one.  For a top-level-expr it's the value the expr produces, and for a fullbody it's the return cell.
+  cell cell_num;
+}
+
+struct def_inst {
+  parms idy_genparms;
+  // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None if we have an extern def or primitive def.
+  rhs def_inst_rhs;
+  // The concrete type (with generics replaced) once we've computed it and checked it.  And its properties.  The type properties _must_ (right now) indicate that the type is defwise trivial.
+  // TODO: Many needless uses of unHas, also some of the users of this could stand to take one cu_typrop parameter instead of its fields separately.
+  typrop nbfc[cu_typrop];
+  rhs_status def_inst_rhs_status;
+  graph nbfc[frame_regraphed];
+  evaled_value nbfc[st_value];
+}
+
+func mk(parms idy_genparms, rhs def_inst_rhs) def_inst {
+  return {parms, rhs, NotComputed, DidNotCheckRhs, NotComputed, NotComputed};
+}
+
+struct def_nonprim {
+  // This is either the syntactic typeexpr or converted from a shallow look at the RHS.
+  quick_typeexpr ast_typeexpr;
+  tl *ast_toplevel;
+}
+
+enum def_definition {
+  // The def is a primitive (+, -, etc), has no RHS.
+  DefnPrim primitive_op;
+  DefnHasRhs def_nonprim;
+  // The names are stupid: def_non_magic defs evaluate to values, while def_magic evaluate to fn_bodies.
+  DefnNonMagic def_non_magic;
+  DefnMagic def_magic;
+}
+
+struct def_entry {
+  module_name sym;
+  def_name sym;
+  accessible array[access_entry_id];
+  // A copy of the ast_def's generics field -- if it's an ast_extern_def, this is NoGenerics.
+  generics ast_generics;
+  definition def_definition;
+  converted_typeexpr nbfc[te_typeexpr];
+
+  insts hash[idy_genparms, def_inst_id];
+}
+
+func mk(module_name sym, def_name sym, accessible array[access_entry_id], generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
+  return {module_name, def_name, accessible, generics, DefnHasRhs({quick_typeexpr, tl}), NotComputed, mk_hash@[idy_genparms, def_inst_id]()};
+}
+
+struct clqueue_deftype_entry {
+  ent_id deftype_entry_id;
+  inst_id deftype_inst_id;
+  // The instantiation depth when we _push_ the entry.
+  instantiation_depth u32;
+}
+
+struct clqueue_def_entry {
+  ent_id def_entry_id;
+  inst_id def_inst_id;
+  // The instantiation depth when we _push_ the entry.
+  instantiation_depth u32;
+}
+
+enum clqueue_entry {
+  ClqDeftypeEntry clqueue_deftype_entry;
+  ClqDefEntry clqueue_def_entry;
+}
+
+struct clqueue {
+  cs *checkstate;
+  im *identmap;
+  entries array[clqueue_entry];
+}
+
+func mk(cs *checkstate) clqueue {
+  return {cs, cs->im, mk_array@[clqueue_entry]()};
+}
+
+defclass move depth_rewinder {
+  cs *checkstate;
+  old_depth u32;
+}
+
+def template_instantiation_limit u32 = 50;
+
+access depth_rewinder {
+  func do_init(d *depth_rewinder) void {
+    init(&d->cs);
+    init(&d->old_depth);
+  }
+  func do_destroy(d *depth_rewinder) void {
+    check(d->old_depth <= template_instantiation_limit);
+    if d->cs != null {
+      d->cs->instantiation_depth = d->old_depth;
+    }
+    d->cs = null;
+    d->old_depth = 0;
+  }
+  func set_instantiation_depth(cs *checkstate, depth u32, rw *depth_rewinder) np {
+    check(rw->cs == null);
+    if depth > template_instantiation_limit {
+      return ERR(_u8("Instantiation depth too deep."));
+    }
+    rw->cs = cs;
+    rw->old_depth = cs->instantiation_depth;
+    cs->instantiation_depth = depth;
+    return NoFail;
+  }
+}
+
+// TODO: The very concept of this function will soon be (when we have true generic non-instantiated parameters) broken?
+// Update: We only use this function in to_defclass_properties, so the question becomes one of whether its use makes sense for that situation.  It does, because we return a type that references lifetimes that are in fact generic parameters, but it's perfectly normal to do name lookup using types that have generic lifetimes without any sort of scopage information on those lifetimes -- that's just how it's done.
+func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
+  ent *deftype_entry = ref_deftype_entry(cs, ent_id);
+  name sym = ent->name;
+  switch &ent->generics {
+  case &NoGenerics:
+    return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
+  default:
+    parms *idy_genparms = &ref_deftype_inst(cs, inst_id)->parms;
+    converted array[te_typeexpr];
+    n size = count(&parms->repls.tys);
+    reserve(&converted, n);
+    for i size = 0; i < n; i = i + 1 {
+      push(&converted, ref(&parms->repls.tys, i)->x);
+    }
+    return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
+  }
+}
+
+// True if the type is trivial enough to be used in a def.  In other words, it has trivial copy/move/destroy constructors, but initialization could be non-trivial.  (It could default-initialize to a nonzero value.)
+func is_defwise_trivial(props *type_properties) bool {
+  return isTrivial(props->move_behavior) && isTrivial(props->copy_behavior) && isTrivial(props->destroy_behavior);
+}
+
+func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, impl_name sym, behavior_out *derived_method_behavior) np {
+  res match_def_res;
+  gp genparms = NoParms;
+  #match_def(clq->cs, impl_name, &gp, fntype, &res);
+
+  switch &res {
+    case &NoMatch: {
+      *behavior_out = DerivedMethodAbsent;
+      return NoFail;
+    }
+    case &MultiMatch: {
+      return ERR(_u8("Multiple explicit methods '"), lookup(clq->im, impl_name), _u8("'"));
+    }
+    case &OneMatch(m ent_and_parms): {
+      inst_id def_inst_id;
+      #make_inst(clq, m.ent, &m.parms, &inst_id);
+      *behavior_out = DerivedMethodExplicit({m.ent, inst_id});
+      return NoFail;
+    }
+  }
+}
+
+func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *structspec, out *type_properties) np {
+  cs *checkstate = clq->cs;
+  it te_typeexpr = inst_type(cs, ent_id, inst_id);
+  switch a {
+    case DefaultMoveCopyDestroy: {
+      ret type_properties;
+      #compute_complete_struct_properties(clq, st, &it, (ComputeMove | ComputeCopy) | ComputeDestroy, &ret);
+      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      ptrtype te_typeexpr = ptr_type(cs, type.x);
+      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym, &ret.init_behavior);
+      *out = ret;
+      return NoFail;
+    }
+    case DefaultMove: {
+      ret type_properties;
+      #compute_complete_struct_properties(clq, st, &it, ComputeMove, &ret);
+      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      ptrtype te_typeexpr = ptr_type(cs, type.x);
+      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym, &ret.init_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym, &ret.copy_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym, &ret.destroy_behavior);
+      *out = ret;
+      return NoFail;
+    }
+    case NoDefaults: {
+      ret type_properties;
+      #compute_complete_struct_properties(clq, st, &it, ComputeNone, &ret);
+      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      ptrtype te_typeexpr = ptr_type(cs, type.x);
+      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym, &ret.init_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_movesym, &ret.move_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym, &ret.copy_behavior);
+      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym, &ret.destroy_behavior);
+      ret.is_scalar = IsScalarNo;
+      *out = ret;
+      return NoFail;
+    }
+  }
+}

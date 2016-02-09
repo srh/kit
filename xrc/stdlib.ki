@@ -1,0 +1,395 @@
+import array;
+
+extern malloc fn[size, *void];
+extern free fn[*void, void];
+extern abort fn[void];
+defclass FILE { }
+extern Stdout fn[*FILE];
+extern Stdin fn[*FILE];
+extern Stderr fn[*FILE];
+extern putchar fn[i32, i32];
+// buffer, size, count, stream
+extern fread fn[*void, size, size, *FILE, size];
+extern fwrite fn[*void, size, size, *FILE, size];
+// TODO: Add "int" as a built-in?  "c_int"?
+extern fclose fn[*FILE, i32];  // TODO: actually returns "int"
+extern feof fn[*FILE, i32];  // TODO: actually returns "int"
+// TODO: Add "char" as a built-in?
+extern fopen fn[* ^[0]u8, * ^[0]u8, *FILE];
+extern fflush fn[*FILE, i32];   // TODO: actually returns "int"
+// TODO: Add platform-specific tests for stuff like "is EOF -1"
+def EOF i32 = -1;  // TODO: is actually "int"
+
+func print(fp *FILE, arr array[u8]) void {
+  c size = count(&arr);
+  ign var = fwrite(@[*void]cast(data(&arr)), sizeof@[u8], count(&arr), fp);
+}
+
+func print(fp *FILE, arr1 array[u8], arr2 array[u8]) void {
+  print(fp, arr1);
+  print(fp, arr2);
+}
+
+func print(fp *FILE, arr1 array[u8], arr2 array[u8], arr3 array[u8]) void {
+  print(fp, arr1);
+  print(fp, arr2);
+  print(fp, arr3);
+}
+
+func[T] debugstr(arr T) void {
+  ign var = fwrite(cast(@[*u8]&arr[0]), sizeof@[u8], arr.length, Stderr());
+  ign2 var = fflush(Stderr());
+}
+
+func lpz_as_u8str(s * ^[0]u8) array[u8] {
+  n size = 0;
+  while s[n] != '\0' {
+    n = n + 1;
+  }
+  return make_copy(s, n);
+}
+
+func[H, T] build_u8str(help H, r *array[u8], x **T) void {
+  u union { p *void; x size; };
+  u.p = cast(x);
+  append(r, as_hex(u.x));
+}
+
+func[H] build_u8str(help H, r *array[u8], x *bool) void {
+  if *x {
+    append(r, _u8!"true");
+  } else {
+    append(r, _u8!"false");
+  }
+}
+
+func[H] build_u8str(help H, r *array[u8], x *u32) void {
+  append(r, unsigned_as_dec(*x));
+}
+
+func[H] build_u8str(help H, r *array[u8], x *i32) void {
+  if *x >= 0 {
+    y u32 = ~ *x;
+    build_u8str(r, &y);
+  } else {
+    push(r, '-');
+    // We avoid the overflow we'd get from negating -2^31.
+    y u32 = 1 + @[u32] ~ ^ *x;
+    build_u8str(r, &y);
+  }
+}
+
+func[H] build_u8str(help H, r *array[u8], x *size) void {
+  append(r, unsigned_as_dec(*x));
+}
+
+func as_hex(x size) array[u8] {
+  arr array[u8];
+  if x == 0 {
+    push(&arr, '0');
+    return arr;
+  }
+  while x != 0 {
+    units size = x % 16;
+    ch u8;
+    if units < 10 {
+      ch = ~(units + '0');
+    } else {
+      ch = ~((units - 10) + 'a');
+    }
+    push(&arr, ch);
+    x = x / 16;
+  }
+  return reverse(&arr);
+}
+
+func[T] unsigned_as_dec(x T) array[u8] {
+  arr array[u8];
+  if x == 0 {
+    push(&arr, '0');
+    return arr;
+  }
+  while x != 0 {
+    units T = x % 10;
+    ch u8 = ~(units + '0');
+    push(&arr, ch);
+    x = x / 10;
+  }
+  return reverse(&arr);
+}
+
+func[T] printerr(x array[u8], y T) void {
+  print(Stderr(), x);
+  print(Stderr(), to_u8str(y));
+  print(Stderr(), make("\n"));
+  fflush(Stderr());
+}
+
+func[T] to_u8str(x T) array[u8] {
+  ret array[u8];
+  build_u8str(void, &ret, &x);
+  return ret;
+}
+
+func[H, T] to_u8str(help H, x T) array[u8] {
+  ret array[u8];
+  build_u8str(help, &ret, &x);
+  return ret;
+}
+
+func checkmalloc(n size) *void {
+  ret *void = malloc(n);
+  if ret == null {
+    if n == 0 {
+      ret = malloc(1);
+    }
+    if ret == null {
+      crash(_u8!"checkmalloc fail");
+    }
+  }
+  return ret;
+}
+
+// TODO: We should not need uses of this.
+func[T] fake() T {
+  ret T;
+  return ret;
+}
+
+enum[T] opt {
+  None void;
+  Has T;
+}
+
+func[T] isHas(p *opt[T]) bool {
+  if case &Has(x) = p {
+    return true;
+  }
+  return false;
+}
+
+func[T] isHas(x opt[T]) bool {
+  if case &Has(y) = &x {
+    return true;
+  }
+  return false;
+}
+
+func[T] isNone(p *opt[T]) bool {
+  if case &None = p {
+    return true;
+  }
+  return false;
+}
+
+func[T] unHas(p *opt[T]) *T {
+  if case &Has(t T) = p {
+    return &t;
+  }
+  crash(_u8("unHas sees None"));
+  return fake();
+}
+
+func[T] unHas(p opt[T]) T {
+  return *unHas(&p);
+}
+
+func[T] `==`(x opt[T], y opt[T]) bool {
+  switch &x {
+    case &None: {
+      if case &None(u) = &y { return true; }
+    }
+    case &Has(a T): {
+      if case &Has(b T) = &y {
+        return a == b;
+      }
+    }
+  }
+  return false;
+}
+
+func[T] set(dest *opt[T], y T) void {
+  if case &Has(t T) = dest {
+    crash(_u8("set sees Has"));
+  }
+  *dest = Has(y);
+}
+
+func[T] unSet(dest *opt[T]) void {
+  if case &None = dest {
+    crash(_u8("unset sees None"));
+  }
+  *dest = None;
+}
+
+struct[S, T] tup {
+  car S;
+  cdr T;
+}
+
+inline func[S, T] `==`(x tup[S, T], y tup[S, T]) bool {
+  return x.car == y.car && x.cdr == y.cdr;
+}
+
+func[H] build_u8str(help H, r *array[u8], x *void) void {
+  arr ^[4]u8 = "void";
+  append_raw(r, &arr[0], 4);
+}
+
+func[H, S, T] build_u8str(help H, r *array[u8], p *tup[S, T]) void {
+  build_u8str(help, r, &p->car);
+  build_u8str(help, r, &p->cdr);
+}
+
+// Our replacements of whole_field expressions use .x as the field name.
+inline func[S, T] wrapconvert(x T) S {
+  ret S;
+  ret.x = x;
+  return ret;
+}
+
+inline func[S, T] wrapequate(x S, y T) bool {
+  return x.x == y.x;
+}
+
+func[T] TODO() T {
+  print(Stderr(), _u8("TODO()\n"));
+  ign var = fflush(Stderr());
+  ret T;
+  return ret;
+}
+
+func check(x bool) void {
+  if x {
+    return;
+  }
+  debugstr("Check failed.\n");
+  abort();
+}
+
+func crash() void {
+  debugstr("ICE: no message");
+  abort();
+}
+
+func crash(msg array[u8]) void {
+  print(Stderr(), msg, make("\n"));
+  ign var = fflush(Stderr());
+  abort();
+}
+
+func[T] check_mutate(p *T, old T, new T) void {
+  check(*p == old);
+  *p = new;
+}
+
+inline func[T] max(x T, y T) T {
+  return x < y then y else x;
+}
+
+inline func[T] min(x T, y T) T {
+  return x < y then x else y;
+}
+
+inline func[S, T] cast(p *S) *T {
+  u union { p *S; q *T; };
+  u.p = p;
+  return u.q;
+}
+
+inline func[T] ixcast(p *T) * ^[0]T {
+  u union { p *T; q * ^[0]T; };
+  u.p = p;
+  return u.q;
+}
+
+def U32_MAX u32 = ^(@[u32]0);
+
+func try_mul(x u32, y u32, out *u32) bool {
+  if y != 0 && U32_MAX / y < x {
+    return false;
+  }
+  *out = x * y;
+  return true;
+}
+
+func try_add(x u32, y u32, out *u32) bool {
+  if U32_MAX - y < x {
+    return false;
+  }
+  *out = x + y;
+  return true;
+}
+
+func ceil_aligned(x u32, y u32) u32 {
+  if x % y == 0 {
+    return x;
+  }
+  return x + (y - x % y);
+}
+
+func[T] ceil_divide(x T, y T) T {
+  if x % y == 0 {
+    return x / y;
+  } else {
+    return x / y + 1;
+  }
+}
+
+func ceil_aligned(x i32, y u32) i32 {
+  return -floor_aligned(-x, y);
+}
+
+func floor_aligned(x i32, y u32) i32 {
+  if x >= 0 {
+    return x - (x % ~y);
+  } else {
+    return - @[i32] ~ceil_aligned(@[u32] ~ -x, y);
+  }
+}
+
+// TODO: This is... platform-specific.
+inline func[T] enumnum(x *T) u32 {
+  ret u32 = * @[*u32]cast(x);
+  if ret == 0 {
+    crash();
+  }
+  return ret;
+}
+
+func[T] fill(p * ^[0]T, n size, value T) void {
+  for i size = 0; i < n; i += 1 {
+    p[i] = value;
+  }
+}
+
+func[T] bufcopy(dest * ^[0]T, src * ^[0]T, n size) void {
+  for i size = 0; i < n; i++ {
+    dest[i] = src[i];
+  }
+}
+
+func[T] move(x *T) T {
+  ret T;
+  destroy(&ret);
+  move(&ret, x);
+  init(x);
+  return ret;
+}
+
+func[T] fromBool(x bool) T {
+  return x then 1 else 0;
+}
+
+inline func[T] `++`(x *T) void { *x = *x + 1; }
+inline func[T] `--`(x *T) void { *x = *x - 1; }
+inline func[T] `+=`(x *T, y T) void { *x = *x + y; }
+inline func[T] `-=`(x *T, y T) void { *x = *x - y; }
+inline func[T] `*=`(x *T, y T) void { *x = *x * y; }
+inline func[T] `/=`(x *T, y T) void { *x = *x / y; }
+inline func[T] `%=`(x *T, y T) void { *x = *x % y; }
+inline func[T] `&=`(x *T, y T) void { *x = *x & y; }
+inline func[T] `|=`(x *T, y T) void { *x = *x | y; }
+inline func[T] `^=`(x *T, y T) void { *x = *x ^ y; }
+inline func[T] `>>=`(x *T, y T) void { *x = *x >> y; }
+inline func[T] `<<=`(x *T, y T) void { *x = *x << y; }

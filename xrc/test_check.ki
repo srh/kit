@@ -1,0 +1,2155 @@
+import build;
+import check;
+import eval;
+
+func testmodule_name() string {
+  return _s("testmodule");
+}
+
+func test_loader(cs *checkstate, name sym, out *array[u8]) bool {
+  if name == intern(cs->im, testmodule_name()) {
+    *out = * @[*array[u8]]cast(cs->loader_ctx);
+    return true;
+  } else {
+    return false;
+  }
+}
+
+func x86_32_platform(opsys platform_os) platform_info {
+  jrr shift_behavior = JustRangecheckRhs;
+  ret platform_info = {
+    LittleEndian,
+    4,
+    8,
+    4,
+    {0, 1},
+    {1, 1},
+    {{1, 1}, {SignedTwos, jrr, true, -bigu(128), bigu(127)}},
+    {{1, 1}, {Unsigned, jrr, true, bigu(0), bigu(255)}},
+    {{1, 1}, {Unsigned, jrr, false, bigu(0), bigu(255)}},
+    {{2, 2}, {SignedTwos, jrr, true, -bigu(32768), bigu(32767)}},
+    {{2, 2}, {Unsigned, jrr, true, bigu(0), bigu(65535)}},
+    {{2, 2}, {Unsigned, jrr, false, bigu(0), bigu(65535)}},
+    {{4, 4}, {SignedTwos, jrr, true, -bigu(2147483648), bigu(2147483647)}},
+    {{4, 4}, {Unsigned, jrr, true, bigu(0), bigu(4294967295)}},
+    {{4, 4}, {Unsigned, jrr, false, bigu(0), bigu(4294967295)}},
+    {{4, 4}, {SignedTwos, jrr, true, -bigu(2147483648), bigu(2147483647)}},
+    {{4, 4}, {Unsigned, jrr, true, bigu(0), bigu(4294967295)}},
+    {{4, 4}, {Unsigned, jrr, false, bigu(0), bigu(4294967295)}},
+    {4, 4},
+    {4, 4},
+    opsys,
+    UniversalCdeclConvention
+  };
+  return ret;
+}
+
+func x86_linux32_platform() platform_info {
+  return x86_32_platform(Linux32);
+}
+
+func x86_win32_platform() platform_info {
+  return x86_32_platform(Win32);
+}
+
+func x86_osx32_platform() platform_info {
+  return x86_32_platform(Osx32);
+}
+
+func test_platform() platform_info {
+  return x86_linux32_platform();
+}
+
+func print_test_announce(neg bool, name array[u8]) void {
+  s array[u8];
+  if neg {
+    s = _u8("test !");
+  } else {
+    s = _u8("test ");
+  }
+  print(Stdout(), s, name, _u8("..."));
+  ign var = fflush(Stdout());
+}
+
+func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
+  if case &Has(sname array[u8]) = &ctx->specific_run {
+    u8name array[u8] = _u8(name);
+    if !array_equal(&sname, &u8name) {
+      return;
+    }
+  }
+  if ctx->verbose {
+    print_test_announce(false, _u8(name));
+  }
+  im identmap = make_im();
+  cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
+  add_primitives(&cs);
+  success bool;
+  if ctx->build {
+    flattened array[u8];
+    success = from_np(build_nowrite_module(&cs, intern(&im, testmodule_name()), &flattened));
+  } else {
+    success = from_np(check_module(&cs, intern(&im, testmodule_name())));
+  }
+  if !success {
+    if !ctx->verbose {
+      print_test_announce(false, _u8(name));
+    }
+    print(Stdout(), _u8("FAIL\n"));
+    ign var = fflush(Stdout());
+    ctx->failures = ctx->failures + 1;
+  } else {
+    if ctx->verbose {
+      print(Stdout(), _u8("PASS\n"));
+      ign var = fflush(Stdout());
+    }
+  }
+}
+
+func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
+  if case &Has(sname array[u8]) = &ctx->specific_run {
+    u8name array[u8] = _u8(name);
+    if !array_equal(&sname, &u8name) {
+      return;
+    }
+  }
+  if ctx->verbose {
+    print_test_announce(true, _u8(name));
+  }
+  im identmap = make_im();
+  cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
+  add_primitives(&cs);
+  if from_np(check_module(&cs, intern(&im, testmodule_name()))) {
+    if !ctx->verbose {
+      print_test_announce(true, _u8(name));
+    }
+    print(Stdout(), _u8("FAIL\n"));
+    ign var = fflush(Stdout());
+    ctx->failures = ctx->failures + 1;
+  } else {
+    if ctx->verbose {
+      print(Stdout(), _u8("PASS\n"));
+      ign var = fflush(Stdout());
+    }
+  }
+}
+
+// TODO: Make test output not go directly to stdout/stderr.
+
+struct check_ctx {
+  verbose bool;
+  build bool;
+  specific_run opt[array[u8]];
+  failures u32;
+}
+
+
+func test_check_basic_cases(ctx *check_ctx) void {
+  run_check_test(ctx, "c001-a",
+    _u8("def x bool = true;"));
+  run_check_test(ctx, "c001-b",
+    _u8("def x u32 = 3;"));
+  run_check_test(ctx, "c001-c",
+    _u8("def x i32 = -3;"));
+  // Fails because unsigned negation is not permitted.
+  run_check_negtest(ctx, "c001-d",
+    _u8("def x u32 = -3;"));
+  run_check_test(ctx, "c002",
+    _u8("def x i32 = 3;\n"
+        "struct dword { x u32; }\n"
+        "struct blah { x dword; }\n"
+        "struct feh { x *blah; }\n"
+        "struct quux { x *quux; }\n"));
+  // Fails because foo holds itself flatly.
+  run_check_negtest(ctx, "c003",
+    _u8("struct foo { x bar; }\n"
+        "struct bar { x foo; }\n"));
+  run_check_test(ctx, "c004",
+    _u8("def x i32 = 3;\n"
+        "struct foo { x u32; y i32; z *foo; }\n"));
+  run_check_test(ctx, "c005",
+    _u8("def x i32 = 3;"
+        "struct foo { x u32; y i32; z *foo; }\n"));
+  // TODO: This should fail, because "whatever[_]" is not in scope.
+  run_check_test(ctx, "c006-a",
+    _u8("def x i32 = 3;"
+        "struct[T] foo { count u32; p whatever[T]; }\n"));
+  run_check_test(ctx, "c006-b",
+    _u8("def x i32 = 3;"
+        "struct[T] foo { count u32; p *T; }\n"));
+  run_check_negtest(ctx, "c006-c",
+    _u8("def x i32 = 3;"
+        "struct[T] foo { count u32; p whatever[T]; }\n"
+        "struct bar { x foo[i32]; }\n"));
+  // Fails because bar recursively holds itself through a template parameter.
+  run_check_negtest(ctx, "c007",
+    _u8("struct[T, U] foo { x *T; y U; }\n"
+        "struct bar { z foo[u32, bar]; }\n"));
+  run_check_test(ctx, "c008",
+    _u8("struct[T, U] foo { x *T; y U; }\n"
+        "struct bar { z foo[bar, u32]; }\n"));
+  run_check_test(ctx, "c009",
+    _u8("def x i32 = 3;\n"));
+  run_check_test(ctx, "c010",
+    _u8("def x u32 = 3;\n"));
+  run_check_test(ctx, "c011-a",
+    _u8("def[] x i32 = 3;\n"));
+  run_check_test(ctx, "c011-b",
+    _u8("def[] x i32 = 3;\n"
+        "def y i32 = x;\n"));
+}
+
+func test_check_lambda_cases(ctx *check_ctx) void {
+  run_check_test(ctx, "c012",
+    _u8("def x i32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  return x;\n"
+        "};\n"));
+  // Fails because k is a u32.
+  run_check_negtest(ctx, "c013",
+    _u8("def x i32 = 3;\n"
+        "def k u32 = k;\n"
+        "def x i32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  return k;\n"
+        "};\n"));
+  // Passes despite x shadowing a global, because that's allowed.
+  run_check_test(ctx, "c014",
+    _u8("def x i32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  x i32 = 4;\n"
+        "  return z;\n"
+        "};\n"));
+  // Fails because z shadows a local.
+  run_check_negtest(ctx, "c016",
+    _u8("def x i32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  z i32 = 4;\n"
+        "  return x;\n"
+        "};\n"));
+  run_check_test(ctx, "c017",
+    _u8("def x i32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  return x + z + 5;\n"
+        "};\n"));
+  // Fails because x is a u32.
+  run_check_negtest(ctx, "c018",
+    _u8("def x u32 = x;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  return x + z + 5;\n"
+        "};\n"));
+  // Fails because typechecking can't see that 5 is an i32.
+  run_check_negtest(ctx, "c019",
+    _u8("def x i32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  return -x + z + -5;\n"
+        "};\n"));
+  // Fails because you can't negate a u32.
+  run_check_negtest(ctx, "c020",
+    _u8("def x u32 = 3;\n"
+        "def y fn[i32, i32] = func(z i32)i32 {\n"
+        "  return -x;\n"
+        "};\n"));
+  run_check_test(ctx, "c021",
+    _u8("struct foo { x i32; y i32; }\n"
+        "def y fn[foo, i32] = func(z foo) i32 {\n"
+        "  return z.x;\n"
+        "};\n"));
+  // Fails because the field x has type u32.
+  run_check_negtest(ctx, "c022",
+    _u8("struct foo { x u32; y i32; }\n"
+        "def y fn[foo, i32] = func(z foo) i32 {\n"
+        "  return z.x;\n"
+        "};\n"));
+  run_check_test(ctx, "c023",
+    _u8("struct[T] foo { x T; y i32; }\n"
+        "def y fn[foo[i32], i32] = func(z foo[i32]) i32 {\n"
+        "  return z.x + z.y;\n"
+        "};\n"));
+  // Fails because z.x is a u32.
+  run_check_negtest(ctx, "c024",
+    _u8("struct[T] foo { x T; y i32; }\n"
+        "def y fn[foo[u32], i32] = func(z foo[u32]) i32 {\n"
+        "  return z.x + z.y;\n"
+        "};\n"));
+  run_check_test(ctx, "c025-a",
+    _u8("def y fn[i32, i32] = func(z i32) i32 {\n"
+        "  k fn[i32, i32] = func(m i32) i32 {\n"
+        "    return m + m;\n"
+        "  };\n"
+        "  return k(z) + k(z);\n"
+        "};\n"));
+  run_check_test(ctx, "c025-b",
+    _u8("def y fn[i32, i32] = func(z i32) i32 {\n"
+        "  k var = func(m i32) i32 {\n"
+        "    return m + m;\n"
+        "  };\n"
+        "  return k(z) + k(z);\n"
+        "};\n"));
+  // Fails because lambdas can't capture.
+  run_check_negtest(ctx, "c026",
+    _u8("def y fn[i32, i32] = func(z i32) i32 {\n"
+        "  k fn[i32, i32] = func(m i32) i32 {\n"
+        "    return m + z;\n"
+        "  };\n"
+        "  return k(z) + k(z);\n"
+        "};\n"));
+  run_check_test(ctx, "c027",
+    _u8("struct foo { x i32; y i32; }\n"
+        "def y fn[*foo, i32] = func(z *foo) i32 {\n"
+        "  return z->x;\n"
+        "};\n"));
+  run_check_test(ctx, "c028",
+    _u8("struct[T] foo { x T; y i32; }\n"
+        "def y fn[*foo[i32], i32] = func(z *foo[i32]) i32 {\n"
+        "  return z->x + z->y;\n"
+        "};\n"));
+
+  run_check_test(ctx, "c029-a",
+    _u8("func foo(z *i32) i32 {\n"
+        "  return *z;\n"
+        "}\n"));
+  run_check_test(ctx, "c029-b",
+    _u8("struct[T] foo { x T; y i32; }\n"
+        "def y fn[*foo[i32], i32] = func(z *foo[i32]) i32 {\n"
+        "  return (*z).x + (&(*z))->y;\n"
+        "};\n"));
+
+  run_check_test(ctx, "c030-a",
+    _u8("func y() i32 {\n"
+        "  x i32 = 4;\n"
+        "  x = 5;\n"
+        "  return x;\n"
+        "}\n"));
+  run_check_test(ctx, "c030-b",
+    _u8("struct[T] foo { x T; y i32; }\n"
+        "def y fn[*foo[i32], i32] = func(z *foo[i32]) i32 {\n"
+        "  if (z->x < 3 && z->y > 19) {\n"
+        "    z->x = (*z).y + 5;\n"
+        "  }\n"
+        "  return (*z).x + (&(*z))->y;\n"
+        "};\n"));
+  /* Fails because assignment mismatches types. */
+  run_check_negtest(ctx, "c031",
+    _u8("struct[T] foo { x T; y i32; }\n"
+        "def y fn[*foo[i32], i32] = func(z *foo[i32]) i32 {\n"
+        "  if (z->x < 3 && z->y > 19) {\n"
+        "    z->x = z;\n"
+        "  }\n"
+        "  return (*z).x + (&(*z))->y;\n"
+        "};\n"));
+  run_check_test(ctx, "c032",
+    _u8("def[T] foo fn[*T, T] = func(x *T) T { return *x; };\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  x i32 = 3;\n"
+        "  return foo(&x);\n"
+        "};\n"));
+  // Fails because the def does not match.
+  run_check_negtest(ctx, "c033",
+    _u8("def[T] foo fn[*T, T] = func(x *T) T { return *x; };\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  x i32 = 3;\n"
+        "  return foo(x);\n"
+        "};\n"));
+  run_check_test(ctx, "c034",
+    _u8("def[T] fac fn[T, T] = func(x T) T {\n"
+        "  if (x == 0) {\n"
+        "    return 1;\n"
+        "  } else {\n"
+        "    return x * fac(x - 1);\n"
+        "  }\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  x i32 = 5;\n"
+        "  return fac(x);\n"
+        "};\n"));
+  // Fails because of recursive template instantiation.
+  run_check_negtest(ctx, "c035",
+    _u8("struct[T] foo { x i32; }\n"
+        "def[T] biggefy fn[T, foo[T]] = func(x T) foo[T] {\n"
+        "  return biggefy(x);\n"
+        "};\n"
+        "def[T] rec fn[T, i32] = func(x T) i32 {\n"
+        "  return rec(biggefy(x));\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  x u32 = 5;\n"
+        "  return rec(x);\n"
+        "};\n"));
+  run_check_test(ctx, "c036",
+    _u8("def x i32 = 3;\n"
+        "def y u32 = 3 + 4;\n"
+        "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"));
+  run_check_test(ctx, "c037-a",
+    _u8("def x i32 = z(3);\n"
+        "def z fn[i32, i32] = func(k i32) i32 { return k + 1; };\n"));
+  run_check_test(ctx, "c037-b",
+    _u8("def x i32 = bar();\n"
+        "func bar() i32 {\n"
+        "  x i32 = 5;\n"
+        "  return x;\n"
+        "}\n"));
+  run_check_test(ctx, "c037-c1",
+    _u8("def x i32 = bar();\n"
+        "def[T] fac fn[T, T] = func(x T) T {\n"
+        "  if x == 0 {\n"
+        "    return 1;\n"
+        "  } else {\n"
+        "    return x * fac(x - 1);\n"
+        "  }\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  x i32 = 5;\n"
+        "  return fac(x);\n"
+        "};\n"));
+  // Just to gratuitously use an ident unop.
+  run_check_test(ctx, "c037-c2",
+    _u8("def x i32 = bar();\n"
+        "def[T] fac fn[T, T] = func(x T) T {\n"
+        "  if x == 0 {\n"
+        "    return 1;\n"
+        "  } else {\n"
+        "    y T = x - 1;\n"
+        "    return fac! y * x;\n"
+        "  }\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  x i32 = 5;\n"
+        "  return fac(x);\n"
+        "};\n"));
+  run_check_test(ctx, "c037-d",
+    _u8("def x i32 = bar();\n"
+        "func fac(x i32) i32 {\n"
+        "  acc i32 = 1;\n"
+        "  while x != 0 {\n"
+        "    acc = acc * x;\n"
+        "    x = x - 1;\n"
+        "  }\n"
+        "  return acc;\n"
+        "}\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  x i32 = 7;\n"
+        "  return fac(x);\n"
+        "};\n"));
+  run_check_test(ctx, "c038",
+    _u8("def y i32 = -x;\n"
+        "def x i32 = -3;\n"));
+  // Fails because of cyclic reference.
+  run_check_negtest(ctx, "c039",
+    _u8("def y i32 = -x;\n"
+        "def x i32 = -y;\n"));
+}
+
+func test_check_more_cases(ctx *check_ctx) void {
+  // We skip c040, to keep units digit in alignment with s1 testcases.
+
+  run_check_test(ctx, "c041",
+    _u8("def foo fn[u32, u32] = func(x u32) u32 {\n"
+        "  return x + 4;\n"
+        "};"
+        "def bar fn[i32, i32] = foo;\n"
+        "def foo fn[i32, i32] = func(x i32) i32 {\n"
+        "  return x + 3;\n"
+        "};\n"));
+  run_check_test(ctx, "c042",
+    _u8("def foo fn[u32, u32] = func(x u32) u32 {\n"
+        "  return x + 4;\n"
+        "};"
+        "def bar fn[i32, i32] = foo;\n"
+        "def[T] foo fn[T, i32] = func(x T) i32 {\n"
+        "  return x + 3;\n"
+        "};\n"));
+  // Fails because foo's instatiation won't typecheck.
+  run_check_negtest(ctx, "c043",
+    _u8("def foo fn[u32, u32] = func(x u32) u32 {\n"
+        "  return x + 4;\n"
+        "};"
+        "def bar fn[u32, i32] = foo;\n"
+        "def[T] foo fn[T, i32] = func(x T) i32 {\n"
+        "  return x + 3;\n"
+        "};\n"));
+  // Fails because foo lacks a return statement.
+  run_check_negtest(ctx, "c044",
+    _u8("def foo fn[u32, u32] = func(x u32) u32 {\n"
+        "  x + x;\n"
+        "};"));
+
+  run_check_test(ctx, "c045",
+    _u8("def foo i32 = 7;\n"
+        "def bar i32 = 5 << foo;\n"));
+  // TODO: Should fail, because the shift overflows.
+  run_check_test(ctx, "c046",
+    _u8("def foo i32 = 30;\n"
+        "def bar i32 = 5 << foo;\n"));
+  run_check_test(ctx, "c047-a",
+    _u8("def[T] foo fn[T, T] = func(x T) T {\n"
+        "  y T = x;\n"
+        "  return y;\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  return foo(3);\n"
+        "};\n"));
+  run_check_test(ctx, "c047-b",
+    _u8("def[T] foo fn[T, T] = func(x T) T {\n"
+        "  y var = x;\n"
+        "  return y;\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  return foo(3);\n"
+        "};\n"));
+  run_check_test(ctx, "c048",
+    _u8("def[T] add32 fn[i32, T, i32] = func(x i32, y T) i32 {\n"
+        "  z i32 = 4;\n"
+        "  return x + z;\n"
+        "};\n"
+        "def bar fn[i32] = func() i32 {\n"
+        "  return add32(3, @[u32]4);\n"
+        "};\n"));
+  // Fails because return type in return expression is wrong.
+  run_check_negtest(ctx, "c049",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  return @[u32] 4;\n"
+        "};\n"));
+  run_check_test(ctx, "c050",
+    _u8("def x i32 = ~ @[u32]4;\n"));
+
+  run_check_test(ctx, "c051",
+    _u8("def[T] foo fn[*T, i32, T] = func(p *T, i i32) T {\n"
+        "  ret T = p[i];\n"
+        "  p[i] = p[i + 1];\n"
+        "  return ret;\n"
+        "};\n"));
+  // Fails because vec3 and [3]u32 are different types.
+  run_check_negtest(ctx, "c052",
+    _u8("struct vec3 { x ^[3]u32; }\n"
+        "def foo fn[^[3]u32, vec3] = func(arr ^[3]u32) vec3 {\n"
+        "  v vec3 = arr;\n"
+        "  return v;\n"
+        "};\n"));
+  // Passes because the conversion of ~@[u32]3 can be inferred.
+  run_check_test(ctx, "c053",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  return 2 + ~ @[u32]3;\n"
+        "};\n"));
+  run_check_test(ctx, "c054",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  return 2 + @[i32](~ @[u32]3);\n"
+        "};\n"));
+  run_check_test(ctx, "c055",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  x i32 = 5;\n"
+        "  while (x > 3) {\n"
+        "    x = x + 1;\n"
+        "  }\n"
+        "  return x;\n"
+        "};\n"));
+
+  run_check_test(ctx, "c056",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  x i32 = 5;\n"
+        "  while !(x > 3) {\n"
+        "    x = x + 1;\n"
+        "  }\n"
+        "  return x;\n"
+        "};\n"));
+  // Fails because some control paths don't return a value.
+  run_check_negtest(ctx, "c057",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  x i32 = 2;\n"
+        "  if (x < 3) {\n"
+        "    x = x + 1;\n"
+        "  } else {\n"
+        "    return x;\n"
+        "  }\n"
+        "};\n"));
+  run_check_test(ctx, "c058",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  acc u32 = 0;\n"
+        "  for i u32 = 0; i < 10; i = i + 1 {\n"
+        "    acc = acc + i;\n"
+        "  }\n"
+        "  return ~acc;\n"
+        "};\n"));
+
+  run_check_test(ctx, "c059",
+    _u8("def[T] foo fn[i32, T] = func(x i32) T {\n"
+        "  // Why not test '@[T]' works where T is generic.\n"
+        "  y T = @[T](~x);\n"
+        "  return y;\n"
+        "};\n"
+        "def bar fn[fn[i32, i16], i32, i16] = func(x fn[i32, i16], y i32) i16 {\n"
+        "  return x(y);\n"
+        "};\n"
+        "def baz fn[i16] = func() i16 {\n"
+        "  return bar(foo, 4);\n"
+        "};\n"));
+  run_check_test(ctx, "c060",
+    _u8("def[T] foo fn[i32, T] = func(x i32) T {\n"
+        "  // Why not test '@[T]' works where T is generic.\n"
+        "  y T = @[T]~x;\n"
+        "  return y;\n"
+        "};\n"
+        "def bar fn[fn[i32, i16], i32, i16] = func(x fn[i32, i16], y i32) i16 {\n"
+        "  return x(y);\n"
+        "};\n"
+        "def baz fn[i16] = func() i16 {\n"
+        "  return bar(foo@[i16], 4);\n"
+        "};\n"));
+
+  run_check_test(ctx, "c061",
+    _u8("struct ty { x i32; y i32; }\n"
+        "def foo fn[size] = func() size {\n"
+        "  return sizeof@[ty];\n"
+        "};\n"
+        "def x size = foo();\n"
+        "def y size = alignof@[ty];\n"));
+  // Fails because whatever is not the name of a defclass type.
+  run_check_negtest(ctx, "c062",
+    _u8("defclass ty { x i32; y i32; }\n"
+        "access whatever {\n"
+        "def foo fn[*ty, i32] = func(t *ty) i32 {\n"
+        "  return t->x;\n"
+        "};\n"
+        "}\n"));
+  // Fails because ty[] has bad arity.
+  run_check_negtest(ctx, "c063",
+    _u8("defclass ty { x i32; y i32; }\n"
+        "access ty[] {\n"
+        "def foo fn[*ty, i32] = func(t *ty) i32 {\n"
+        "  return t->x;\n"
+        "};\n"
+        "}\n"));
+  // Fails because ty[_, _] has bad arity.
+  run_check_negtest(ctx, "c064",
+    _u8("defclass ty { x i32; y i32; }\n"
+        "access ty[_, _] {\n"
+        "def foo fn[*ty, i32] = func(t *ty) i32 {\n"
+        "  return t->x;\n"
+        "};\n"
+        "}\n"));
+  run_check_test(ctx, "c065",
+    _u8("defclass ty { x i32; y i32; }\n"
+        "access ty {\n"
+        "def foo fn[*ty, i32] = func(t *ty) i32 {\n"
+        "  return t->x;\n"
+        "};\n"
+        "}\n"));
+  run_check_test(ctx, "c066",
+    _u8("defclass[T] ty { x T; y T; }\n"
+        "access ty[_] {\n"
+        "def[T] foo fn[*ty[T], T] = func(t *ty[T]) T {\n"
+        "  return t->x;\n"
+        "};\n"
+        "}\n"
+        "def bar fn[*ty[i32], i32] = foo;\n"));
+  // Fails because we try to access a field of a defclass type.
+  run_check_negtest(ctx, "c067",
+    _u8("defclass[T] ty { x T; y T; }\n"
+        "def[T] foo fn[*ty[T], T] = func(t *ty[T]) T {\n"
+        "  return t->x;\n"
+        "};\n"
+        "def bar fn[*ty[i32], i32] = foo;\n"));
+  run_check_test(ctx, "c068",
+    _u8("struct ty { x i32; }\n"
+        "def foo fn[ty, i32] = func(t ty) i32 {\n"
+        "  return t.x;\n"
+        "};\n"));
+  // Fails (unlike c068) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs, checks that field access is accessible.
+  run_check_negtest(ctx, "c069",
+    _u8("defclass ty { field i32; }\n"
+        "def foo fn[ty, i32] = func(t ty) i32 {\n"
+        "  return t.field;\n"
+        "};\n"));
+  run_check_negtest(ctx, "c070",
+    _u8("defclass ty { field i32; }\n"
+        "access ty {\n"
+        "def foo fn[ty, i32] = func(t ty) i32 {\n"
+        "  return t.field;\n"
+        "};\n"
+        "}\n"));
+  run_check_test(ctx, "c071",
+    _u8("defclass copy ty { field i32; }\n"
+        "access ty {\n"
+        "def foo fn[ty, i32] = func(t ty) i32 {\n"
+        "  return t.field;\n"
+        "};\n"
+        "}\n"));
+
+  // Fails (like more_29) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs, checks that field access is accessible.
+  run_check_negtest(ctx, "c071",
+    _u8("defclass[T] ty { field i32; }\n"
+        "def[T] foo fn[ty[T], i32] = func(t ty[T]) i32 {\n"
+        "  return t.field;\n"
+        "};\n"
+        "def bar fn[ty[u32], i32] = foo;\n"));
+  run_check_negtest(ctx, "c072a",
+    _u8("defclass[T] ty { field i32; }\n"
+        "access ty[_] {\n"
+        "def[T] foo fn[ty[T], i32] = func(t ty[T]) i32 {\n"
+        "  return t.field;\n"
+        "};\n"
+        "}\n"
+        "def bar fn[ty[u32], i32] = foo;\n"));
+  run_check_test(ctx, "c072b",
+    _u8("defclass[T] copy ty { field i32; }\n"
+        "access ty[_] {\n"
+        "def[T] foo fn[ty[T], i32] = func(t ty[T]) i32 {\n"
+        "  return t.field;\n"
+        "};\n"
+        "}\n"
+        "def bar fn[ty[u32], i32] = foo;\n"));
+  // Fails (unlike c068) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs, checks whether field access is accessible.
+  run_check_negtest(ctx, "c073",
+    _u8("defclass ty i32;\n"
+        "def foo fn[*ty, *i32] = func(t *ty) *i32 {\n"
+        "  return &t->field;\n"
+        "};\n"));
+  run_check_test(ctx, "c074",
+    _u8("defclass ty { field i32; }\n"
+        "access ty {\n"
+        "def foo fn[*ty, *i32] = func(t *ty) *i32 {\n"
+        "  return &t->field;\n"
+        "};\n"
+        "}\n"));
+  // Fails (like c069) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs...
+  run_check_negtest(ctx, "c075",
+    _u8("defclass[T] ty { field i32; }\n"
+        "def[T] foo fn[*ty[T], *i32] = func(t *ty[T]) *i32 {\n"
+        "  return &t->field;\n"
+        "};\n"
+        "def bar fn[*ty[u32], *i32] = foo;\n"));
+
+  run_check_test(ctx, "c076",
+    _u8("defclass[T] ty { field i32; }\n"
+        "access ty[_] {\n"
+        "def[T] foo fn[*ty[T], *i32] = func(t *ty[T]) *i32 {\n"
+        "  return &t->field;\n"
+        "};\n"
+        "}\n"
+        "def bar fn[*ty[u32], *i32] = foo;\n"));
+
+  run_check_test(ctx, "c077",
+    _u8("defclass copy ty { field i32; }\n"
+        "access ty {\n"
+        "def do_init fn[*ty, void] = func(t *ty) void {\n"
+        "  ret void;\n"
+        "  return ret;\n"
+        "};\n"
+        "}\n"
+        "def foo fn[i32] = func() i32 {\n"
+        "  k ty;\n"
+        "  return 1;\n"
+        "};\n"));
+  // Fails because blah is not the name of a type.
+  run_check_negtest(ctx, "c078",
+    _u8("def foo fn[i32] = func() i32 {\n"
+        "  x blah;\n"
+        "  return 1;\n"
+        "};\n"));
+  run_check_negtest(ctx, "c079",
+    _u8("defclass copy ty { field i32; }\n"
+        "def foo fn[i32] = func() i32 {\n"
+        "  k ty;\n"
+        "  return 1;\n"
+        "};\n"));
+  run_check_test(ctx, "c080",
+    _u8("defclass copy ty { field i32; }\n"
+        "access ty {\n"
+        "def do_init fn[*ty, void] = func(t *ty) void {\n"
+        "  ret void;\n"
+        "  return ret;\n"
+        "};\n"
+        "}\n"
+        "struct ty2 { x i32; y ty; }\n"
+        "def foo fn[i32] = func() i32 {\n"
+        "  k ty2;\n"
+        "  return 1;\n"
+        "};\n"));
+
+  run_check_negtest(ctx, "c081",
+    _u8("defclass copy ty { field i32; }\n"
+        "struct ty2 { x i32; y ty; }\n"
+        "def foo fn[i32] = func() i32 {\n"
+        "  k ty2;\n"
+        "  return 1;\n"
+        "};\n"));
+  run_check_test(ctx, "c082",
+    _u8("def x u8 = '\\x12';\n"));
+  // Passes because the char literal value is in range for an i8.
+  run_check_test(ctx, "c083",
+    _u8("def x i8 = '\\x12';\n"));
+  // TODO: This should fail if string literals not allowed in static evaluation.
+  // TODO: String literals should be allowed, this should pass.
+  run_check_test(ctx, "c084",
+    _u8("def x ^[5]u8 = \"pq\\x12rs\";\n"));
+  // Fails because the array size is wrong.
+  run_check_negtest(ctx, "c085",
+    _u8("def x ^[6]u8 = \"pq\\x12rs\";\n"));
+
+  run_check_test(ctx, "c086",
+    _u8("struct pq { p i32; q i32; }\n"
+        "enum ty {\n"
+        "  c1 void;\n"
+        "  c2 pq;\n"
+        "}\n"
+        "def foo fn[ty, ty] = func(x ty) ty {\n"
+        "  v void;\n"
+        "  y ty = c1(v);\n"
+        "  u pq;\n"
+        "  y = c2(u);\n"
+        "  return y;\n"
+        "};\n"));
+  // Fails because c2 passed wrong type.
+  run_check_negtest(ctx, "c087",
+    _u8("struct pq { p i32; q i32; }\n"
+        "struct pqu { p i32; q u32; }\n"
+        "enum ty {\n"
+        "  c1 void;\n"
+        "  c2 pq;\n"
+        "}\n"
+        "def foo fn[ty, ty] = func(x ty) ty {\n"
+        "  v void;\n"
+        "  y ty = c1(v);\n"
+        "  u pqu;\n"
+        "  y = c2(u);\n"
+        "  return y;\n"
+        "}\n"));
+  run_check_test(ctx, "c088",
+    _u8("struct[T] pq { p T; q T; }\n"
+        "enum[T] ty {\n"
+        "  c1 void;\n"
+        "  c2 pq[T];\n"
+        "}\n"
+        "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
+        "  v void;\n"
+        "  y ty[i32] = c1(v);\n"
+        "  u pq[i32];\n"
+        "  y = c2(u);\n"
+        "  return y;\n"
+        "};\n"));
+  // Fails because c2 returns wrong type.
+  run_check_negtest(ctx, "c089",
+    _u8("struct[T] pq { p T; q T; }\n"
+        "enum[T] ty {\n"
+        "  c1 void;\n"
+        "  c2 pq[T];\n"
+        "}\n"
+        "def foo fn[ty[i32], ty[i32]] = func(x ty[i32]) ty[i32] {\n"
+        "  v void;\n"
+        "  y ty[i32] = c1(v);\n"
+        "  u pq[u32];\n"
+        "  y = c2(u);\n"
+        "  return y;\n"
+        "};\n"));
+  run_check_test(ctx, "c090a",
+    _u8("struct pq { p i32; q i32; }\n"
+        "enum ty {\n"
+        "  c1 void;\n"
+        "  c2 pq;\n"
+        "}\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch x {\n"
+        "    case c1: return -1;\n"
+        "    case c2(s pq):\n"
+        "      return s.p + s.q;\n"
+        "  }\n"
+        "};\n"));
+  run_check_test(ctx, "c090b",
+    _u8("struct pq { p i32; q i32; }\n"
+        "enum ty {\n"
+        "  c1 void;\n"
+        "  c2 pq;\n"
+        "}\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch &x {\n"
+        "    case &c1: { return -1; }\n"
+        "    case &c2(s pq): {\n"
+        "      return s.p + s.q;\n"
+        "    }\n"
+        "  }\n"
+        "};\n"));
+
+  // Fails because a control path in the switch does not return a value.
+  run_check_negtest(ctx, "c091",
+    _u8("struct pq { p i32; q i32; }\n"
+        "enum ty {\n"
+        "  c1 void;\n"
+        "  c2 pq;\n"
+        "}\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch x {\n"
+        "    case c1: { return -1; }\n"
+        "    case c2(s pq): {\n"
+        "      s.p + s.q;\n"
+        "    }\n"
+        "  }\n"
+        "};\n"));
+  run_check_test(ctx, "c092",
+    _u8("def foo fn[i32, void] = func(x i32) void {\n"
+        "  p *_ = &x;\n"
+        "  q var = *p;\n"
+        "  r var = q;\n"
+        "  s i32 = r;\n"
+        "  ret void;\n"
+        "  return ret;\n"
+        "};\n"));
+  run_check_test(ctx, "c093",
+    _u8("struct pq { p i32; q i32; }\n"
+        "enum ty {\n"
+        "  c1 void;\n"
+        "  c2 pq;\n"
+        "}\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch x {\n"
+        "    case c1: { return -1; }\n"
+        "    case c2(s):\n"
+        "      return s.p + s.q;\n"
+        "  }\n"
+        "};\n"));
+  run_check_test(ctx, "c094",
+    _u8("def foo fn[i32, void] = func(x i32) void {\n"
+        "  p *_ = &x;\n"
+        "  q _ = *p;\n"
+        "  if (x == 3) {\n"
+        "    return;\n"
+        "  }\n"
+        "  r var = q;\n"
+        "  s i32 = r;\n"
+        "};\n"));
+  run_check_test(ctx, "c095",
+    _u8("def foo = func(x i32, y u32) void {\n"
+        "  z var = @[i32] 1;\n"
+        "};\n"));
+
+  run_check_test(ctx, "c096",
+    _u8("func foo(x i32, y u32) void {\n"
+        "  z var = @[i32] 1;\n"
+        "}\n"));
+  run_check_test(ctx, "c097",
+    _u8("struct notsize { x u32; }\n"
+        "func `~`(x u32) notsize {\n"
+        "  ret notsize;\n"
+        "  ret.x = x;\n"
+        "  return ret;\n"
+        "}\n"
+        "func foo(x u32) notsize {\n"
+        "  return ~(x + 1);\n"
+        "}\n"));
+  // Fails because x[0] is of wrong type.
+  run_check_negtest(ctx, "c098",
+    _u8("func foo() i32 {\n"
+        "  x ^[3]u32;\n"
+        "  return x[0];\n"
+        "}\n"));
+  run_check_test(ctx, "c099",
+    _u8("func foo() bool {\n"
+        "  x ^[3]u32;\n"
+        "  return &x[0] == &x[1];\n"
+        "}\n"));
+  // Fails because ptr types don't match.
+  run_check_negtest(ctx, "c100",
+    _u8("func foo() bool {\n"
+        "  x ^[3]u32;\n"
+        "  return &x[0] == &x;\n"
+        "}\n"));
+
+  run_check_test(ctx, "c101",
+    _u8("func foo(x osize, y size) osize {\n"
+        "  return x + ~y;\n"
+        "}\n"));
+  run_check_test(ctx, "c102",
+    _u8("func foo(x *i32) bool {\n"
+        "  return x == null;\n"
+        "}\n"));
+  // Fails because size is not a *_.
+  run_check_negtest(ctx, "c103",
+    _u8("func foo(x size) bool {\n"
+        "  return x == null;\n"
+        "}\n"));
+  run_check_test(ctx, "c104",
+    _u8("struct pq { p i32; q i32; }\n"
+        "enum ty {\n"
+        "  c1 void;\n"
+        "  c2 pq;\n"
+        "}\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch x {\n"
+        "    default: { return -1; }\n"
+        "    case c2(s): {\n"
+        "      return s.p + s.q;\n"
+        "    }\n"
+        "  }\n"
+        "};\n"));
+  // Fails because of overlapping default cases.
+  run_check_negtest(ctx, "c105a",
+    _u8("struct pq { p i32; q i32; }\n"
+        "enum ty {\n"
+        "  c1 void;\n"
+        "  c2 pq;\n"
+        "}\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch x {\n"
+        "    default: { return -1; }\n"
+        "    default: { return -2; }\n"
+        "    case c2(s): {\n"
+        "      return s.p + s.q;\n"
+        "    }\n"
+        "  }\n"
+        "};\n"));
+  // Fails because of overlapping default cases.
+  run_check_negtest(ctx, "c105b",
+    _u8("struct pq { p i32; q i32; }\n"
+        "enum ty {\n"
+        "  c1 void;\n"
+        "  c2 pq;\n"
+        "}\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  switch &x {\n"
+        "    default: { return -1; }\n"
+        "    default: { return -2; }\n"
+        "    case &c2(s): {\n"
+        "      return s.p + s.q;\n"
+        "    }\n"
+        "  }\n"
+        "};\n"));
+
+  run_check_test(ctx, "c106",
+    _u8("struct foo {\n"
+        "  x i32;\n"
+        "  y i32;\n"
+        "}\n"
+        "func bar(x i32) foo {\n"
+        "  return { x, x };\n"
+        "}\n"));
+  // Fails because struct expr has wrong count.
+  run_check_negtest(ctx, "c107",
+    _u8("struct foo {\n"
+        "  x i32;\n"
+        "  y i32;\n"
+        "}\n"
+        "func bar(x i32) foo {\n"
+        "  return { x, x, x };\n"
+        "}\n"));
+  // Fails because struct expr has wrong type.
+  run_check_negtest(ctx, "c108",
+    _u8("struct foo {\n"
+        "  x i32;\n"
+        "  y i32;\n"
+        "}\n"
+        "func bar(x i32, y u32) foo {\n"
+        "  return { x, y };\n"
+        "}\n"));
+  run_check_test(ctx, "c109",
+    _u8("struct foo {\n"
+        "  x i32;\n"
+        "  y i32;\n"
+        "}\n"
+        "func bar(x i32) foo {\n"
+        "  return { x, 5 };\n"
+        "}\n"));
+  run_check_test(ctx, "c110",
+    _u8("struct foo {\n"
+        "  x i32;\n"
+        "  y u32;\n"
+        "}\n"
+        "func bar(x i32) foo {\n"
+        "  ret foo = { x, 7 };\n"
+        "  return ret;\n"
+        "}\n"));
+
+  run_check_test(ctx, "c111",
+    _u8("struct foo {\n"
+        "  x i32;\n"
+        "  y u32;\n"
+        "}\n"
+        "func bar(x i32) foo {\n"
+        "  return quux({ x, 7 });\n"
+        "}\n"
+        "func quux(x foo) foo {\n"
+        "  return {99, ~x.x};\n"
+        "}\n"));
+  run_check_test(ctx, "c112",
+    _u8("struct[T] foo { }\n"
+        "func[T, U] make(arr U) foo[T] {\n"
+        "  return {};\n"
+        "}\n"
+        "func zed(blah foo[i32]) bool { return true; }\n"
+        "func bar() bool {\n"
+        "  return zed(make(\"test\"));\n"
+        "}\n"));
+  run_check_test(ctx, "c113",
+    _u8("struct pq { p i32; q i32; }\n"
+        "enum ty {\n"
+        "  c1 void;\n"
+        "  c2 pq;\n"
+        "}\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  if case c2(s pq) = x {\n"
+        "    return s.p + s.q;\n"
+        "  }\n"
+        "  return -1;\n"
+        "};\n"));
+  run_check_test(ctx, "c114",
+    _u8("struct pq { p i32; q i32; }\n"
+        "enum ty {\n"
+        "  c1 void;\n"
+        "  c2 pq;\n"
+        "}\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  if case c2(s pq) = x {\n"
+        "    return s.p + s.q;\n"
+        "  } else {\n"
+        "    return -1;\n"
+        "  }\n"
+        "};\n"));
+  // Fails because pattern mismatch.
+  run_check_negtest(ctx, "c115",
+    _u8("struct pq { p i32; q i32; }\n"
+        "struct puq { p u32; q i32; }\n"
+        "enum ty {\n"
+        "  c1 void;\n"
+        "  c2 pq;\n"
+        "}\n"
+        "def foo fn[ty, i32] = func(x ty) i32 {\n"
+        "  if case c2(s puq) = x {\n"
+        "    return s.p + s.q;\n"
+        "  } else {\n"
+        "    return -1;\n"
+        "  }\n"
+        "};\n"));
+}
+
+func test_check_yet_more_cases(ctx *check_ctx) void {
+  // Fails because exit without return.
+  run_check_negtest(ctx, "c116",
+    _u8("func foo(x i32) i32 {\n"
+        "  goto foo;\n"
+        "  label foo;\n"
+        "}\n"));
+  run_check_test(ctx, "c117",
+    _u8("func foo(x i32) i32 {\n"
+        "  label foo;\n"
+        "  goto foo;\n"
+        "}\n"));
+  run_check_test(ctx, "c118",
+    _u8("func foo(x i32) i32 {\n"
+        "  goto foo;\n"
+        "  if true {\n"
+        "    y i32;\n"
+        "    label foo;\n"
+        "    return y;\n"
+        "  }\n"
+        "}\n"));
+  run_check_test(ctx, "c119",
+    _u8("func foo(x i32) i32 {\n"
+        "  if true {\n"
+        "    y i32;\n"
+        "    label foo;\n"
+        "  }\n"
+        "  goto foo;\n"
+        "}\n"));
+  // A control for subsequent tests.
+  run_check_test(ctx, "c120",
+    _u8("enum ty { c1 i32; }\n"
+        "func foo(x i32) i32 {\n"
+        "  t ty = c1(x);\n"
+        "  if case c1(y i32) = t {\n"
+        "    return y;\n"
+        "  }\n"
+        "  return x;\n"
+        "}\n"));
+
+  // Fails because a goto points into a non-autoinit variable.
+  run_check_negtest(ctx, "c121",
+    _u8("enum ty { c1 i32; }\n"
+        "func foo(x i32) i32 {\n"
+        "  t ty = c1(x);\n"
+        "  if case c1(y i32) = t {\n"
+        "    label foo;\n"
+        "    return y;\n"
+        "  }\n"
+        "  goto foo;\n"
+        "}\n"));
+  // Fails because a goto points into a non-autoinit variable.
+  run_check_negtest(ctx, "c122",
+    _u8("enum ty { c1 i32; }\n"
+        "func foo(x i32) i32 {\n"
+        "  t ty = c1(x);\n"
+        "  if case c1(y i32) = t {\n"
+        "    label foo;\n"
+        "    return y;\n"
+        "  }\n"
+        "  goto foo;\n"
+        "}\n"));
+
+  // Passes because the loop has no condition.
+  run_check_test(ctx, "c123",
+    _u8("func foo(y i32) i32 {\n"
+        "  for x i32 = 0;; x = x + 1 {\n"
+        "  }\n"
+        "}\n"));
+
+  // Fails because the loop can terminate, no return statement.
+  run_check_negtest(ctx, "c124",
+    _u8("func foo(y i32) i32 {\n"
+        "  for x i32 = 0; true; x = x + 1 {\n"
+        "  }\n"
+        "}\n"));
+
+  // Passes because the goto points back into the loop.
+  run_check_test(ctx, "c125",
+    _u8("func foo(y i32) i32 {\n"
+        "  for x i32 = 0; true; x = x + 1 {\n"
+        "    label foo;\n"
+        "  }\n"
+        "  goto foo;\n"
+        "}\n"));
+
+  // Fails because the goto points into a non-autoinit variable.
+  run_check_negtest(ctx, "c125",
+    _u8("enum ty { c1 i32; c2 i32; }\n"
+        "func foo(y i32) i32 {\n"
+        "  t ty;\n"
+        "  switch t {\n"
+        "    case c1(x i32): {\n"
+        "      label foo;\n"
+        "      return 5;\n"
+        "    }\n"
+        "    default: {\n"
+        "      goto foo;\n"
+        "    }\n"
+        "  }\n"
+        "}\n"));
+
+  // Passes because the goto points away from a non-autoinit variable.
+  run_check_test(ctx, "c126",
+    _u8("enum ty { c1 i32; c2 i32; }\n"
+        "func foo(y i32) i32 {\n"
+        "  t ty;\n"
+        "  switch t {\n"
+        "    case c1(x i32): {\n"
+        "      goto foo;\n"
+        "      return 5;\n"
+        "    }\n"
+        "    default: {\n"
+        "      label foo;\n"
+        "      return 5;\n"
+        "    }\n"
+        "  }\n"
+        "}\n"));
+
+  // Fails because control flow falls off the end.
+  run_check_negtest(ctx, "c127",
+    _u8("enum ty { c1 i32; c2 i32; }\n"
+        "func foo(y i32) i32 {\n"
+        "  t ty;\n"
+        "  switch t {\n"
+        "    case c1(x i32): {\n"
+        "      goto foo;\n"
+        "      return 5;\n"
+        "    }\n"
+        "    default: {\n"
+        "      label foo;\n"
+        "    }\n"
+        "  }\n"
+        "}\n"));
+
+  // Passes because the goto doesn't point from outside the autoinit variable.
+  run_check_test(ctx, "c128",
+    _u8("enum ty { c1 i32; c2 i32; }\n"
+        "func foo(y i32) i32 {\n"
+        "  t ty;\n"
+        "  switch t {\n"
+        "    case c1(x i32):\n"
+        "      goto foo;\n"
+        "      label foo;\n"
+        "      return 5;\n"
+        "    default: {\n"
+        "      return 5;\n"
+        "    }\n"
+        "  }\n"
+        "}\n"));
+
+  run_check_test(ctx, "c129-a",
+    _u8("func[T, U] foo() void { }\n"));
+  // Fails because of duplicate generics.
+  run_check_negtest(ctx, "c129-b",
+    _u8("func[T, T] foo() void { }\n"));
+  run_check_test(ctx, "c129-c",
+    _u8("struct[T, U] ty { x i32; }\n"));
+  // Fails because of duplicate generics.
+  run_check_negtest(ctx, "c129-c",
+    _u8("struct[T, T] ty { x i32; }\n"));
+  // Fails because fn type has variadic after-arity of 1.
+  run_check_negtest(ctx, "c130-a",
+    _u8("struct foo { x fn[]; }\n"));
+  run_check_test(ctx, "c130-b",
+    _u8("struct foo { x fn[void]; }\n"));
+
+  // Fails because we try to assign to an rvalue.
+  run_check_negtest(ctx, "c131-a",
+    _u8("def x i32 = 3;\n"
+        "func y() void {\n"
+        "  x = 5;\n"
+        "}\n"));
+  run_check_test(ctx, "c131-b",
+    _u8("func y(x i32) void {\n"
+        "  x = 5;\n"
+        "}\n"));
+
+  // Fails because ty doesn't have an init method.
+  run_check_negtest(ctx, "c132-a",
+    _u8("defclass copy ty { field i32; }\n"
+        "func foo() ty { t *ty = null; return *t; }\n"
+        "func f() void {\n"
+        "  if true {\n"
+        "    k ty = foo();\n"
+        "    label bar;\n"
+        "  }\n"
+        "  goto bar;\n"
+        "}\n"));
+  run_check_test(ctx, "c132-b",
+    _u8("defclass copy ty { field i32; }\n"
+        "access ty {\n"
+        "  func do_init(t *ty) void { }\n"
+        "}\n"
+        "func foo() ty { t *ty = null; return *t; }\n"
+        "func f() void {\n"
+        "  if true {\n"
+        "    k ty = foo();\n"
+        "    label bar;\n"
+        "  }\n"
+        "  goto bar;\n"
+        "}\n"));
+
+  // A regression test for struct sizeof computation aborting when size % max_alignment != 0.
+  run_check_test(ctx, "c133",
+    _u8("struct foo {\n"
+        "  x u32;\n"
+        "  y u8;\n"
+        "}\n"
+        "func bar() foo {\n"
+        "  ret foo;\n"
+        "  return ret;\n"
+        "}\n"));
+  run_check_negtest(ctx, "c134-a",
+    _u8("func foo() u32 {\n"
+        "  for n u8 = 0; ; n = n + 1 { }\n"
+        "}\n"
+        "def x u32 = foo();\n"));
+  run_check_negtest(ctx, "c134-b",
+    _u8("func foo() u32 {\n"
+        "  n u8 = 0;\n"
+        "  while true {\n"
+        "    n = n + 1;\n"
+        "  }\n"
+        "  return 80;\n"
+        "}\n"
+        "def x u32 = foo();\n"));
+  run_check_test(ctx, "c135",
+    _u8("func foo() u32 {\n"
+        "  n u8 = 5;\n"
+        "  f fn[*u8, void] = func(p *u8) void {\n"
+        "    *p = *p + 7;\n"
+        "  };\n"
+        "  f(&n);\n"
+        "  return ~n;\n"
+        "}\n"
+        "def x u32 = foo();\n"));
+  run_check_test(ctx, "c136",
+    _u8("func foo() u32 {\n"
+        "  u union {\n"
+        "    ch ^[4]u8;\n"
+        "    x u32;\n"
+        "  };\n"
+        "  u.ch[0] = 3;\n"
+        "  u.ch[1] = 4;\n"
+        "  u.ch[2] = 6;\n"
+        "  u.ch[3] = 7;\n"
+        "  return u.x;\n"
+        "}\n"
+        "def x u32 = foo();\n"));
+
+  run_check_test(ctx, "c137-a",
+    _u8("struct st {\n"
+        "  y ^[3]i8;\n"
+        "  z u8;\n"
+        "  x i32;\n"
+        "}\n"
+        "func foo(x i32) st {\n"
+        "  ret st;\n"
+        "  ret.y[0] = 0;\n"
+        "  ret.y[1] = 1;\n"
+        "  ret.y[2] = -2;\n"
+        "  ret.z = 5;\n"
+        "  ret.x = x;\n"
+        "  return ret;\n"
+        "}\n"
+        "\n"
+        "def x st = foo(- @[i32] 15);\n"));
+
+  run_check_test(ctx, "c137-b",
+    _u8("defclass copy cl { field i32; }\n"
+        "access cl {\n"
+        "  func do_init(x *cl) void {\n"
+        "    x->field = 0x99;\n"
+        "  }\n"
+        "}\n"
+        "struct st {\n"
+        "  x i32;\n"
+        "  w cl;\n"
+        "}\n"
+        "func foo(x i32) st {\n"
+        "  ret st;\n"
+        "  ret.x = x;\n"
+        "  return ret;\n"
+        "}\n"
+        "\n"
+        "def t st = foo(- @[i32] 15);\n"));
+
+  // This used to fail because the padding of st was not zeroed, and defs must be fully initialized -- but now padding of structs is zeroed.
+  run_check_test(ctx, "c137-c",
+    _u8("defclass copy cl { field i32; }\n"
+        "access cl {\n"
+        "  func do_init(x *cl) void {\n"
+        "    x->field = 0x99;\n"
+        "  }\n"
+        "}\n"
+        "struct st {\n"
+        "  x i16;\n"
+        "  w cl;\n"
+        "}\n"
+        "func foo(x i32) st {\n"
+        "  ret st;\n"
+        "  ret.x = ~x;\n"
+        "  return ret;\n"
+        "}\n"
+        "\n"
+        "def t st = foo(- @[i32] 15);\n"));
+
+  // A defect of these padding tests is that they don't check copy/move padding behavior, because non-trivially-copyable types cannot be used in defs.
+
+  // This used to fail because the padding of en was not zeroed, and defs must be fully initialized.  But now padding of enums is zeroed.
+  // This also used to fail because enum initialization was incorrectly derived to be non-trivial, when it had a class member.
+  run_check_test(ctx, "c137-d",
+    _u8("defclass copy cl { field i16; }\n"
+        "access cl {\n"
+        "  func do_init(x *cl) void {\n"
+        "    x->field = 0x99;\n"
+        "  }\n"
+        "}\n"
+        "enum en {\n"
+        "  Foo i32;\n"
+        "  Bar cl;\n"
+        "}\n"
+        "func bar() en {\n"
+        "  c cl;\n"
+        "  return Bar(c);\n"
+        "}\n"
+        "\n"
+        "def t en = bar();\n"));
+
+  // The next few tests involved switch statements and pattern-conditionals.  They come in direct/pointer variants with "/d" and "/p" in their names.
+
+  run_check_test(ctx, "c138-a/d",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo(x opt[i32]) i32 {\n"
+        "  switch x {\n"
+        "  case Has(y i32):\n"
+        "    return y + 3;\n"
+        "  case None:\n"
+        "    return 99;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo(None);\n"
+        "def d2 i32 = foo(Has(@[i32]40));\n"
+        ));
+  run_check_test(ctx, "c138-b/d",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  switch x {\n"
+        "  case Has(y i32):\n"
+        "    return y + 3;\n"
+        "  case None:\n"
+        "    return 99;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+
+  run_check_test(ctx, "c138-a/p",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo(x opt[i32]) i32 {\n"
+        "  switch &x {\n"
+        "  case &Has(y i32):\n"
+        "    return y + 3;\n"
+        "  case &None:\n"
+        "    return 99;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo(None);\n"
+        "def d2 i32 = foo(Has(@[i32]40));\n"
+        ));
+  run_check_test(ctx, "c138-b/p",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  switch &x {\n"
+        "  case &Has(y i32):\n"
+        "    return y + 3;\n"
+        "  case &None:\n"
+        "    return 99;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+
+  // Maybe this test should fail, because the swartch should be alive during the default case, and the goto shouldn't be able to jump into the default case and default-initialize the swartch, the way it is doing right now.  Or should it?  Someday for non-scoped variables we'd want the swartch to die before entering the default case, so it seems fine to allow default-initialization now, especially since, for enum values (and ints, if we implement that), the default-constructed value is the trivially-initializable zero-tag value.
+  run_check_test(ctx, "c139/d",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  z i32 = 6;\n"
+        "  switch x {\n"
+        "  case Has(y i32):\n"
+        "    z = z + y;\n"
+        "  default:\n"
+        "    label baaz;\n"
+        "    return z;\n"
+        "  }\n"
+        "  goto baaz;\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+
+  // Unlike 139/d, maybe this should not fail, no matter what, because the swartch is a pointer and doesn't get destructed at all.
+  run_check_test(ctx, "c139/p",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  z i32 = 6;\n"
+        "  switch &x {\n"
+        "  case &Has(y i32):\n"
+        "    z = z + y;\n"
+        "  default:\n"
+        "    label baaz;\n"
+        "    return z;\n"
+        "  }\n"
+        "  goto baaz;\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+
+  run_check_test(ctx, "c140-a/d",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  if case Has(y i32) = x {\n"
+        "    return y;\n"
+        "  } else {\n"
+        "    return 81;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+  run_check_test(ctx, "c140-b/d",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  if case Has(y i32) = x {\n"
+        "    return y + 1;\n"
+        "  } else {\n"
+        "    return 81;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+  run_check_test(ctx, "c140-c/d",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = None;\n"
+        "  if case Has(y i32) = x {\n"
+        "    return y + 1;\n"
+        "  } else {\n"
+        "    return 81;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+
+  run_check_test(ctx, "c140-a/p",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  if case &Has(y i32) = &x {\n"
+        "    return y;\n"
+        "  } else {\n"
+        "    return 81;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+  run_check_test(ctx, "c140-b/p",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  if case &Has(y i32) = &x {\n"
+        "    return y + 1;\n"
+        "  } else {\n"
+        "    return 81;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+  run_check_test(ctx, "c140-c/p",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = None;\n"
+        "  if case &Has(y i32) = &x {\n"
+        "    return y + 1;\n"
+        "  } else {\n"
+        "    return 81;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+
+  run_check_test(ctx, "c141-a/d",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(7);\n"
+        "  acc i32 = 1;\n"
+        "  while case Has(y i32) = x {\n"
+        "    acc = acc * y;\n"
+        "    if y == 1 {\n"
+        "      x = None;\n"
+        "    } else {\n"
+        "      x = Has(y - 1);\n"
+        "    }\n"
+        "  }\n"
+        "  return acc;\n"
+        "}\n"
+        "def d1 i32 = foo();\n"));
+  run_check_test(ctx, "c141-a/p",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(7);\n"
+        "  acc i32 = 1;\n"
+        "  while case &Has(y i32) = &x {\n"
+        "    acc = acc * y;\n"
+        "    if y == 1 {\n"
+        "      x = None;\n"
+        "    } else {\n"
+        "      x = Has(y - 1);\n"
+        "    }\n"
+        "  }\n"
+        "  return acc;\n"
+        "}\n"
+        "def d1 i32 = foo();\n"));
+  run_check_test(ctx, "c141-b/d",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(7);\n"
+        "  acc i32 = 1;\n"
+        "  while case Has(y i32) = x {\n"
+        "    acc = acc * y;\n"
+        "    if y == 1 {\n"
+        "      return acc;\n"
+        "    } else {\n"
+        "      x = Has(y - 1);\n"
+        "    }\n"
+        "  }\n"
+        "  return -1;\n"
+        "}\n"
+        "def d1 i32 = foo();\n"));
+  run_check_test(ctx, "c141-b/p",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(7);\n"
+        "  acc i32 = 1;\n"
+        "  while case &Has(y i32) = &x {\n"
+        "    acc = acc * y;\n"
+        "    if y == 1 {\n"
+        "      return acc;\n"
+        "    } else {\n"
+        "      x = Has(y - 1);\n"
+        "    }\n"
+        "  }\n"
+        "  return -1;\n"
+        "}\n"
+        "def d1 i32 = foo();\n"));
+
+  // A general for loop test.
+  run_check_test(ctx, "c142",
+    _u8("func fac(x i32) i32 {\n"
+        "  acc i32 = 1;\n"
+        "  for i i32 = 1; i <= x; i = i + 1 {\n"
+        "    acc = acc * i;\n"
+        "  }\n"
+        "  return acc;\n"
+        "}\n"
+        "def d1 i32 = fac(7);\n"));
+
+  // Fails because we overflow an i32.
+  run_check_negtest(ctx, "c143",
+    _u8("func fac(x i32) i32 {\n"
+        "  acc i32 = 1;\n"
+        "  for i i32 = 1; i <= x; i = i + 1 {\n"
+        "    acc = acc * i;\n"
+        "  }\n"
+        "  return acc;\n"
+        "}\n"
+        "def d1 i32 = fac(13);\n"));
+
+  // We use gotos to make a loop.
+  run_check_test(ctx, "c144-a",
+    _u8("func fac(x i32) i32 {\n"
+        "  acc i32 = 1;\n"
+        "  label top;\n"
+        "  if x == 0 {\n"
+        "    return acc;\n"
+        "  }\n"
+        "  acc = acc * x;\n"
+        "  x = x - 1;\n"
+        "  goto top;\n"
+        "}\n"
+        "def d1 i32 = fac(7);\n"));
+  run_check_test(ctx, "c144-b",
+    _u8("func fac(x i32) i32 {\n"
+        "  acc i32 = 1;\n"
+        "  label top;\n"
+        "  if x == 0 {\n"
+        "    goto bottom;\n"
+        "  }\n"
+        "  acc = acc * x;\n"
+        "  x = x - 1;\n"
+        "  goto top;\n"
+        "  label bottom;\n"
+        "  return acc;\n"
+        "}\n"
+        "def d1 i32 = fac(7);\n"));
+
+  run_check_test(ctx, "c145-a",
+    _u8("defclass copy cl { field i16; }\n"
+        "access cl {\n"
+        "  func do_init(x *cl) void {\n"
+        "    x->field = 0x99;\n"
+        "  }\n"
+        "  func incr(x *cl) void {\n"
+        "    x->field = x->field + 1;\n"
+        "  }\n"
+        "  func get(x *cl) i16 {\n"
+        "    return x->field;\n"
+        "  }\n"
+        "}\n"
+        "func bar() i32 {\n"
+        "  c cl;\n"
+        "  d cl;\n"
+        "  destroy(&c);\n"
+        "  incr(&d);\n"
+        "  copy(&c, &d);\n"
+        "  return ~get(&c);\n"
+        "}\n"
+        "\n"
+        "def t i32 = bar();\n"));
+
+  // TODO: This fails with "Looking for structural type information on inaccessible..." when it should have a def matching error on "get" (in the return statement, since i16!=i32).  This is just bonkers.
+  run_check_negtest(ctx, "c145-b",
+    _u8("defclass copy cl { field i16; }\n"
+        "access cl {\n"
+        "  func do_init(x *cl) void {\n"
+        "    x->field = 0x99;\n"
+        "  }\n"
+        "  func incr(x *cl) void {\n"
+        "    x->field = x->field + 1;\n"
+        "  }\n"
+        "  func get(x *cl) i16 {\n"
+        "    return x->field;\n"
+        "  }\n"
+        "}\n"
+        "func bar() i32 {\n"
+        "  c cl;\n"
+        "  d cl;\n"
+        "  destroy(&c);\n"
+        "  incr(&d);\n"
+        "  copy(&c, &d);\n"
+        "  return get(&c);\n"
+        "}\n"
+        "\n"
+        "def t i32 = bar();\n"));
+
+  run_check_test(ctx, "c146-a",
+    _u8("def x size = sizeof@[u32];\n"));
+  run_check_test(ctx, "c146-b",
+    _u8("def x size = alignof@[u32];\n"));
+
+  run_check_test(ctx, "c147",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func[T] foo(x opt[T]) i32 {\n"
+        "  switch &x {\n"
+        "  case &None:\n"
+        "    return 1;\n"
+        "  case &Has(b T):\n"
+        "    return 2;\n"
+        "  }\n"
+        "}\n"
+        "def d1 i32 = foo@[u32](Has(@[u32]3));\n"));
+
+  run_check_test(ctx, "c148",
+    _u8("defclass ty { n i32; }\n"
+        "access ty {\n"
+        "  func do_init(x *ty) void {\n"
+        "    x->n = 5;\n"
+        "  }\n"
+        "  func do_copy(x *ty, y *ty) void {\n"
+        "    x->n = y->n + 1;\n"
+        "  }\n"
+        "  func do_destroy(x *ty) void {\n"
+        "  }\n"
+        "  func get(x *ty) i32 {\n"
+        "    return x->n;\n"
+        "  }\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  z ^[3]ty;\n"
+        "  return get(&z[2]);\n"
+        "}\n"
+        "def d1 i32 = foo();\n"));
+
+  run_check_test(ctx, "c149",
+    _u8("defclass ty { n i8; }\n"
+        "access ty {\n"
+        "  func do_init(x *ty) void {\n"
+        "    x->n = 5;\n"
+        "  }\n"
+        "  func do_copy(x *ty, y *ty) void {\n"
+        "    x->n = y->n + 1;\n"
+        "  }\n"
+        "  func do_destroy(x *ty) void {\n"
+        "  }\n"
+        "  func get(x *ty) i8 {\n"
+        "    return x->n;\n"
+        "  }\n"
+        "}\n"
+        "enum en {\n"
+        "  Foo ty;\n"
+        "  Bar i32;\n"
+        "}\n"
+        "func foo() i8 {\n"
+        "  x ty;\n"
+        "  z en = Foo(x);\n"
+        "  t en = z;\n"
+        "  /* if case Foo(u ty) = t {\n"
+        "    return get(&u);\n"
+        "  } else {\n"
+        "    return 3;\n"
+        "  } */\n"
+        "  return 3;\n"
+        "}\n"
+        "def d1 i8 = foo();\n"));
+
+  run_check_test(ctx, "c150",
+    _u8("struct ty { n u8; m u8; }\n"
+        "func bar() ty {\n"
+        "  ret ty = {8, 9};\n"
+        "  return ret;\n"
+        "}\n"
+        "func foo() u8 {\n"
+        "  z u8 = 3;\n"
+        "  z = bar().n;\n"
+        "  return z;\n"
+        "}\n"
+        "def d1 u8 = foo();\n"));
+
+  // Just to make sure the parser doesn't stack overflow.
+  run_check_test(ctx, "c151",
+    _u8("def y u32 = 2;\n"
+        "def x u32 = 1 + (y + ((((y + y + 1) + 2) + 3) + (y + (5 + (y + 7 + 8)))));\n"));
+
+  // Fails because conversion is lossy.
+  run_check_negtest(ctx, "c152-a",
+    _u8("def x u32 = 8;\n"
+        "def y i32 = +x;\n"));
+  run_check_test(ctx, "c152-b",
+    _u8("def x i16 = 8;\n"
+        "def y i32 = +x;\n"));
+  run_check_test(ctx, "c152-c",
+    _u8("def x u8 = 8;\n"
+        "def y i32 = +x;\n"));
+  run_check_negtest(ctx, "c152-d",
+    _u8("def x u8 = 8;\n"
+        "def y o8 = +(x + 253);\n"));
+  run_check_test(ctx, "c152-e",
+    _u8("def x u8 = 8;\n"
+        "def y o8 = +x + 253;\n"));
+
+  run_check_negtest(ctx, "c153-a",
+    _u8("func foo(x i32) void {\n"
+        "  x++;\n"
+        "  for i i32 = 0; i < x; i++ {\n"
+        "    if i == 5 { return; }\n"
+        "  }\n"
+        "}\n"));
+  run_check_test(ctx, "c153-b",
+    _u8("func foo(x i32) void {\n"
+        "  x++;\n"
+        "  for i i32 = 0; i < x; i++ {\n"
+        "    if i == 5 { return; }\n"
+        "  }\n"
+        "}\n"
+        "inline func `++`(x *i32) void {\n"
+        "  *x = *x + 1;\n"
+        "}\n"));
+
+  run_check_test(ctx, "c154",
+    _u8("enum en {\n"
+        "  Foo void;\n"
+        "}\n"
+        "func blah(x en) u32 {\n"
+        "  switch x {\n"
+        "  case Foo:\n"
+        "    accum u32 = 0x12345679;\n"
+        "    return accum;\n"
+        "  }\n"
+        "}\n"));
+  run_check_test(ctx, "c155",
+    _u8("func blah(x i32) u32 {\n"
+        "  return x == 3 then 99 else 66;\n"
+        "}\n"));
+  run_check_test(ctx, "c156",
+    _u8("func blah(x i32) u32 {\n"
+        "  y u32 = x == 3 then 99 else 66;\n"
+        "  y = y == 3 then 0 else 1;\n"
+        "  return y;\n"
+        "}\n"));
+
+  run_check_test(ctx, "c157",
+    _u8("struct foo { a i32; b i32; }\n"
+        "func blah(x i32) i32 {\n"
+        "  y foo = {x, 3};\n"
+        "  return y.a;\n"
+        "}\n"));
+  run_check_test(ctx, "c158",
+    _u8("struct foo { a i32; b i32; }\n"
+        "func blah(x i32) i32 {\n"
+        "  y i32 = (@[foo]{x, 3}).a;\n"
+        "  return y;\n"
+        "}\n"
+        "def glob i32 = blah(1);\n"));
+
+  // b is made void because statements require a void type.  For now.
+  run_check_test(ctx, "c159",
+    _u8("struct foo { a i32; b void; }\n"
+        "func bar() foo {\n"
+        "  return {1, void};\n"
+        "}\n"
+        "func blah() void {\n"
+        "  bar().b;\n"
+        "}\n"
+        "def glob void = blah();\n"));
+
+  run_check_test(ctx, "c160-a1",
+    _u8("enum[T] foo { #Pass T; Fail void; }\n"
+        "func bar(x foo[u32]) foo[i32] {\n"
+        "  r u32 = #x;\n"
+        "  return Pass(@[i32]~r);\n"
+        "}\n"
+        "def z foo[i32] = bar(@[foo[u32]]Pass(3));\n"));
+
+  run_check_test(ctx, "c160-a2",
+    _u8("enum[T] foo { #Pass T; Fail void; }\n"
+        "func bar(x foo[u32]) foo[i32] {\n"
+        "  r u32 = #x;\n"
+        "  return Pass(@[i32]~r);\n"
+        "}\n"
+        "def z foo[i32] = bar(Fail);\n"));
+
+  run_check_test(ctx, "c160-b",
+    _u8("enum[T] foo { #Pass T; Fail void; }\n"
+        "func quux() foo[u32] {\n"
+        "  return Pass(3);\n"
+        "}\n"
+        "func bar() foo[i32] {\n"
+        "  r u32 = #quux();\n"
+        "  return Pass(@[i32]~r);\n"
+        "}\n"
+        "def z foo[i32] = bar();\n"));
+
+  run_check_test(ctx, "c160-c",
+    _u8("enum[T] foo { #Pass T; Fail void; }\n"
+        "struct stroo { n i32; x foo[u32]; }\n"
+        "func quux() stroo {\n"
+        "  return {2, Pass(3)};\n"
+        "}\n"
+        "func bar() foo[i32] {\n"
+        "  r u32 = #quux().x;\n"
+        "  return Pass(@[i32]~r);\n"
+        "}\n"));
+
+  run_check_test(ctx, "c161",
+    _u8("enum en { Foo void; }\n"
+        "func foo() i32 {\n"
+        "  r i32 = 5;\n"
+        "  while case Foo(v void) = @[en]Foo {\n"
+        "    if r == 5 {\n"
+        "      break;\n"
+        "    }\n"
+        "  }\n"
+        "  return r;\n"
+        "}\n"
+        "def x i32 = foo();\n"));
+
+  run_check_test(ctx, "c162",
+    _u8("func foo() i32 {\n"
+        "  k i32 = 0;\n"
+        "  for i size = 0; i < 20; i = i + 1 {\n"
+        "    k = k + 1;\n"
+        "    continue;\n"
+        "  }\n"
+        "  return k;\n"
+        "}\n"
+        "def x i32 = foo();\n"));
+  run_check_test(ctx, "c163",
+    _u8("func foo() i32 {\n"
+        "  k i32 = 0;\n"
+        "  for ;; {\n"
+        "    k = k + 1;\n"
+        "    continue;\n"
+        "  }\n"
+        "  return k;\n"
+        "}\n"));
+  run_check_test(ctx, "c164",
+    _u8("func foo() i32 {\n"
+        "  k i32 = 0;\n"
+        "  for ;; k = k - 1 {\n"
+        "    k = k + 1;\n"
+        "    continue;\n"
+        "  }\n"
+        "  return k;\n"
+        "}\n"));
+  run_check_test(ctx, "c165",
+    _u8("func foo() i32 {\n"
+        "  k i32 = 0;\n"
+        "  for i size = 0 ; i < 20; {\n"
+        "    k = k + 1;\n"
+        "    continue;\n"
+        "  }\n"
+        "  return k;\n"
+        "}\n"));
+  // Forces quick-return to unwind an active virtual cell.
+  run_check_test(ctx, "c166",
+    _u8("defclass ty { n i8; }\n"
+        "access ty {\n"
+        "  func do_init(x *ty) void {\n"
+        "    x->n = 5;\n"
+        "  }\n"
+        "  func do_copy(x *ty, y *ty) void {\n"
+        "    x->n = y->n + 1;\n"
+        "  }\n"
+        "  func do_destroy(x *ty) void {\n"
+        "  }\n"
+        "}\n"
+        "struct foo { x ty; y i32; }\n"
+        "enum opt { None void; #Has i32; }\n"
+        "func bar() opt {\n"
+        "  x opt = None;\n"
+        "  z ty;\n"
+        "  y foo = {z, #x};\n"
+        "  return Has(y.y);\n"
+        "}\n"
+        "def glob opt = bar();\n"));
+
+  // (BTW, returning null is not defined behavior for do_index.  In these tests, we don't have any way to abort().)
+  run_check_test(ctx, "c167",
+    _u8("struct ty { x i32; y i32; }\n"
+        "func do_index(p *ty, k size) *i32 {\n"
+        "  if k == 0 { return &p->x; }\n"
+        "  if k == 1 { return &p->y; }\n"
+        "  return null;\n"
+        "}\n"
+        "func foo(x ty) i32 {\n"
+        "  return x[1];\n"
+        "}\n"
+        "def blah i32 = foo({3, 4});\n"));
+
+  run_check_test(ctx, "c168",
+    _u8("struct range { lo size; hi size; }\n"
+        "func do_iter_mk(x range) range { return x; }\n"
+        "func do_iter_done(x *range) bool { return x->lo >= x->hi; }\n"
+        "func do_iter_step(x *range) void { x->lo = x->lo + 1; }\n"
+        "func do_iter_access(x *range) size { return x->lo; }\n"
+        "func foo() size {\n"
+        "  sum size = 0;\n"
+        "  foreach i size in (@[range]{0, 10}) {\n"
+        "    sum = sum + i;\n"
+        "  }\n"
+        "  return sum;\n"
+        "}\n"
+        "def x size = foo();\n"
+        "\n"));
+}
+
+func mk_ctx(verbose bool, build bool, name opt[array[u8]]) check_ctx {
+  return {verbose, build, name, 0};
+}
+
+func test_check(verbose bool, build bool) tup[bool, u32] {
+  ctx check_ctx = mk_ctx(verbose, build, None);
+  test_check_basic_cases(&ctx);
+  test_check_lambda_cases(&ctx);
+  test_check_more_cases(&ctx);
+  test_check_yet_more_cases(&ctx);
+  return {ctx.failures == 0, ctx.failures};
+}
