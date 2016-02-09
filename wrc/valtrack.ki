@@ -6,16 +6,17 @@ struct vt_track {
 
   // Indexed by gr_num.
   annot array[vt_annot];
+}
 
-  // What sq nodes are "fresh" and we need to continue from.
+struct vt_freshtrack {
   fresh array[gr_num];
+  end_state opt[vt_state];
 }
 
 func mk_track(gr *frame_graph) vt_track {
   return {
     @[vt_state]{ },
-    repeat(count(&gr->ops), {None, Stale}),
-    mk_array@[gr_num]()
+    repeat(count(&gr->ops), {None, Stale})
   };
 }
 
@@ -47,17 +48,28 @@ func vt_graph(clq *clqueue, gr *frame_graph, gn gr_num) np {
 
   track vt_track = mk_track(gr);
 
-  return vt_inner_expr({clq, gr, &track}, gn);
-}
-
-func vt_inner_expr(c cgt, gn gr_num) np {
-  c.track->annot[gn.x].fr = Fresh;
-  new_gn gr_num = #vt_xops(c, gn);
-  // TODO()
+  terminates bool = #vt_inner_expr({clq, gr, &track}, gn);
   return NoFail;
 }
 
-func vt_xops(c cgt, gn gr_num) cr[gr_num] {
+// Returns true if the inner_expr can terminate (in which case c.track->current means something).
+func vt_inner_expr(c cgt, outer_gn gr_num) cr[bool] {
+  ft vt_freshtrack = {mk_array@[gr_num](), None};
+  fr freshness = #vt_unify(c, &ft, outer_gn);
+  while case Has(gn gr_num) = popval(&ft.fresh) {
+    if c.track->annot[gn.x].fr == Fresh {
+      #vt_xops(c, &ft, gn);
+    }
+  }
+  if case &Has(st vt_state) = &ft.end_state {
+    c.track->current = st;
+    return NoFail(true);
+  } else {
+    return NoFail(false);
+  }
+}
+
+func vt_xops(c cgt, ft *vt_freshtrack, gn gr_num) np {
   for ;; {
     switch ref_node(c.gr, gn) {
     case &XOp(xn gr_xnode):
@@ -65,8 +77,8 @@ func vt_xops(c cgt, gn gr_num) cr[gr_num] {
       ice(_u8("vt_xops sees an xop."));
     case &QOp(qn gr_qnode):
       if qn.indegree.x > 1 {
-        if Stale == #vt_unify(c, gn) {
-          return NoFail(gn);
+        if Stale == #vt_unify(c, ft, gn) {
+          return NoFail;
         }
       }
       c.track->annot[gn.x].fr = Stale;
@@ -77,15 +89,16 @@ func vt_xops(c cgt, gn gr_num) cr[gr_num] {
           target *gr_branch_target = branch_target_ref(&a, i);
           switch target->disposition {
           case ForwardTarget:
-            #vt_track_soon(c, target->sn);
+            #vt_track_soon(c, ft, target->sn);
           case LoopingTarget:
-            #vt_track_soon(c, target->sn);
+            #vt_track_soon(c, ft, target->sn);
           case AbnormalTarget:
             saved_state vt_state = c.track->current;
-            #vt_abnormal_excursion(c, target->sn.x);
+            #vt_abnormal_excursion(c, ft, target->sn.x);
             c.track->current = saved_state;
           }
         }
+        return NoFail;
       case &GrSequence(a gr_sequence):
         #vt_single_xop(c, a.first);
         gn = a.second.x;
@@ -96,7 +109,7 @@ func vt_xops(c cgt, gn gr_num) cr[gr_num] {
           gn = a.next.x;
         case ExitNormalcy(b gr_jmp_exit_normalcy):
           saved_state vt_state = c.track->current;
-          #vt_abnormal_excursion(c, a.next.x);
+          #vt_abnormal_excursion(c, ft, a.next.x);
           c.track->current = saved_state;
           gn = b.subsequent_normalcy.x;
           // loop around
@@ -104,13 +117,14 @@ func vt_xops(c cgt, gn gr_num) cr[gr_num] {
           ice(_u8("vt_xops sees GrJmp ReenterNormalcy"));
         }
       case &GrQNop:
-        return NoFail(gn);
+        fr freshness = #unify_vt_state(&ft->end_state, &c.track->current);
+        return NoFail;
       }
     }
   }
 }
 
-func vt_abnormal_excursion(c cgt, gn gr_num) np {
+func vt_abnormal_excursion(c cgt, ft *vt_freshtrack, gn gr_num) np {
   for ;; {
     switch ref_node(c.gr, gn) {
     case &XOp(xn gr_xnode):
@@ -118,7 +132,7 @@ func vt_abnormal_excursion(c cgt, gn gr_num) np {
     case &QOp(qn gr_qnode):
       // Abnormal excursions could merge together, yes.
       if qn.indegree.x > 1 {
-        if Stale == #vt_unify(c, gn) {
+        if Stale == #vt_unify(c, ft, gn) {
           return NoFail;
         }
       }
@@ -136,7 +150,7 @@ func vt_abnormal_excursion(c cgt, gn gr_num) np {
         case ExitNormalcy(b gr_jmp_exit_normalcy):
           ice(_u8("vt_abnormal_excursion sees an ExitNormalcy"));
         case ReenterNormalcy:
-          fr freshness = #vt_unify(c, a.next.x);
+          fr freshness = #vt_unify(c, ft, a.next.x);
           return NoFail;
         }
       case &GrQNop:
@@ -153,11 +167,15 @@ func vt_single_xop(c cgt, gn gr_num) np {
     return NoFail;
   case &QOp(qn gr_qnode):
     // Ack -- we've gotta trace a sub-qop-expr.
-    return vt_inner_expr(c, gn);
+    terminates bool = #vt_inner_expr(c, gn);
+    if !terminates {
+      ice(_u8("single-op inner expr does not terminate"));
+    }
+    return NoFail;
   }
 }
 
-func vt_unify(c cgt, gn gr_num) cr[freshness] {
+func vt_unify(c cgt, ft *vt_freshtrack, gn gr_num) cr[freshness] {
   old_fr freshness = c.track->annot[gn.x].fr;
   fr freshness = #unify_vt_state(&c.track->annot[gn.x].savestate, &c.track->current);
   switch old_fr {
@@ -167,7 +185,7 @@ func vt_unify(c cgt, gn gr_num) cr[freshness] {
     switch fr {
     case Fresh:
       c.track->annot[gn.x].fr = Fresh;
-      push(&c.track->fresh, gn);
+      push(&ft->fresh, gn);
       return NoFail(Fresh);
     case Stale:
       return NoFail(Stale);
@@ -175,7 +193,7 @@ func vt_unify(c cgt, gn gr_num) cr[freshness] {
   }
 }
 
-func vt_track_soon(c cgt, sn sq_num) np {
-  fr freshness = #vt_unify(c, sn.x);
+func vt_track_soon(c cgt, ft *vt_freshtrack, sn sq_num) np {
+  fr freshness = #vt_unify(c, ft, sn.x);
   return NoFail;
 }
