@@ -21,3 +21,8 @@ Some feature/implementation differences between s1 and s2:
 Some feature/implementation differences between s2 and s3:
   Superset of s2, necessary to compile s4:
   - s3 has generalized array indexing.
+
+Some feature/implementation differences between s3 and s4:
+  Superset of s3, necessary to compile s5:
+  - s4 has foreach loops.
+
