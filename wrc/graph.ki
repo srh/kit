@@ -451,10 +451,11 @@ func mut_connect(gs gr_statep, bu *sq_builder, outflow *tracked_target, disposit
   return help_mut_connect(bu, outflow->sn, disposition);
 }
 
-func uni_connect(gs gr_statep, partof gr_current_segment, gn gr_num, outflow *tracked_target, disposition gr_jmp_disposition) sq_num {
-  // (Not sure if disposition is useful.)
-  note_celltrack(&outflow->note, gs.ctr);
-  return seqq(gs.gr, PartofSeg(partof.osn), {gn, outflow->sn});
+func uni_connect(gs gr_statep, gn gr_num, outflow *tracked_target, disposition gr_jmp_disposition) sq_num {
+  // At one point this just did a seqq -- but we really do want the jmp disposition, so there's no gain over using mut_connect.
+  bu sq_builder = mk_builder(gs);
+  add(&bu, gn);
+  return mut_connect(gs, &bu, outflow, disposition);
 }
 
 // last(.) is used to identify the label target for gr_label_statement.
@@ -780,7 +781,7 @@ func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_break_statement_info = un(&a->info);
   uw gr_num = gr_unwinding(gs, &info->destructions);
-  uw_target sq_num = uni_connect(gs, {None}, uw, unHas(&obg)->break_target, ReenterNormalcy);
+  uw_target sq_num = uni_connect(gs, uw, unHas(&obg)->break_target, ReenterNormalcy);
   append_and_nopq_exit_normalcy(bu, uw_target, &saved);
 }
 
@@ -788,7 +789,7 @@ func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack]
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_continue_statement_info = un(&a->info);
   uw gr_num = gr_unwinding(gs, &info->destructions);
-  uw_target sq_num = uni_connect(gs, {None}, uw, unHas(&obg)->continue_target, ReenterNormalcy);
+  uw_target sq_num = uni_connect(gs, uw, unHas(&obg)->continue_target, ReenterNormalcy);
   append_and_nopq_exit_normalcy(bu, uw_target, &saved);
 }
 
@@ -1043,7 +1044,7 @@ func gr_while_statement(gs gr_statep, fb *fullbody_state, a *ast_while_statement
   loopexitgn gr_num = gr_condition_discard(gs, &a->condition_discard);
 
   // TODO: Would be kinda nice if break (or continue) targeted _before_ the condition discard.
-  exitseq sq_num = uni_connect(gs, *gs.curseg, loopexitgn, &outflow, JmpForward);
+  exitseq sq_num = uni_connect(gs, loopexitgn, &outflow, JmpForward);
 
   jmp_qnop_node(gs.gr, then_nop, thengn, JmpForward);
   jmp_qnop_node(gs.gr, else_nop, exitseq, JmpForward);
