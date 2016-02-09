@@ -1196,7 +1196,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       #check_and_compute_parms_no_canonicalize(es->clq, &egm.parms, &matched_parms);
 
       ent_typeexpr *te_typeexpr;
-      #def_converted_typeexpr(es->cs, ent, &ent_typeexpr);
+      #def_converted_typeexpr(ent, &ent_typeexpr);
 
       computed cac_typeexpr;
       #check_and_compute_typeexpr(es->clq, &ent->generics, &matched_parms, ent_typeexpr, &computed);
@@ -1570,7 +1570,7 @@ func deftype_rhs_info_accessible(ds *defscope, id deftype_entry_id, result_out *
   ent *deftype_entry = ref_deftype_entry(ds->cs, id);
   if case &Has(np deftype_nonprim) = &ent->nonprim {
     rhs *deftype_rhs_spec;
-    #deftype_converted_rhs(ds->cs, &np, &rhs);
+    #deftype_converted_rhs(&np, &rhs);
     switch rhs {
     case &ClassexprRhsSpec(crs classexpr_rhs_spec):
       n size = count(&ds->accessible);

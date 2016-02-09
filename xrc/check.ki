@@ -145,8 +145,7 @@ func convert_typeexpr(a *ast_typeexpr) cr[te_typeexpr] {
   }
 }
 
-// TODO: Nothing uses cs.  (So remove it.)
-func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) np {
+func def_converted_typeexpr(ent *def_entry, out **te_typeexpr) np {
   switch &ent->converted_typeexpr {
     case &NotComputed: {
       ent->converted_typeexpr = BeganComputing;
@@ -193,8 +192,7 @@ func def_converted_typeexpr(cs *checkstate, ent *def_entry, out **te_typeexpr) n
   }
 }
 
-// TODO: cs is not used.  (So remove it?)
-func deftype_converted_rhs(cs *checkstate, np *deftype_nonprim, out **deftype_rhs_spec) np {
+func deftype_converted_rhs(np *deftype_nonprim, out **deftype_rhs_spec) np {
   switch &np->rhs {
     case &NotComputed: {
       np->rhs = BeganComputing;
@@ -309,7 +307,7 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       inst->typrop = BeganComputing;
 
       ent_typeexpr *te_typeexpr;
-      if case Printed(pm) = def_converted_typeexpr(cs, ent, &ent_typeexpr) {
+      if case Printed(pm) = def_converted_typeexpr(ent, &ent_typeexpr) {
         inst->typrop = FailedComputation;
         return Printed(pm);
       }
@@ -735,7 +733,7 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) np {
     }
     case &HasGenerics(ig): {
       discard *te_typeexpr;
-      #def_converted_typeexpr(cs, ent, &discard);
+      #def_converted_typeexpr(ent, &discard);
       // We declare success -- we check non-generic defs.
       return NoFail;
     }
@@ -1134,7 +1132,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
 
       if case &Has(np deftype_nonprim) = &ent->nonprim {
         ent_rhs *deftype_rhs_spec;
-        #deftype_converted_rhs(cs, &np, &ent_rhs);
+        #deftype_converted_rhs(&np, &ent_rhs);
 
         switch ent_rhs {
         case &ClassexprRhsSpec(crs classexpr_rhs_spec):
@@ -1222,7 +1220,7 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) np {
   ent *deftype_entry = ref_deftype_entry(cs, id);
   if case &Has(np deftype_nonprim) = &ent->nonprim {
     discard *deftype_rhs_spec;
-    #deftype_converted_rhs(cs, &np, &discard);
+    #deftype_converted_rhs(&np, &discard);
     switch &np.tl->generics {
       case &NoGenerics: {
         parms idy_genparms = blank_idyparms();
@@ -1489,7 +1487,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
       id def_entry_id = arr[i];
       ent *def_entry = ref_def_entry(cs, id);
       ent_typeexpr *te_typeexpr;
-      #def_converted_typeexpr(cs, ent, &ent_typeexpr);
+      #def_converted_typeexpr(ent, &ent_typeexpr);
       match_result entry_matches_res = entry_matches(cs, pt, &ent->generics, gp, ent_typeexpr);
       switch match_result {
         case EntryDoesNotMatch: {
