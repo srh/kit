@@ -407,10 +407,9 @@ func seqqgar(gr *frame_graph, gsq gr_sequence) sq_num {
   return seqq(gr, garbage_seg(), gsq);
 }
 
-// TODO(): seginfo could be a redundant parameter, it handily breaks compilation for now.
-func seqq(gs gr_statep, seginfo gr_seginfo, gn gr_num, outflow *tracked_target) sq_num {
+func seqq(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
   note_celltrack(&outflow->note, gs.ctr);
-  return seqq(gs.gr, seginfo, {gn, outflow->sn});
+  return seqq(gs.gr, partof(gs), {gn, outflow->sn});
 }
 
 func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num, disposition gr_jmp_disposition) void {
@@ -2780,7 +2779,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
 
     finalgn gr_num = done(&sub_bu);
 
-    finalseqgn sq_num = seqq(gs, partof(gs), finalgn, &join_target);
+    finalseqgn sq_num = seqq(gs, finalgn, &join_target);
     push(&cases_gn, {@[gr_const]ConstInt(~ tagval.x), {finalseqgn, ForwardTarget}});
   }
 
@@ -2790,7 +2789,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), {join_target.sn, ForwardTarget}});
   } else {
     ztgn gr_num = addx(gs, @[gr_xop]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))}));
-    ztseq sq_num = seqq(gs, partof(gs), ztgn, &join_target);
+    ztseq sq_num = seqq(gs, ztgn, &join_target);
     push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), {ztseq, ForwardTarget}});
   }
 
