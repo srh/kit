@@ -502,3 +502,27 @@ func[T] mk_array(x0 T, x1 T, x2 T, x3 T, x4 T, x5 T, x6 T, x7 T) array[T] {
 
 // Heh.
 def[T] _u8 fn[T, array[u8]] = make;
+
+
+struct[T] array_refs {
+  arr *array[T];
+}
+
+inline func[T] refs(a *array[T]) array_refs[T] {
+  return {a};
+}
+
+struct[T] array_refs_iter {
+  i size;
+  n size;
+  arr *array[T];
+}
+
+inline func[T] do_iter_mk(a array_refs[T]) array_refs_iter[T] {
+  return {0, count(a.arr), a.arr};
+}
+
+inline func[T] do_iter_again(a *array_refs_iter[T]) bool { return a->i < a->n; }
+inline func[T] do_iter_step(a *array_refs_iter[T]) void { a->i++; }
+inline func[T] do_iter_access(a *array_refs_iter[T]) *T { return ref(a->arr, a->i); }
+

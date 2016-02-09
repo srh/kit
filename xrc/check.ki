@@ -39,10 +39,9 @@ func check_module(cs *checkstate, mod_name sym) np {
   id module_id = #process_module(cs, mod_name);
   mod *module = ref_module(cs, id);
 
-  naccess_blocks size = count(&mod->access_blocks);
-  for i size = 0; i < naccess_blocks; i = i + 1 {
+  foreach aid *access_entry_id in refs(&mod->access_blocks) {
     dti deftype_entry_id;
-    #get_accessible_deftype(cs, mod->access_blocks[i], &dti);
+    #get_accessible_deftype(cs, *aid, &dti);
   }
 
   ndefs size = count(&mod->defs);

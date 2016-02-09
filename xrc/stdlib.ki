@@ -393,3 +393,18 @@ inline func[T] `|=`(x *T, y T) void { *x = *x | y; }
 inline func[T] `^=`(x *T, y T) void { *x = *x ^ y; }
 inline func[T] `>>=`(x *T, y T) void { *x = *x >> y; }
 inline func[T] `<<=`(x *T, y T) void { *x = *x << y; }
+
+struct ixrange {
+  beg size;
+  end size;
+}
+
+struct ixrange_iter {
+  i size;
+  end size;
+}
+
+inline func do_iter_mk(a ixrange) ixrange_iter { return {a.beg, a.end}; }
+inline func do_iter_again(a *ixrange_iter) bool { return a->i < a->end; }
+inline func do_iter_step(a *ixrange_iter) void { a->i++; }
+inline func do_iter_access(a *ixrange_iter) size { return a->i; }
