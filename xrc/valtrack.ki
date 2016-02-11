@@ -165,8 +165,7 @@ func vt_abnormal_excursion(c cgt, ft *vt_freshtrack, gn gr_num) np {
 func vt_single_xop(c cgt, gn gr_num) np {
   switch ref_node(c.gr, gn) {
   case &XOp(xn gr_xnode):
-    // We track the state modification of the XOp.  Which means we do nothing, because vt_state is an empty struct right now.
-    return NoFail;
+    return vs_xop(c, &xn);
   case &QOp(qn gr_qnode):
     // Ack -- we've gotta trace a sub-qop-expr.
     terminates bool = #vt_inner_expr(c, gn);
