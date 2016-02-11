@@ -48,6 +48,7 @@ func vt_graph(clq *clqueue, gr *frame_graph, gn gr_num) np {
 
   track vt_track = mk_track(gr);
 
+  // TODO: We could use vt_xop() here?  That would remove the need for a sq_builder in add_prim_fn_body.
   terminates bool = #vt_inner_expr({clq, gr, &track}, gn);
   return NoFail;
 }

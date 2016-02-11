@@ -3166,7 +3166,7 @@ func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_a
   return done(&bu);
 }
 
-func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op primitive_op) fn_body_id {
+func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op primitive_op) cr[fn_body_id] {
   gr frame_graph = init_frame_graph_empty(informal_name);
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
@@ -3202,13 +3202,19 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op pri
 
   argcells_copy array[cell_num] = argcells;
   argshray shray[cell_num] = freeze(&argcells_copy);
-  gn gr_num = addx(gs, @[gr_xop]GrPrimApply({op, argshray, retcell}));
+  // We only use a bu because valtrack code expects one.  (I think that's why.)
+  // TODO: It doesn't need to be that way, I think not.
+  bu sq_builder = mk_builder(gs);
+  add(&bu, @[gr_xop]GrPrimApply({op, argshray, retcell}));
+  gn gr_num = done(&bu);
 
   gr_deactivate(&ctr, retcell);
   gr_deaden(&ctr, retcell);
   gr_check_empty(&ctr);
 
-  return add_fn_body(clq->cs, {informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells, InlineMust, NotComputed})});
+  #vt_graph(clq, &gr, gn);
+
+  return NoFail!add_fn_body(clq->cs, {informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells, InlineMust, NotComputed})});
 }
 
 func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) np {
@@ -3222,7 +3228,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
       inst->graph = BeganComputing;
       switch &inst->rhs {
         case &InstRhsPrim(op primitive_op): {
-          id fn_body_id = add_prim_fn_body(clq, ent->def_name, &inst_typrop->cu, op);
+          id fn_body_id = #add_prim_fn_body(clq, ent->def_name, &inst_typrop->cu, op);
           frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
           inst->graph = Computed(move(&frg));
           return NoFail;
@@ -3284,6 +3290,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
             arg_cells array[cell_num];
             inline should_inline;
             #gr_magic(clq, &mag, &body_gr, &body_gn, &return_cell, &arg_cells, &inline);
+            #vt_graph(clq, &body_gr, body_gn);
             id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells, inline, NotComputed})});
           }
 
