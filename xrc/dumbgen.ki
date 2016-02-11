@@ -695,6 +695,13 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
 
       switch ref_node(h->gr, gn) {
       case &XOp(xn gr_xnode):
+        /*
+        // TODO: Run valstate tracking on everything and have this assertion.
+          if !xn.vs_xopped {
+            // This means that valtracking missed some reachable code.
+            ice(_u8!"dumbly_gen_function_body vs_xopped fail");
+          }
+        */
         switch &xn.op {
         case &GrApply(a gr_apply):
           switch h->cs->plat.callconv {

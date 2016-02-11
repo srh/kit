@@ -26,7 +26,8 @@ func unify_vt_state(onto *vt_state, from *vt_state) cr[freshness] {
   return NoFail(Stale);
 }
 
-func vs_xop(c cgt, xn *gr_xnode) np {
+func vs_xop(c cgt, gn gr_num, xn *gr_xnode) np {
+  xn->vs_xopped = true;
   // It's an empty struct, there's nothing to track.
   return NoFail;
 }

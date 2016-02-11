@@ -63,6 +63,7 @@ enum gr_node {
 
 struct gr_xnode {
   op gr_xop;
+  vs_xopped bool;
 }
 
 // The "in-degree" is the number of qnodes flowing into this (not as the first elem of a gr_sequence).
@@ -170,8 +171,8 @@ func help_add_node(gr *frame_graph, node gr_node) gr_num {
 }
 
 // Used in dumbgen for inlining, maybe some other manipulations.
-func untracked_addx(gr *frame_graph, op gr_xop) gr_num {
-  return help_add_node(gr, @[gr_node]XOp({op}));
+func untracked_addx(gr *frame_graph, op gr_xop, xopped bool) gr_num {
+  return help_add_node(gr, @[gr_node]XOp({op, xopped}));
 }
 
 inline func addx(gs gr_statep, op gr_xop) gr_num {
@@ -251,7 +252,7 @@ func addx(gr *frame_graph, ctr *celltrack, op gr_xop) gr_num {
     }
   }
 
-  return untracked_addx(gr, op);
+  return untracked_addx(gr, op, false);
 }
 
 func add(bu *sq_builder, op gr_xop) void {
