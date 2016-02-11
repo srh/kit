@@ -682,8 +682,8 @@ func st_const_compute_for_gen(cs *checkstate, c *gr_const, length u32, out *st_v
 
 func st_offset_compute(env *st_env, gro gr_offset, out *u32) np {
   switch gro {
-  case OffsetConst(o u32):
-    *out = o;
+  case OffsetConst(o gr_offset_const):
+    *out = o.offset;
   case OffsetComputed(pair gr_offset_computed):
     index_obj st_obj_ref = cell_obj_ref(env, pair.ix_cell, "in XIII");
     index_value st_value;

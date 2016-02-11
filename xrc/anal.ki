@@ -431,7 +431,7 @@ func help_adjust_params(cm *array[cell_num], params *shray[cell_num]) shray[cell
 
 func help_adjust_offset(cm *array[cell_num], off *gr_offset) gr_offset {
   switch off {
-  case &OffsetConst(x u32):
+  case &OffsetConst(x gr_offset_const):
     return OffsetConst(x);
   case &OffsetComputed(p gr_offset_computed):
     return OffsetComputed({p.array_elem_size, get(cm, p.ix_cell.x)});

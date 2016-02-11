@@ -403,9 +403,9 @@ func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
     switch ci->location {
     case LocationVirtual:
       if case &Has(sd subcell_disp) = &ref(&h->bas->celldisp, c.x)->subcell {
-        if case &OffsetConst(offset u32) = &sd.offset {
+        if case &OffsetConst(offset gr_offset_const) = &sd.offset {
           c = sd.partof;
-          cumulative_offset = cumulative_offset + offset;
+          cumulative_offset = cumulative_offset + offset.offset;
           nonzero_iterations = true;
         } else {
           return None;
@@ -837,9 +837,9 @@ func x86_load_cell_address(f *objfile, h *frame, dest u8, c cell_num) void {
 
 func x86_add_offset(f *objfile, h *frame, dest u8, offset gr_offset, scratch1 u8, scratch2 u8) void {
   switch offset {
-  case OffsetConst(off u32):
-    if off != 0 {
-      x86_mov_imm32(f, scratch1, off);
+  case OffsetConst(off gr_offset_const):
+    if off.offset != 0 {
+      x86_mov_imm32(f, scratch1, off.offset);
       x86_add_w32(f, dest, scratch1);
     }
   case OffsetComputed(factors gr_offset_computed):
