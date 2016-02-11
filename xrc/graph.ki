@@ -546,9 +546,8 @@ enum gr_field_info {
   EnumTagField void;
   // The field is some sort of padding.
   PaddingField void;
-  // The field is questionably some sort of padding.  Idk, maybe it's got a type, but we're doing a trivial op on it.
-  // TODO: Get rid of this or figure this out.
-  WeirdField void;
+  // The field is... being turned into some sort of padding, I guess.  Idk, maybe it's got a type, but we're doing a trivial op on it -- so maybe the field's type is the padding type.
+  TrivialField void;
   // This isn't a field -- we're accessing the whole value.  (E.g. when we deref a pointer or occasionally alias two cells for convenience.)
   NoField void;
 }
@@ -2386,7 +2385,7 @@ func gr_add_basics(gs gr_statep, size u32, arity size, out *gr_basics, bu *sq_bu
   for i size = 0; i < arity; i = i + 1 {
     pc cell_num = add_cell(gs.gr, {LocationVirtual, pointee_tp.cu, pointee_tp.props});
     push(&ret.pointeecells, pc);
-    add(bu, @[gr_xop]GrDeref({pc, get(&ret.minimal.argcells, i), OffsetConst({0, WeirdField})}));
+    add(bu, @[gr_xop]GrDeref({pc, get(&ret.minimal.argcells, i), OffsetConst({0, TrivialField})}));
   }
   *out = ret;
 }
