@@ -225,7 +225,8 @@ func obj_write(env *st_env, oref st_obj_ref, in_ *st_value) np {
   return NoFail;
 }
 
-// TODO: Eventually get rid of this.
+// TODO: Get rid of this.
+// Use of this only has a 0.5% cost on build time.
 func[T] cell_obj_ref(env *st_env, num cell_num, msg T) st_obj_ref {
   if case &Has(obj_ref st_obj_ref) = ref(&env->framecells, num.x) {
     return obj_ref;
