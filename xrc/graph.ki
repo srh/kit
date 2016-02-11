@@ -527,9 +527,14 @@ struct gr_subcell {
   offset gr_offset;
 }
 
+struct gr_offset_computed {
+  array_elem_size u32;
+  ix_cell cell_num;
+}
+
 enum gr_offset {
   OffsetConst u32;
-  OffsetComputed tup[u32, cell_num];
+  OffsetComputed gr_offset_computed;
 }
 
 struct gr_active_xop {

@@ -684,13 +684,13 @@ func st_offset_compute(env *st_env, gro gr_offset, out *u32) np {
   switch gro {
   case OffsetConst(o u32):
     *out = o;
-  case OffsetComputed(pair tup[u32, cell_num]):
-    index_obj st_obj_ref = cell_obj_ref(env, pair.cdr, "in XIII");
+  case OffsetComputed(pair gr_offset_computed):
+    index_obj st_obj_ref = cell_obj_ref(env, pair.ix_cell, "in XIII");
     index_value st_value;
     #obj_read(env, index_obj, &index_value);
     index u32;
     #st_value_as_size(&env->plat, &index_value, &index);
-    *out = pair.car * index;
+    *out = pair.array_elem_size * index;
   }
   return NoFail;
 }

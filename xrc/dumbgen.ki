@@ -842,9 +842,9 @@ func x86_add_offset(f *objfile, h *frame, dest u8, offset gr_offset, scratch1 u8
       x86_mov_imm32(f, scratch1, off);
       x86_add_w32(f, dest, scratch1);
     }
-  case OffsetComputed(factors tup[u32, cell_num]):
-    x86_load32(f, scratch1, get_size_loc(h, factors.cdr));
-    x86_mov_imm32(f, scratch2, factors.car);
+  case OffsetComputed(factors gr_offset_computed):
+    x86_load32(f, scratch1, get_size_loc(h, factors.ix_cell));
+    x86_mov_imm32(f, scratch2, factors.array_elem_size);
     x86_imul_w32(f, scratch1, scratch2);
     x86_add_w32(f, dest, scratch1);
   }
