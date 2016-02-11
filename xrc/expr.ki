@@ -799,10 +799,10 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   #compute_type_properties(es->clq, &fieldtype, &props);
   lval is_lval;
   switch cf_res {
-    case InheritsLval(offset u32): {
+    case InheritsLval(off check_field_offset_and_index): {
       // We deref, so it's always an lval.
       lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe, field_lifetime(lifetime)});
-      annotate(&a->info, DerefFieldName(offset));
+      annotate(&a->info, DerefFieldName(@[ast_field_info]{off.offset, off.index}));
     }
     case ConstantField(value u32): {
       lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
@@ -847,7 +847,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
   #compute_type_properties(es->clq, &fieldtype, &props);
   lval is_lval;
   switch cf_res {
-    case InheritsLval(offset u32): {
+    case InheritsLval(off check_field_offset_and_index): {
       switch &info->lval {
         case &IsLvalYes(desc lval_description): {
           lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe, field_lifetime(desc.lifetime)});
@@ -857,7 +857,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
         }
       }
       // There's no disposal, it's a real field access.
-      annotate(&a->info, FieldName(offset));
+      annotate(&a->info, FieldName(@[ast_field_info]{off.offset, off.index}));
     }
     case ConstantField(value u32): {
       after nc[ast_expr_after_discard] = NotComputed;
@@ -1509,9 +1509,14 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
   return true;
 }
 
+struct check_field_offset_and_index {
+  offset u32;
+  index size;
+}
+
 enum check_field_result {
   // Inherits the lvalue-ness of the thing it's a field of.  Includes the field's offset (in bnnos).
-  InheritsLval u32;
+  InheritsLval check_field_offset_and_index;
   // Doesn't inherit the lvalue-ness.  In fact it's a compile-time constant (for the array ".length" field).
   ConstantField u32;
 }
@@ -1701,8 +1706,9 @@ func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, 
 
 func help_lookup_struct_field(es *framescope, st *structspec, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   offset u32;
-  #lookup_field_from_list(es->clq, &st->fields, fieldname->value, fieldtype_out, &offset);
-  *res_out = InheritsLval(offset);
+  index size;
+  #lookup_field_from_list(es->clq, &st->fields, fieldname->value, fieldtype_out, &offset, &index);
+  *res_out = InheritsLval({offset, index});
   return NoFail;
 }
 
@@ -1717,9 +1723,10 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
     case &TeUnion(a te_union): {
       // The offset's what it would be for a struct.
       offset_discard u32;
-      #lookup_field_from_list(es->clq, &a.fields, fieldname->value, fieldtype_out, &offset_discard);
+      index size;
+      #lookup_field_from_list(es->clq, &a.fields, fieldname->value, fieldtype_out, &offset_discard, &index);
       // Offset's always 0 for a union.
-      *res_out = InheritsLval(0);
+      *res_out = InheritsLval({0, index});
       return NoFail;
     }
     case &TeArraytype(a te_arraytype): {
@@ -1762,7 +1769,7 @@ func find_vardecl(a *shray[te_vardecl], name sym, out **te_typeexpr, index_out *
 }
 
 // fields is supposed to be complete.
-func lookup_field_from_list(clq *clqueue, fields *shray[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr, offset_out *u32) np {
+func lookup_field_from_list(clq *clqueue, fields *shray[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr, offset_out *u32, index_out *size) np {
   psd partial_struct_data;
   #compute_partial_struct_data(clq, fields, Has(fieldname), &psd);
 
@@ -1772,6 +1779,7 @@ func lookup_field_from_list(clq *clqueue, fields *shray[te_vardecl], fieldname s
 
   *fieldtype_out = ~ ref(fields, psd_index(&psd))->type;
   *offset_out = psd.offset;
+  *index_out = count(&psd.fields);
   return NoFail;
 }
 

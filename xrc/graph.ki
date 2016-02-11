@@ -534,6 +534,23 @@ struct gr_offset_computed {
 
 struct gr_offset_const {
   offset u32;
+  field_info gr_field_info;
+}
+
+enum gr_field_info {
+  // The field index of the struct (or class) field we're accessing (from 0 to n-1 for a struct with n fields)
+  StructField size;
+  // The constructor index of the enum field we're accessing.
+  EnumConstructorField size;
+  // The field is the enum's tag field.
+  EnumTagField void;
+  // The field is some sort of padding.
+  PaddingField void;
+  // The field is questionably some sort of padding.  Idk, maybe it's got a type, but we're doing a trivial op on it.
+  // TODO: Get rid of this or figure this out.
+  WeirdField void;
+  // This isn't a field -- we're accessing the whole value.  (E.g. when we deref a pointer or occasionally alias two cells for convenience.)
+  NoField void;
 }
 
 enum gr_offset {
@@ -835,9 +852,9 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 
   info *ast_enum_deconstruction_info = un(&a->info);
   if is_ptr {
-    add(bu, @[gr_xop]GrDeref({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst({enum_tag_offset})}));
+    add(bu, @[gr_xop]GrDeref({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst({enum_tag_offset, EnumTagField})}));
   } else {
-    add(bu, @[gr_xop]GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst({enum_tag_offset})}));
+    add(bu, @[gr_xop]GrSubcell({info->tag_cell, result_cell(oo(&a->swartch)), OffsetConst({enum_tag_offset, EnumTagField})}));
   }
 
   outer_segment segmarker = begin_segment(bu);
@@ -864,10 +881,11 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
 
           case_bu sq_builder = mk_builder(gs);
           add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
+          offset gr_offset = OffsetConst({cp_info->field_offset, EnumConstructorField(unmk_enum_tag_value(cp_info->tag_value))});
           if is_ptr {
-            add(&case_bu, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&a->swartch)), OffsetConst({cp_info->field_offset})}));
+            add(&case_bu, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&a->swartch)), offset}));
           } else {
-            add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), OffsetConst({cp_info->field_offset})}));
+            add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), offset}));
           }
 
           #gr_bracebody(gs, fb, obg, &sc->body, &case_bu);
@@ -1164,11 +1182,12 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_targe
       #gr_live_and_expr_consume(gs, oo(&pa.rhs), &bef_bu);
 
       info *ast_pattern_assign_info = un(&pa.info);
+
       // TODO: Avoid the duplicate checks for addressof_constructor, only do one GrDeref.
       if isHas(&pa.pattern.addressof_constructor) {
-        add(&bef_bu, @[gr_xop]GrDeref({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst({enum_tag_offset})}));
+        add(&bef_bu, @[gr_xop]GrDeref({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst({enum_tag_offset, EnumTagField})}));
       } else {
-        add(&bef_bu, @[gr_xop]GrSubcell({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst({enum_tag_offset})}));
+        add(&bef_bu, @[gr_xop]GrSubcell({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst({enum_tag_offset, EnumTagField})}));
       }
       postcond_save gr_savetrack = save_celltrack(gs.ctr);
       saved_elsecase bool = false;
@@ -1187,9 +1206,9 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_targe
           if case Has(vn var_number) = cp_info->ovn {
             vi *var_info = ref(&fb->all_vars, vn.x);
             if isHas(&pa.pattern.addressof_constructor) {
-              add(&case_bu, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst({cp_info->field_offset})}));
+              add(&case_bu, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst({cp_info->field_offset, EnumConstructorField(i)})}));
             } else {
-              add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst({cp_info->field_offset})}));
+              add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst({cp_info->field_offset, EnumConstructorField(i)})}));
             }
           }
           *thentrack_out = save_celltrack(gs.ctr);
@@ -1240,7 +1259,7 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
   saved gr_savetrack = save_celltrack(gs.ctr);
   if case &Has(b box[ast_expr_consume]) = &a->expr {
     subcell cell_num = result_cell(oo(&b));
-    add(bu, @[gr_xop]GrSubcell({subcell, fb->return_cell, OffsetConst({0})}));
+    add(bu, @[gr_xop]GrSubcell({subcell, fb->return_cell, OffsetConst({0, NoField})}));
     #gr_expr_consume(gs, oo(&b), bu);
     add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(subcell)}));
     add(bu, @[gr_xop]GrVirtualDead({subcell}));
@@ -1414,7 +1433,7 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
 
   info *ast_quickreturn_info = un(&a->info);
   et *enumspec = &info->et;
-  add(bu, @[gr_xop]GrSubcell({info->tag_cell, value_cell(oo(&a->rhs)), OffsetConst({enum_tag_offset})}));
+  add(bu, @[gr_xop]GrSubcell({info->tag_cell, value_cell(oo(&a->rhs)), OffsetConst({enum_tag_offset, EnumTagField})}));
 
   success_case_ix size = unHas(et->success_case_ix);
 
@@ -1432,8 +1451,10 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
     if i != success_case_ix {
       // TODO: This has got to be duplicate code with some enum constructor thing.
 
+      return_constructor_index size = get(&info->constructor_mapping, i);
+
       field_offset u32 = enum_field_offset(gs.clq->cs, et, mk_enum_tag_value(i));
-      return_field_offset u32 = enum_field_offset(gs.clq->cs, &info->return_et, mk_enum_tag_value(get(&info->constructor_mapping, i)));
+      return_field_offset u32 = enum_field_offset(gs.clq->cs, &info->return_et, mk_enum_tag_value(return_constructor_index));
 
       field_type *te_typeexpr = &ref(&et->constructors, i)->type;
       field_props type_properties;
@@ -1445,9 +1466,9 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       case_bu sq_builder = mk_builder(gs);
 
       add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
-      add(&case_bu, @[gr_xop]GrSubcell({field_cell, value_cell(oo(&a->rhs)), OffsetConst({field_offset})}));
-      add(&case_bu, @[gr_xop]GrSubcell({return_field_cell, fb->return_cell, OffsetConst({return_field_offset})}));
-      add(&case_bu, @[gr_xop]GrSubcell({info->return_tag_cell, fb->return_cell, OffsetConst({enum_tag_offset})}));
+      add(&case_bu, @[gr_xop]GrSubcell({field_cell, value_cell(oo(&a->rhs)), OffsetConst({field_offset, EnumConstructorField(i)})}));
+      add(&case_bu, @[gr_xop]GrSubcell({return_field_cell, fb->return_cell, OffsetConst({return_field_offset, EnumConstructorField(return_constructor_index)})}));
+      add(&case_bu, @[gr_xop]GrSubcell({info->return_tag_cell, fb->return_cell, OffsetConst({enum_tag_offset, EnumTagField})}));
       add(&case_bu, @[gr_xop]GrWriteConst({info->return_tag_cell, ConstInt(~ mk_enum_tag_value(i).x)}));
       add(&case_bu, @[gr_xop]GrVirtualDead({info->return_tag_cell}));
 
@@ -1460,10 +1481,10 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       add(&case_bu, @[gr_xop]GrVirtualDead({field_cell}));
 
       check(enum_tag_offset == 0);
-      prepadding_ogn opt[gr_num] = gr_bzero_subcell(gs, fb->return_cell, tag_ty.props.flat_size, return_field_offset - tag_ty.props.flat_size);
+      prepadding_ogn opt[gr_num] = gr_bzero_padding(gs, fb->return_cell, tag_ty.props.flat_size, return_field_offset - tag_ty.props.flat_size);
       addo(&case_bu, prepadding_ogn);
 
-      postpadding_ogn opt[gr_num] = gr_bzero_subcell(gs, fb->return_cell, return_field_offset + field_props.flat_size, return_cell_size - (return_field_offset + field_props.flat_size));
+      postpadding_ogn opt[gr_num] = gr_bzero_padding(gs, fb->return_cell, return_field_offset + field_props.flat_size, return_cell_size - (return_field_offset + field_props.flat_size));
       addo(&case_bu, postpadding_ogn);
 
       add(&case_bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(return_field_cell)}));
@@ -1483,7 +1504,7 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
 
     case_bu sq_builder = mk_builder(gs);
     add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
-    add(&case_bu, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->rhs)), OffsetConst({field_offset})}));
+    add(&case_bu, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->rhs)), OffsetConst({field_offset, EnumConstructorField(success_case_ix)})}));
     switch &expr_complete_info(oo(&a->rhs))->lval {
     case &IsLvalYes(desc lval_description):
       if case DeadMe = desc.deadme {
@@ -1552,7 +1573,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   postcond_save gr_savetrack = save_celltrack(gs.ctr);
 
   then_bu sq_builder = mk_builder(gs);
-  add(&then_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->then_clause)), conjoined, OffsetConst({0})}));
+  add(&then_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->then_clause)), conjoined, OffsetConst({0, NoField})}));
   #gr_expr_consume(gs, oo(&a->then_clause), &then_bu);
   add(&then_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->then_clause)))}));
   add(&then_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->then_clause))}));
@@ -1561,7 +1582,7 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   restore_celltrack(gs.ctr, &postcond_save);
 
   else_bu sq_builder = mk_builder(gs);
-  add(&else_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->else_clause)), conjoined, OffsetConst({0})}));
+  add(&else_bu, @[gr_xop]GrSubcell({result_cell(oo(&a->else_clause)), conjoined, OffsetConst({0, NoField})}));
   #gr_expr_consume(gs, oo(&a->else_clause), &else_bu);
   add(&else_bu, @[gr_xop]GrActiveXop({Activate(conjoined), Deactivate(result_cell(oo(&a->else_clause)))}));
   add(&else_bu, @[gr_xop]GrVirtualDead({result_cell(oo(&a->else_clause))}));
@@ -1584,7 +1605,7 @@ func gr_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np
   nparams size = count(&a->exprs);
   for i size = 0; i < nparams; i = i + 1 {
     param *ast_strinit_param = ref(&a->exprs, i);
-    add(bu, @[gr_xop]GrSubcell({result_cell(&param->ec), rval_cell(x), OffsetConst({un(&param->info)->offset})}));
+    add(bu, @[gr_xop]GrSubcell({result_cell(&param->ec), rval_cell(x), OffsetConst({un(&param->info)->offset, StructField(i)})}));
     #gr_expr_consume(gs, &param->ec, bu);
     push(&activation_ops, Deactivate(result_cell(&param->ec)));
   }
@@ -1607,9 +1628,9 @@ func gr_deref_field(gs gr_statep, x *ast_expr, a *ast_deref_field, bu *sq_builde
   case &DerefArrayLength(count u32):
     add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~count)}));
     add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
-  case &DerefFieldName(offset u32):
+  case &DerefFieldName(sfi ast_field_info):
     name cell_num = ellval_cell(x);
-    add(bu, @[gr_xop]GrDeref({name, result_cell(oo(&a->lhs)), OffsetConst({offset})}));
+    add(bu, @[gr_xop]GrDeref({name, result_cell(oo(&a->lhs)), OffsetConst({sfi.offset, StructField(sfi.index)})}));
   }
   ap gr_num = gr_later_discard(gs, &a->ptr_discard);
   add(bu, ap);
@@ -1627,10 +1648,10 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
       add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
       return NoFail;
     }
-    case &FieldName(offset u32): {
+    case &FieldName(sfi ast_field_info): {
       #gr_expr(gs, oo(&a->lhs), bu);
 
-      add(bu, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst({offset})}));
+      add(bu, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst({sfi.offset, StructField(sfi.index)})}));
       switch &expr_complete_info(oo(&a->lhs))->lval {
       case &IsLvalYes(desc lval_description):
         if case DeadMe = desc.deadme {
@@ -1795,7 +1816,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
       add(bu, @[gr_xop]GrApply({funcell, mk_shray(collection_ptr_cell, result_cell(oo(&a->rhs))), result_ptr_cell, StandardApply}));
       // Now I have a result pointer.  Ho ho ho!
     }
-    add(bu, @[gr_xop]GrDeref({ellval_cell(x), result_ptr_cell, OffsetConst({0})}));
+    add(bu, @[gr_xop]GrDeref({ellval_cell(x), result_ptr_cell, OffsetConst({0, NoField})}));
     add(bu, @[gr_xop]GrActiveXop({Deactivate(result_ptr_cell), Nothing}));
     add(bu, @[gr_xop]GrDead({result_ptr_cell}));
   }
@@ -1809,7 +1830,7 @@ func gr_later_discard(gs gr_statep, a *ast_later_discard_info) gr_num {
 
 func gr_mk_deref(gs gr_statep, x *ast_expr, a *ast_deref, bu *sq_builder) np {
   #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
-  add(bu, @[gr_xop]GrDeref({ellval_cell(x), result_cell(oo(&a->rhs)), OffsetConst({0})}));
+  add(bu, @[gr_xop]GrDeref({ellval_cell(x), result_cell(oo(&a->rhs)), OffsetConst({0, NoField})}));
   ap gr_num = gr_later_discard(gs, &a->ptr_discard);
   add(bu, ap);
   return NoFail;
@@ -2065,11 +2086,11 @@ func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) v
     compute_prim(gs.clq, enum_tag_type(gs.clq->cs, &vi.et), &cu, &props);
     tag_cell cell_num = add_cell(gs.gr, {LocationVirtual, cu, props});
     field_offset u32 = enum_field_offset(gs.clq->cs, &vi.et, vi.constructor_tag);
-    add(bu, @[gr_xop]GrSubcell({tag_cell, x_cell, OffsetConst({enum_tag_offset})}));
+    add(bu, @[gr_xop]GrSubcell({tag_cell, x_cell, OffsetConst({enum_tag_offset, EnumTagField})}));
     add(bu, @[gr_xop]GrWriteConst({tag_cell, ConstInt(~vi.constructor_tag.x)}));
     tag_end u32 = enum_tag_offset + props.flat_size;
     postpadding_ogn opt[gr_num]
-      = gr_bzero_subcell(gs, x_cell, tag_end, info->cu_props.flat_size - tag_end);
+      = gr_bzero_padding(gs, x_cell, tag_end, info->cu_props.flat_size - tag_end);
     addo(bu, postpadding_ogn);
     add(bu, @[gr_xop]GrVirtualDead({tag_cell}));
     // ^ This hub-bub writes a constant value to x_cell.
@@ -2365,7 +2386,7 @@ func gr_add_basics(gs gr_statep, size u32, arity size, out *gr_basics, bu *sq_bu
   for i size = 0; i < arity; i = i + 1 {
     pc cell_num = add_cell(gs.gr, {LocationVirtual, pointee_tp.cu, pointee_tp.props});
     push(&ret.pointeecells, pc);
-    add(bu, @[gr_xop]GrDeref({pc, get(&ret.minimal.argcells, i), OffsetConst({0})}));
+    add(bu, @[gr_xop]GrDeref({pc, get(&ret.minimal.argcells, i), OffsetConst({0, WeirdField})}));
   }
   *out = ret;
 }
@@ -2506,14 +2527,13 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
 
   bu sq_builder = mk_builder(gs);
 
-
   pointeecells array[cell_num];
   for i size = 0; i < nargs; i = i + 1 {
     ac cell_num = get(&argcells, i);
     pc cell_num = add_cell(&gr, {LocationVirtual, mai->cu_type, mai->cu_props});
     push(&pointeecells, pc);
 
-    add(&bu, @[gr_xop]GrDeref({pc, ac, OffsetConst({0})}));
+    add(&bu, @[gr_xop]GrDeref({pc, ac, OffsetConst({0, NoField})}));
     add(&bu, @[gr_xop]GrActiveXop({Deactivate(ac), Nothing}));
     add(&bu, @[gr_xop]GrDead({ac}));
   }
@@ -2676,10 +2696,10 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     push(&tagcells, tc);
 
     ac cell_num = get(&argcells, i);
-    add(&bu, @[gr_xop]GrDeref({pc, ac, OffsetConst({0})}));
+    add(&bu, @[gr_xop]GrDeref({pc, ac, OffsetConst({0, NoField})}));
     add(&bu, @[gr_xop]GrActiveXop({Deactivate(ac), Nothing}));
     add(&bu, @[gr_xop]GrDead({ac}));
-    add(&bu, @[gr_xop]GrSubcell({tc, pc, OffsetConst({enum_tag_offset})}));
+    add(&bu, @[gr_xop]GrSubcell({tc, pc, OffsetConst({enum_tag_offset, EnumTagField})}));
   }
 
   outer_segment segmarker = begin_segment(&bu);
@@ -2705,7 +2725,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     for j size = 0; j < nargs; j = j + 1 {
       fc cell_num = add_cell(&gr, {LocationVirtual, fieldtype, fieldtype_props});
       push(&fieldcella, fc);
-      push(&fieldcellops, @[gr_xop]GrSubcell({get(&fieldcella, j), get(&pointeecells, j), OffsetConst({field_offset})}));
+      push(&fieldcellops, @[gr_xop]GrSubcell({get(&fieldcella, j), get(&pointeecells, j), OffsetConst({field_offset, EnumConstructorField(i)})}));
     }
 
     if i != 0 {
@@ -2781,11 +2801,11 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
     }
 
     prepadding_ogn opt[gr_num]
-      = gr_bzero_subcell(gs, get(&pointeecells, 0), tag_end, field_offset - tag_end);
+      = gr_bzero_padding(gs, get(&pointeecells, 0), tag_end, field_offset - tag_end);
     addo(&sub_bu, prepadding_ogn);
 
     postpadding_ogn opt[gr_num]
-      = gr_bzero_subcell(gs, get(&pointeecells, 0), field_end, mei->cu_props.flat_size - field_end);
+      = gr_bzero_padding(gs, get(&pointeecells, 0), field_end, mei->cu_props.flat_size - field_end);
     addo(&sub_bu, postpadding_ogn);
 
     finalgn gr_num = done(&sub_bu);
@@ -2872,7 +2892,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
     push(&pointeecells, pc);
 
     ac cell_num = get(&argcells, i);
-    add(&bu, @[gr_xop]GrDeref({pc, ac, OffsetConst({0})}));
+    add(&bu, @[gr_xop]GrDeref({pc, ac, OffsetConst({0, NoField})}));
     add(&bu, @[gr_xop]GrActiveXop({Deactivate(ac), Nothing}));
     add(&bu, @[gr_xop]GrDead({ac}));
   }
@@ -2893,7 +2913,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
       fc cell_num = add_cell(&gr, {LocationVirtual, ~ ref(&st->fields, i)->type, ref(&psd.fields, i)->props});
       push(&fieldcella, fc);
 
-      push(&fieldcellops, @[gr_xop]GrSubcell({fc, get(&pointeecells, j), OffsetConst({ref(&psd.fields, i)->offset})}));
+      push(&fieldcellops, @[gr_xop]GrSubcell({fc, get(&pointeecells, j), OffsetConst({ref(&psd.fields, i)->offset, StructField(i)})}));
     }
 
     if case Has(ip instpair) = get(&msi->fips, i) {
@@ -2960,7 +2980,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
       padding_offset u32;
       padding_count u32;
       postpadding_offset_and_count(&psd, i, &padding_offset, &padding_count);
-      addo(&bu, gr_bzero_subcell(gs, get(&pointeecells, 0), padding_offset, padding_count));
+      addo(&bu, gr_bzero_padding(gs, get(&pointeecells, 0), padding_offset, padding_count));
     }
   }
 
@@ -2984,14 +3004,14 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
   return NoFail;
 }
 
-func gr_bzero_subcell(gs gr_statep, c cell_num, offset u32, size u32) opt[gr_num] {
+func gr_bzero_padding(gs gr_statep, c cell_num, offset u32, size u32) opt[gr_num] {
   if size == 0 {
     return None;
   }
   bu sq_builder = mk_builder(gs);
   padtype cu_typrop = compute_prim(gs.clq, primitive_padding_type(gs.clq->cs, size));
   pad_cell cell_num = add_cell(gs.gr, {LocationVirtual, padtype.cu, padtype.props});
-  add(&bu, @[gr_xop]GrSubcell({pad_cell, c, OffsetConst({offset})}));
+  add(&bu, @[gr_xop]GrSubcell({pad_cell, c, OffsetConst({offset, PaddingField})}));
   add(&bu, @[gr_xop]GrWriteConst({pad_cell, ConstInt(bigu(0))}));
   add(&bu, @[gr_xop]GrVirtualDead({pad_cell}));
   return Has(done(&bu));
@@ -3043,12 +3063,12 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 
   bu sq_builder = mk_builder(gs);
 
-  add(&bu, @[gr_xop]GrSubcell({tag_cell, retnum, OffsetConst({enum_tag_offset})}));
+  add(&bu, @[gr_xop]GrSubcell({tag_cell, retnum, OffsetConst({enum_tag_offset, EnumTagField})}));
   add(&bu, @[gr_xop]GrWriteConst({tag_cell, ConstInt(~tagval.x)}));
   add(&bu, @[gr_xop]GrVirtualDead({tag_cell}));
 
 
-  add(&bu, @[gr_xop]GrSubcell({retpart, retnum, OffsetConst({field_offset})}));
+  add(&bu, @[gr_xop]GrSubcell({retpart, retnum, OffsetConst({field_offset, EnumConstructorField(mec->constructor_index)})}));
 
   switch &mec->operational {
   case &EnumConstructMove(cd ctor_desc):
@@ -3064,12 +3084,12 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
   }
 
   prepadding_ogn opt[gr_num]
-    = gr_bzero_subcell(gs, retnum, tag_end, field_offset - tag_end);
+    = gr_bzero_padding(gs, retnum, tag_end, field_offset - tag_end);
 
   addo(&bu, prepadding_ogn);
   field_end u32 = field_offset + mec->rhs_props.flat_size;
   postpadding_ogn opt[gr_num]
-    = gr_bzero_subcell(gs, retnum, field_end, mec->return_type_props.flat_size - field_end);
+    = gr_bzero_padding(gs, retnum, field_end, mec->return_type_props.flat_size - field_end);
   addo(&bu, postpadding_ogn);
 
   add(&bu, @[gr_xop]GrActiveXop({Activate(retnum), Deactivate(retpart)}));

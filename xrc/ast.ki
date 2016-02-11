@@ -407,7 +407,7 @@ struct ast_arraylength_info {
 enum ast_local_field_info {
   ArrayLength ast_arraylength_info;
   // Holds the offset.
-  FieldName u32;
+  FieldName ast_field_info;
 }
 
 struct ast_local_field {
@@ -420,11 +420,17 @@ func mk(lhs box[ast_expr], fieldname ast_fieldname) ast_local_field {
   return {NotComputed, lhs, fieldname};
 }
 
+struct ast_field_info {
+  offset u32;
+  // Its index in 0..n-1 for a struct with n fields.
+  index size;
+}
+
 enum ast_deref_field_info {
   // The array's count.
   DerefArrayLength u32;
   // The field's offset.
-  DerefFieldName u32;
+  DerefFieldName ast_field_info;
 }
 
 struct ast_deref_field {
