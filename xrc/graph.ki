@@ -2188,7 +2188,7 @@ func gr_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after
   case &ConsumeByCopyDestroy(cd copy_destroy_action):
     // It's an rvalue, we make the whole cell live before evaling.
     add(bu, @[gr_xop]GrLive({whole_cell(expr)}));
-  case &ConsumeByCopy(cc tup[copy_action, lval_deadme]): { }
+  case &ConsumeByCopy(cc copy_consume): { }
   case &ConsumeByMove(m move_action): { }
   }
 }
@@ -2202,11 +2202,11 @@ func gr_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consum
     addo(bu, gr_maybe_virtualdead(gs, cd.copy.x.src));
     destroy_gn gr_num = gr_destroy_action(gs, &cd.destroy, DeadactAfterDestroyYes);
     add(bu, destroy_gn);
-  case &ConsumeByCopy(cc tup[copy_action, lval_deadme]):
-    dep gr_num = gr_copy_action(gs, &cc.car, BiCopy);
+  case &ConsumeByCopy(cc copy_consume):
+    dep gr_num = gr_copy_action(gs, &cc.copy, BiCopy);
     add(bu, dep);
-    if case DeadMe = cc.cdr {
-      addo(bu, gr_maybe_virtualdead(gs, cc.car.x.src));
+    if case DeadMe = cc.deadme {
+      addo(bu, gr_maybe_virtualdead(gs, cc.copy.x.src));
     }
   case &ConsumeByMove(m move_action):
     dep gr_num = gr_move_action(gs, &m, BiMove);

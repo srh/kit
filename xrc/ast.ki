@@ -653,10 +653,15 @@ struct copy_destroy_action {
   destroy destroy_action;
 }
 
+struct copy_consume {
+  copy copy_action;
+  deadme lval_deadme;
+}
+
 enum consume_actions {
   ConsumeByInPlace void;
   ConsumeByCopyDestroy copy_destroy_action;
-  ConsumeByCopy tup[copy_action, lval_deadme];
+  ConsumeByCopy copy_consume;
   // Only used for return statements, but later will be used for other exprs.
   ConsumeByMove move_action;
 }
