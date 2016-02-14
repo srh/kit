@@ -1679,10 +1679,10 @@ func unify_under_generics(pt *te_typeexpr,
     case &TeName(a te_name): {
       if case Has(ix size) = lookup_plain_name(names, a.value) {
         unified te_typeexpr;
-        if !unify_types(ref(unif_parms, ix), pt, &unified) {
+        if !unify_types(&unif_parms[ix], pt, &unified) {
           return false;
         }
-        *ref(unif_parms, ix) = unified;
+        unif_parms[ix] = unified;
         *unified_out = TeName({a.value, None});
         return true;
       } else {
@@ -1716,7 +1716,7 @@ func unify_under_generics(pt *te_typeexpr,
         reserve(&unified_params, n);
         for i size = 0; i < n; i = i + 1 {
           unified te_typeexpr;
-          if !unify_under_generics(ref(pa_params, i), names, unif_parms, ref(a_params, i), &unified) {
+          if !unify_under_generics(&pa_params[i], names, unif_parms, &a_params[i], &unified) {
             return false;
           }
           push(&unified_params, unified);
@@ -1736,8 +1736,8 @@ func unify_under_generics(pt *te_typeexpr,
         }
         unified_fields array[te_vardecl];
         for i size = 0; i < n; i = i + 1 {
-          pd *te_vardecl = ref(&pa.fields, i);
-          d *te_vardecl = ref(&a.fields, i);
+          pd *te_vardecl = &pa.fields[i];
+          d *te_vardecl = &a.fields[i];
           if pd->name != d->name {
             return false;
           }
@@ -1785,10 +1785,10 @@ func unify_under_generics(pt *te_typeexpr,
       // NOTE: I mimicked the TeName case, and haven't fully thought out how that would affect this function's callers, so treat this code with skepticism.
       if case Has(ix size) = lookup_lifetime_name(names, a.name) {
         unified te_typeexpr;
-        if !unify_types(ref(unif_parms, ix), pt, &unified) {
+        if !unify_types(&unif_parms[ix], pt, &unified) {
           return false;
         }
-        *ref(unif_parms, ix) = unified;
+        unif_parms[ix] = unified;
         *unified_out = TeLifetime({a.name});
         return true;
       } else {
@@ -1816,7 +1816,7 @@ func unify_under_generics(pt *te_typeexpr,
 func lookup_plain_name(arr *array[ast_generik], x sym) opt[size] {
   n size = count(arr);
   for i size = 0; i < n; i = i + 1 {
-    switch ref(arr, i) {
+    switch &arr[i] {
     case &PlainGeneric(b ast_ident):
       if b.value == x {
         return Has(i);
@@ -1830,7 +1830,7 @@ func lookup_plain_name(arr *array[ast_generik], x sym) opt[size] {
 func lookup_lifetime_name(arr *array[ast_generik], x sym) opt[size] {
   n size = count(arr);
   for i size = 0; i < n; i = i + 1 {
-    switch ref(arr, i) {
+    switch &arr[i] {
     case &PlainGeneric(b ast_ident): { }
     case &LifetimeGeneric(b ast_ident):
       if b.value == x {
