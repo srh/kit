@@ -2,7 +2,6 @@ import stdlib;
 import state;
 
 // Tells (a) if the operation failed, and (b) if it did, whether location info was printed.  Might be expanded to include other info.
-// TODO: Possibly deprecated in favor of cr[T].
 enum np {
   // No failure happened.
   #NoFail void;

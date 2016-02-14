@@ -48,10 +48,8 @@ func `~`(x u16) le_u16 {
 }
 
 func write_le_u16(dest * ^[0]u8, x u16) void {
-  // TODO: s1 can't codegen a u16 numeric literal.  Likewise below.
-  ff u16 = ~ @[u8] 0xFF;
-  dest[0] = ~ (x & ff);
-  dest[1] = ~ ((x >> ~ @[u8] 8) & ff);
+  dest[0] = ~ (x & 0xFF);
+  dest[1] = ~ ((x >> 8) & 0xFF);
 }
 
 struct le_i16 {
@@ -65,7 +63,6 @@ func `~`(x i16) le_i16 {
 }
 
 func write_le_i16(dest * ^[0]u8, x i16) void {
-  ff i16 = ~ @[u8] 0xFF;
-  dest[0] = ~ (x & ff);
-  dest[1] = ~ ((x >> ~ @[u8] 8) & ff);
+  dest[0] = ~ (x & 0xFF);
+  dest[1] = ~ ((x >> 8) & 0xFF);
 }
