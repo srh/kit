@@ -391,28 +391,26 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
 // parms have already had generics replaced.  They should also be complete.
 func check_and_compute_parms_no_canonicalize(clq *clqueue, t *genparms, out *idy_repls) np {
   switch t {
-    case &NoParms: {
-      *out = blank_idyrepls();
-      return NoFail;
-    }
-    case &HasParms(ps shray[te_typeexpr]): {
-      noscope_g ast_generics = NoGenerics;
-      noscope_parms idy_repls = blank_idyrepls();
-      params_complete bool;
-      params shray[te_typeexpr];
-      #check_and_compute_typeexpr_shray(clq, &noscope_g, &noscope_parms, &ps, &params, &params_complete);
+  case &NoParms:
+    *out = blank_idyrepls();
+    return NoFail;
+  case &HasParms(ps shray[te_typeexpr]):
+    noscope_g ast_generics = NoGenerics;
+    noscope_parms idy_repls = blank_idyrepls();
+    params_complete bool;
+    params shray[te_typeexpr];
+    #check_and_compute_typeexpr_shray(clq, &noscope_g, &noscope_parms, &ps, &params, &params_complete);
 
-      if !params_complete {
-        ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
-      }
-
-      cu_params array[cu_typeexpr];
-      foreach param *te_typeexpr in refs(&params) {
-        push(&cu_params, ~*param);
-      }
-      *out = {freeze(&cu_params)};
-      return NoFail;
+    if !params_complete {
+      ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
     }
+
+    cu_params array[cu_typeexpr];
+    foreach param *te_typeexpr in refs(&params) {
+      push(&cu_params, ~*param);
+    }
+    *out = {freeze(&cu_params)};
+    return NoFail;
   }
 }
 
