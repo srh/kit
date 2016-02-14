@@ -14,8 +14,8 @@ struct ps {
 
   base_offset size;
   comments array[interval];
-  // ast_meta values are indices into this array.
-  metas *array[meta_datum];
+  // ast_meta values are indices into posits->metas.
+  posits *positionals;
 
   im *identmap;
 }
@@ -27,7 +27,7 @@ func make_ps(im *identmap, posits *positionals, base_offset size, data * ^[0]u8,
   p.pos = 0;
   p.base_offset = base_offset;
   p.im = im;
-  p.metas = &posits->metas;
+  p.posits = posits;
   step(&p);
   return p;
 }
@@ -56,20 +56,20 @@ inline func ps_step(p *ps) void {
 }
 
 func startend(p *ps) ast_meta {
-  ret ast_meta = ~count(p->metas);
-  push(p->metas, {Has(p->current.interval.left), Has(p->current.interval.right), None});
+  ret ast_meta = ~count(&p->posits->metas);
+  push(&p->posits->metas, {Has(p->current.interval.left), Has(p->current.interval.right), None});
   return ret;
 }
 
 func start(p *ps) ast_meta {
-  ret ast_meta = ~count(p->metas);
-  push(p->metas, {Has(p->current.interval.left), None, None});
+  ret ast_meta = ~count(&p->posits->metas);
+  push(&p->posits->metas, {Has(p->current.interval.left), None, None});
   return ret;
 }
 
 func copystart(p *ps, meta ast_meta) ast_meta {
-  ret ast_meta = ~count(p->metas);
-  push(p->metas, {ref(p->metas, meta.x)->left, None, None});
+  ret ast_meta = ~count(&p->posits->metas);
+  push(&p->posits->metas, {p->posits->metas[meta.x].left, None, None});
   return ret;
 }
 
@@ -80,12 +80,12 @@ func copyend(p *ps, meta ast_meta) ast_meta {
 }
 
 func end(p *ps, meta ast_meta) void {
-  r *meta_datum = ref(p->metas, meta.x);
+  r *meta_datum = &p->posits->metas[meta.x];
   set(&r->right, mk_pos(p->base_offset, p->prev_right));
 }
 
 func note_original(p *ps, meta ast_meta, orig ast_original_syntax) void {
-  r *meta_datum = ref(p->metas, meta.x);
+  r *meta_datum = &p->posits->metas[meta.x];
   set(&r->original_syntax, orig);
 }
 

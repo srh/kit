@@ -21,7 +21,6 @@ struct meta_datum {
   original_syntax opt[ast_original_syntax];
 }
 
-// TODO: Don't just give ps and tok.ki code direct access to this?
 struct positionals {
   metas array[meta_datum];
 }
