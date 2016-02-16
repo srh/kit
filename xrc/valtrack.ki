@@ -61,6 +61,7 @@ func vt_inner_expr(c cgt, outer_gn gr_num) cr[bool] {
   fr freshness = #vt_unify(c, &ft, outer_gn);
   while case Has(gn gr_num) = popval(&ft.fresh) {
     if c.track->annot[gn.x].fr == Fresh {
+      c.track->current = *unHas(&c.track->annot[gn.x].savestate);
       #vt_xops(c, &ft, gn);
     }
   }
@@ -111,11 +112,8 @@ func vt_xops(c cgt, ft *vt_freshtrack, gn gr_num) np {
         case JmpForward:
           gn = a.next.x;
         case ExitNormalcy(b gr_jmp_exit_normalcy):
-          saved_state vt_state = c.track->current;
           #vt_abnormal_excursion(c, ft, a.next.x);
-          c.track->current = saved_state;
-          gn = b.subsequent_normalcy.x;
-          // loop around
+          return NoFail;
         case ReenterNormalcy:
           ice(_u8("vt_xops sees GrJmp ReenterNormalcy"));
         }
