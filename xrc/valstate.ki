@@ -1,11 +1,15 @@
 struct vt_state {
+  checksum vs_checksum;
+}
+
+struct vs_checksum {
   // These counts may go negative, because we start them from zero after a paramlist is set-up.  They just have to be consistent, they're a basic sanity-check.
   live_count i32;
   active_count i32;
 }
 
 func mk_vt_state() vt_state {
-  return {0, 0};
+  return {@[vs_checksum]{0, 0}};
 }
 
 enum freshness {
@@ -30,8 +34,13 @@ func unify_vt_state(onto *opt[vt_state], from *vt_state) cr[freshness] {
 
 // Returns whether "onto" changed.
 func unify_vt_state(onto *vt_state, from *vt_state) cr[freshness] {
+  #unify_vs_checksum(&onto->checksum, &from->checksum);
+  return NoFail(Stale);
+}
+
+func unify_vs_checksum(onto *vs_checksum, from *vs_checksum) np {
   if onto->live_count == from->live_count && onto->active_count == from->active_count {
-    return NoFail(Stale);
+    return NoFail;
   } else {
     return ERR(_u8("ICE? unify_vt_state active/live count mismatch"));
   }
@@ -40,12 +49,17 @@ func unify_vt_state(onto *vt_state, from *vt_state) cr[freshness] {
 func vs_xop(c cgt, gn gr_num, xn *gr_xnode) np {
   xn->vs_xopped = true;
   vs *vt_state = &c.track->current;
-  switch &xn->op {
+  vs_checksum_xop(&vs->checksum, &xn->op);
+  return NoFail;
+}
+
+func vs_checksum_xop(vs *vs_checksum, op *gr_xop) void {
+  switch op {
   case &GrApply(a gr_apply):
     switch a.act {
     case TwoExtraOps(ops gr_active_xop):
-      vs_active_op(vs, ops.op1);
-      vs_active_op(vs, ops.op2);
+      vs_checksum_active_op(vs, ops.op1);
+      vs_checksum_active_op(vs, ops.op2);
     case StandardApply: { }
     }
     nparams i32 = ~count(&a.params);
@@ -73,18 +87,16 @@ func vs_xop(c cgt, gn gr_num, xn *gr_xnode) np {
   case &GrVirtualDead(a gr_virtual_dead):
     vs->live_count--;
   case &GrActiveXop(a gr_active_xop):
-    vs_active_op(vs, a.op1);
-    vs_active_op(vs, a.op2);
+    vs_checksum_active_op(vs, a.op1);
+    vs_checksum_active_op(vs, a.op2);
   case &GrManyActiveXop(a gr_many_active_xop):
-    foreach op gr_active_op in elems(&a.ops) {
-      vs_active_op(vs, op);
+    foreach aop gr_active_op in elems(&a.ops) {
+      vs_checksum_active_op(vs, aop);
     }
   }
-  // It's an empty struct, there's nothing to track.
-  return NoFail;
 }
 
-func vs_active_op(vs *vt_state, op gr_active_op) void {
+func vs_checksum_active_op(vs *vs_checksum, op gr_active_op) void {
   switch op {
   case Nothing: { }
   case Activate(c cell_num):
