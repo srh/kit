@@ -15,7 +15,7 @@ struct vt_freshtrack {
 
 func mk_track(gr *frame_graph) vt_track {
   return {
-    @[vt_state]{ },
+    mk_vt_state(),
     repeat(count(&gr->ops), {None, Stale})
   };
 }

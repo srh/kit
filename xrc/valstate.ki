@@ -1,4 +1,11 @@
-struct vt_state {  }
+struct vt_state {
+  live_count i32;
+  active_count i32;
+}
+
+func mk_vt_state() vt_state {
+  return {0, 0};
+}
 
 enum freshness {
   Stale void;
@@ -22,12 +29,66 @@ func unify_vt_state(onto *opt[vt_state], from *vt_state) cr[freshness] {
 
 // Returns whether "onto" changed.
 func unify_vt_state(onto *vt_state, from *vt_state) cr[freshness] {
-  // do nothing, vt_state is an empty struct.
-  return NoFail(Stale);
+  if onto->live_count == from->live_count && onto->active_count == from->active_count {
+    return NoFail(Stale);
+  } else {
+    return ERR(_u8("ICE? unify_vt_state active/live count mismatch"));
+  }
 }
 
 func vs_xop(c cgt, gn gr_num, xn *gr_xnode) np {
   xn->vs_xopped = true;
+  vs *vt_state = &c.track->current;
+  switch &xn->op {
+  case &GrApply(a gr_apply):
+    switch a.act {
+    case TwoExtraOps(ops gr_active_xop):
+      vs_active_op(vs, ops.op1);
+      vs_active_op(vs, ops.op2);
+    case StandardApply: { }
+    }
+    nparams i32 = ~count(&a.params);
+    // funcell deactivates, params deactivate, return cell activates
+    vs->active_count += -nparams;
+    // funcell dead, params dead, return cell was already live
+    vs->live_count += -nparams - 1;
+  case &GrPrimApply(a gr_prim_apply):
+    nparams i32 = ~count(&a.params);
+    // Same as GrApply except without the funcell.
+    vs->active_count += -nparams + 1;
+    vs->live_count += -nparams;
+  case &GrMemCopy(a gr_memcopy): { }
+  case &GrWriteConst(a gr_writeconst): { }
+  case &GrAddressof(a gr_addressof): { }
+  case &GrDeref(a gr_deref):
+    vs->live_count++;
+  case &GrSubcell(a gr_subcell):
+    vs->live_count++;
+  case &GrLive(a gr_live):
+    vs->live_count++;
+  case &GrAssertLive(a gr_assert_live): { }
+  case &GrDead(a gr_dead):
+    vs->live_count--;
+  case &GrVirtualDead(a gr_virtual_dead):
+    vs->live_count--;
+  case &GrActiveXop(a gr_active_xop):
+    vs_active_op(vs, a.op1);
+    vs_active_op(vs, a.op2);
+  case &GrManyActiveXop(a gr_many_active_xop):
+    foreach op gr_active_op in elems(&a.ops) {
+      vs_active_op(vs, op);
+    }
+  }
   // It's an empty struct, there's nothing to track.
   return NoFail;
+}
+
+func vs_active_op(vs *vt_state, op gr_active_op) void {
+  switch op {
+  case Nothing: { }
+  case Activate(c cell_num):
+    vs->active_count++;
+  case Deactivate(c cell_num):
+    vs->active_count--;
+  }
 }
