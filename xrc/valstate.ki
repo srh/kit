@@ -1,4 +1,5 @@
 struct vt_state {
+  // These counts may go negative, because we start them from zero after a paramlist is set-up.  They just have to be consistent, they're a basic sanity-check.
   live_count i32;
   active_count i32;
 }
