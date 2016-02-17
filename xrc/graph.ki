@@ -224,6 +224,7 @@ func addx(gr *frame_graph, ctr *celltrack, op gr_xop) gr_num {
   case &GrAddressof(a gr_addressof):
     gr_expect_live(ctr, a.addressee);
     gr_expect_live(ctr, a.dest);
+    gr_activate(ctr, a.dest);
   case &GrDeref(a gr_deref):
     gr_expect_live(ctr, a.pointer);
     check(!isLocationStatic(ref_cell(gr, a.name)->location));
@@ -1807,7 +1808,6 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
       #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
 
       add(bu, @[gr_xop]GrAddressof({collection_ptr_cell, value_cell(oo(&a->lhs))}));
-      add(bu, @[gr_xop]GrActiveXop({Activate(collection_ptr_cell), Nothing}));
       desc *lval_description = ellval_desc(oo(&a->lhs));
       if case DeadMe = desc->deadme {
         add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->lhs))}));
@@ -1841,7 +1841,6 @@ func gr_mk_addressof(gs gr_statep, x *ast_expr, a *ast_addressof, bu *sq_builder
   #gr_expr(gs, oo(&a->rhs), bu);
   desc *lval_description = ellval_desc(oo(&a->rhs));
   add(bu, @[gr_xop]GrAddressof({rval_cell(x), desc->num}));
-  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   if case DeadMe = desc->deadme {
     add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->rhs))}));
   }
@@ -1853,7 +1852,6 @@ func gr_mk_refof(gs gr_statep, x *ast_expr, a *ast_refof, bu *sq_builder) np {
   #gr_expr(gs, oo(&a->rhs), bu);
   desc *lval_description = ellval_desc(oo(&a->rhs));
   add(bu, @[gr_xop]GrAddressof({rval_cell(x), desc->num}));
-  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   if case DeadMe = desc->deadme {
     add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->rhs))}));
   }
@@ -1930,7 +1928,6 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       add(bu, @[gr_xop]GrLive({srcptr}));
       add(bu, @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
       add(bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
-      add(bu, @[gr_xop]GrActiveXop({Activate(destptr), Activate(srcptr)}));
       add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result, StandardApply}));
 
       postbranch_save gr_savetrack = save_celltrack(gs.ctr);
@@ -2241,10 +2238,10 @@ func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num, statechange uni_fun_sta
 
   add(&bu, @[gr_xop]GrLive({funcell}));
   add(&bu, @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
+  add(&bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
 
   add(&bu, @[gr_xop]GrLive({argptrcell}));
   add(&bu, @[gr_xop]GrAddressof({argptrcell, arg}));
-  add(&bu, @[gr_xop]GrActiveXop({Activate(funcell), Activate(argptrcell)}));
 
   switch statechange {
   case Nothing:
@@ -2303,7 +2300,6 @@ func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechan
   add(&bu, @[gr_xop]GrAddressof({srcptrcell, src}));
 
   add(&bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
-  add(&bu, @[gr_xop]GrActiveXop({Activate(destptrcell), Activate(srcptrcell)}));
 
   switch statechange {
   case BiMove:
@@ -2604,7 +2600,6 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
         push(&elemptrcells, epc);
         add(&vd_bu, @[gr_xop]GrLive({epc}));
         add(&vd_bu, @[gr_xop]GrAddressof({epc, ec}));
-        add(&vd_bu, @[gr_xop]GrActiveXop({Activate(epc), Nothing}));
         add(&vd_bu, @[gr_xop]GrVirtualDead({ec}));
       }
 
@@ -2757,7 +2752,6 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
         add(&sub_bu, @[gr_xop]GrLive({fpc}));
         add(&sub_bu, get(&fieldcellops, j));
         add(&sub_bu, @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
-        add(&sub_bu, @[gr_xop]GrActiveXop({Activate(fpc), Nothing}));
         add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 
@@ -2941,7 +2935,6 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
         add(&bu, @[gr_xop]GrLive({fpc}));
         add(&bu, get(&fieldcellops, j));
         add(&bu, @[gr_xop]GrAddressof({fpc, get(&fieldcella, j)}));
-        add(&bu, @[gr_xop]GrActiveXop({Activate(fpc), Nothing}));
         add(&bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 

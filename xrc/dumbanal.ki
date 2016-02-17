@@ -86,6 +86,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
       case &GrAddressof(a gr_addressof):
         expect_live(ctr, a.addressee);
         expect_live(ctr, a.dest);
+        gr_activate(ctr, a.dest);
         return NoFail(Terminal);
 
       case &GrDeref(a gr_deref):

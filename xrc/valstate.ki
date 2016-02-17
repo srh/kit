@@ -74,7 +74,8 @@ func vs_checksum_xop(vs *vs_checksum, op *gr_xop) void {
     vs->live_count += -nparams;
   case &GrMemCopy(a gr_memcopy): { }
   case &GrWriteConst(a gr_writeconst): { }
-  case &GrAddressof(a gr_addressof): { }
+  case &GrAddressof(a gr_addressof):
+    vs->active_count++;
   case &GrDeref(a gr_deref):
     vs->live_count++;
   case &GrSubcell(a gr_subcell):
