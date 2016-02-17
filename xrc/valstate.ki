@@ -1,4 +1,5 @@
 struct vt_state {
+  supports array[vs_support];
   checksum vs_checksum;
 }
 
@@ -9,7 +10,23 @@ struct vs_checksum {
 }
 
 func mk_vt_state() vt_state {
-  return {@[vs_checksum]{0, 0}};
+  return {mk_array@[vs_support](), @[vs_checksum]{0, 0}};
+}
+
+struct vs_support {
+  supporter vs_supporter;
+  supportee cell_num;
+}
+
+enum vs_supporter {
+  // A pointer, it points at the supportee.
+  PointerFrom cell_num;
+  // Supportee is a field of the given cell.
+  FieldOf cell_num;
+  // A descoping element.
+  DescopingElement cell_num;
+  // We've lost track of the cell's support.  TODO: Get rid of this.
+  LostTrack void;
 }
 
 enum freshness {
@@ -49,7 +66,16 @@ func unify_vs_checksum(onto *vs_checksum, from *vs_checksum) np {
 func vs_xop(c cgt, gn gr_num, xn *gr_xnode) np {
   xn->vs_xopped = true;
   vs *vt_state = &c.track->current;
+
   vs_checksum_xop(&vs->checksum, &xn->op);
+
+  #vs_support_xop(&vs->supports, &xn->op);
+
+  return NoFail;
+}
+
+func vs_support_xop(ar *array[vs_support], op *gr_xop) np {
+  // TODO(): Durr, implement.
   return NoFail;
 }
 
