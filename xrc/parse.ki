@@ -1721,16 +1721,18 @@ func parse_rest_of_char_literal(p *ps, m ast_meta, out *ast_expr) parse_result {
   }
 }
 
-func see_if_parse(file *array[u8]) bool {
+func see_if_parse(file *array[u8], print_error_location bool) bool {
   im identmap = make_im();
   posits positionals = mk_positionals();
   p ps = make_ps(&im, &posits, 0, data(file), count(file));
   out ast_file;
   if case Fail = parse_file(&p, &out) {
-    print(Stdout(), _u8("at offset "));
-    print(Stdout(), to_u8str(peek(&p)->interval.left.x));
-    print(Stdout(), _u8("..."));
-    ign var = fflush(Stdout());
+    if print_error_location {
+      print(Stdout(), _u8("at offset "));
+      print(Stdout(), to_u8str(peek(&p)->interval.left.x));
+      print(Stdout(), _u8("..."));
+      ign var = fflush(Stdout());
+    }
     return false;
   } else {
     return true;
@@ -1755,7 +1757,7 @@ func help_run_parse_test(ctx *parse_test_ctx, test_name *array[u8], file *array[
     print(Stdout(), _u8("..."));
     ign var = fflush(Stdout());
   }
-  if expected_success != see_if_parse(file) {
+  if expected_success != see_if_parse(file, expected_success || ctx->verbose) {
     print(Stdout(), _u8("FAIL\n"));
     ign var = fflush(Stdout());
     ctx->failures = ctx->failures + 1;
