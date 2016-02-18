@@ -656,7 +656,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
   switch a {
     case DefaultMoveCopyDestroy: {
       ret type_properties;
-      #compute_complete_struct_properties(clq, st, &it, (ComputeMove | ComputeCopy) | ComputeDestroy, &ret);
+      #compute_complete_struct_properties(clq, st, &it, ComputeMove | ComputeCopy | ComputeDestroy, &ret);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym, &ret.init_behavior);
