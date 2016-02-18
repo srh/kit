@@ -40,9 +40,6 @@ enum prec_cmp {
   PullsRight void;
 }
 
-// def[T] dbgparse fn[T, void] = debugstr;
-inline func[T] dbgparse(x T) void { }
-
 def kSemicolonPrec i32 = 205;
 def kCommaPrec i32 = 205;
 // This is 305 because it would prevent assignment in conditionals, if it weren't otherwise banned (which it is).
@@ -52,7 +49,6 @@ def kConversionRightPrec i32 = 905;
 def kGeneralUnopRightPrec i32 = 905;
 
 func parse_file(p *ps, out *ast_file) parse_result {
-  dbgparse("parse_file\n");
   arr array[ast_toplevel];
   #parse_toplevels(p, Eof, &arr);
   *out = {move(&arr)};
@@ -60,7 +56,6 @@ func parse_file(p *ps, out *ast_file) parse_result {
 }
 
 func parse_toplevels(p *ps, stop tokval, out *array[ast_toplevel]) parse_result {
-  dbgparse("parse_toplevels\n");
   ret array[ast_toplevel];
   for ;; {
     if equal(&peek(p)->val, &stop) {
@@ -151,7 +146,6 @@ func try_skip_oper(p *ps, exp0 i32, exp1 i32, exp2 i32) parse_result {
 }
 
 func parse_toplevel(p *ps, out *ast_toplevel) parse_result {
-  dbgparse("parse_toplevel\n");
   if +try_skip_keyw(p, Func) {
     return parse_rest_of_func(p, IsNotExport, IsNotInline, out);
   } else if +try_skip_keyw(p, Def) {
@@ -238,7 +232,6 @@ func parse_rest_of_extern_def(p *ps, out *ast_toplevel) parse_result {
 }
 
 func parse_rest_of_import(p *ps, out *ast_toplevel) parse_result {
-  dbgparse("parse_rest_of_import\n");
   name ast_ident;
   #parse_ident(p, &name);
   #try_skip_oper(p, ';');
@@ -373,7 +366,6 @@ func parse_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) parse_resu
 }
 
 func triparse_ident(p *ps, out *ast_ident) triparse_result {
-  dbgparse("triparse_ident\n");
   switch peek(p)->val {
   case Ident(text shray[i32]):
     m ast_meta = startend(p);
@@ -394,7 +386,6 @@ func triparse_ident(p *ps, out *ast_ident) triparse_result {
 
 // Takes a [_]u8.
 func[T] try_skip_specific_ident(p *ps, x T) parse_result {
-  dbgparse("try_skip_specific_ident\n");
   switch peek(p)->val {
   case Ident(text shray[i32]):
     if count(&text) != x.length {
