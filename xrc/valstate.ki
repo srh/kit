@@ -75,8 +75,47 @@ func vs_xop(c cgt, gn gr_num, xn *gr_xnode) np {
 }
 
 func vs_support_xop(ar *array[vs_support], op *gr_xop) np {
-  // TODO(): Durr, implement.
-  return NoFail;
+  switch op {
+  case &GrApply(a gr_apply):
+    // TODO(): Implement.
+    return NoFail;
+  case &GrPrimApply(a gr_prim_apply):
+    // TODO(): Implement.
+    return NoFail;
+  case &GrMemCopy(a gr_memcopy):
+    // TODO(): Implement.
+    return NoFail;
+  case &GrWriteConst(a gr_writeconst):
+    // TODO(): Implement.
+    return NoFail;
+  case &GrAddressof(a gr_addressof):
+    // TODO(): Implement.
+    return NoFail;
+  case &GrDeref(a gr_deref):
+    // TODO(): Implement.
+    return NoFail;
+  case &GrSubcell(a gr_subcell):
+    // TODO(): Implement.
+    return NoFail;
+  case &GrLive(a gr_live):
+    // TODO(): Implement.
+    return NoFail;
+  case &GrAssertLive(a gr_assert_live):
+    // TODO(): Implement.
+    return NoFail;
+  case &GrDead(a gr_dead):
+    // TODO(): Implement.
+    return NoFail;
+  case &GrVirtualDead(a gr_virtual_dead):
+    // TODO(): Implement.
+    return NoFail;
+  case &GrActiveXop(a gr_active_xop):
+    // TODO(): Implement.
+    return NoFail;
+  case &GrManyActiveXop(a gr_many_active_xop):
+    // TODO(): Implement.
+    return NoFail;
+  }
 }
 
 func vs_checksum_xop(vs *vs_checksum, op *gr_xop) void {
