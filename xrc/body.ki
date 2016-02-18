@@ -166,11 +166,11 @@ struct breakpack {
 }
 
 func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) np {
-  if case Printed(pm err_printed) = help_check_statement(bs, vp, obp, s, ee_out) {
+  if case Unprinted(pm err_printed) = help_check_statement(bs, vp, obp, s, ee_out) {
     if !pm.printed_meta {
       return MERR(bs->cs, s->meta, _u8(" in this statement"));
     } else {
-      return Printed(pm);
+      return Unprinted(pm);
     }
   }
   return NoFail;
@@ -335,7 +335,7 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
   et *enumspec;
   switch structural_enumspec(es->ds, switchable_type, &et) {
   case Error(pm):
-    return Printed(pm);
+    return Unprinted(pm);
   case Success: { }
   case NotAccessible:
     return ERR(_u8("Inaccessible rhs hit or non-enum type in swartch"));

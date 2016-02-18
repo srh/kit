@@ -60,7 +60,8 @@ func st_eval_prim_logical(clq *clqueue, env *st_env, paramorefs *array[st_obj_re
     resultint = bigu(0);
   }
   val st_value = st_bigint_to_value_unsigned(&env->plat, retvalref.count, resultint);
-  if case Printed(pm) = obj_write(env, retvalref, &val) {
+  if case Unprinted(pm) = obj_write(env, retvalref, &val) {
+    dump_err_printed(pm);
     ice(_u8("st_eval_prim_logical cannot write into retvalref"));
   }
   return NoFail;
@@ -105,7 +106,8 @@ func st_eval_prim_ptr_compare(clq *clqueue, env *st_env, paramorefs *array[st_ob
     resultint = bigu(0);
   }
   val st_value = st_bigint_to_value_unsigned(&env->plat, retvalref.count, resultint);
-  if case Printed(pm) = obj_write(env, retvalref, &val) {
+  if case Unprinted(pm) = obj_write(env, retvalref, &val) {
+    dump_err_printed(pm);
     ice(_u8("st_eval_prim_ptr_compare cannot write into retvalref"));
   }
   return NoFail;
@@ -137,7 +139,8 @@ func st_eval_prim_num_compare(clq *clqueue, env *st_env, paramorefs *array[st_ob
     resultint = bigu(0);
   }
   val st_value = st_bigint_to_value_unsigned(&env->plat, retvalref.count, resultint);
-  if case Printed(pm) = obj_write(env, retvalref, &val) {
+  if case Unprinted(pm) = obj_write(env, retvalref, &val) {
+    dump_err_printed(pm);
     ice(_u8("st_eval_prim_num_compare cannot write into retvalref"));
   }
   return NoFail;

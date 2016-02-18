@@ -93,10 +93,8 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
         }
         if case &Computed(val st_value) = &inst->evaled_value {
           fnid fn_body_id;
-          if case Printed(pm) = x86_simple_symbolref(cs, &val, &fnid) {
-            // TODO: This is weird.  Do something?
-            ign np = @[np]ERR(_u8("Export fn-symbol has invalid value (zero-initialized fn[...] value, I bet)"));
-            return Printed(pm);
+          if case Unprinted(pm) = x86_simple_symbolref(cs, &val, &fnid) {
+            return Unprinted({true, err_string(_u8("Export fn-symbol has invalid value (zero-initialized fn[...] value, I bet)"))});
           }
           body_text_offset u32 = *un(&ref_fn_body(cs, fnid)->body_text_offset);
           name string = lookup(cs->im, ent->def_name);

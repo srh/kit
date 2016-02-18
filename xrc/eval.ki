@@ -328,17 +328,15 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
       pool st_objpool = mk_objpool();
       env st_env = mk_env(&pool, clq->cs->plat, count(&fg->gr.cells));
 
-      if case Printed(pm err_printed) = st_eval_frame_regraphed(clq, &env, fg) {
-        // We ignore pm.printed_meta -- this is like a stack trace.
+      if case Unprinted(pm err_printed) = st_eval_frame_regraphed(clq, &env, fg) {
         inst->evaled_value = FailedComputation;
-        return ERR(_u8("(in evaling def "), defname, _u8(")"));
+        return ERR_append(pm, err_string(_u8("(in evaling def "), defname, _u8(")")));
       }
       result st_obj_ref = cell_obj_ref(&env, fg->cell, "in st_eval_def");
       value st_value;
-      if case Printed(pm err_printed) = obj_read(&env, result, &value) {
-        // We ignore printed_meta.
+      if case Unprinted(pm err_printed) = obj_read(&env, result, &value) {
         inst->evaled_value = FailedComputation;
-        return ERR(_u8("(in result from evaling def "), defname, _u8(")"));
+        return ERR_append(pm, err_string(_u8("(in result from evaling def "), defname, _u8(")")));
       }
       if count(&value.objrefs) != 0 {
         inst->evaled_value = FailedComputation;
@@ -601,9 +599,8 @@ func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], r
     }
     *ref(&subenv.framecells, fnent.graph.cell.x) = Has(retvalref);
 
-    if case Printed(pm err_printed) = st_eval_frame_regraphed(clq, &subenv, &fnent.graph) {
-      // We ignore pm.printed_meta -- this is essentially a stack frame.
-      return ERR(_u8("(in evaling fn "), lookup(clq->im, fnent.graph.gr.informal_name), _u8(")"));
+    if case Unprinted(pm err_printed) = st_eval_frame_regraphed(clq, &subenv, &fnent.graph) {
+      return ERR_append(pm, err_string(_u8("(in evaling fn "), lookup(clq->im, fnent.graph.gr.informal_name), _u8(")")));
     }
     return NoFail;
   case &ExternFnBody(exent extern_fn_body):

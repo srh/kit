@@ -185,9 +185,9 @@ func basic_and_inline(cs *checkstate, g *graphed_fn_body) np {
     bas basic_analyze_state;
     basic_analyze_fn_body(cs, g, &bas);
 
-    if case Printed(pm) = help_basic_inline_inlinables(cs, &bas, g) {
+    if case Unprinted(pm) = help_basic_inline_inlinables(cs, &bas, g) {
       g->inline_state = FailedComputation;
-      return Printed(pm);
+      return Unprinted(pm);
     }
     g->inline_state = Computed(bas);
     return NoFail;

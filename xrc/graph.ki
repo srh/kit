@@ -3174,7 +3174,8 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op pri
   for i size = 0; i < nfn_params; i = i + 1 {
     ty *te_typeexpr = ref(typarams, i);
     props type_properties;
-    if case Printed(pm) = compute_complete_type_properties(clq, ty, &props) {
+    if case Unprinted(pm) = compute_complete_type_properties(clq, ty, &props) {
+      dump_err_printed(pm);
       ice(_u8("add_prim_fn_body typrops"));
     }
     c cell_num = add_cell(&gr, {LocationStatic, ~ *ty, props});
@@ -3182,7 +3183,8 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op pri
   }
   retty *te_typeexpr = ref(typarams, ntyparams - 1);
   retprops type_properties;
-  if case Printed(pm) = compute_complete_type_properties(clq, retty, &retprops) {
+  if case Unprinted(pm) = compute_complete_type_properties(clq, retty, &retprops) {
+    dump_err_printed(pm);
     ice(_u8("add_prim_fn_body retprops"));
   }
   retcell cell_num = add_cell(&gr, {LocationStatic, ~ *retty, retprops});
@@ -3244,9 +3246,9 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           curseg gr_current_segment = {None};
           gs gr_statep = {clq, &gr, &ctr, &curseg, None};
           bu sq_builder = mk_builder(gs);
-          if case Printed(pm) = gr_live_and_expr_consume(gs, &dire.ec, &bu) {
+          if case Unprinted(pm) = gr_live_and_expr_consume(gs, &dire.ec, &bu) {
             inst->graph = FailedComputation;
-            return Printed(pm);
+            return Unprinted(pm);
           }
           gn gr_num = done(&bu);
 

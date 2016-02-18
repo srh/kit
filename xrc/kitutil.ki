@@ -1,9 +1,10 @@
 import stdlib;
 import state;
 
-// A "printed" error happened.
+// A "printed" error happened.  (More like, "to be printed.")
 struct err_printed {
   printed_meta bool;
+  msg array[u8];
 }
 
 // Tells (a) if the operation failed, and (b) if it did, whether location info was printed.  Might be expanded to include other info.
@@ -11,40 +12,42 @@ enum np {
   // No failure happened.
   #NoFail void;
   // We had a failure, and an error message was printed.  True if location info was printed.
-  Printed err_printed;
+  Unprinted err_printed;
 }
 
-// Callers of this are OK with discarding Printed info (presumably).
+// Callers of this are OK with discarding Unprinted info (presumably).
 func from_np(x np) bool {
   switch x {
   case NoFail: return true;
-  case Printed(b err_printed): return false;
+  case Unprinted(pm err_printed):
+    dump_err_printed(pm);
+    return false;
   }
 }
 
 // cr = check result.
 enum[T] cr {
   #NoFail T;
-  Printed err_printed;
+  Unprinted err_printed;
 }
 
-func[T] ERR(x T) np { DBG(x); return Printed({false}); }
-func[T, U] ERR(x T, y U) np { DBG(x, y); return Printed({false}); }
-func[T, U, V] ERR(x T, y U, z V) np { DBG(x, y, z); return Printed({false}); }
-func[T, U, V, W] ERR(x T, y U, z V, p W) np { DBG(x, y, z, p); return Printed({false}); }
-func[T, U, V, W, X] ERR(x T, y U, z V, p W, q X) np { DBG(x, y, z, p, q); return Printed({false}); }
-func[T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) np { DBG(x, y, z, p, q, r); return Printed({false}); }
-func[T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) np { DBG(x, y, z, p, q, r, s); return Printed({false}); }
-func[T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) np { DBG(x, y, z, p, q, r, s, t); return Printed({false}); }
+func[T] ERR(x T) np { return Unprinted({false, err_string(x)}); }
+func[T, U] ERR(x T, y U) np { return ERR(consup(x, y)); }
+func[T, U, V] ERR(x T, y U, z V) np { return ERR(consup(x, y, z)); }
+func[T, U, V, W] ERR(x T, y U, z V, p W) np { return ERR(consup(x, y, z, p)); }
+func[T, U, V, W, X] ERR(x T, y U, z V, p W, q X) np { return ERR(consup(x, y, z, p, q)); }
+func[T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) np { return ERR(consup(x, y, z, p, q, r)); }
+func[T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) np { return ERR(consup(x, y, z, p, q, r, s)); }
+func[T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) np { return ERR(consup(x, y, z, p, q, r, s, t)); }
 
-func[R, T] ERR(x T) cr[R] { DBG(x); return Printed({false}); }
-func[R, T, U] ERR(x T, y U) cr[R] { DBG(x, y); return Printed({false}); }
-func[R, T, U, V] ERR(x T, y U, z V) cr[R] { DBG(x, y, z); return Printed({false}); }
-func[R, T, U, V, W] ERR(x T, y U, z V, p W) cr[R] { DBG(x, y, z, p); return Printed({false}); }
-func[R, T, U, V, W, X] ERR(x T, y U, z V, p W, q X) cr[R] { DBG(x, y, z, p, q); return Printed({false}); }
-func[R, T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) cr[R] { DBG(x, y, z, p, q, r); return Printed({false}); }
-func[R, T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) cr[R] { DBG(x, y, z, p, q, r, s); return Printed({false}); }
-func[R, T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) cr[R] { DBG(x, y, z, p, q, r, s, t); return Printed({false}); }
+func[R, T] ERR(x T) cr[R] { return Unprinted({false, err_string(x)}); }
+func[R, T, U] ERR(x T, y U) cr[R] { return ERR(consup(x, y)); }
+func[R, T, U, V] ERR(x T, y U, z V) cr[R] { return ERR(consup(x, y, z)); }
+func[R, T, U, V, W] ERR(x T, y U, z V, p W) cr[R] { return ERR(consup(x, y, z, p)); }
+func[R, T, U, V, W, X] ERR(x T, y U, z V, p W, q X) cr[R] { return ERR(consup(x, y, z, p, q)); }
+func[R, T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) cr[R] { return ERR(consup(x, y, z, p, q, r)); }
+func[R, T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) cr[R] { return ERR(consup(x, y, z, p, q, r, s)); }
+func[R, T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) cr[R] { return ERR(consup(x, y, z, p, q, r, s, t)); }
 
 func[T, U, V, W, X, Y, Z, A] consup(x T, y U, z V, p W, q X, r Y, s Z, t A) tup[tup[tup[T, U], tup[V, W]], tup[tup[X, Y], tup[Z, A]]] {
   return {{{x, y}, {z, p}}, {{q, r}, {s, t}}};
@@ -105,6 +108,11 @@ func[T] DBG(x T) void {
   ign var = fflush(Stderr());
 }
 
+func dump_err_printed(pm err_printed) void {
+  print(Stderr(), pm.msg);
+  ign var = fflush(Stderr());
+}
+
 func[T, U, V, W, X, Y, Z, A] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z, t A) np {
   return MERR(cs, m, consup(x, y, z, p, q, r, s, t));
 }
@@ -133,9 +141,34 @@ func[T, U] MERR(cs *checkstate, m ast_meta, x T, y U) np {
   return MERR(cs, m, consup(x, y));
 }
 
-func[T] MERR(cs *checkstate, m ast_meta, x T) np {
+// Hopefully msg ends in \n, like strings created by err_string.
+func ERR_append(pm err_printed, msg array[u8]) np {
+  // We ignore pm.printed_meta.  (It's like ERR.
+  return Unprinted({false, concat(pm.msg, msg)});
+}
+
+func MERR_append(cs *checkstate, m ast_meta, pm err_printed, msg array[u8]) np {
+  return Unprinted({true, concat(pm.msg, merr_string(cs, m, false, msg))});
+}
+
+func[T] err_string(x T) array[u8] {
   r array[u8];
-  if case Has(p pos) = ref(&cs->posits.metas, m.x)->left {
+  build_u8str(void, &r, &x);
+  push(&r, '\n');
+  return r;
+}
+
+func[T, U] err_string(x T, y U) array[u8] {
+  return err_string(consup(x, y));
+}
+
+func[T, U, V] err_string(x T, y U, z V) array[u8] {
+  return err_string(consup(x, y, z));
+}
+
+func[T] merr_string(cs *checkstate, m ast_meta, newline bool, x T) array[u8] {
+  r array[u8];
+  if case Has(p pos) = cs->posits.metas[m.x].left {
     hp human_pos = to_human_pos(cs, p);
     build_u8str(cs->im, &r, &hp);
     append(&r, _u8(": "));
@@ -143,10 +176,14 @@ func[T] MERR(cs *checkstate, m ast_meta, x T) np {
     append(&r, _u8("At ??: "));
   }
   build_u8str(cs->im, &r, &x);
-  push(&r, '\n');
-  print(Stderr(), r);
-  ign var = fflush(Stderr());
-  return Printed({true});
+  if newline {
+    push(&r, '\n');
+  }
+  return r;
+}
+
+func[T] MERR(cs *checkstate, m ast_meta, x T) np {
+  return Unprinted({true, merr_string(cs, m, true, x)});
 }
 
 func[T] ice(x T) void {

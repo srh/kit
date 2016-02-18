@@ -284,7 +284,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     et *enumspec;
     switch structural_enumspec(ds, pt, &et) {
     case Error(pm):
-      return Printed(pm);
+      return Unprinted(pm);
     case Success: { }
     case NotAccessible:
       return NoFail(NoMatchConstructor);
@@ -312,7 +312,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     et *enumspec;
     switch structural_enumspec(ds, &cac_return_type.te, &et) {
     case Error(pm):
-      return Printed(pm);
+      return Unprinted(pm);
     case Success: { }
     case NotAccessible:
       return NoFail(NoMatchConstructor);
@@ -505,12 +505,12 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
     return NoFail;
   }
 
-  if case Printed(pm err_printed) = help_check_expr_ai(es, ai, x, pt) {
+  if case Unprinted(pm err_printed) = help_check_expr_ai(es, ai, x, pt) {
     if !pm.printed_meta {
       // TODO: Get rid of this terrible hackish way to error message.  (By printing location information everywhere.)
-      return MERR(es->cs, x->meta, _u8(" in this expression"));
+      return MERR_append(es->cs, x->meta, pm, _u8(" in this expression"));
     } else {
-      return Printed(pm);
+      return Unprinted(pm);
     }
   }
 
@@ -593,7 +593,7 @@ func success_enum_case_info(ds *defscope, cu *cu_typeexpr, success_case_ix_out *
   et *enumspec;
   switch structural_enumspec(ds, &cu->x, &et) {
   case Error(pm err_printed):
-    return Printed(pm);
+    return Unprinted(pm);
   case Success:
     if case Has(ix size) = et->success_case_ix {
       *success_case_ix_out = ix;
@@ -1278,7 +1278,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     b *structspec;
     switch structural_structspec(es->ds, pt, &b) {
     case Error(pm):
-      return Printed(pm);
+      return Unprinted(pm);
     case Success: { }
     case NotAccessible:
       return MERR(es->cs, a->meta, _u8("Strinit for inaccessible or non-structural type, "), pretty(es->im, pt));
@@ -1631,13 +1631,13 @@ enum structural_rhs_result {
 
 func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **deftype_inst_rhs_info) structural_rhs_result {
   accessible_result bool;
-  if case Printed(pm) = deftype_rhs_info_accessible(ds, pack->ent_id, &accessible_result) {
+  if case Unprinted(pm) = deftype_rhs_info_accessible(ds, pack->ent_id, &accessible_result) {
     return Error(pm);
   }
   if !accessible_result {
     return NotAccessible;
   }
-  if case Printed(pm) = ensure_deftype_inst_checked(ds->clq, pack->ent_id, pack->inst_id) {
+  if case Unprinted(pm) = ensure_deftype_inst_checked(ds->clq, pack->ent_id, pack->inst_id) {
     return Error(pm);
   }
   inst *deftype_inst = ref_deftype_inst(ds->cs, pack->inst_id);
@@ -1695,7 +1695,7 @@ func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, 
   st *structspec;
   switch help_structural_structspec(es->ds, pack, &st) {
   case Error(pm):
-    return Printed(pm);
+    return Unprinted(pm);
   case Success:
     return help_lookup_struct_field(es, st, fieldname, fieldtype_out, res_out);
   case NotAccessible:
