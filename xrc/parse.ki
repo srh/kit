@@ -21,8 +21,12 @@ enum parse_result {
   Fail void;
 }
 
-// NOTE: This can fail if x is unininitialized.  Should this be "~"?  In the long run the uninitialized value should be impossible.  If that does not happen, this should be changed to "~".
-func `+`(x parse_result) bool {
+enum try_parse_result {
+  #Success void;
+  Fail void;
+}
+
+inline func `+`(x try_parse_result) bool {
   switch x {
   case Fail: return false;
   case Success: return true;
@@ -79,7 +83,7 @@ func try_parse_keyw(p *ps, expected keyw) opt[ast_meta] {
   return None;  // Fail
 }
 
-func try_skip_keyw(p *ps, expected keyw) parse_result {
+func try_skip_keyw(p *ps, expected keyw) try_parse_result {
   if case &Keyw(k keyw) = &peek(p)->val {
     if k == expected {
       step(p);
@@ -98,7 +102,7 @@ func try_parse_token(p *ps, expected tokval) opt[ast_meta] {
   return None;  // Fail
 }
 
-func try_skip_token(p *ps, expected tokval) parse_result {
+func try_skip_token(p *ps, expected tokval) try_parse_result {
   if equal(&peek(p)->val, &expected) {
     step(p);
     return Success;
@@ -106,7 +110,7 @@ func try_skip_token(p *ps, expected tokval) parse_result {
   return Fail;
 }
 
-func try_parse_oper(p *ps, expected i32, out *ast_ident) parse_result {
+func try_parse_oper(p *ps, expected i32, out *ast_ident) try_parse_result {
   if case &Oper(arr smallstr) = &peek(p)->val {
     if arr.len == 1 && arr.vals[0] == expected {
       m ast_meta = startend(p);
@@ -117,7 +121,7 @@ func try_parse_oper(p *ps, expected i32, out *ast_ident) parse_result {
   }
   return Fail;
 }
-func try_skip_oper(p *ps, expected i32) parse_result {
+func try_skip_oper(p *ps, expected i32) try_parse_result {
   if case &Oper(arr smallstr) = &peek(p)->val {
     if arr.len == 1 && arr.vals[0] == expected {
       step(p);
@@ -126,7 +130,7 @@ func try_skip_oper(p *ps, expected i32) parse_result {
   }
   return Fail;
 }
-func try_skip_oper(p *ps, exp0 i32, exp1 i32) parse_result {
+func try_skip_oper(p *ps, exp0 i32, exp1 i32) try_parse_result {
   if case &Oper(arr smallstr) = &peek(p)->val {
     if arr.len == 2 && arr.vals[0] == exp0 && arr.vals[1] == exp1 {
       step(p);
@@ -135,7 +139,7 @@ func try_skip_oper(p *ps, exp0 i32, exp1 i32) parse_result {
   }
   return Fail;
 }
-func try_skip_oper(p *ps, exp0 i32, exp1 i32, exp2 i32) parse_result {
+func try_skip_oper(p *ps, exp0 i32, exp1 i32, exp2 i32) try_parse_result {
   if case &Oper(arr smallstr) = &peek(p)->val {
     if arr.len == 3 && arr.vals[0] == exp0 && arr.vals[1] == exp1 && arr.vals[2] == exp2 {
       step(p);
@@ -385,7 +389,7 @@ func triparse_ident(p *ps, out *ast_ident) triparse_result {
 }
 
 // Takes a [_]u8.
-func[T] try_skip_specific_ident(p *ps, x T) parse_result {
+func[T] try_skip_specific_ident(p *ps, x T) try_parse_result {
   switch peek(p)->val {
   case Ident(text shray[i32]):
     if count(&text) != x.length {
@@ -467,7 +471,7 @@ func triparse_bracebody(p *ps, out *ast_bracebody) triparse_result {
       return Success;
     }
     statement ast_statement;
-    if ! +parse_statement(p, &statement) {
+    if case Fail = parse_statement(p, &statement) {
       return Error;
     }
     pushmove(&statements, &statement);
@@ -481,7 +485,7 @@ func parse_bracebody(p *ps, out *ast_bracebody) parse_result {
   }
 }
 
-func try_underscore_if_allowed(p *ps, ab allow_blanks, out *ast_typeexpr) parse_result {
+func try_underscore_if_allowed(p *ps, ab allow_blanks, out *ast_typeexpr) try_parse_result {
   switch ab {
     case AllowBlanksYes: {
       if +try_skip_keyw(p, Underscore) {
@@ -564,7 +568,7 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_lifetimes, out *ast
     return Success;
   }
   args array[ast_typeexpr];
-  if ! +parse_rest_of_type_param_list(p, ab, &args) {
+  if case Fail = parse_rest_of_type_param_list(p, ab, &args) {
     return Error;
   }
   // NOTE: Allow arbitrarily many type applications?
@@ -629,7 +633,7 @@ func triparse_lifetime(p *ps, out *ast_lifetime) triparse_result {
     return Quickfail;
   }
   name ast_ident;
-  if ! +parse_ident(p, &name) {
+  if case Fail = parse_ident(p, &name) {
     return Error;
   }
   *out = {name};
@@ -1155,9 +1159,7 @@ func parse_atomic_expr(p *ps, ab allow_braces, out *ast_expr) parse_result {
       ident_meta ast_meta = startend(p);
       step(p);
       rhs ast_expr;
-      if ! +parse_expr(p, kGeneralUnopRightPrec, ab, IsNotStatementExpr, &rhs) {
-        return Fail;
-      }
+      #parse_expr(p, kGeneralUnopRightPrec, ab, IsNotStatementExpr, &rhs);
       end(p, m);
       *out = build_unop_expr(p->im, m, {ident_meta, intern(p->im, ~identch)}, rhs);
       return Success;
@@ -1724,14 +1726,15 @@ func see_if_parse(file *array[u8]) bool {
   posits positionals = mk_positionals();
   p ps = make_ps(&im, &posits, 0, data(file), count(file));
   out ast_file;
-  ret bool = +parse_file(&p, &out);
-  if !ret {
+  if case Fail = parse_file(&p, &out) {
     print(Stdout(), _u8("at offset "));
     print(Stdout(), to_u8str(peek(&p)->interval.left.x));
     print(Stdout(), _u8("..."));
     ign var = fflush(Stdout());
+    return false;
+  } else {
+    return true;
   }
-  return ret;
 }
 
 func run_parse_negtest(ctx *parse_test_ctx, test_name array[u8], file array[u8]) void {
