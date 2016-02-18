@@ -1308,7 +1308,7 @@ func load_module(cs *checkstate, mod_name sym) cr[module_id] {
     if case Fail = parse_file(&p, &oo(&mod)->file) {
       // The @[np] was something to grep for at one point.  TODO: Something about this is bad?
       ign np = @[np]ERR(_u8("Trouble parsing module at "), to_u8str(cs->im, to_human_pos(oo(&mod), peek(&p)->interval.left)));
-      return Printed(true);
+      return Printed({true});
     }
     mod_id module_id = ~count(&cs->modules);
     push(&cs->modules, mod);

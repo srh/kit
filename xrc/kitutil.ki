@@ -1,45 +1,50 @@
 import stdlib;
 import state;
 
+// A "printed" error happened.
+struct err_printed {
+  printed_meta bool;
+}
+
 // Tells (a) if the operation failed, and (b) if it did, whether location info was printed.  Might be expanded to include other info.
 enum np {
   // No failure happened.
   #NoFail void;
   // We had a failure, and an error message was printed.  True if location info was printed.
-  Printed bool;
+  Printed err_printed;
 }
 
 // Callers of this are OK with discarding Printed info (presumably).
 func from_np(x np) bool {
   switch x {
   case NoFail: return true;
-  case Printed(b bool): return false;
+  case Printed(b err_printed): return false;
   }
 }
 
 // cr = check result.
 enum[T] cr {
   #NoFail T;
-  Printed bool;
+  Printed err_printed;
 }
 
-func[T] ERR(x T) np { DBG(x); return Printed(false); }
-func[T, U] ERR(x T, y U) np { DBG(x, y); return Printed(false); }
-func[T, U, V] ERR(x T, y U, z V) np { DBG(x, y, z); return Printed(false); }
-func[T, U, V, W] ERR(x T, y U, z V, p W) np { DBG(x, y, z, p); return Printed(false); }
-func[T, U, V, W, X] ERR(x T, y U, z V, p W, q X) np { DBG(x, y, z, p, q); return Printed(false); }
-func[T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) np { DBG(x, y, z, p, q, r); return Printed(false); }
-func[T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) np { DBG(x, y, z, p, q, r, s); return Printed(false); }
-func[T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) np { DBG(x, y, z, p, q, r, s, t); return Printed(false); }
+func[T] ERR(x T) np { DBG(x); return Printed({false}); }
+func[T, U] ERR(x T, y U) np { DBG(x, y); return Printed({false}); }
+func[T, U, V] ERR(x T, y U, z V) np { DBG(x, y, z); return Printed({false}); }
+func[T, U, V, W] ERR(x T, y U, z V, p W) np { DBG(x, y, z, p); return Printed({false}); }
+func[T, U, V, W, X] ERR(x T, y U, z V, p W, q X) np { DBG(x, y, z, p, q); return Printed({false}); }
+func[T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) np { DBG(x, y, z, p, q, r); return Printed({false}); }
+func[T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) np { DBG(x, y, z, p, q, r, s); return Printed({false}); }
+func[T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) np { DBG(x, y, z, p, q, r, s, t); return Printed({false}); }
 
-func[R, T] ERR(x T) cr[R] { DBG(x); return Printed(false); }
-func[R, T, U] ERR(x T, y U) cr[R] { DBG(x, y); return Printed(false); }
-func[R, T, U, V] ERR(x T, y U, z V) cr[R] { DBG(x, y, z); return Printed(false); }
-func[R, T, U, V, W] ERR(x T, y U, z V, p W) cr[R] { DBG(x, y, z, p); return Printed(false); }
-func[R, T, U, V, W, X] ERR(x T, y U, z V, p W, q X) cr[R] { DBG(x, y, z, p, q); return Printed(false); }
-func[R, T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) cr[R] { DBG(x, y, z, p, q, r); return Printed(false); }
-func[R, T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) cr[R] { DBG(x, y, z, p, q, r, s); return Printed(false); }
-func[R, T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) cr[R] { DBG(x, y, z, p, q, r, s, t); return Printed(false); }
+func[R, T] ERR(x T) cr[R] { DBG(x); return Printed({false}); }
+func[R, T, U] ERR(x T, y U) cr[R] { DBG(x, y); return Printed({false}); }
+func[R, T, U, V] ERR(x T, y U, z V) cr[R] { DBG(x, y, z); return Printed({false}); }
+func[R, T, U, V, W] ERR(x T, y U, z V, p W) cr[R] { DBG(x, y, z, p); return Printed({false}); }
+func[R, T, U, V, W, X] ERR(x T, y U, z V, p W, q X) cr[R] { DBG(x, y, z, p, q); return Printed({false}); }
+func[R, T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) cr[R] { DBG(x, y, z, p, q, r); return Printed({false}); }
+func[R, T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) cr[R] { DBG(x, y, z, p, q, r, s); return Printed({false}); }
+func[R, T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) cr[R] { DBG(x, y, z, p, q, r, s, t); return Printed({false}); }
 
 func[T, U, V, W, X, Y, Z, A] consup(x T, y U, z V, p W, q X, r Y, s Z, t A) tup[tup[tup[T, U], tup[V, W]], tup[tup[X, Y], tup[Z, A]]] {
   return {{{x, y}, {z, p}}, {{q, r}, {s, t}}};
@@ -141,7 +146,7 @@ func[T] MERR(cs *checkstate, m ast_meta, x T) np {
   push(&r, '\n');
   print(Stderr(), r);
   ign var = fflush(Stderr());
-  return Printed(true);
+  return Printed({true});
 }
 
 func[T] ice(x T) void {

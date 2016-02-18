@@ -505,12 +505,12 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
     return NoFail;
   }
 
-  if case Printed(printed_meta bool) = help_check_expr_ai(es, ai, x, pt) {
-    if !printed_meta {
-      // TODO: Get rid of this terrible hackish way to error message.
+  if case Printed(pm err_printed) = help_check_expr_ai(es, ai, x, pt) {
+    if !pm.printed_meta {
+      // TODO: Get rid of this terrible hackish way to error message.  (By printing location information everywhere.)
       return MERR(es->cs, x->meta, _u8(" in this expression"));
     } else {
-      return Printed(printed_meta);
+      return Printed(pm);
     }
   }
 
@@ -592,7 +592,7 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
 func success_enum_case_info(ds *defscope, cu *cu_typeexpr, success_case_ix_out *size, et_out **enumspec) np {
   et *enumspec;
   switch structural_enumspec(ds, &cu->x, &et) {
-  case Error(pm):
+  case Error(pm err_printed):
     return Printed(pm);
   case Success:
     if case Has(ix size) = et->success_case_ix {
@@ -1624,8 +1624,7 @@ func type_pack(t *te_typeexpr) opt[te_instpack] {
 }
 
 enum structural_rhs_result {
-  // An error was printed.  True if location info was printed.
-  Error bool;
+  Error err_printed;
   Success void;
   NotAccessible void;
 }

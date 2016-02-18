@@ -166,11 +166,11 @@ struct breakpack {
 }
 
 func check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *ast_statement, ee_out *entryexit) np {
-  if case Printed(printed_meta bool) = help_check_statement(bs, vp, obp, s, ee_out) {
-    if !printed_meta {
+  if case Printed(pm err_printed) = help_check_statement(bs, vp, obp, s, ee_out) {
+    if !pm.printed_meta {
       return MERR(bs->cs, s->meta, _u8(" in this statement"));
     } else {
-      return Printed(printed_meta);
+      return Printed(pm);
     }
   }
   return NoFail;
