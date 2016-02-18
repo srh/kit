@@ -76,9 +76,19 @@ func vs_xop(c cgt, gn gr_num, xn *gr_xnode) np {
 
 func vs_support_xop(vs *vt_state, op *gr_xop) np {
   switch op {
-  case &GrApply(a gr_apply):
-    // TODO(): Implement.
+  case &GrApply(a gr_apply): {
+    // Just some fanciful ways to say "activate" and "deactivate" without knowing what we're doing.
+    #vs_support_descope(vs, a.funcell);
+    foreach c cell_num in elems(&a.params) {
+      // This is the opposite of typical destruction order.  But it shouldn't matter because we don't really know the order, do we?
+      #vs_support_descope(vs, c);
+    }
+
+    #vs_support_enscope(vs, a.retcell);
+
+    // TODO(): The function surely has some other information than this!  We could at least fake init/move/copy/destroy behavior!
     return NoFail;
+  }
   case &GrPrimApply(a gr_prim_apply):
     // TODO(): Implement.
     return NoFail;
@@ -116,6 +126,16 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
     // TODO(): Implement.
     return NoFail;
   }
+}
+
+func vs_support_enscope(vs *vt_state, c cell_num) np {
+  // TODO(): Do something
+  return NoFail;
+}
+
+func vs_support_descope(vs *vt_state, c cell_num) np {
+  // TODO(): Do something
+  return NoFail;
 }
 
 func vs_checksum_xop(vs *vs_checksum, op *gr_xop) void {
