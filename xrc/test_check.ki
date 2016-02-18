@@ -84,17 +84,18 @@ func[T] run_check_test(ctx *check_ctx, name T, file array[u8]) void {
   im identmap = make_im();
   cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
   add_primitives(&cs);
-  success bool;
+  result np;
   if ctx->build {
     flattened array[u8];
-    success = from_np(build_nowrite_module(&cs, intern(&im, testmodule_name()), &flattened));
+    result = build_nowrite_module(&cs, intern(&im, testmodule_name()), &flattened);
   } else {
-    success = from_np(check_module(&cs, intern(&im, testmodule_name())));
+    result = check_module(&cs, intern(&im, testmodule_name()));
   }
-  if !success {
+  if case Unprinted(pm) = result {
     if !ctx->verbose {
       print_test_announce(false, _u8(name));
     }
+    dump_err_printed(pm);
     print(Stdout(), _u8("FAIL\n"));
     ign var = fflush(Stdout());
     ctx->failures = ctx->failures + 1;
@@ -119,22 +120,21 @@ func[T] run_check_negtest(ctx *check_ctx, name T, file array[u8]) void {
   im identmap = make_im();
   cs checkstate = make_checkstate(&im, test_platform(), @[*void]cast(&file), test_loader);
   add_primitives(&cs);
-  if from_np(check_module(&cs, intern(&im, testmodule_name()))) {
+  if case Unprinted(pm) = check_module(&cs, intern(&im, testmodule_name())) {
+    if ctx->verbose {
+      dump_err_printed(pm);
+      print(Stdout(), _u8("PASS\n"));
+      ign var = fflush(Stdout());
+    }
+  } else {
     if !ctx->verbose {
       print_test_announce(true, _u8(name));
     }
     print(Stdout(), _u8("FAIL\n"));
     ign var = fflush(Stdout());
     ctx->failures = ctx->failures + 1;
-  } else {
-    if ctx->verbose {
-      print(Stdout(), _u8("PASS\n"));
-      ign var = fflush(Stdout());
-    }
   }
 }
-
-// TODO: Make test output not go directly to stdout/stderr.
 
 struct check_ctx {
   verbose bool;
