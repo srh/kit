@@ -116,13 +116,14 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
     #vs_support_const_properties(vs, a.dest);
     return NoFail;
   case &GrAddressof(a gr_addressof):
-    // TODO(): Implement.
+    #vs_support_enscope(vs, a.dest);
+    #vs_support_add(vs, {PointerFrom(a.dest), a.addressee});
     return NoFail;
   case &GrDeref(a gr_deref):
-    // TODO(): Implement.
+    #vs_support_add(vs, {PointerFrom(a.pointer), a.name});
     return NoFail;
   case &GrSubcell(a gr_subcell):
-    // TODO(): Implement.
+    #vs_support_add(vs, {FieldOf(a.partof), a.name});
     return NoFail;
   case &GrLive(a gr_live):
     #vs_support_enscope(vs, a.cell);
@@ -133,7 +134,7 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
     #vs_support_descope(vs, a.cell);
     return NoFail;
   case &GrVirtualDead(a gr_virtual_dead):
-    // TODO(): Implement.
+    #vs_support_virtualdead(vs, a.cell);
     return NoFail;
   case &GrActiveXop(a gr_active_xop):
     #vs_support_active_op(vs, a.op1);
@@ -147,14 +148,8 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
   }
 }
 
-func vs_support_active_op(vs *vt_state, op gr_active_op) np {
-  switch op {
-  case Nothing: { }
-  case Activate(c cell_num):
-    #vs_support_activate(vs, c);
-  case Deactivate(c cell_num):
-    #vs_support_deactivate(vs, c);
-  }
+func vs_support_add(vs *vt_state, supp vs_support) np {
+  // TODO(): Do something
   return NoFail;
 }
 
@@ -188,6 +183,23 @@ func vs_support_const_properties(vs *vt_state, dest cell_num) np {
   // We'll probably need the const value, too...
   return NoFail;
 }
+
+func vs_support_virtualdead(vs *vt_state, dest cell_num) np {
+  // TODO(): Do something
+  return NoFail;
+}
+
+func vs_support_active_op(vs *vt_state, op gr_active_op) np {
+  switch op {
+  case Nothing: { }
+  case Activate(c cell_num):
+    #vs_support_activate(vs, c);
+  case Deactivate(c cell_num):
+    #vs_support_deactivate(vs, c);
+  }
+  return NoFail;
+}
+
 
 func vs_checksum_xop(vs *vs_checksum, op *gr_xop) void {
   switch op {
