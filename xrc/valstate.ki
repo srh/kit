@@ -102,9 +102,13 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
     }
     return NoFail;
   }
-  case &GrPrimApply(a gr_prim_apply):
-    // TODO(): Implement.
+  case &GrPrimApply(a gr_prim_apply): {
+    foreach c cell_num in elems(&a.params) {
+      #vs_support_descope(vs, c);
+    }
+    #vs_support_activate(vs, a.retcell);
     return NoFail;
+  }
   case &GrMemCopy(a gr_memcopy):
     // TODO(): Implement.
     return NoFail;
