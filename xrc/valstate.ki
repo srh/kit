@@ -77,16 +77,29 @@ func vs_xop(c cgt, gn gr_num, xn *gr_xnode) np {
 func vs_support_xop(vs *vt_state, op *gr_xop) np {
   switch op {
   case &GrApply(a gr_apply): {
-    // Just some fanciful ways to say "activate" and "deactivate" without knowing what we're doing.
+    // We don't know what we're doing yet so we just call these do-nothing functions.
     #vs_support_descope(vs, a.funcell);
     foreach c cell_num in elems(&a.params) {
       // This is the opposite of typical destruction order.  But it shouldn't matter because we don't really know the order, do we?
       #vs_support_descope(vs, c);
     }
 
-    #vs_support_enscope(vs, a.retcell);
+    #vs_support_activate(vs, a.retcell);
 
-    // TODO(): The function surely has some other information than this!  We could at least fake init/move/copy/destroy behavior!
+    switch a.semantic {
+    case NoSemantic: { }
+    case MoveSemantic(bs gr_apply_bi_semantic):
+      #vs_support_activate(vs, bs.dest);
+      #vs_support_copy_properties(vs, bs.dest, bs.src);
+      #vs_support_deactivate(vs, bs.src);
+    case CopySemantic(bs gr_apply_bi_semantic):
+      #vs_support_activate(vs, bs.dest);
+      #vs_support_copy_properties(vs, bs.dest, bs.src);
+    case InitSemantic(us gr_apply_uni_semantic):
+      #vs_support_activate(vs, us.cell);
+    case DestroySemantic(us gr_apply_uni_semantic):
+      #vs_support_deactivate(vs, us.cell);
+    }
     return NoFail;
   }
   case &GrPrimApply(a gr_prim_apply):
@@ -134,6 +147,21 @@ func vs_support_enscope(vs *vt_state, c cell_num) np {
 }
 
 func vs_support_descope(vs *vt_state, c cell_num) np {
+  // TODO(): Do something
+  return NoFail;
+}
+
+func vs_support_activate(vs *vt_state, c cell_num) np {
+  // TODO(): Do something
+  return NoFail;
+}
+
+func vs_support_deactivate(vs *vt_state, c cell_num) np {
+  // TODO(): Do something
+  return NoFail;
+}
+
+func vs_support_copy_properties(vs *vt_state, dest cell_num, src cell_num) np {
   // TODO(): Do something
   return NoFail;
 }
