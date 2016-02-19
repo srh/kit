@@ -140,7 +140,9 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
     #vs_support_active_op(vs, a.op2);
     return NoFail;
   case &GrManyActiveXop(a gr_many_active_xop):
-    // TODO(): Implement.
+    foreach aop gr_active_op in elems(&a.ops) {
+      #vs_support_active_op(vs, aop);
+    }
     return NoFail;
   }
 }
