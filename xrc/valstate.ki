@@ -136,12 +136,24 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
     // TODO(): Implement.
     return NoFail;
   case &GrActiveXop(a gr_active_xop):
-    // TODO(): Implement.
+    #vs_support_active_op(vs, a.op1);
+    #vs_support_active_op(vs, a.op2);
     return NoFail;
   case &GrManyActiveXop(a gr_many_active_xop):
     // TODO(): Implement.
     return NoFail;
   }
+}
+
+func vs_support_active_op(vs *vt_state, op gr_active_op) np {
+  switch op {
+  case Nothing: { }
+  case Activate(c cell_num):
+    #vs_support_activate(vs, c);
+  case Deactivate(c cell_num):
+    #vs_support_deactivate(vs, c);
+  }
+  return NoFail;
 }
 
 func vs_support_enscope(vs *vt_state, c cell_num) np {
