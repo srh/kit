@@ -148,7 +148,7 @@ func ERR_append(pm err_printed, msg array[u8]) np {
 }
 
 func MERR_append(cs *checkstate, m ast_meta, pm err_printed, msg array[u8]) np {
-  return Unprinted({true, concat(pm.msg, merr_string(cs, m, false, msg))});
+  return Unprinted({true, concat(pm.msg, merr_string(cs, m, msg))});
 }
 
 func[T] err_string(x T) array[u8] {
@@ -166,7 +166,7 @@ func[T, U, V] err_string(x T, y U, z V) array[u8] {
   return err_string(consup(x, y, z));
 }
 
-func[T] merr_string(cs *checkstate, m ast_meta, newline bool, x T) array[u8] {
+func[T] merr_string(cs *checkstate, m ast_meta, x T) array[u8] {
   r array[u8];
   if case Has(p pos) = cs->posits.metas[m.x].left {
     hp human_pos = to_human_pos(cs, p);
@@ -176,14 +176,12 @@ func[T] merr_string(cs *checkstate, m ast_meta, newline bool, x T) array[u8] {
     append(&r, _u8("At ??: "));
   }
   build_u8str(cs->im, &r, &x);
-  if newline {
-    push(&r, '\n');
-  }
+  push(&r, '\n');
   return r;
 }
 
 func[T] MERR(cs *checkstate, m ast_meta, x T) np {
-  return Unprinted({true, merr_string(cs, m, true, x)});
+  return Unprinted({true, merr_string(cs, m, x)});
 }
 
 func[T] ice(x T) void {
