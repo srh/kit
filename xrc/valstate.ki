@@ -125,12 +125,12 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
     // TODO(): Implement.
     return NoFail;
   case &GrLive(a gr_live):
-    // TODO(): Implement.
+    #vs_support_enscope(vs, a.cell);
     return NoFail;
   case &GrAssertLive(a gr_assert_live):
     return NoFail;
   case &GrDead(a gr_dead):
-    // TODO(): Implement.
+    #vs_support_descope(vs, a.cell);
     return NoFail;
   case &GrVirtualDead(a gr_virtual_dead):
     // TODO(): Implement.
