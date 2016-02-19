@@ -89,12 +89,12 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
     switch a.semantic {
     case NoSemantic: { }
     case MoveSemantic(bs gr_apply_bi_semantic):
-      #vs_support_activate(vs, bs.dest);
       #vs_support_copy_properties(vs, bs.dest, bs.src);
+      #vs_support_activate(vs, bs.dest);
       #vs_support_deactivate(vs, bs.src);
     case CopySemantic(bs gr_apply_bi_semantic):
-      #vs_support_activate(vs, bs.dest);
       #vs_support_copy_properties(vs, bs.dest, bs.src);
+      #vs_support_activate(vs, bs.dest);
     case InitSemantic(us gr_apply_uni_semantic):
       #vs_support_activate(vs, us.cell);
     case DestroySemantic(us gr_apply_uni_semantic):
@@ -110,10 +110,10 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
     return NoFail;
   }
   case &GrMemCopy(a gr_memcopy):
-    // TODO(): Implement.
+    #vs_support_copy_properties(vs, a.dest, a.src);
     return NoFail;
   case &GrWriteConst(a gr_writeconst):
-    // TODO(): Implement.
+    #vs_support_const_properties(vs, a.dest);
     return NoFail;
   case &GrAddressof(a gr_addressof):
     // TODO(): Implement.
@@ -128,7 +128,6 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
     // TODO(): Implement.
     return NoFail;
   case &GrAssertLive(a gr_assert_live):
-    // TODO(): Implement.
     return NoFail;
   case &GrDead(a gr_dead):
     // TODO(): Implement.
@@ -167,6 +166,12 @@ func vs_support_deactivate(vs *vt_state, c cell_num) np {
 
 func vs_support_copy_properties(vs *vt_state, dest cell_num, src cell_num) np {
   // TODO(): Do something
+  return NoFail;
+}
+
+func vs_support_const_properties(vs *vt_state, dest cell_num) np {
+  // TODO(): Do something
+  // We'll probably need the const value, too...
   return NoFail;
 }
 
