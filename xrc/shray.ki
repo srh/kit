@@ -122,16 +122,8 @@ func[T] repeat(n size, x T) shray[T] {
   return freeze(&ret);
 }
 
-// TODO: This could be improved.
-func[T] mk_copy(x *shray[T]) array[T] {
-  ret array[T];
-  n size = count(x);
-  p * ^[0]T = data(x);
-  reserve(&ret, n);
-  for i size = 0; i < n; i = i + 1 {
-    push(&ret, p[i]);
-  }
-  return ret;
+inline func[T] mk_copy(x *shray[T]) array[T] {
+  return make_copy(data(x), count(x));
 }
 
 func[T] shray_equal(a *shray[T], b *shray[T]) bool {

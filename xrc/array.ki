@@ -208,10 +208,7 @@ access array[_] {
 
 func[T] make_copy(p * ^[0]T, n size) array[T] {
   ret array[T];
-  reserve(&ret, n);
-  for i size = 0; i < n; i = i + 1 {
-    push(&ret, p[i]);
-  }
+  append_raw(&ret, p, n);
   return ret;
 }
 
