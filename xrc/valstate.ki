@@ -23,7 +23,7 @@ enum vs_supporter {
   PointerFrom cell_num;
   // Supportee is a field of the given cell.
   FieldOf cell_num;
-  // A descoping element.
+  // A descoping element.  Not sure if cell_num actually gets used -- it is informative though.
   DescopingElement cell_num;
   // We've lost track of the cell's support.  TODO: Get rid of this.
   LostTrack void;
@@ -83,9 +83,11 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
   switch op {
   case &GrApply(a gr_apply): {
     // We don't know what we're doing yet so we just call these do-nothing functions.
+    #vs_support_deactivate(vs, a.funcell);
     #vs_support_descope(vs, a.funcell);
     foreach c cell_num in elems(&a.params) {
       // This is the opposite of typical destruction order.  But it shouldn't matter because we don't really know the order, do we?
+      #vs_support_deactivate(vs, c);
       #vs_support_descope(vs, c);
     }
 
@@ -165,8 +167,25 @@ func vs_support_enscope(vs *vt_state, c cell_num) np {
   return NoFail;
 }
 
+// Cases where c is the _supporter_ should have been handled if/when the cell got deactivated.
+inline func vs_descope_removes_support(supp *vs_support, c cell_num) bool {
+  return supp->supportee == c;
+}
+
 func vs_support_descope(vs *vt_state, c cell_num) np {
-  // TODO(): Do something
+  // If we descope, that means... we become deceased
+  // TODO(): a way to deactivate anything that referenced us
+
+  n size = count(&vs->supports);
+  w size = 0;
+  for i size = 0; i < n; i++ {
+    supp *vs_support = &vs->supports[i];
+    if !vs_descope_removes_support(supp, c) {
+      vs->supports[w] = *supp;
+      w++;
+    }
+  }
+  truncate(&vs->supports, w);
   return NoFail;
 }
 
@@ -175,8 +194,32 @@ func vs_support_activate(vs *vt_state, c cell_num) np {
   return NoFail;
 }
 
+// Cases where c is the _supportee_ would be handled at descoping(?)
+func vs_deactivate_removes_support(supp *vs_support, c cell_num) bool {
+  switch &supp->supporter {
+  case &PointerFrom(d cell_num):
+    return d == c;
+  case &FieldOf(d cell_num):
+    return d == c;
+  case &DescopingElement(d cell_num):
+    return false;
+  case &LostTrack(v void):
+    return false;
+  }
+}
+
 func vs_support_deactivate(vs *vt_state, c cell_num) np {
-  // TODO(): Do something
+  n size = count(&vs->supports);
+  w size = 0;
+  for i size = 0; i < n; i++ {
+    supp *vs_support = &vs->supports[i];
+    if !vs_deactivate_removes_support(supp, c) {
+      vs->supports[w] = *supp;
+      w++;
+    }
+  }
+  truncate(&vs->supports, w);
+
   return NoFail;
 }
 
