@@ -57,7 +57,11 @@ access hash[_, _] {
     swap(&h->arr, &new_array);
   }
 
-  func[K, V] try_insert(h *hash[K, V], key *K, value V) bool {
+  inline func[K, V] try_insert(h *hash[K, V], key *K, value V) bool {
+    return try_insert_ref(h, key, &value);
+  }
+
+  func[K, V] try_insert_ref(h *hash[K, V], key *K, value *V) bool {
     if count(&h->arr) == 0 {
       rebuild_(h, 8);
     }
@@ -68,7 +72,7 @@ access hash[_, _] {
     for ;; {
       switch ref(&h->arr, offset) {
         case &HashEmpty: {
-          *ref(&h->arr, offset) = @[hash_entry[K, V]]HashValue({*key, value});
+          *ref(&h->arr, offset) = @[hash_entry[K, V]]HashValue({*key, *value});
           h->user_count = h->user_count + 1;
           h->cell_count = h->cell_count + 1;
           if h->cell_count * 2 >= count(&h->arr) {
@@ -90,7 +94,7 @@ access hash[_, _] {
             step = step + 1;
             switch ref(&h->arr, offset) {
             case &HashEmpty:
-              *ref(&h->arr, insertion_offset) = @[hash_entry[K, V]]HashValue({*key, value});
+              *ref(&h->arr, insertion_offset) = @[hash_entry[K, V]]HashValue({*key, *value});
               h->user_count = h->user_count + 1;
               return true;
             case &HashValue(p tup[K, V]):

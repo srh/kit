@@ -63,9 +63,90 @@ func unify_vs_checksum(onto *vs_checksum, from *vs_checksum) np {
   }
 }
 
+// Well.  This sure seems like a bespoke thing that won't last.
+struct vs_unify_half_pairage {
+  // Does it have a descoping element?  (Whose cell_num must be the same ofc.)
+  descoping bool;
+  // Does it have FieldOf support?
+  fieldof opt[cell_num];
+  // What are our PointerFroms?
+  inpointers array[cell_num];
+  // Did we "lose track"?
+  losttrack bool;
+}
+
+struct vs_unify_pairage {
+  for_onto vs_unify_half_pairage;
+  for_from vs_unify_half_pairage;
+}
+
 func unify_vs_support(onto *vt_state, from *vt_state) cr[freshness] {
+  // Okay, how is this gonna work.
+  // Essentially, "onto" and "from" give us a grab-bag of supports.  We combine them together.
+
+  // We can also have conflicting supports.  Let's describe in text what'll combine and what'll conflict.
+
+  /*
+     For a given supportee, we try to pair up identical supporters.  If we can't pair them up one-to-one, what happens:
+
+       - we replace the PointerFrom's with LostTrack
+       - the FieldOf's and DescopingElements had damn well better match up, and they're retained (in fact, there must be <= 1 of them in total)
+       - we return Fresh (not Stale)
+
+     TODO(): Obviously we'd like to avoid LostTrack and handle things better.
+  */
+
+  initial_pairage vs_unify_pairage = {
+    {false, None, mk_array(), false},
+    {false, None, mk_array(), false}
+  };
+
+  bu hash[cell_num, vs_unify_pairage];
+
+  foreach supp *vs_support in refs(&onto->supports) {
+    ign bool = try_insert_ref(&bu, &supp->supportee, &initial_pairage);
+    pa *vs_unify_pairage = unHas!lookup_ref(&bu, &supp->supportee);
+    #add_supp(&pa->for_onto, supp);
+  }
+
+  foreach supp *vs_support in refs(&from->supports) {
+    ign bool = try_insert_ref(&bu, &supp->supportee, &initial_pairage);
+    pa *vs_unify_pairage = unHas!lookup_ref(&bu, &supp->supportee);
+    #add_supp(&pa->for_from, supp);
+  }
+
+  // bu_it hash_iter[cell_num, vs_unify_pairage]
+
   // TODO(): Implement.
   return NoFail(Stale);
+}
+
+func add_supp(hp *vs_unify_half_pairage, supp *vs_support) np {
+  switch &supp->supporter {
+  case &PointerFrom(c cell_num):
+    push(&hp->inpointers, c);
+  case &FieldOf(c cell_num):
+    if case Has(d cell_num) = hp->fieldof {
+      if d == c {
+        return ERR(_u8("ICE?  FieldOf already present, cells match."));
+      } else {
+        return ERR(_u8("ICE?  FieldOf already present, cells do NOT match."));
+      }
+    } else {
+      hp->fieldof = Has(c);
+    }
+  case &DescopingElement(c cell_num):
+    if c != supp->supportee {
+      return ERR(_u8("ICE?  Mismatched descoping elem"));
+    }
+    if hp->descoping {
+      return ERR(_u8("ICE?  Multiple descoping elems for cell "), c);
+    }
+    hp->descoping = true;
+  case &LostTrack:
+    hp->losttrack = true;
+  }
+  return NoFail;
 }
 
 func vs_xop(c cgt, gn gr_num, xn *gr_xnode) np {
@@ -268,11 +349,12 @@ func vs_support_virtualdead(vs *vt_state, c cell_num) np {
       case &PointerFrom(d cell_num):
         if d == c {
           // Uh yeah we update in-place.
+          // This could also be improved.
           supp->supporter = LostTrack;
         }
         incr_w = 1;
       case &FieldOf(d cell_num):
-        // How should this work?  We really do lose track of support, but...
+        // How should this work?  We really do lose track of support, but... obviously this could be improved.
         if d == c {
           supp->supporter = LostTrack;
         }
