@@ -209,6 +209,7 @@ func vs_deactivate_removes_support(supp *vs_support, c cell_num) bool {
 }
 
 func vs_support_deactivate(vs *vt_state, c cell_num) np {
+  // vs_support_const_properties calls this, check if that makes sense if you modify this.
   n size = count(&vs->supports);
   w size = 0;
   for i size = 0; i < n; i++ {
@@ -224,18 +225,71 @@ func vs_support_deactivate(vs *vt_state, c cell_num) np {
 }
 
 func vs_support_copy_properties(vs *vt_state, dest cell_num, src cell_num) np {
-  // TODO(): Do something
+  // Okay, what properties are copied?
+  // In general, I think, emitted support, but _not_ (necessarily) exposed information.
+
+  n size = count(&vs->supports);
+  for i size = 0; i < n; i++ {
+    supp *vs_support = &vs->supports[i];
+    switch &supp->supporter {
+    case &PointerFrom(d cell_num):
+      if d == src {
+        #vs_support_add(vs, {PointerFrom(dest), supp->supportee});
+      }
+    case &FieldOf(d cell_num): {
+      // For what it's worth, the support from a field to its struct owner is _not_ emitted support.  So it's not an exception that it doesn't get copied.
+    }
+    case &DescopingElement(d cell_num): { }
+    case &LostTrack(v void): { }
+    }
+    // supp is inv
+  }
+
   return NoFail;
 }
 
 func vs_support_const_properties(vs *vt_state, dest cell_num) np {
-  // TODO(): Do something
   // We'll probably need the const value, too...
-  return NoFail;
+  // If we're overwriting a pointer... it's essentially deactivation for now.
+  return vs_support_deactivate(vs, dest);
 }
 
-func vs_support_virtualdead(vs *vt_state, dest cell_num) np {
-  // TODO(): Do something
+func vs_support_virtualdead(vs *vt_state, c cell_num) np {
+  n size = count(&vs->supports);
+  w size = 0;
+  for i size = 0; i < n; i++ {
+    supp *vs_support = &vs->supports[i];
+    incr_w size;
+    if supp->supportee == c {
+      // We drop this.
+      incr_w = 0;
+    } else {
+      switch &supp->supporter {
+      case &PointerFrom(d cell_num):
+        if d == c {
+          // Uh yeah we update in-place.
+          supp->supporter = LostTrack;
+        }
+        incr_w = 1;
+      case &FieldOf(d cell_num):
+        // How should this work?  We really do lose track of support, but...
+        if d == c {
+          supp->supporter = LostTrack;
+        }
+        incr_w = 1;
+      case &DescopingElement(d cell_num):
+        // We shouldn't have any descoping elements for virtual cells.
+        check(d != c);
+        incr_w = 1;
+      case &LostTrack:
+        incr_w = 1;
+      }
+    }
+    vs->supports[w] = vs->supports[i];
+    w += incr_w;
+  }
+  truncate(&vs->supports, w);
+
   return NoFail;
 }
 
