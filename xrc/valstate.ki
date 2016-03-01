@@ -166,8 +166,7 @@ func unify_vs_support(onto *vt_state, from *vt_state) cr[freshness] {
 
   swap(&onto->supports, &new_supports);
 
-  // TODO(): Oh you better return Fresh vvvv
-  return NoFail(fresh then @[freshness]Stale else @[freshness]Stale);
+  return NoFail(fresh then @[freshness]Fresh else @[freshness]Stale);
 }
 
 func add_supp(hp *vs_unify_half_pairage, supp *vs_support) np {

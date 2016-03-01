@@ -39,13 +39,13 @@ func ensure_def_inst_valtracked(clq *clqueue, ent_id def_entry_id, inst_id def_i
 }
 
 func vt_regraphed(clq *clqueue, fg *frame_regraphed) np {
-  // DBG(_u8!"valtracking for graph ", lookup(clq->im, fg->gr.informal_name));
   return vt_graph(clq, &fg->gr, fg->gn);
 }
 
 func vt_graph(clq *clqueue, gr *frame_graph, gn gr_num) np {
+  // DBG(_u8!"valtracking for graph ", lookup(clq->im, gr->informal_name));
   // This uses a different traversal algorithm than some other graph-traversing code.  Metadata that tells us about the AST's structure make us revisit alternate branches more "locally," and more importantly, in a defined order that can be described in terms of the original AST.
-  // TODO: Make the above comment be true.
+  // TODO: Make the above comment be true.  Right now we don't really have a defined order.
 
   track vt_track = mk_track(gr);
 
@@ -168,7 +168,12 @@ func vt_single_xop(c cgt, gn gr_num) np {
     // Ack -- we've gotta trace a sub-qop-expr.
     terminates bool = #vt_inner_expr(c, gn);
     if !terminates {
-      ice(_u8("single-op inner expr does not terminate"));
+      /* TODO(): We either need to:
+        - get rid of inner exprs
+        - make them a special thing with end state specially recorded
+        - have this function be able to record "was stale, did not finish"
+      */
+      ice(_u8("single-op inner expr of gn "), gn, _u8(" does not terminate"));
     }
     return NoFail;
   }

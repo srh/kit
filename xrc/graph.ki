@@ -116,6 +116,14 @@ inline func hash_equal(x *gr_num, y *gr_num) bool {
   return x->x == y->x;
 }
 
+func[H] build_u8str(help H, r *array[u8], gn *gr_num) void {
+  build_u8str(help, r, &gn->x);
+}
+
+func[H] build_u8str(help H, r *array[u8], gn *sq_num) void {
+  build_u8str(help, r, &gn->x.x);
+}
+
 struct sq_num { x gr_num; }
 def `~` fn[gr_num, sq_num] = wrapconvert;
 func `==`(x sq_num, y sq_num) bool { return x.x.x == y.x.x; }
@@ -461,6 +469,9 @@ func uni_connect(gs gr_statep, gn gr_num, outflow *tracked_target, disposition g
 // last(.) is used to identify the label target for gr_label_statement.
 func last(bu *sq_builder) sq_num {
   return bu->last;
+}
+func front(bu *sq_builder) sq_num {
+  return bu->first;
 }
 
 func done(bu *sq_builder) gr_num {
