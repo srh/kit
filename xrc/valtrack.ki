@@ -103,7 +103,10 @@ func vt_xops(c cgt, ft *vt_freshtrack, gn gr_num) np {
         }
         return NoFail;
       case &GrSequence(a gr_sequence):
-        #vt_single_xop(c, a.first);
+        if ! #vt_single_xop(c, a.first) {
+          // The single xop didn't reach the end freshly.  So.
+          return NoFail;
+        }
         gn = a.second.x;
         // loop around
       case &GrJmp(a gr_jmp):
@@ -141,7 +144,10 @@ func vt_abnormal_excursion(c cgt, ft *vt_freshtrack, gn gr_num) np {
       case &GrBranch(a gr_branch):
         ice(_u8("vt_abnormal_excursion sees a branch"));
       case &GrSequence(a gr_sequence):
-        #vt_single_xop(c, a.first);
+        if ! #vt_single_xop(c, a.first) {
+          // Single expr hit a stale point, exit.
+          return NoFail;
+        }
         gn = a.second.x;
       case &GrJmp(a gr_jmp):
         switch a.disposition {
@@ -160,22 +166,21 @@ func vt_abnormal_excursion(c cgt, ft *vt_freshtrack, gn gr_num) np {
   }
 }
 
-func vt_single_xop(c cgt, gn gr_num) np {
+// Returns true if we reached the end of the single xop.  If true, c.track->current means something.  If false, it doesn't!
+func vt_single_xop(c cgt, gn gr_num) cr[bool] {
   switch ref_node(c.gr, gn) {
   case &XOp(xn gr_xnode):
-    return vs_xop(c, gn, &xn);
+    #vs_xop(c, gn, &xn);
+    return NoFail(true);
   case &QOp(qn gr_qnode):
     // Ack -- we've gotta trace a sub-qop-expr.
-    terminates bool = #vt_inner_expr(c, gn);
-    if !terminates {
-      /* TODO(): We either need to:
-        - get rid of inner exprs
-        - make them a special thing with end state specially recorded
-        - have this function be able to record "was stale, did not finish"
-      */
-      ice(_u8("single-op inner expr of gn "), gn, _u8(" does not terminate"));
-    }
-    return NoFail;
+    return vt_inner_expr(c, gn);
+
+    /* We either want to:
+      - get rid of inner exprs
+      - make them a special kind of XOp with end state specially recorded, so that we _know_ they have an explicit join target before reentering the rest of the world
+        TODO: ^^^ especially if valtracking gets more complicated
+    */
   }
 }
 
