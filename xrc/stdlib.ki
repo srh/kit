@@ -208,6 +208,10 @@ func[T] `==`(x opt[T], y opt[T]) bool {
   return false;
 }
 
+func[T] `!=`(x opt[T], y opt[T]) bool {
+  return !(x == y);
+}
+
 func[T] set(dest *opt[T], y T) void {
   if case &Has(t T) = dest {
     crash(_u8("set sees Has"));

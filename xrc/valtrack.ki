@@ -53,8 +53,6 @@ func vt_graph(clq *clqueue, gr *frame_graph, gn gr_num) np {
   return NoFail;
 }
 
-// TODO: Mark all nodes we've traversed at least once so that building can assert that we've traversed all nodes codegenned.
-
 // Returns true if the inner_expr can terminate (in which case c.track->current means something).
 func vt_inner_expr(c cgt, outer_gn gr_num) cr[bool] {
   ft vt_freshtrack = {mk_array@[gr_num](), None};

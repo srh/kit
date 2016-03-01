@@ -115,10 +115,58 @@ func unify_vs_support(onto *vt_state, from *vt_state) cr[freshness] {
     #add_supp(&pa->for_from, supp);
   }
 
-  // bu_it hash_iter[cell_num, vs_unify_pairage]
+  new_supports array[vs_support];
 
-  // TODO(): Implement.
-  return NoFail(Stale);
+  fresh bool = false;
+
+  it hash_iter[cell_num, vs_unify_pairage] = iter(&bu);
+  while case Has(p *tup[_, _]) = next(&it) {
+    supportee cell_num = p->car;
+    oh *vs_unify_half_pairage = &p->cdr.for_onto;
+    fh *vs_unify_half_pairage = &p->cdr.for_from;
+    if oh->descoping != fh->descoping {
+      return ERR(_u8("Inconsistent descoping state for "), supportee);
+    }
+    if oh->fieldof != fh->fieldof {
+      return ERR(_u8("Inconsistent fieldof state for "), supportee);
+    }
+    if oh->descoping && isHas(&oh->fieldof) {
+      return ERR(_u8("Field has descoping element for field "), supportee);
+    }
+    if oh->descoping {
+      push(&new_supports, {DescopingElement(supportee), supportee});
+    }
+    if case Has(d cell_num) = oh->fieldof {
+      push(&new_supports, {FieldOf(d), supportee});
+    }
+    losttrack bool = oh->losttrack | fh->losttrack;
+    if !losttrack {
+      if count(&oh->inpointers) != count(&fh->inpointers) {
+        losttrack = true;
+        fresh = true;
+      } else {
+        // Right now it's p easy to see if inpointers pair up.
+        sort(&oh->inpointers);
+        sort(&fh->inpointers);
+        if !array_equal(&oh->inpointers, &fh->inpointers) {
+          losttrack = true;
+          fresh = true;
+        }
+      }
+    }
+
+    if losttrack {
+      push(&new_supports, {LostTrack, supportee});
+    } else {
+      foreach inpointer cell_num in elems(&oh->inpointers) {
+        push(&new_supports, {PointerFrom(inpointer), supportee});
+      }
+    }
+  }
+
+  swap(&onto->supports, &new_supports);
+
+  return NoFail(fresh then @[freshness]Fresh else @[freshness]Stale);
 }
 
 func add_supp(hp *vs_unify_half_pairage, supp *vs_support) np {
