@@ -1911,15 +1911,14 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "  x ty;\n"
         "  z en = Foo(x);\n"
         "  t en = z;\n"
-        "  /* if case Foo(u ty) = t {\n"
+        "  if case Foo(u ty) = t {\n"
         "    return get(&u);\n"
         "  } else {\n"
         "    return 3;\n"
-        "  } */\n"
+        "  }\n"
         "  return 3;\n"
         "}\n"
         "def d1 i8 = foo();\n"));
-  // TODO(): ^^ remove commented code in test above
 
   run_check_test(ctx, "c150",
     _u8("struct ty { n u8; m u8; }\n"
