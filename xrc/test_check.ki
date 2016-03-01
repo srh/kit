@@ -1539,7 +1539,7 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         ));
 
   // Unlike 139/d, maybe this should not fail, no matter what, because the swartch is a pointer and doesn't get destructed at all.
-  run_check_test(ctx, "c139/p",
+  run_check_test(ctx, "c139/p-a",
     _u8("enum[T] opt {\n"
         "  Has T;\n"
         "  None void;\n"
@@ -1555,6 +1555,26 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "    return z;\n"
         "  }\n"
         "  goto baaz;\n"
+        "}\n"
+        "def d1 i32 = foo();\n"
+        ));
+
+  // Added to see if a failure of c139/p-a was the result of the goto/label.  (It was.)
+  run_check_test(ctx, "c139/p-b",
+    _u8("enum[T] opt {\n"
+        "  Has T;\n"
+        "  None void;\n"
+        "}\n"
+        "func foo() i32 {\n"
+        "  x opt[i32] = Has(4);\n"
+        "  z i32 = 6;\n"
+        "  switch &x {\n"
+        "  case &Has(y i32):\n"
+        "    z = z + y;\n"
+        "  default:\n"
+        "    return z;\n"
+        "  }\n"
+        "  return z;\n"
         "}\n"
         "def d1 i32 = foo();\n"
         ));

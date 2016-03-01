@@ -204,7 +204,7 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
     #vs_support_const_properties(vs, a.dest);
     return NoFail;
   case &GrAddressof(a gr_addressof):
-    #vs_support_enscope(vs, a.dest);
+    #vs_support_activate(vs, a.dest);
     #vs_support_add(vs, {PointerFrom(a.dest), a.addressee});
     return NoFail;
   case &GrDeref(a gr_deref):
