@@ -498,3 +498,5 @@ func vs_checksum_active_op(vs *vs_checksum, op gr_active_op) void {
 func[T] DBG_losttrack(x T) void {
   // DBG(x);
 }
+
+// TODO: Get rid of null pointers (from the language).
