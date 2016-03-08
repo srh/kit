@@ -661,38 +661,50 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
   type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
   switch a {
     case DefaultMoveCopyDestroy: {
-      ret type_properties;
-      #compute_complete_struct_properties(clq, st, &it, ComputeMove | ComputeCopy | ComputeDestroy, &ret);
+      props type_properties;
+      #compute_complete_struct_properties(clq, st, &it, ComputeMove | ComputeCopy | ComputeDestroy, &props);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      ret.init_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
-      *out = ret;
+      init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
+      *out = {props.flat_size, props.flat_alignment,
+              init_behavior,
+              props.move_behavior, props.copy_behavior, props.destroy_behavior, props.is_scalar, props.is_pow2, props.exposed_types};
       return NoFail;
     }
     case DefaultMove: {
-      ret type_properties;
-      #compute_complete_struct_properties(clq, st, &it, ComputeMove, &ret);
+      props type_properties;
+      #compute_complete_struct_properties(clq, st, &it, ComputeMove, &props);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      ret.init_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
-      ret.copy_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym);
-      ret.destroy_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym);
-      *out = ret;
+      init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
+      copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym);
+      destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym);
+      *out = {props.flat_size, props.flat_alignment,
+              init_behavior,
+              props.move_behavior,
+              copy_behavior,
+              destroy_behavior,
+              props.is_scalar, props.is_pow2, props.exposed_types};
       return NoFail;
     }
     case NoDefaults: {
-      ret type_properties;
-      #compute_complete_struct_properties(clq, st, &it, ComputeNone, &ret);
+      props type_properties;
+      #compute_complete_struct_properties(clq, st, &it, ComputeNone, &props);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      ret.init_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
-      ret.move_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_movesym);
-      ret.copy_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym);
-      ret.destroy_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym);
-      ret.is_scalar = IsScalarNo;
-      *out = ret;
+      init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
+      move_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_movesym);
+      copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym);
+      destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym);
+      props.is_scalar = IsScalarNo;
+      *out = {props.flat_size, props.flat_alignment,
+              init_behavior,
+              move_behavior,
+              copy_behavior,
+              destroy_behavior,
+              props.is_scalar, props.is_pow2, props.exposed_types};
       return NoFail;
     }
   }
