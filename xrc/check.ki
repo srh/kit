@@ -863,8 +863,9 @@ func mask_level(mask u32, bit u32, level behavior_level) behavior_level {
   }
 }
 
-func subfield_exposed_type_name(fieldname sym, field_exposed *exposed_type_name) exposed_type_name {
-  return {concat(Has(fieldname), field_exposed->parts)};
+// fieldname could be a struct field or enum constructor
+func subfield_exposed_type_name(fieldname sym, field_exposed exposed_type_name) exposed_type_name {
+  return {concat(Has(fieldname), field_exposed.parts)};
 }
 
 // fielddecls gives us the field names
@@ -874,7 +875,7 @@ func psd_exposed_types(fielddecls *shray[te_vardecl], psd *partial_struct_data) 
   build array[exposed_type_name];
   for i size = 0; i < n; i++ {
     foreach field_exposed *exposed_type_name in refs(&psd->fields[i].props.exposed_types) {
-      push(&build, subfield_exposed_type_name(fielddecls[i].name, field_exposed));
+      push(&build, subfield_exposed_type_name(fielddecls[i].name, *field_exposed));
     }
   }
   return freeze(&build);
@@ -897,6 +898,11 @@ func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *
   return NoFail;
 }
 
+inline func pluralize_enum_exposed(etn *exposed_type_name) exposed_type_name {
+  // Right now there's no kindness to exposed type names, so... we expose the name.
+  return *etn;
+}
+
 func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_typeexpr, out *type_properties) np {
   tag_size u32 = clq->cs->plat.enum_tag_size;
   max_size u32 = tag_size;
@@ -906,6 +912,7 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_t
   destroy_level behavior_level = TrivialLevel;
   is_pow2 pow2_turtles = IsPow2AllTheWayDown;
   n size = count(&et->constructors);
+  exposed_types array[exposed_type_name];
   for i size = 0; i < n; i = i + 1 {
     props type_properties;
     #compute_complete_type_properties(clq, &ref(&et->constructors, i)->type, &props);
@@ -916,6 +923,9 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_t
     copy_level = max(copy_level, to_level(&props.copy_behavior));
     destroy_level = max(destroy_level, to_level(&props.destroy_behavior));
     is_pow2 = combine_pow2(is_pow2, props.is_pow2);
+    foreach field_exposed *exposed_type_name in refs(&props.exposed_types) {
+      push(&exposed_types, subfield_exposed_type_name(et->constructors[i].name, pluralize_enum_exposed(field_exposed)));
+    }
   }
 
   // See TeUnion for explanation of final_size.
@@ -928,7 +938,7 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_t
           level_to_derived(clq, CtorDestroy, 1, realtype, destroy_level),
           IsScalarNo,
           is_pow2,
-          bogus_exposed_types()};
+          freeze(&exposed_types)};
   return NoFail;
 }
 
