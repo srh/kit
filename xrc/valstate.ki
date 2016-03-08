@@ -1,3 +1,5 @@
+import array;
+import graph;
 import treestate;
 
 struct vt_state {
