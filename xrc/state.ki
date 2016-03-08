@@ -511,8 +511,8 @@ struct def_inst {
   parms idy_genparms;
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics replaced.  This is None if we have an extern def or primitive def.
   rhs def_inst_rhs;
-  // The concrete type (with generics replaced) once we've computed it and checked it.  And its properties.  The type properties _must_ (right now) indicate that the type is defwise trivial.
-  // TODO: Many needless uses of unHas, also some of the users of this could stand to take one cu_typrop parameter instead of its fields separately.
+  // The concrete type (with generics replaced) once we've computed it and checked it.  And its properties.
+  // TODO: Many needless uses of "un," also some of the users of this could stand to take one cu_typrop parameter instead of its fields separately.
   typrop nbfc[cu_typrop];
   rhs_status def_inst_rhs_status;
   graph nbfc[frame_regraphed];
