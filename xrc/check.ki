@@ -863,6 +863,23 @@ func mask_level(mask u32, bit u32, level behavior_level) behavior_level {
   }
 }
 
+func subfield_exposed_type_name(fieldname sym, field_exposed *exposed_type_name) exposed_type_name {
+  return {concat(Has(fieldname), field_exposed->parts)};
+}
+
+// fielddecls gives us the field names
+func psd_exposed_types(fielddecls *shray[te_vardecl], psd *partial_struct_data) shray[exposed_type_name] {
+  n size = count(&psd->fields);
+  check(n == count(fielddecls));
+  build array[exposed_type_name];
+  for i size = 0; i < n; i++ {
+    foreach field_exposed *exposed_type_name in refs(&psd->fields[i].props.exposed_types) {
+      push(&build, subfield_exposed_type_name(fielddecls[i].name, field_exposed));
+    }
+  }
+  return freeze(&build);
+}
+
 // st had better be complete and computed.
 // Realtype is the name (or app) type (a struct or defclass) whose fields the structspec specifies.
 func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *te_typeexpr, constructor_mask u32, out *type_properties) np {
@@ -876,7 +893,7 @@ func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *
           level_to_derived(clq, CtorDestroy, 1, realtype, mask_level(constructor_mask, ComputeDestroy, psd.destroy_level)),
           IsScalarNo,
           psd.is_pow2,
-          bogus_exposed_types()};
+          psd_exposed_types(&st->fields, &psd)};
   return NoFail;
 }
 
