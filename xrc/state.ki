@@ -260,6 +260,20 @@ func combine_pow2(x pow2_turtles, y pow2_turtles) pow2_turtles {
   }
 }
 
+struct exposed_type_name {
+  // TODO: Make the one-element case not allocate.
+  parts shray[sym];
+}
+
+func mk_exposed_type_name(only_part sym) exposed_type_name {
+  return {mk_shray(only_part)};
+}
+
+// TODO(): Get rid of uses of this.
+func bogus_exposed_types() shray[exposed_type_name] {
+  return mk_shray();
+}
+
 struct type_properties {
   flat_size u32;
   flat_alignment u32;
@@ -269,6 +283,7 @@ struct type_properties {
   destroy_behavior derived_method_behavior;
   is_scalar type_scalarity;
   is_pow2 pow2_turtles;
+  exposed_types shray[exposed_type_name];
 }
 
 struct cu_typrop {

@@ -875,7 +875,8 @@ func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *
           level_to_derived(clq, CtorCopy, 2, realtype, mask_level(constructor_mask, ComputeCopy, psd.copy_level)),
           level_to_derived(clq, CtorDestroy, 1, realtype, mask_level(constructor_mask, ComputeDestroy, psd.destroy_level)),
           IsScalarNo,
-          psd.is_pow2};
+          psd.is_pow2,
+          bogus_exposed_types()};
   return NoFail;
 }
 
@@ -909,7 +910,8 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_t
           level_to_derived(clq, CtorCopy, 2, realtype, copy_level),
           level_to_derived(clq, CtorDestroy, 1, realtype, destroy_level),
           IsScalarNo,
-          is_pow2};
+          is_pow2,
+          bogus_exposed_types()};
   return NoFail;
 }
 
@@ -953,7 +955,8 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
       final_size u32 = ceil_aligned(max_size, max_alignment);
       *out = {final_size, max_alignment, DerivedMethodTrivial,
               DerivedMethodTrivial, DerivedMethodTrivial,
-              DerivedMethodTrivial, IsScalarNo, is_pow2};
+              DerivedMethodTrivial, IsScalarNo, is_pow2,
+              bogus_exposed_types()};
       return NoFail;
     }
 
@@ -976,7 +979,8 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
                 level_to_derived(clq, CtorCopy, 2, t, to_level(&props.copy_behavior)),
                 level_to_derived(clq, CtorDestroy, 1, t, to_level(&props.destroy_behavior)),
                 IsScalarNo,
-                is_pow2};
+                is_pow2,
+                bogus_exposed_types()};
         return NoFail;
       } else {
         ice(_u8("compute_type_properties called on incomplete arraytype."));

@@ -346,7 +346,9 @@ func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
       DerivedMethodTrivial,
       DerivedMethodTrivial,
       IsScalarYes,
-      IsPow2AllTheWayDown
+      IsPow2AllTheWayDown,
+      // For now, integer/double primtiivse don't expose any types.
+      mk_shray@[exposed_type_name]()
     }
   };
   instparms idy_genparms = blank_idyparms();
@@ -428,7 +430,8 @@ func add_pointer_primitive_type(cs *checkstate) void {
            DerivedMethodTrivial,
            DerivedMethodTrivial,
            IsScalarYes,
-           IsPow2AllTheWayDown
+           IsPow2AllTheWayDown,
+           mk_shray(mk_exposed_type_name(cs->im->cym.target))
          }}),
     mk_hash@[idy_genparms, deftype_inst_id]()
   };
@@ -454,7 +457,9 @@ func add_ref_primitive_type(cs *checkstate) void {
            DerivedMethodTrivial,
            DerivedMethodTrivial,
            IsScalarYes,
-           IsPow2AllTheWayDown
+           IsPow2AllTheWayDown,
+           // TODO(): Some way to define target as being the lifetime type param
+           mk_shray(mk_exposed_type_name(cs->im->cym.target))
          }}),
     mk_hash@[idy_genparms, deftype_inst_id]()
   };
@@ -479,7 +484,10 @@ func add_function_primitive(cs *checkstate) void {
            DerivedMethodTrivial,
            DerivedMethodTrivial,
            IsScalarYes,
-           IsPow2AllTheWayDown
+           IsPow2AllTheWayDown,
+           // We don't expose any types?  Okay.
+           // Note that this default_info field will need to be removed, the problem treated differently, we _do_ expose types here (in a way that depends on function type args).  Maybe fn types should just be primitive, like structs and such.
+           mk_shray@[exposed_type_name]()
          }}),
     mk_hash@[idy_genparms, deftype_inst_id]()
   };
