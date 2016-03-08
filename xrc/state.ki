@@ -659,6 +659,7 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
   }
 }
 
+// TODO(): This blindly passes along exposed_types of its inner struct.  Update this to... not do that.
 func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *structspec, out *type_properties) np {
   cs *checkstate = clq->cs;
   it te_typeexpr = inst_type(cs, ent_id, inst_id);
