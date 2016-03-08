@@ -637,25 +637,20 @@ func is_defwise_trivial(props *type_properties) bool {
   return isTrivial(props->move_behavior) && isTrivial(props->copy_behavior) && isTrivial(props->destroy_behavior);
 }
 
-func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, impl_name sym, behavior_out *derived_method_behavior) np {
+func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, impl_name sym) cr[derived_method_behavior] {
   res match_def_res;
   gp genparms = NoParms;
   #match_def(clq->cs, impl_name, &gp, fntype, &res);
 
   switch &res {
-    case &NoMatch: {
-      *behavior_out = DerivedMethodAbsent;
-      return NoFail;
-    }
-    case &MultiMatch: {
-      return ERR(_u8("Multiple explicit methods '"), lookup(clq->im, impl_name), _u8("'"));
-    }
-    case &OneMatch(m ent_and_parms): {
-      inst_id def_inst_id;
-      #make_inst(clq, m.ent, &m.parms, &inst_id);
-      *behavior_out = DerivedMethodExplicit({m.ent, inst_id});
-      return NoFail;
-    }
+  case &NoMatch:
+    return NoFail(DerivedMethodAbsent);
+  case &MultiMatch:
+    return ERR(_u8("Multiple explicit methods '"), lookup(clq->im, impl_name), _u8("'"));
+  case &OneMatch(m ent_and_parms):
+    inst_id def_inst_id;
+    #make_inst(clq, m.ent, &m.parms, &inst_id);
+    return NoFail(@[derived_method_behavior]DerivedMethodExplicit({m.ent, inst_id}));
   }
 }
 
@@ -670,7 +665,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       #compute_complete_struct_properties(clq, st, &it, ComputeMove | ComputeCopy | ComputeDestroy, &ret);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym, &ret.init_behavior);
+      ret.init_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
       *out = ret;
       return NoFail;
     }
@@ -680,9 +675,9 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym, &ret.init_behavior);
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym, &ret.copy_behavior);
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym, &ret.destroy_behavior);
+      ret.init_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
+      ret.copy_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym);
+      ret.destroy_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym);
       *out = ret;
       return NoFail;
     }
@@ -692,10 +687,10 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym, &ret.init_behavior);
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_movesym, &ret.move_behavior);
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym, &ret.copy_behavior);
-      #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym, &ret.destroy_behavior);
+      ret.init_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
+      ret.move_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_movesym);
+      ret.copy_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym);
+      ret.destroy_behavior = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym);
       ret.is_scalar = IsScalarNo;
       *out = ret;
       return NoFail;
