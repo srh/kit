@@ -1,0 +1,17 @@
+// This goes inside valstate.
+
+struct treestate {
+
+}
+
+func mk_treestate() treestate {
+  return { };
+}
+
+func ts_xop(ts *treestate, op *gr_xop) np {
+  return NoFail;
+}
+
+func unify_ts(onto *treestate, from *treestate) cr[freshness] {
+  return NoFail(Stale);
+}
