@@ -898,8 +898,14 @@ func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *
   return NoFail;
 }
 
+// It's unclear if, in the long run, this and pluralized_array_exposed will be different.
 inline func pluralize_enum_exposed(etn *exposed_type_name) exposed_type_name {
   // Right now there's no kindness to exposed type names, so... we expose the name.
+  return *etn;
+}
+
+inline func pluralize_array_exposed(etn *exposed_type_name) exposed_type_name {
+  // Likewise, there's no kindness to exposed type names right now.
   return *etn;
 }
 
@@ -911,8 +917,8 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_t
   copy_level behavior_level = TrivialLevel;
   destroy_level behavior_level = TrivialLevel;
   is_pow2 pow2_turtles = IsPow2AllTheWayDown;
-  n size = count(&et->constructors);
   exposed_types array[exposed_type_name];
+  n size = count(&et->constructors);
   for i size = 0; i < n; i = i + 1 {
     props type_properties;
     #compute_complete_type_properties(clq, &ref(&et->constructors, i)->type, &props);
@@ -967,6 +973,8 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
       max_size u32 = 0;
       max_alignment u32 = 1;
       is_pow2 pow2_turtles = IsPow2AllTheWayDown;
+      // TODO: Who knows how union exposed types are supposed to work.  We'll see.
+      exposed_types array[exposed_type_name];
       n size = count(&a.fields);
       for i size = 0; i < n; i = i + 1 {
         props type_properties;
@@ -977,13 +985,16 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
         if !(isTrivial(props.init_behavior) && isTrivial(props.move_behavior) && isTrivial(props.copy_behavior) && isTrivial(props.destroy_behavior)) {
           return ERR(_u8("union type has non-trivial field"));
         }
+        foreach field_exposed *exposed_type_name in refs(&props.exposed_types) {
+          push(&exposed_types, subfield_exposed_type_name(a.fields[i].name, pluralize_enum_exposed(field_exposed)));
+        }
       }
       // Consider the case where you have a union of {uint32_t, uint32_t, uint32_t} and {uint64_t}.  We have alignment 8, thus we need size 16.
       final_size u32 = ceil_aligned(max_size, max_alignment);
       *out = {final_size, max_alignment, DerivedMethodTrivial,
               DerivedMethodTrivial, DerivedMethodTrivial,
               DerivedMethodTrivial, IsScalarNo, is_pow2,
-              bogus_exposed_types()};
+              freeze(&exposed_types)};
       return NoFail;
     }
 
@@ -999,6 +1010,11 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
           is_pow2 = HasNonPow2;
         }
 
+        exposed_types array[exposed_type_name];
+        foreach etn *exposed_type_name in refs(&props.exposed_types) {
+          push(&exposed_types, pluralize_array_exposed(etn));
+        }
+
         // We _should_ maintain alignment for a zero-element array because the pointer to such an array might hack in tag-bit logic.
         *out = {props.flat_size * c, props.flat_alignment,
                 level_to_derived(clq, CtorInit, 1, t, to_level(&props.init_behavior)),
@@ -1007,7 +1023,7 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
                 level_to_derived(clq, CtorDestroy, 1, t, to_level(&props.destroy_behavior)),
                 IsScalarNo,
                 is_pow2,
-                bogus_exposed_types()};
+                freeze(&exposed_types)};
         return NoFail;
       } else {
         ice(_u8("compute_type_properties called on incomplete arraytype."));

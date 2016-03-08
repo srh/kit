@@ -269,11 +269,6 @@ func mk_exposed_type_name(only_part sym) exposed_type_name {
   return {mk_shray(only_part)};
 }
 
-// TODO(): Get rid of uses of this.
-func bogus_exposed_types() shray[exposed_type_name] {
-  return mk_shray();
-}
-
 struct type_properties {
   flat_size u32;
   flat_alignment u32;
