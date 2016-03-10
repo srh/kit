@@ -203,7 +203,7 @@ func deftype_converted_rhs(np *deftype_nonprim, out **deftype_rhs_spec) np {
           np->rhs = FailedComputation;
           return Unprinted(pm);
         case NoFail(fields shray[te_vardecl]):
-          np->rhs = Computed(@[deftype_rhs_spec]ClassexprRhsSpec({a.disposition, {fields}}));
+          np->rhs = Computed(@[deftype_rhs_spec]ClassexprRhsSpec({a.disposition, {fields}, bogus_exposers()}));
         }
         if case &Computed(b deftype_rhs_spec) = &np->rhs {
           *out = &b;

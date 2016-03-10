@@ -314,9 +314,20 @@ struct deftype_inst {
   info nbfc[deftype_inst_info];
 }
 
+struct exposer {
+  outer_name sym;
+  inner_name exposed_type_name;
+}
+
 struct classexpr_rhs_spec {
   disposition ast_defclass_disposition;
   drs structspec;
+  exposers shray[exposer];
+}
+
+// TODO(): Remove.
+func bogus_exposers() shray[exposer] {
+  return mk_shray();
 }
 
 enum deftype_rhs_spec {
