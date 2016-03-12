@@ -41,27 +41,20 @@ func[H, T] wrap_u8str(help H, r *array[u8], x array[u8], y *T) void {
 
 func[H] build_u8str(help H, r *array[u8], a *ast_typeexpr) void {
   switch a {
-    case &Name(b ast_ident): {
-      wrap_u8str(help, r, _u8("Name"), &b);
-    }
-    case &App(b ast_typeapp): {
-      wrap_u8str(help, r, _u8("App"), &b);
-    }
-    case &Struct(b ast_struct): {
-      wrap_u8str(help, r, _u8("Struct"), &b);
-    }
-    case &Enum(b ast_enum): {
-      wrap_u8str(help, r, _u8("Enum"), &b);
-    }
-    case &Union(b ast_union): {
-      wrap_u8str(help, r, _u8("Union"), &b);
-    }
-    case &Arraytype(b ast_arraytype): {
-      wrap_u8str(help, r, _u8("Arraytype"), &b);
-    }
-    case &Unknown(b ast_unknown): {
-      wrap_u8str(help, r, _u8("Unknown"), &b);
-    }
+  case &Name(b ast_ident):
+    wrap_u8str(help, r, _u8("Name"), &b);
+  case &App(b ast_typeapp):
+    wrap_u8str(help, r, _u8("App"), &b);
+  case &Struct(b ast_struct):
+    wrap_u8str(help, r, _u8("Struct"), &b);
+  case &Enum(b ast_enum):
+    wrap_u8str(help, r, _u8("Enum"), &b);
+  case &Union(b ast_union):
+    wrap_u8str(help, r, _u8("Union"), &b);
+  case &Arraytype(b ast_arraytype):
+    wrap_u8str(help, r, _u8("Arraytype"), &b);
+  case &Unknown(b ast_unknown):
+    wrap_u8str(help, r, _u8("Unknown"), &b);
   }
 }
 
