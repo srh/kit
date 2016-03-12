@@ -53,6 +53,8 @@ func[H] build_u8str(help H, r *array[u8], a *ast_typeexpr) void {
     wrap_u8str(help, r, _u8("Union"), &b);
   case &Arraytype(b ast_arraytype):
     wrap_u8str(help, r, _u8("Arraytype"), &b);
+  case &Lifetime(b ast_lifetime):
+    wrap_u8str(help, r, _u8("Lifetime"), &b);
   case &Unknown(b ast_unknown):
     wrap_u8str(help, r, _u8("Unknown"), &b);
   }
@@ -83,6 +85,12 @@ func[H] build_u8str(help H, r *array[u8], a *ast_arraytype) void {
   build_u8str(help, r, &a->count);
   append(r, _u8(",param:"));
   build_u8str(help, r, &a->param);
+  push(r, '}');
+}
+
+func[H] build_u8str(help H, r *array[u8], a *ast_lifetime) void {
+  append(r, _u8("{name:"));
+  build_u8str(help, r, &a->name);
   push(r, '}');
 }
 
