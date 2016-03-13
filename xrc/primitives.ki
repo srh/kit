@@ -440,7 +440,7 @@ func add_pointer_primitive_type(cs *checkstate) void {
 }
 
 func add_ref_primitive_type(cs *checkstate) void {
-  two_generic array[ast_generik] = mk_array(@[ast_generik]LifetimeGeneric({fake_ast_meta(), intern(cs->im, _s("a"))}), @[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym}));
+  two_generic array[ast_generik] = mk_array(@[ast_generik]LifetimeGeneric({{fake_ast_meta(), intern(cs->im, _s("a"))}}), @[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym}));
   ent deftype_entry = {
     cs->im->cym.primitive_module_sym,
     cs->im->cym.reftype_sym,

@@ -799,10 +799,14 @@ struct ast_variadic_generics {
   after array[ast_ident];
 }
 
+struct ast_lifetime_generik {
+  name ast_ident;
+}
+
 // This is named with a k to prevent typos with ast_generics.
 enum ast_generik {
   PlainGeneric ast_ident;
-  LifetimeGeneric ast_ident;
+  LifetimeGeneric ast_lifetime_generik;
 }
 
 enum ast_generics {

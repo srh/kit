@@ -1457,7 +1457,7 @@ func check_generics_unique(cs *checkstate, a *ast_generics) np {
 func generik_human_name(a *ast_generik) *ast_ident {
   switch a {
   case &PlainGeneric(an ast_ident): return &an;
-  case &LifetimeGeneric(an ast_ident): return &an;
+  case &LifetimeGeneric(an ast_lifetime_generik): return &an.name;
   }
 }
 
@@ -1867,7 +1867,7 @@ func lookup_plain_name(arr *array[ast_generik], x sym) opt[size] {
       if b.value == x {
         return Has(i);
       }
-    case &LifetimeGeneric(b ast_ident): { }
+    case &LifetimeGeneric(b ast_lifetime_generik): { }
     }
   }
   return None;
@@ -1878,8 +1878,8 @@ func lookup_lifetime_name(arr *array[ast_generik], x sym) opt[size] {
   for i size = 0; i < n; i = i + 1 {
     switch &arr[i] {
     case &PlainGeneric(b ast_ident): { }
-    case &LifetimeGeneric(b ast_ident):
-      if b.value == x {
+    case &LifetimeGeneric(b ast_lifetime_generik):
+      if b.name.value == x {
         return Has(i);
       }
     }

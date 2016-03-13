@@ -434,7 +434,7 @@ func parse_generik(p *ps, out *ast_generik) parse_result {
   if +try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
     name ast_ident;
     #parse_ident(p, &name);
-    *out = LifetimeGeneric(name);
+    *out = LifetimeGeneric({name});
     return Success;
   }
   name ast_ident;
