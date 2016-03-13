@@ -801,6 +801,7 @@ struct ast_variadic_generics {
 
 struct ast_lifetime_generik {
   name ast_ident;
+  oftype ast_typeexpr;
 }
 
 // This is named with a k to prevent typos with ast_generics.
