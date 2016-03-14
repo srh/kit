@@ -381,3 +381,26 @@ func help_pretty_vardecl(im *identmap, r *array[u8], a *shray[te_vardecl]) void 
     push(r, ' ');
   }
 }
+
+// Variadic generics doesn't support lifetime generics (for no particular reason, other than that we have no need for it) yet.
+struct te_variadic_generics {
+  before shray[sym];
+  variadic_name sym;
+  after shray[sym];
+}
+
+struct te_lifetime_generik {
+  name sym;
+  oftype te_typeexpr;
+}
+
+enum te_generik {
+  TePlainGeneric sym;
+  TeLifetimeGeneric te_lifetime_generik;
+}
+
+enum te_generics {
+  TeNoGenerics void;
+  TeHasGenerics shray[te_generik];
+  TeVariadicGenerics te_variadic_generics;
+}

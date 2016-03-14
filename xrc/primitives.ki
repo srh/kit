@@ -245,7 +245,7 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool 
 }
 
 // The caller is welcome to ignore the return value.
-func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_typeexpr, definition def_definition) def_entry_id {
+func add_def_primitive(cs *checkstate, name sym, generics te_generics, type te_typeexpr, definition def_definition) def_entry_id {
   // access_scope is not relevant to a primitive def.
   ent shp[def_entry];
   *oo(&ent) = {cs->im->cym.primitive_module_sym, name, mk_array@[access_entry_id](), generics, definition, Computed(type), mk_hash@[idy_genparms, def_inst_id]()};
@@ -254,12 +254,12 @@ func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_
 }
 
 // The caller is welcome to ignore the return value.
-func add_def_primitive(cs *checkstate, name sym, generics ast_generics, type te_typeexpr, op primitive_op) def_entry_id {
+func add_def_primitive(cs *checkstate, name sym, generics te_generics, type te_typeexpr, op primitive_op) def_entry_id {
   return add_def_primitive(cs, name, generics, type, @[def_definition]DefnPrim(op));
 }
 
 func add_def_primitive(cs *checkstate, name sym, type te_typeexpr, op primitive_op) void {
-  ign var = add_def_primitive(cs, name, NoGenerics, type, op);
+  ign var = add_def_primitive(cs, name, TeNoGenerics, type, op);
 }
 
 func add_op_primitive(cs *checkstate, oper sym, typename sym, arity size, op primitive_op) void {
@@ -267,13 +267,13 @@ func add_op_primitive(cs *checkstate, oper sym, typename sym, arity size, op pri
   add_def_primitive(cs, oper, type, op);
 }
 
-func add_comparison_primitive(cs *checkstate, oper sym, generics ast_generics, type te_typeexpr, op primitive_op) def_entry_id {
+func add_comparison_primitive(cs *checkstate, oper sym, generics te_generics, type te_typeexpr, op primitive_op) def_entry_id {
   f te_typeexpr = fn_type(cs, type, type, primitive_bool_type(cs));
   return add_def_primitive(cs, oper, generics, f, op);
 }
 
 func add_comparison_primitive(cs *checkstate, oper sym, typename sym, op primitive_op) void {
-  ign var = add_comparison_primitive(cs, oper, NoGenerics, @[te_typeexpr]TeName({typename, None}), op);
+  ign var = add_comparison_primitive(cs, oper, TeNoGenerics, @[te_typeexpr]TeName({typename, None}), op);
 }
 
 func add_binop_primitive(cs *checkstate, oper sym, typename sym, op primitive_op) void {
@@ -360,13 +360,13 @@ func add_scalar_primitive(cs *checkstate, name sym, flat_traits flat_traits) voi
 
   // access_scope is not relevant to a primitive deftype.
   access_scope array[access_entry_id];
-  ent deftype_entry = {cs->im->cym.primitive_module_sym, name, access_scope, NoGenerics, None, Has(info), instst};
+  ent deftype_entry = {cs->im->cym.primitive_module_sym, name, access_scope, TeNoGenerics, None, Has(info), instst};
   id deftype_entry_id = add_deftype_entry(cs, ent);
   // TODO: We probably want to put the id in some kind of "primitive" module.
 }
 
-func tee_generic(cs *checkstate) ast_generics {
-  return HasGenerics(mk_array(@[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym})));
+func tee_generic(cs *checkstate) te_generics {
+  return TeHasGenerics(mk_shray(@[te_generik]TePlainGeneric(cs->im->cym.tee_sym)));
 }
 
 func fn_type(cs *checkstate, params shray[te_typeexpr]) te_typeexpr {
@@ -413,13 +413,13 @@ func add_pointer_primitive(cs *checkstate) void {
 }
 
 func add_pointer_primitive_type(cs *checkstate) void {
-  one_generic array[ast_generik] = mk_array(@[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym}));
+  one_generic shray[te_generik] = mk_shray(@[te_generik]TePlainGeneric(cs->im->cym.tee_sym));
   // It's as if pointers belong in an even _more_ primitive module than integer/bool types.
   ent deftype_entry = {
     cs->im->cym.primitive_module_sym,
     cs->im->cym.ptrtype_sym,
     mk_array@[access_entry_id](),
-    HasGenerics(one_generic),
+    TeHasGenerics(one_generic),
     None,
     Has({None,
          @[type_properties]{
@@ -440,13 +440,13 @@ func add_pointer_primitive_type(cs *checkstate) void {
 }
 
 func add_ref_primitive_type(cs *checkstate) void {
-  tee_ident ast_ident = {fake_ast_meta(), cs->im->cym.tee_sym};
-  two_generic array[ast_generik] = mk_array(@[ast_generik]LifetimeGeneric({{fake_ast_meta(), intern(cs->im, _s("a"))}, Name(tee_ident)}), @[ast_generik]PlainGeneric(tee_ident));
+  tee sym = cs->im->cym.tee_sym;
+  two_generic shray[te_generik] = mk_shray(@[te_generik]TeLifetimeGeneric({intern(cs->im, _s("a")), TeName({tee, None})}), @[te_generik]TePlainGeneric(tee));
   ent deftype_entry = {
     cs->im->cym.primitive_module_sym,
     cs->im->cym.reftype_sym,
     mk_array@[access_entry_id](),
-    HasGenerics(two_generic),
+    TeHasGenerics(two_generic),
     None,
     Has({None,
          @[type_properties]{
@@ -474,7 +474,7 @@ func add_function_primitive(cs *checkstate) void {
     cs->im->cym.primitive_module_sym,
     cs->im->cym.fnsym,
     mk_array@[access_entry_id](),
-    VariadicGenerics({mk_array@[ast_ident](), {fake_ast_meta(), cs->im->cym.tee_sym}, mk_array({fake_ast_meta(), cs->im->cym.uee_sym})}),
+    TeVariadicGenerics({mk_shray@[sym](), cs->im->cym.tee_sym, mk_shray(cs->im->cym.uee_sym)}),
     None,
     Has({None,
          @[type_properties]{

@@ -395,7 +395,7 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t *genparms, out *idy
     *out = blank_idyrepls();
     return NoFail;
   case &HasParms(ps shray[te_typeexpr]):
-    noscope_g ast_generics = NoGenerics;
+    noscope_g te_generics = TeNoGenerics;
     noscope_parms idy_repls = blank_idyrepls();
     params_complete bool;
     params shray[te_typeexpr];
@@ -422,7 +422,7 @@ func check_and_compute_parms(clq *clqueue, t *genparms, out *idy_genparms) np {
       return NoFail;
     }
     case &HasParms(ps shray[te_typeexpr]): {
-      noscope_g ast_generics = NoGenerics;
+      noscope_g te_generics = TeNoGenerics;
       noscope_parms idy_repls = blank_idyrepls();
       params_complete bool;
       params shray[te_typeexpr];
@@ -448,13 +448,13 @@ func check_and_compute_parms(clq *clqueue, t *genparms, out *idy_genparms) np {
 }
 
 func noscoped_check_and_compute_typeexpr(clq *clqueue, t *te_typeexpr, out *cac_typeexpr) np {
-  ng ast_generics = NoGenerics;
+  ng te_generics = TeNoGenerics;
   np idy_repls = blank_idyrepls();
   return check_and_compute_typeexpr(clq, &ng, &np, t, out);
 }
 
 // NOTE: Generics replacement should really be a separate phase.  (Why?)  (Performance is one counter-argument -- we'd create an extra intermediate te_typeexpr.)
-func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls, t *te_typeexpr, out *cac_typeexpr) np {
+func check_and_compute_typeexpr(clq *clqueue, g *te_generics, parms *idy_repls, t *te_typeexpr, out *cac_typeexpr) np {
   switch t {
     case &TeName(a te_name): {
       computed cu_typeexpr;
@@ -539,7 +539,7 @@ func fake_eval_arraytype_count(x *ast_expr, count_out *u32) np {
   }
 }
 
-func help_check_and_compute_fields(clq *clqueue, g *ast_generics, parms *idy_repls, a *shray[te_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) np {
+func help_check_and_compute_fields(clq *clqueue, g *te_generics, parms *idy_repls, a *shray[te_vardecl], computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) np {
   all_complete bool = true;
   all_computed array[te_vardecl];
   foreach i size in upto(count(a)) {
@@ -559,7 +559,7 @@ func help_check_and_compute_fields(clq *clqueue, g *ast_generics, parms *idy_rep
   return NoFail;
 }
 
-func check_and_compute_name_type(clq *clqueue, g *ast_generics, parms *idy_repls, a *te_name, computed_out *cu_typeexpr) np {
+func check_and_compute_name_type(clq *clqueue, g *te_generics, parms *idy_repls, a *te_name, computed_out *cu_typeexpr) np {
   // Generic parameters have already been checked.  (I hope so.)
   if lookup_plain_generic(g, parms, a->value, computed_out) {
     return NoFail;
@@ -574,7 +574,7 @@ func check_and_compute_name_type(clq *clqueue, g *ast_generics, parms *idy_repls
   return NoFail;
 }
 
-func check_and_compute_typeexpr_shray(clq *clqueue, g *ast_generics, parms *idy_repls, t *shray[te_typeexpr], computed_out *shray[te_typeexpr], computed_complete_out *bool) np {
+func check_and_compute_typeexpr_shray(clq *clqueue, g *te_generics, parms *idy_repls, t *shray[te_typeexpr], computed_out *shray[te_typeexpr], computed_complete_out *bool) np {
   complete bool = true;
   computed array[te_typeexpr];
   n size = count(t);
@@ -590,7 +590,7 @@ func check_and_compute_typeexpr_shray(clq *clqueue, g *ast_generics, parms *idy_
   return NoFail;
 }
 
-func check_and_compute_app_type(clq *clqueue, g *ast_generics, parms *idy_repls, a *te_typeapp, out *cac_typeexpr) np {
+func check_and_compute_app_type(clq *clqueue, g *te_generics, parms *idy_repls, a *te_typeapp, out *cac_typeexpr) np {
   params_complete bool;
   params shray[te_typeexpr];
   #check_and_compute_typeexpr_shray(clq, g, parms, &a->params, &params, &params_complete);
@@ -624,15 +624,15 @@ func check_and_compute_app_type(clq *clqueue, g *ast_generics, parms *idy_repls,
   }
 }
 
-func arity_matches(a *ast_generics, params opt[*shray[te_typeexpr]]) bool {
+func arity_matches(a *te_generics, params opt[*shray[te_typeexpr]]) bool {
   return help_arity_matches(a, params);
 }
 
-func arity_matches(a *ast_generics, params opt[*shray[cu_typeexpr]]) bool {
+func arity_matches(a *te_generics, params opt[*shray[cu_typeexpr]]) bool {
   return help_arity_matches(a, params);
 }
 
-func[T] help_arity_matches(a *ast_generics, params opt[*shray[T]]) bool {
+func[T] help_arity_matches(a *te_generics, params opt[*shray[T]]) bool {
   switch arity(a) {
     case NoParamsArity: {
       if case None = params {
@@ -683,33 +683,33 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_ty
 }
 
 // Returns an index into the HasGenerics array.
-func find_plain_generic(g *ast_generics, name sym) opt[size] {
+func find_plain_generic(g *te_generics, name sym) opt[size] {
   switch g {
-  case &NoGenerics:
+  case &TeNoGenerics:
     return None;
-  case &HasGenerics(a array[ast_generik]):
+  case &TeHasGenerics(a shray[te_generik]):
     return lookup_plain_name(&a, name);
-  case &VariadicGenerics(a ast_variadic_generics):
+  case &TeVariadicGenerics(a te_variadic_generics):
     // We can't see variadic generics because there's no "RHS type" of a fn.
     ice(_u8("find_generic sees variadic generic."));
     return fake();
   }
 }
 
-func find_lifetime_generic(g *ast_generics, name sym) opt[size] {
+func find_lifetime_generic(g *te_generics, name sym) opt[size] {
   switch g {
-  case &NoGenerics:
+  case &TeNoGenerics:
     return None;
-  case &HasGenerics(a array[ast_generik]):
+  case &TeHasGenerics(a shray[te_generik]):
     return lookup_lifetime_name(&a, name);
-  case &VariadicGenerics(a ast_variadic_generics):
+  case &TeVariadicGenerics(a te_variadic_generics):
     // We can't see variadic generics because there's no "RHS type" of a fn.
     ice(_u8("find_generic sees variadic generic."));
     return fake();
   }
 }
 
-func lookup_plain_generic(g *ast_generics, parms *idy_repls, name sym, out *cu_typeexpr) bool {
+func lookup_plain_generic(g *te_generics, parms *idy_repls, name sym, out *cu_typeexpr) bool {
   if case Has(ix size) = find_plain_generic(g, name) {
     *out = *ref(&parms->tys, ix);
     return true;
@@ -720,13 +720,13 @@ func lookup_plain_generic(g *ast_generics, parms *idy_repls, name sym, out *cu_t
 func ensure_def_checked(cs *checkstate, id def_entry_id) np {
   ent *def_entry = ref_def_entry(cs, id);
   switch &ent->generics {
-    case &NoGenerics: {
+    case &TeNoGenerics: {
       parms idy_genparms = blank_idyparms();
       clq clqueue = mk(cs);
       discard_inst_id def_inst_id = enqueue_def_inst(&clq, id, &parms);
       return finish_checking(cs, &clq);
     }
-    case &HasGenerics(ig): {
+    case &TeHasGenerics(ig): {
       discard *te_typeexpr;
       #def_converted_typeexpr(ent, &discard);
       // We declare success -- we check non-generic defs.
@@ -1147,10 +1147,10 @@ func inst_type(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id)
   ent *deftype_entry = ref_deftype_entry(cs, ent_id);
   inst *deftype_inst = ref_deftype_inst(cs, inst_id);
   switch &ent->generics {
-  case &NoGenerics:
+  case &TeNoGenerics:
     return TeName({ent->name, Has({ent_id, inst_id})});
-  case &HasGenerics(a array[ast_generik]): { }
-  case &VariadicGenerics(a ast_variadic_generics): { }
+  case &TeHasGenerics(a shray[te_generik]): { }
+  case &TeVariadicGenerics(a te_variadic_generics): { }
   }
   cu_params *shray[cu_typeexpr] = &inst->parms.repls.tys;
   te_params array[te_typeexpr];
@@ -1408,17 +1408,15 @@ func process_toplevels(cs *checkstate,
       case &Def(a ast_def): {
         quick_te ast_typeexpr;
         #quick_typeexpr(cs->im, &a, &quick_te);
-        #check_generics_unique(cs, &a.generics);
-        ent def_entry = mk(mod->module_name, a.name.value, access_scope, a.generics, quick_te, toplevel);
+        ent def_entry = mk(mod->module_name, a.name.value, access_scope, #convert_generics(cs, &a.generics), quick_te, toplevel);
         add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
       }
       case &ExternDef(a ast_extern_def): {
-        ent def_entry = mk(mod->module_name, a.name.value, access_scope, NoGenerics, a.type, toplevel);
+        ent def_entry = mk(mod->module_name, a.name.value, access_scope, TeNoGenerics, a.type, toplevel);
         add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
       }
       case &TypeDef(a ast_type_def): {
-        #check_generics_unique(cs, &a.generics);
-        id deftype_entry_id = add_deftype_entry(cs, mk(mod->module_name, a.name.value, access_scope, a.generics, &a));
+        id deftype_entry_id = add_deftype_entry(cs, mk(mod->module_name, a.name.value, access_scope, #convert_generics(cs, &a.generics), &a));
         push(&mod->deftypes, id);
       }
       case &Access(a ast_access): {
@@ -1441,9 +1439,9 @@ func check_generics_unique(cs *checkstate, a *ast_generics) np {
     case &HasGenerics(b array[ast_generik]): {
       n size = count(&b);
       for i size = 0; i < n; i = i + 1 {
-        xi *ast_generik = ref(&b, i);
+        xi *ast_generik = &b[i];
         for j size = 0; j < i; j = j + 1 {
-          yi *ast_generik = ref(&b, j);
+          yi *ast_generik = &b[j];
           if generiks_same_human_name(xi, yi) {
             return ERR(_u8("Generic params are self-shadowing."));
           }
@@ -1451,6 +1449,29 @@ func check_generics_unique(cs *checkstate, a *ast_generics) np {
       }
       return NoFail;
     }
+  }
+}
+
+func convert_generics(cs *checkstate, a *ast_generics) cr[te_generics] {
+  #check_generics_unique(cs, a);
+  switch a {
+  case &NoGenerics:
+    return NoFail(TeNoGenerics);
+  case &HasGenerics(ags array[ast_generik]):
+    arr array[te_generik];
+    foreach ag *ast_generik in refs(&ags) {
+      push(&arr, #convert_generik(cs, ag));
+    }
+    return NoFail!TeHasGenerics(freeze(&arr));
+  }
+}
+
+func convert_generik(cs *checkstate, a *ast_generik) cr[te_generik] {
+  switch a {
+  case &PlainGeneric(b ast_ident):
+    return NoFail!TePlainGeneric(b.value);
+  case &LifetimeGeneric(b ast_lifetime_generik):
+    return NoFail!@[te_generik]TeLifetimeGeneric({b.name.value, #convert_typeexpr(&b.oftype)});
   }
 }
 
@@ -1587,22 +1608,22 @@ func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res
   }
 }
 
-func entry_matches(cs *checkstate, pt *te_typeexpr, generics *ast_generics, gp *genparms, typeexpr *te_typeexpr) entry_matches_res {
+func entry_matches(cs *checkstate, pt *te_typeexpr, generics *te_generics, gp *genparms, typeexpr *te_typeexpr) entry_matches_res {
   switch generics {
-    case &NoGenerics: {
+    case &TeNoGenerics: {
       switch gp {
         case &HasParms(parms shray[te_typeexpr]): {
           return EntryDoesNotMatch;
         }
         case &NoParms: {
-          names array[ast_generik];
+          names shray[te_generik];
           parms shray[te_typeexpr];
           res var = type_matches(pt, &names, &parms, typeexpr);
           return from_type_matches_res(false, &res);
         }
       }
     }
-    case &HasGenerics(names array[ast_generik]): {
+    case &TeHasGenerics(names shray[te_generik]): {
       switch gp {
         case &HasParms(parms shray[te_typeexpr]): {
           if count(&parms) != count(&names) {
@@ -1630,7 +1651,7 @@ enum type_matches_res {
 }
 
 // t is complete, but it references the generic names in "names", whose corresponding values in "parms" could be incomplete.  pt is the partial type of an expression we're matching against this generic definition.  count(parms) == count(names).
-func type_matches(pt *te_typeexpr, names *array[ast_generik], parms *shray[te_typeexpr],
+func type_matches(pt *te_typeexpr, names *shray[te_generik], parms *shray[te_typeexpr],
                   t *te_typeexpr) type_matches_res {
   check(count(names) == count(parms));
   // We need to retain all new information we gain about the value of the generic param typeexprs as we compare the whole type, in order to make sure we don't match conflicting information about a generic parameter.
@@ -1714,7 +1735,7 @@ func is_complete(t *te_typeexpr) bool {
 // t references the generic names in "names", whose corresponding values in "unif_parms" might be incomplete.  We update the values in unif_parms when necessary.  t does not need to be complete -- this code is also used by unify_types.
 // "*unified_out" is initialized with the unified type, _except_ when t references a generic name, in which case it's initialized with the value of "*t", the generic name.  (The reason is, we might not have gathered complete information about the generic parameter when we've halfway-processed the type -- the caller can and should reconstruct the correct values later.)
 func unify_under_generics(pt *te_typeexpr,
-                          names *array[ast_generik], unif_parms *array[te_typeexpr],
+                          names *shray[te_generik], unif_parms *array[te_typeexpr],
                           t *te_typeexpr, unified_out *te_typeexpr) bool {
   if case &TeUnknown = pt {
     // It's worth pointing out:  This _is_ correct behavior if t is a generic parameter.
@@ -1859,27 +1880,27 @@ func unify_under_generics(pt *te_typeexpr,
   }
 }
 
-func lookup_plain_name(arr *array[ast_generik], x sym) opt[size] {
+func lookup_plain_name(arr *shray[te_generik], x sym) opt[size] {
   n size = count(arr);
   for i size = 0; i < n; i = i + 1 {
     switch &arr[i] {
-    case &PlainGeneric(b ast_ident):
-      if b.value == x {
+    case &TePlainGeneric(b sym):
+      if b == x {
         return Has(i);
       }
-    case &LifetimeGeneric(b ast_lifetime_generik): { }
+    case &TeLifetimeGeneric(b te_lifetime_generik): { }
     }
   }
   return None;
 }
 
-func lookup_lifetime_name(arr *array[ast_generik], x sym) opt[size] {
+func lookup_lifetime_name(arr *shray[te_generik], x sym) opt[size] {
   n size = count(arr);
   for i size = 0; i < n; i = i + 1 {
     switch &arr[i] {
-    case &PlainGeneric(b ast_ident): { }
-    case &LifetimeGeneric(b ast_lifetime_generik):
-      if b.name.value == x {
+    case &TePlainGeneric(b sym): { }
+    case &TeLifetimeGeneric(b te_lifetime_generik):
+      if b.name == x {
         return Has(i);
       }
     }
@@ -1913,7 +1934,7 @@ func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) boo
 }
 
 func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
-  names array[ast_generik];
+  names shray[te_generik];
   unif_parms array[te_typeexpr];
   return unify_under_generics(pta, &names, &unif_parms, ptb, out);
 }

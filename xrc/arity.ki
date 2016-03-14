@@ -15,13 +15,13 @@ enum generics_arity {
 }
 
 // TODO: The so-called "arity" might need to include information whether it's a lifetime generic or plain generic.
-func arity(a *ast_generics) generics_arity {
+func arity(a *te_generics) generics_arity {
   switch a {
-    case &NoGenerics: { return NoParamsArity; }
-    case &HasGenerics(arr array[ast_generik]): {
+    case &TeNoGenerics: { return NoParamsArity; }
+    case &TeHasGenerics(arr shray[te_generik]): {
       return FiniteArity(~count(&arr));
     }
-    case &VariadicGenerics(b ast_variadic_generics): {
+    case &TeVariadicGenerics(b te_variadic_generics): {
       return VariadicArity({~count(&b.before), ~count(&b.after)});
     }
   }

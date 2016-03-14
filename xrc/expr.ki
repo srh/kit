@@ -61,7 +61,7 @@ struct defscope {
   clq *clqueue;
   accessible array[access_entry_id];
   // Generics and their _complete_ replacements.
-  generics *ast_generics;
+  generics *te_generics;
   repls *idy_repls;
   def_informal_name sym;
 }
@@ -199,7 +199,7 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
   return NoFail;
 }
 
-func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *ast_generics, parms *idy_repls, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
+func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *te_generics, parms *idy_repls, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
   ds defscope = {clq->cs, clq->im, clq, accessible, g, parms, def_informal_name};
   es framescope = mk(&ds, None);
   #check_expr_consume(&es, x, pt);
@@ -393,7 +393,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
 
   mec magic_enum_construct = {*et, ~ *return_type, return_type_props, decl_index, rhs_props, meco};
 
-  ent def_entry_id = add_def_primitive(ds->cs, defname, NoGenerics, *ctor_type, @[def_definition]DefnMagic(MagicEnumConstruct(mec)));
+  ent def_entry_id = add_def_primitive(ds->cs, defname, TeNoGenerics, *ctor_type, @[def_definition]DefnMagic(MagicEnumConstruct(mec)));
   inst_id def_inst_id;
   if !from_np(make_inst(ds->clq, ent, &nogp, &inst_id)) {
     ice(_u8("lookup_or_make_enum_constructor_def make_inst failed on fresh def"));

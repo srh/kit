@@ -345,7 +345,7 @@ struct deftype_entry {
   module_name sym;
   name sym;
   accessible array[access_entry_id];
-  generics ast_generics;
+  generics te_generics;
   // nonprim/default_info are mutually exclusive Has-havers.
   // Info relevant for non-primitive types.
   nonprim opt[deftype_nonprim];
@@ -354,7 +354,7 @@ struct deftype_entry {
   insts hash[idy_genparms, deftype_inst_id];
 }
 
-func mk(module_name sym, name sym, accessible array[access_entry_id], g ast_generics, tl *ast_type_def) deftype_entry {
+func mk(module_name sym, name sym, accessible array[access_entry_id], g te_generics, tl *ast_type_def) deftype_entry {
   return {module_name, name, accessible, g, Has({tl, NotComputed}), None, mk_hash@[idy_genparms, deftype_inst_id]()};
 }
 
@@ -431,7 +431,7 @@ struct idy_genparms {
   // The number of distinct lifetime types used in repls.
   num_lifetime_types_used size;
 
-  // If the ast_generics is NoGenerics, this is of course empty.
+  // If the te_generics is TeNoGenerics, this is of course empty.
   // Entries that line up with lifetime parameters will be some canonicalized lifetime.
   repls idy_repls;
 }
@@ -554,14 +554,14 @@ struct def_entry {
   def_name sym;
   accessible array[access_entry_id];
   // A copy of the ast_def's generics field -- if it's an ast_extern_def, this is NoGenerics.
-  generics ast_generics;
+  generics te_generics;
   definition def_definition;
   converted_typeexpr nbfc[te_typeexpr];
 
   insts hash[idy_genparms, def_inst_id];
 }
 
-func mk(module_name sym, def_name sym, accessible array[access_entry_id], generics ast_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
+func mk(module_name sym, def_name sym, accessible array[access_entry_id], generics te_generics, quick_typeexpr ast_typeexpr, tl *ast_toplevel) def_entry {
   return {module_name, def_name, accessible, generics, DefnHasRhs({quick_typeexpr, tl}), NotComputed, mk_hash@[idy_genparms, def_inst_id]()};
 }
 
@@ -631,7 +631,7 @@ func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_ins
   ent *deftype_entry = ref_deftype_entry(cs, ent_id);
   name sym = ent->name;
   switch &ent->generics {
-  case &NoGenerics:
+  case &TeNoGenerics:
     return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
   default:
     parms *idy_genparms = &ref_deftype_inst(cs, inst_id)->parms;
