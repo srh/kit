@@ -28,7 +28,8 @@ struct magic_arraytype_info {
 }
 
 enum magic_ctor_info {
-  // These are None for fields that are trivially constructed.  But of course one field is not None.
+  // These are None for fields that are trivially constructed.  But of course one field is
+  // not None.
   MagicStructInfo magic_struct_info;
   MagicEnumInfo magic_enum_info;
   MagicArraytypeInfo magic_arraytype_info;

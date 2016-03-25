@@ -21,7 +21,8 @@ struct framescope {
   // Used for auto-generating $frame_1, $frame_2, ... lifetimes.
   lifetime_gen_counter size;
 
-  // The return type... if we're in a body that has a return type -- used for QuickReturn expressions.
+  // The return type... if we're in a body that has a return type -- used for QuickReturn
+  // expressions.
   return_type opt[*cu_typeexpr];
 
   gr frame_graph;
@@ -76,9 +77,12 @@ func `<`(x var_number, y var_number) bool {
 }
 
 enum var_binding {
-  // The variable overlays some other object, in a switch/etc.  It's bound _to_ some object, or partt of one, and we can't auto-initialize it (and it doesn't get destructed on its own when it goes out of scope).
+  // The variable overlays some other object, in a switch/etc.  It's bound _to_ some
+  // object, or partt of one, and we can't auto-initialize it (and it doesn't get
+  // destructed on its own when it goes out of scope).
   VarOverlay void;
-  // The variable's a self-contained object -- it gets destroyed or not, it can be autoinitialized.
+  // The variable's a self-contained object -- it gets destroyed or not, it can be
+  // autoinitialized.
   VarSelfContained void;
 }
 
@@ -90,7 +94,14 @@ struct var_info {
   cell cell_num;
   name opt[sym];
   lifetime cu_typeexpr;
-  // Can a goto statement enter this var's scope and construct the var?  True if the var is self-contained.  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)  This also means the var needs to be destructed by return statements and gotos that leave its scope.  NOTE: What about default cases of switch statements?  You shouldn't be able to goto into one of those?  But you should be able to goto into the else block of an "if case" -- this needs to be fixed?  Should the swartch get destroyed?  Are we treating the "destroy later" of the condition properly?
+  // Can a goto statement enter this var's scope and construct the var?  True if the var
+  // is self-contained.  I.e. true if the variable is not bound by a case-pattern.  (Also
+  // true for lambda parameters, out of general principle.)  This also means the var needs
+  // to be destructed by return statements and gotos that leave its scope.  NOTE: What
+  // about default cases of switch statements?  You shouldn't be able to goto into one of
+  // those?  But you should be able to goto into the else block of an "if case" -- this
+  // needs to be fixed?  Should the swartch get destroyed?  Are we treating the "destroy
+  // later" of the condition properly?
   binding var_binding;
   initter opt[ctor_desc];
   destroyer opt[ctor_desc];
@@ -139,7 +150,8 @@ func do_destroy(vp *varpopper) void {
   vp->es = null;
 }
 
-func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], lifetime cu_typeexpr, computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) np {
+func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], lifetime cu_typeexpr,
+                 computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) np {
   osymname opt[sym];
   if case Has(ident *ast_ident) = name {
     osymname = Has(ident->value);
@@ -199,7 +211,8 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
   return NoFail;
 }
 
-func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *te_generics, parms *idy_repls, x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
+func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *te_generics, parms *idy_repls,
+                    x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
   ds defscope = {clq->cs, clq->im, clq, accessible, g, parms, def_informal_name};
   es framescope = mk(&ds, None);
   #check_expr_consume(&es, x, pt);
@@ -214,7 +227,8 @@ func check_expr_consume(es *framescope, x *ast_expr_consume, pt *te_typeexpr) np
   return NoFail;
 }
 
-func check_expr_retconsume(es *framescope, x *ast_expr_consume, pt *te_typeexpr, movable_cells *shray[opt[cell_num]], moved_cell_ix_out *opt[size]) np {
+func check_expr_retconsume(es *framescope, x *ast_expr_consume, pt *te_typeexpr,
+                           movable_cells *shray[opt[cell_num]], moved_cell_ix_out *opt[size]) np {
   #check_expr_ai(es, AllowIncompleteNo, &x->expr, pt);
   #annotate_disposal_for_consume(es, &x->expr, movable_cells, &x->after, moved_cell_ix_out);
   return NoFail;
@@ -339,7 +353,8 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
 }
 
 // return_type is the return type of ctor_type.  Both are complete and computed.
-func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type *te_typeexpr, ctor_type *te_typeexpr, decl_index size) cr[instpair] {
+func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type *te_typeexpr,
+                                         ctor_type *te_typeexpr, decl_index size) cr[instpair] {
   defname_u8 array[u8] = _u8("$magic_enum_ctor_");
   build_u8str(void, &defname_u8, &decl_index);
   defname sym = intern(ds->im, from_u8(defname_u8));
@@ -393,7 +408,8 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
 
   mec magic_enum_construct = {*et, ~ *return_type, return_type_props, decl_index, rhs_props, meco};
 
-  ent def_entry_id = add_def_primitive(ds->cs, defname, TeNoGenerics, *ctor_type, @[def_definition]DefnMagic(MagicEnumConstruct(mec)));
+  ent def_entry_id = add_def_primitive(ds->cs, defname, TeNoGenerics, *ctor_type,
+                                       @[def_definition]DefnMagic(MagicEnumConstruct(mec)));
   inst_id def_inst_id;
   if !from_np(make_inst(ds->clq, ent, &nogp, &inst_id)) {
     ice(_u8("lookup_or_make_enum_constructor_def make_inst failed on fresh def"));
@@ -424,7 +440,8 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
       type te_typeexpr;
       vartype *cu_typeexpr = &ref_var(es, num)->type;
       if !unify_types(pt, &vartype->x, &type) {
-        return ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"), pretty(es->im, vartype), _u8("' where '"), pretty(es->im, pt), _u8("' expected"));
+        return ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"),
+                   pretty(es->im, vartype), _u8("' where '"), pretty(es->im, pt), _u8("' expected"));
       }
       *res_out = OneLocalMatch({num});
       return NoFail;
@@ -476,7 +493,8 @@ func es_find_current_local(es *framescope, name sym) opt[var_number] {
   return None;
 }
 
-func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr, errmsg_name array[u8], x *ast_expr) np {
+func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr,
+                               errmsg_name array[u8], x *ast_expr) np {
   unified te_typeexpr;
   if !unify_types(pt, &type, &unified) {
     return ERR(errmsg_name, _u8(" literal in bad place"));
@@ -507,7 +525,8 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
 
   if case Unprinted(pm err_printed) = help_check_expr_ai(es, ai, x, pt) {
     if !pm.printed_meta {
-      // TODO: Get rid of this terrible hackish way to error message.  (By printing location information everywhere.)
+      // TODO: Get rid of this terrible hackish way to error message.  (By printing
+      // location information everywhere.)
       return MERR_append(es->cs, x->meta, pm, _u8(" in this expression"));
     } else {
       return Unprinted(pm);
@@ -607,8 +626,12 @@ func success_enum_case_info(ds *defscope, cu *cu_typeexpr, success_case_ix_out *
   }
 }
 
-func structurally_convertible_in_non_success(ds *defscope, rhs_success_ix size, rhs_constructors *shray[te_vardecl], return_success_ix size, return_et *enumspec, out *bool, constructor_mapping_out *array[size]) np {
-  // For now we're going to be uber-restrictive and require exactly the same constructor ordering (and of course exactly the same enum case types).  "Structurally convertible" is designed around generic enum types like opt[T] or cr[T].
+func structurally_convertible_in_non_success(ds *defscope, rhs_success_ix size, rhs_constructors *shray[te_vardecl],
+                                             return_success_ix size, return_et *enumspec, out *bool,
+                                             constructor_mapping_out *array[size]) np {
+  // For now we're going to be uber-restrictive and require exactly the same constructor
+  // ordering (and of course exactly the same enum case types).  "Structurally
+  // convertible" is designed around generic enum types like opt[T] or cr[T].
 
   n size = count(rhs_constructors);
   if n != count(&return_et->constructors) || rhs_success_ix != return_success_ix {
@@ -643,9 +666,15 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
     // In order for a quickreturn expression to be valid, the following must be true:
     //   a. the rhs must be an enum type with a success case
     //   b. the pt must be the success case's inside type
-    //   c. the return type of the fullbody we're in must be an enum type that is "structurally convertible in the non-success cases" from the rhs enum type.  For example, opt[foo] is structurally convertible (in the non-success cases) from opt[bar].
+    //   c. the return type of the fullbody we're in must be an enum type that is
+    //      "structurally convertible in the non-success cases" from the rhs enum type.
+    //      For example, opt[foo] is structurally convertible (in the non-success cases)
+    //      from opt[bar].
     //
-    // Because the rhs can be _any_ enum type, for now we'll evaluate the rhs with no pt, and AllowIncompleteNo, and then see if that matches up with the lhs.  Eventually we can implement "looking through the enum" logic -- that will be necessary for arithmetic overflow.
+    // Because the rhs can be _any_ enum type, for now we'll evaluate the rhs with no pt,
+    // and AllowIncompleteNo, and then see if that matches up with the lhs.  Eventually we
+    // can implement "looking through the enum" logic -- that will be necessary for
+    // arithmetic overflow.
 
     rhs_pt te_typeexpr = TeUnknown;
     #check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), &rhs_pt);
@@ -669,7 +698,9 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
 
     is_structurally_convertible bool;
     constructor_mapping array[size];
-    #structurally_convertible_in_non_success(es->ds, success_case_ix, &et->constructors, return_success_case_ix, return_et, &is_structurally_convertible, &constructor_mapping);
+    #structurally_convertible_in_non_success(es->ds, success_case_ix, &et->constructors,
+                                             return_success_case_ix, return_et, &is_structurally_convertible,
+                                             &constructor_mapping);
     if !is_structurally_convertible {
       return ERR(_u8("quick-return types not structurally convertible"));
     }
@@ -681,7 +712,8 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
     lval is_lval;
     switch &rhs_info->lval {
     case &IsLvalYes(desc lval_description):
-      lval = IsLvalYes({add_cell(es, {LocationVirtual, success_case_cu, success_case_props}), DeadMe, enum_field_lifetime(desc.lifetime)});
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, success_case_cu, success_case_props}), DeadMe,
+            enum_field_lifetime(desc.lifetime)});
     case &IsLvalNo(desc rval_description):
       lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, success_case_cu, success_case_props})});
     }
@@ -711,13 +743,15 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
     ice(_u8("RefOf sees non-ref after unifying with ref."));
   }
 
-  // We require complete matching because addressof requires it.  Addressof says meh, the rhs should be some crystal clear lvalue anyway.
+  // We require complete matching because addressof requires it.  Addressof says meh, the
+  // rhs should be some crystal clear lvalue anyway.
   #check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), pt_param);
 
   rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
   switch &rhs_info->lval {
   case &IsLvalNo(desc rval_description):
-    // TODO: Support taking reference of an rvalue -- have it become a temporary that expires... when it can.
+    // TODO: Support taking reference of an rvalue -- have it become a temporary that
+    // expires... when it can.
     return ERR(_u8("Taking reference of a non-lvalue"));
   case &IsLvalYes(desc lval_description):
     unified_lifetime te_typeexpr;
@@ -735,7 +769,8 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
 
     ref_props type_properties;
     #compute_complete_type_properties(es->clq, &ref_computed.te, &ref_props);
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ref_computed.te, ref_props})), ~ref_computed.te, ref_props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ref_computed.te, ref_props})),
+                                      ~ref_computed.te, ref_props)));
     return NoFail;
   }
 }
@@ -761,7 +796,8 @@ func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt 
 func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_expr, pt *te_typeexpr, x *ast_expr) np {
   // TODO: Cache converted.
   converted te_typeexpr = #convert_typeexpr(&a->type);
-  // We call check_and_compute_typeexpr to disallow totally bogus typeexprs more directly than the eventual type error that would happen.
+  // We call check_and_compute_typeexpr to disallow totally bogus typeexprs more directly
+  // than the eventual type error that would happen.
   computed cac_typeexpr;
   #check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &computed);
   unified te_typeexpr;
@@ -813,7 +849,8 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   return NoFail;
 }
 
-// Right now fields have the same lifetime as what they're part of -- they're part of the same object!  So, having equal lifetimes does not mean you're the same object.
+// Right now fields have the same lifetime as what they're part of -- they're part of the
+// same object!  So, having equal lifetimes does not mean you're the same object.
 func field_lifetime(outer_lifetime te_typeexpr) te_typeexpr {
   return outer_lifetime;
 }
@@ -823,13 +860,16 @@ func enum_field_lifetime(outer_lifetime te_typeexpr) te_typeexpr {
   return outer_lifetime;
 }
 
-// Varnames aren't supposed to shadow, so... we have user-friendly lifetime names.  (Note that vars could shadow generic lifetime parameters, for now, so we add the $var_ prefix.)
+// Varnames aren't supposed to shadow, so... we have user-friendly lifetime names.  (Note
+// that vars could shadow generic lifetime parameters, for now, so we add the $var_
+// prefix.)
 func varname_lifetime(im *identmap, name sym) te_typeexpr {
   n sym = intern(im, _s("$var_") + lookup(im, name));
   return TeLifetime({n});
 }
 
-// TODO: Most uses of this will get replaced by some rval lifetime getter.  (We'll set rval lifetimes with this value, though.)
+// TODO: Most uses of this will get replaced by some rval lifetime getter.  (We'll set
+// rval lifetimes with this value, though.)
 func unnamed_lifetime(es *framescope) te_typeexpr {
   n sym = intern(es->im, _s("$frame_") + from_u8(to_u8str(void, es->lifetime_gen_counter)));
   es->lifetime_gen_counter = es->lifetime_gen_counter + 1;
@@ -850,7 +890,8 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
     case InheritsLval(off check_field_offset_and_index): {
       switch &info->lval {
         case &IsLvalYes(desc lval_description): {
-          lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe, field_lifetime(desc.lifetime)});
+          lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe,
+                            field_lifetime(desc.lifetime)});
         }
         case &IsLvalNo(desc rval_description): {
           lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, fieldtype, props})});
@@ -886,7 +927,9 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
 
     props type_properties;
     #compute_complete_type_properties(es->clq, param, &props);
-    annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}), DeadMe, lifetime}), ~ *param, props)));
+    annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}),
+                                                           DeadMe, lifetime}),
+                                      ~ *param, props)));
     return NoFail;
   }
   return ERR(_u8("Trying to deref a non-pointer, non-reference."));
@@ -902,11 +945,13 @@ func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *
   if !decompose_typeapp(&unif_pt, primitive_pointer_puretype(es->cs), &param) {
     ice(_u8("AddressOf sees non-pointer after unifying with pointer."));
   }
-  // We require complete matching, because, meh, the rhs should be some crystal clear lvalue anyway.
+  // We require complete matching, because, meh, the rhs should be some crystal clear
+  // lvalue anyway.
   #check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), param);
   rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
   if case &IsLvalNo(desc rval_description) = &rhs_info->lval {
-    // TODO: Support taking address of an rvalue -- have it become a temporary that expires at the end of the full expression.
+    // TODO: Support taking address of an rvalue -- have it become a temporary that
+    // expires at the end of the full expression.
     return ERR(_u8("Taking address of a non-lvalue"));
   }
 
@@ -916,7 +961,8 @@ func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *
   check(ptr_computed.complete);
   ptr_props type_properties;
   #compute_complete_type_properties(es->clq, &ptr_computed.te, &ptr_props);
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ptr_computed.te, ptr_props})), ~ptr_computed.te, ptr_props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ptr_computed.te, ptr_props})),
+                                    ~ptr_computed.te, ptr_props)));
   return NoFail;
 }
 
@@ -1005,8 +1051,11 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, after *nc[ast_ex
   return annotate_disposal_for_consume(es, a, &movable_cells, after, &moved_cell_ix_discard);
 }
 
-// Annotates the disposal to "consume" the value -- i.e. what happens if it's a function param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or whatever).
-func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *shray[opt[cell_num]], after *nc[ast_expr_after_consume], moved_cell_ix_out *opt[size]) np {
+// Annotates the disposal to "consume" the value -- i.e. what happens if it's a function
+// param or otherwise a "use-once" value (i.e. to be copied/moved into a param list, or
+// whatever).
+func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *shray[opt[cell_num]],
+                                   after *nc[ast_expr_after_consume], moved_cell_ix_out *opt[size]) np {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
@@ -1031,7 +1080,9 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
         *moved_cell_ix_out = Has(ix);
       } else {
         copy ctor_desc = #get_copy_ctor(es->clq, &info->cu);
-        annotate(after, mk_after(@[consume_actions]ConsumeByCopy({@[copy_action]+{copy, dest, desc.num}, desc.deadme}), dest));
+        annotate(after, mk_after(@[consume_actions]ConsumeByCopy({@[copy_action]+{copy, dest, desc.num},
+                                                                  desc.deadme}),
+                                 dest));
         *moved_cell_ix_out = None;
       }
     }
@@ -1049,7 +1100,8 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
     }
     case &IsLvalYes(desc lval_description): {
       if case DeadMe = desc.deadme {
-        // This could ostensibly be Has(desc.num), but there's no reason to be inconsistent with the rvalue case.
+        // This could ostensibly be Has(desc.num), but there's no reason to be
+        // inconsistent with the rvalue case.
         annotate(after, mk_virtualdead_discard(desc.num));
       } else {
         annotate(after, mk_nothing_discard());
@@ -1061,7 +1113,8 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
 
 
 // Annotates the disposal for a value we'll use but then discard.
-func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume], later *ast_later_discard_info) np {
+func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_consume],
+                                                later *ast_later_discard_info) np {
   #annotate_disposal_for_consume(es, a, after);
 
   info *ast_expr_complete_info = expr_complete_info(a);
@@ -1154,7 +1207,8 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
   #es_lookup_name(es, a->ident.value, &parms, pt, &match_res);
   switch &match_res {
     case &NoMatch: {
-      return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, matching type '"), pretty(es->im, pt), _u8("'"));
+      return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value),
+                  _u8("', maybe with parms, not found, matching type '"), pretty(es->im, pt), _u8("'"));
     }
     case &AmbigGlobalMatch: {
       if ai == AllowIncompleteYes {
@@ -1162,7 +1216,8 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
         annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown));
         return NoFail;
       } else {
-        return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), pretty(es->im, pt));
+        return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value),
+                    _u8("', maybe with parms, matches ambiguously over "), pretty(es->im, pt));
       }
     }
     case &NoGlobalAmbigEnumConstructorMatch: {
@@ -1170,21 +1225,25 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
         annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown));
         return NoFail;
       } else {
-        return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, but cannot rule out enum constructor, on type '"), pretty(es->im, pt));
+        return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value),
+                    _u8("', maybe with parms, not found, but cannot rule out enum constructor, on type '"),
+                    pretty(es->im, pt));
       }
     }
     case &OneEnumConstructorMatch(ci constructor_info): {
       annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip}));
       props type_properties;
       #compute_type_properties(es->clq, &ci.type, &props);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ci.type, props})), ci.type, props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ci.type, props})),
+                                        ci.type, props)));
       return NoFail;
     }
     case &EnumVoidConstructedMatch(vci voidconstructed_info): {
       annotate(&a->name_info, @[ast_name_expr_info]EnumVoidConstructed({vci.constructor_tag, vci.et}));
       props type_properties;
       #compute_type_properties(es->clq, &vci.constructed_type, &props);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.constructed_type, props})), vci.constructed_type, props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.constructed_type, props})),
+                                        vci.constructed_type, props)));
       return NoFail;
     }
     case &OneGlobalMatch(egm es_global_match): {
@@ -1207,13 +1266,15 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       #compute_type_properties(es->clq, &cu_computed, &props);
 
       annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id}));
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, cu_computed, props})), cu_computed, props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, cu_computed, props})),
+                                        cu_computed, props)));
       return NoFail;
     }
     case &OneLocalMatch(v local_info): {
       annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({v.varnum}));
       vi *var_info = ref_var(es, v.varnum);
-      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe, vi->lifetime.x}), vi->type, vi->props)));
+      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe, vi->lifetime.x}),
+                                        vi->type, vi->props)));
       return NoFail;
     }
   }
@@ -1343,11 +1404,13 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
 
   props type_properties;
   #compute_complete_type_properties(es->clq, &computed.te, &props);
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~computed.te, props})), ~computed.te, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~computed.te, props})),
+                                    ~computed.te, props)));
   return NoFail;
 }
 
-// This helper method shields its code from using the wrong (outer) framescope variable in check_expr_lambda.
+// This helper method shields its code from using the wrong (outer) framescope variable in
+// check_expr_lambda.
 func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray[te_typeexpr]) np {
   vp varpopper;
   init_vp(&vp, &bs->es);
@@ -1362,7 +1425,8 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
     push(&arg_cells, cell);
     vn var_number;
     name *ast_ident = &a->args[i].name;
-    #es_push_var(&bs->es, &vp, cell, Has(name), ~varname_lifetime(bs->im, name->value), &cu_param, VarSelfContained, &vn);
+    #es_push_var(&bs->es, &vp, cell, Has(name), ~varname_lifetime(bs->im, name->value), &cu_param,
+                 VarSelfContained, &vn);
     #es_note_var_destroyer(&bs->es, vn);
   }
 
@@ -1378,7 +1442,8 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   #compute_complete_type_properties(bs->clq, return_type, &return_type_props);
   return_cell cell_num = add_cell(&bs->es, {LocationStatic, ~ *return_type, return_type_props});
 
-  info ast_fullbody_info = {destructions, bs->es.all_vars, Has(bs->es.gr), bs->gotos, bs->labels, bs->statements, return_cell, arg_cells};
+  info ast_fullbody_info = {destructions, bs->es.all_vars, Has(bs->es.gr), bs->gotos, bs->labels,
+                            bs->statements, return_cell, arg_cells};
   annotate(&a->body.info, info);
 
   return NoFail;
@@ -1412,7 +1477,8 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   if n < facts.minval || n > facts.maxval {
     return ERR(_u8("Numeric literal out of range."));
   }
-  // It's a pt, and it's a numeric type, which means it must be a complete pt, which means it's computed.
+  // It's a pt, and it's a numeric type, which means it must be a complete pt, which means
+  // it's computed.
   check(is_complete_computed(pt).computed);
   props type_properties;
   #compute_complete_type_properties(es->clq, pt, &props);
@@ -1420,7 +1486,8 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   return NoFail;
 }
 
-// You really should use this, in case we decide to rearrange the order of parameters of the ref type.
+// You really should use this, in case we decide to rearrange the order of parameters of
+// the ref type.
 func decompose_ref(t *te_typeexpr, cs *checkstate, lifetime_out **te_typeexpr, param_out **te_typeexpr) bool {
   return decompose_typeapp(t, primitive_ref_puretype(cs), lifetime_out, param_out);
 }
@@ -1474,7 +1541,8 @@ enum decompose_result {
   BadArity void;
 }
 
-func tri_decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr, twoparam_out **te_typeexpr) decompose_result {
+func tri_decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr,
+                           twoparam_out **te_typeexpr) decompose_result {
   params *shray[te_typeexpr];
   if !decompose_typeapp(t, expected_puretype, &params) {
     return BadPuretype;
@@ -1487,7 +1555,8 @@ func tri_decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, onepar
   return Success;
 }
 
-func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr, twoparam_out **te_typeexpr) bool {
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr,
+                       twoparam_out **te_typeexpr) bool {
   if case Success = tri_decompose_typeapp(t, expected_puretype, oneparam_out, twoparam_out) {
     return true;
   } else {
@@ -1495,7 +1564,8 @@ func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_o
   }
 }
 
-func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr, twoparam_out **te_typeexpr, threeparam_out **te_typeexpr) bool {
+func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, oneparam_out **te_typeexpr,
+                       twoparam_out **te_typeexpr, threeparam_out **te_typeexpr) bool {
   params *shray[te_typeexpr];
   if !decompose_typeapp(t, expected_puretype, &params) {
     return false;
@@ -1515,13 +1585,16 @@ struct check_field_offset_and_index {
 }
 
 enum check_field_result {
-  // Inherits the lvalue-ness of the thing it's a field of.  Includes the field's offset (in bnnos).
+  // Inherits the lvalue-ness of the thing it's a field of.  Includes the field's offset
+  // (in bnnos).
   InheritsLval check_field_offset_and_index;
-  // Doesn't inherit the lvalue-ness.  In fact it's a compile-time constant (for the array ".length" field).
+  // Doesn't inherit the lvalue-ness.  In fact it's a compile-time constant (for the array
+  // ".length" field).
   ConstantField u32;
 }
 
-func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr,
+                 fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   fieldtype cu_typeexpr;
   res check_field_result;
   #lookup_field(es, t, a, &fieldtype, &res);
@@ -1629,7 +1702,8 @@ enum structural_rhs_result {
   NotAccessible void;
 }
 
-func help_structural_rhs_info(ds *defscope, pack *te_instpack, rhs_info_out **deftype_inst_rhs_info) structural_rhs_result {
+func help_structural_rhs_info(ds *defscope, pack *te_instpack,
+                              rhs_info_out **deftype_inst_rhs_info) structural_rhs_result {
   accessible_result bool;
   if case Unprinted(pm) = deftype_rhs_info_accessible(ds, pack->ent_id, &accessible_result) {
     return Error(pm);
@@ -1691,7 +1765,8 @@ func help_structural_structspec(ds *defscope, pack *te_instpack, st_out **struct
   }
 }
 
-func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident,
+                       fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   st *structspec;
   switch help_structural_structspec(es->ds, pack, &st) {
   case Error(pm):
@@ -1703,7 +1778,8 @@ func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident, 
   }
 }
 
-func help_lookup_struct_field(es *framescope, st *structspec, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+func help_lookup_struct_field(es *framescope, st *structspec, fieldname *ast_ident,
+                              fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   offset u32;
   index size;
   #lookup_field_from_list(es->clq, &st->fields, fieldname->value, fieldtype_out, &offset, &index);
@@ -1711,7 +1787,8 @@ func help_lookup_struct_field(es *framescope, st *structspec, fieldname *ast_ide
   return NoFail;
 }
 
-func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident,
+                            fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   switch &t->x {
     case &TeName(a te_name): {
       return lookup_name_field(es, unHas(&a.pack), fieldname, fieldtype_out, res_out);
@@ -1750,7 +1827,8 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
   }
 }
 
-func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname, fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+func lookup_field(es *framescope, t *cu_typeexpr, f *ast_fieldname,
+                  fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   return help_lookup_name_field(es, t, &f->name, fieldtype_out, res_out);
 }
 
@@ -1768,7 +1846,8 @@ func find_vardecl(a *shray[te_vardecl], name sym, out **te_typeexpr, index_out *
 }
 
 // fields is supposed to be complete.
-func lookup_field_from_list(clq *clqueue, fields *shray[te_vardecl], fieldname sym, fieldtype_out *cu_typeexpr, offset_out *u32, index_out *size) np {
+func lookup_field_from_list(clq *clqueue, fields *shray[te_vardecl], fieldname sym,
+                            fieldtype_out *cu_typeexpr, offset_out *u32, index_out *size) np {
   psd partial_struct_data;
   #compute_partial_struct_data(clq, fields, Has(fieldname), &psd);
 
@@ -1827,11 +1906,13 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(&oo(&a->fun)->expr)->x);
   props type_properties;
   #compute_complete_type_properties(es->clq, return_type, &props);
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *return_type, props})), ~ *return_type, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *return_type, props})),
+                                    ~ *return_type, props)));
   return NoFail;
 }
 
-func check_funcall_params_firsttime(es *framescope, params *array[ast_expr_consume], a_param_incomplete_out *bool) np {
+func check_funcall_params_firsttime(es *framescope, params *array[ast_expr_consume],
+                                    a_param_incomplete_out *bool) np {
   n size = count(params);
   unknown te_typeexpr = TeUnknown;
   all_params_complete bool = true;
@@ -1912,7 +1993,8 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       // TODO: This is totally duplicating field access logic.
       switch &lhs_info->lval {
         case &IsLvalYes(desc lval_description): {
-          lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}), DeadMe, field_lifetime(desc.lifetime)});
+          lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
+                            DeadMe, field_lifetime(desc.lifetime)});
         }
         case &IsLvalNo(desc rval_description): {
           lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *result_type, result_props})});
@@ -1922,7 +2004,8 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       annotate(&a->info, {None, ArrayIndexingInfo({rhs_later})});
     } else {
       // Dereferencing a pointer always makes an lvalue.
-      lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}), DeadMe, field_lifetime(fake_lifetime(es->cs))});
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
+                        DeadMe, field_lifetime(fake_lifetime(es->cs))});
       ie_info_after nc[ast_expr_after_consume] = NotComputed;
       lhs_later ast_later_discard_info = mk_later();
       #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
@@ -1932,8 +2015,11 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
 
   case Has(ip instpair):
     // What this becomes is:
-    //   - If the lhs (possibly derefed) is an lvalue, we take its address, call ip, and deref the return value, which makes an lvalue.
-    //   - If the lhs is an rvalue, we take its address, call ip, and copy the return value to a new whole rvalue.  But WHAT IF an rvalue's partial_num was allowed to not be a subcell of whole_num?  Then we could just update partial_num.
+    //   - If the lhs (possibly derefed) is an lvalue, we take its address, call ip,
+    //     and deref the return value, which makes an lvalue.
+    //   - If the lhs is an rvalue, we take its address, call ip, and copy the return
+    //     value to a new whole rvalue.  But WHAT IF an rvalue's partial_num was allowed
+    //     to not be a subcell of whole_num?  Then we could just update partial_num.
     //   - For now, if the lhs is an rvalue, we fail to compile.
 
     if !tech.deref {
@@ -1941,7 +2027,8 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
 
       switch &lhs_info->lval {
       case &IsLvalYes(desc lval_description):
-        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}), DeadMe, fake_lifetime(es->cs)});
+        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
+                          DeadMe, fake_lifetime(es->cs)});
       case &IsLvalNo(desc rval_description):
         return ERR(_u8("User-defined array indexing only works on lvalues"));
       }
@@ -1950,7 +2037,8 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     } else {
       #check_expr_consume(es, oo(&a->rhs), &key_type);
 
-      lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}), DeadMe, fake_lifetime(es->cs)});
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
+                        DeadMe, fake_lifetime(es->cs)});
       ie_info_after nc[ast_expr_after_consume] = NotComputed;
       lhs_later ast_later_discard_info = mk_later();
       #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
@@ -1969,8 +2057,10 @@ struct indexing_technique {
   deref bool;
 }
 
-func decompose_indexable(clq *clqueue, typ *te_typeexpr, result_type_out **te_typeexpr, key_type_out *te_typeexpr, tech_out *indexing_technique) np {
-  // We specifically do _not_ support references here.  You can't index into a reference... you'd need a slice type or something like that.
+func decompose_indexable(clq *clqueue, typ *te_typeexpr,
+                         result_type_out **te_typeexpr, key_type_out *te_typeexpr, tech_out *indexing_technique) np {
+  // We specifically do _not_ support references here.  You can't index into a
+  // reference... you'd need a slice type or something like that.
   indexable *te_typeexpr;
   deref bool;
   if decompose_typeapp(typ, primitive_pointer_puretype(clq->cs), &indexable) {
@@ -1994,7 +2084,8 @@ func decompose_indexable(clq *clqueue, typ *te_typeexpr, result_type_out **te_ty
   case &NoMatch:
     return ERR(_u8("indexing on non-indexable type"));
   case &MultiMatch:
-    return ERR(_u8("indexing on type with multiple '"), lookup(clq->im, clq->im->cym.do_indexsym), _u8("' definitions"));
+    return ERR(_u8("indexing on type with multiple '"), lookup(clq->im, clq->im->cym.do_indexsym),
+               _u8("' definitions"));
   case &OneMatch(m ent_and_parms):
     inst_id def_inst_id;
     #make_inst(clq, m.ent, &m.parms, &inst_id);
@@ -2003,13 +2094,15 @@ func decompose_indexable(clq *clqueue, typ *te_typeexpr, result_type_out **te_ty
     arr_ptr_type *te_typeexpr;
     key_type *te_typeexpr;
     result_ptr_type *te_typeexpr;
-    if !decompose_typeapp(&ty->cu.x, primitive_function_puretype(clq->cs), &arr_ptr_type, &key_type, &result_ptr_type) {
+    if !decompose_typeapp(&ty->cu.x, primitive_function_puretype(clq->cs), &arr_ptr_type, &key_type,
+                          &result_ptr_type) {
       // This failure can't happen because we constructed fntype to have 3 types.
       return ERR(_u8("ICE: decompose_indexable cannot decompose match_def type"));
     }
     result_type *te_typeexpr;
     if !decompose_typeapp(result_ptr_type, primitive_pointer_puretype(clq->cs), &result_type) {
-      return ERR(_u8("indexing function '"), lookup(clq->im, clq->im->cym.do_indexsym), _u8("' returns non-pointer type"));
+      return ERR(_u8("indexing function '"), lookup(clq->im, clq->im->cym.do_indexsym),
+                 _u8("' returns non-pointer type"));
     }
     *result_type_out = result_type;
     *key_type_out = *key_type;
@@ -2071,7 +2164,8 @@ func expr_type_incomplete(a *ast_expr) bool {
   return !expr_type_complete(a);
 }
 
-func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[ast_expr_consume], out *te_typeexpr) np {
+func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[ast_expr_consume],
+                          out *te_typeexpr) np {
   type_params array[te_typeexpr];
   n size = count(params);
   reserve(&type_params, n + 1);

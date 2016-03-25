@@ -138,7 +138,8 @@ access array[_] {
     if r->count == r->cap {
       change_cap_(r, max(8, r->cap * 2));
     }
-    // This is not move() and init(&value) because without inlining... and where it materially affects performance, we'll use pushref or pushmove.
+    // This is not move() and init(&value) because without inlining... and where it
+    // materially affects performance, we'll use pushref or pushmove.
     copy(&r->ptr[r->count], &value);
     r->count = r->count + 1;
   }

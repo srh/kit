@@ -662,7 +662,8 @@ func backquote_grab_tok(p *ps) tok {
       return mk_res(p, left, Oper(build));
     }
     ps_step(p);
-    // We actually can't use invalid opers, and need to make the token-grabbing better.  Anyway, we _definitely_ cannot overflow the smallstr.
+    // We actually can't use invalid opers, and need to make the token-grabbing better.
+    // Anyway, we _definitely_ cannot overflow the smallstr.
     if build.len == smallstr_max_len {
       return mk_res(p, left, Bad);
     }

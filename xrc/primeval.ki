@@ -167,7 +167,8 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
     #st_divmod(get(&ps, 0), get(&ps, 1), op, &div_result, &mod_discard);
     return st_num_rangechecked_output(clq, env, retvalref, div_result, op);
   case NumMod:
-    // TODO: This does not have x86-compatible (or platform-compatible) behavior for signed division.
+    // TODO: This does not have x86-compatible (or platform-compatible) behavior for
+    // signed division.
     div_discard bigint;
     mod_result bigint;
     #st_divmod(get(&ps, 0), get(&ps, 1), op, &div_discard, &mod_result);
@@ -219,7 +220,9 @@ func st_divmod(x bigint, y bigint, op *primitive_numeric_op, div_out *bigint, mo
     }
   }
   dm tup[bigint, bigint] = divmod(x, y);
-  // If numerator is negative, twiddle result to obey "official" SignedTwos (x86) semantics.  divmod already handles the x>0, y>0 case (duh) and the x>0, y<0 case correctly.
+  // If numerator is negative, twiddle result to obey "official" SignedTwos (x86)
+  // semantics.  divmod already handles the x>0, y>0 case (duh) and the x>0, y<0 case
+  // correctly.
   if dm.cdr != bigu(0) && is_negative(&x) {
     if is_negative(&y) {
       // div is positive, we need it smaller.
@@ -238,7 +241,8 @@ func st_divmod(x bigint, y bigint, op *primitive_numeric_op, div_out *bigint, mo
   return NoFail;
 }
 
-// Says that we should _not_ trap on overflow -- used for bitwise ops where it's possible and OK to overflow (namely, bitwise not).
+// Says that we should _not_ trap on overflow -- used for bitwise ops where it's possible
+// and OK to overflow (namely, bitwise not).
 enum never_trap {
   NeverTrapNo void;
   NeverTrapYes void;

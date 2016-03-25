@@ -44,12 +44,16 @@ func vt_regraphed(clq *clqueue, fg *frame_regraphed) np {
 
 func vt_graph(clq *clqueue, gr *frame_graph, gn gr_num) np {
   // DBG(_u8!"valtracking for graph ", lookup(clq->im, gr->informal_name));
-  // This uses a different traversal algorithm than some other graph-traversing code.  Metadata that tells us about the AST's structure make us revisit alternate branches more "locally," and more importantly, in a defined order that can be described in terms of the original AST.
-  // TODO: Make the above comment be true.  Right now we don't really have a defined order.
+  /* This uses a different traversal algorithm than some other graph-traversing code.
+  Metadata that tells us about the AST's structure make us revisit alternate branches more
+  "locally," and more importantly, in a defined order that can be described in terms of
+  the original AST. */
+  /* TODO: Make the above comment be true.  Right now we don't really have a defined order. */
 
   track vt_track = mk_track(gr);
 
-  // TODO: We could use vt_xop() here?  That would remove the need for a sq_builder in add_prim_fn_body.
+  // TODO: We could use vt_xop() here?  That would remove the need for a sq_builder in
+  // add_prim_fn_body.
   terminates bool = #vt_inner_expr({clq, gr, &track}, gn);
   return NoFail;
 }
@@ -166,7 +170,8 @@ func vt_abnormal_excursion(c cgt, ft *vt_freshtrack, gn gr_num) np {
   }
 }
 
-// Returns true if we reached the end of the single xop.  If true, c.track->current means something.  If false, it doesn't!
+// Returns true if we reached the end of the single xop.  If true, c.track->current means
+// something.  If false, it doesn't!
 func vt_single_xop(c cgt, gn gr_num) cr[bool] {
   switch ref_node(c.gr, gn) {
   case &XOp(xn gr_xnode):
@@ -178,7 +183,8 @@ func vt_single_xop(c cgt, gn gr_num) cr[bool] {
 
     /* We either want to:
       - get rid of inner exprs
-      - make them a special kind of XOp with end state specially recorded, so that we _know_ they have an explicit join target before reentering the rest of the world
+      - make them a special kind of XOp with end state specially recorded, so that we
+        _know_ they have an explicit join target before reentering the rest of the world
         TODO: ^^^ especially if valtracking gets more complicated
     */
   }

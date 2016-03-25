@@ -344,7 +344,8 @@ enum ast_statement_enum {
 struct ast_cp_info {
   ovn opt[var_number];
   tag_value enum_tag_value;
-  // enum_field_offset(cs, et, tag_value) -- annotated here because getting a enum constructors info in graph.ki is needlessly annoying.
+  // enum_field_offset(cs, et, tag_value) -- annotated here because getting a enum
+  // constructors info in graph.ki is needlessly annoying.
   field_offset u32;
 }
 
@@ -387,7 +388,8 @@ struct ast_fullbody {
 }
 
 struct ast_lambda {
-  // TODO: We put is_inline here mainly for convenience of implementation (in gr_lambda_expr), it is unprincipled in the long run (I think?).
+  // TODO: We put is_inline here mainly for convenience of implementation (in
+  // gr_lambda_expr), it is unprincipled in the long run (I think?).
   is_inline ast_isinline;
   args array[ast_vardecl];
   return_type ast_typeexpr;
@@ -545,7 +547,10 @@ struct ast_quickreturn_info {
   return_tag_cell cell_num;
   return_et enumspec;
 
-  // get(&constructor_mapping, i) returns the constructor corresponding to i.  (The value for the success case is unused.)  Right now we require "structurally convertible" to maintain identical constructor ordering, thus, get(&constructor_mapping, i) returns i.
+  // get(&constructor_mapping, i) returns the constructor corresponding to i.  (The value
+  // for the success case is unused.)  Right now we require "structurally convertible" to
+  // maintain identical constructor ordering, thus, get(&constructor_mapping, i) returns
+  // i.
   constructor_mapping array[size];
 }
 
@@ -563,7 +568,8 @@ struct rval_description {
   partial_num cell_num;
 }
 
-// Tells whether the rval would need to get copied out of the temporary, or whether the rval _is_ the whole temporary and can get moved.
+// Tells whether the rval would need to get copied out of the temporary, or whether the
+// rval _is_ the whole temporary and can get moved.
 inline func whole_temporary(d *rval_description) bool {
   return d->whole_num == d->partial_num;
 }
@@ -669,7 +675,9 @@ enum consume_actions {
 struct ast_expr_after_consume {
   actions consume_actions;
   // The cell the expr's result... goes.
-  // TODO: We should prohibit exprs where a non-whole_field result (or any result?) is discarded.  This will mean we don't need to handle the case where we discard a field lookup without copying it out first.
+  // TODO: We should prohibit exprs where a non-whole_field result (or any result?) is
+  // discarded.  This will mean we don't need to handle the case where we discard a field
+  // lookup without copying it out first.
   result cell_num;
 }
 

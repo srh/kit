@@ -94,7 +94,8 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
         if case &Computed(val st_value) = &inst->evaled_value {
           fnid fn_body_id;
           if case Unprinted(pm) = x86_simple_symbolref(cs, &val, &fnid) {
-            return Unprinted({true, err_string(_u8("Export fn-symbol has invalid value (zero-initialized fn[...] value, I bet)"))});
+            return Unprinted({true, err_string(_u8("Export fn-symbol has invalid value (zero-initialized "
+                                                   "fn[...] value, I bet)"))});
           }
           body_text_offset u32 = *un(&ref_fn_body(cs, fnid)->body_text_offset);
           name string = lookup(cs->im, ent->def_name);
@@ -152,7 +153,8 @@ func add_fn_body_symbol(cs *checkstate, f *objfile, ent *fn_body_entry) void {
     arg_types shray[cu_typeexpr] = argcell_types(cs, &g);
     // We do make symbol names for prim fn bodies, but maybe we won't actually generate them.
     name sym = generate_kit_name(cs, ent->informal_name, arg_types);
-    symbol_table_index sti = add_local_symbol(f, name, 0 /* We'll overwrite the value later. */, SectionText, IsStaticNo);
+    symbol_table_index sti = add_local_symbol(f, name, 0 /* We'll overwrite the value later. */,
+                                              SectionText, IsStaticNo);
     annotate(&ent->symbol_table_index, symbol_table_index);
   case &ExternFnBody(e extern_fn_body):
     c_name sym = c_symbol_name(cs, e.name);

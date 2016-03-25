@@ -1,8 +1,10 @@
 import state;
 
-// This file's a grab-bag for lifetime type related stuff.  Probably most of it should be moved to other files and this should go away.
+// This file's a grab-bag for lifetime type related stuff.  Probably most of it should be
+// moved to other files and this should go away.
 
-// I suspect instpacks might require lifetime type name mapping information, so this is a placeholder.
+// I suspect instpacks might require lifetime type name mapping information, so this is a
+// placeholder.
 func canonicalized_pack(pack *opt[te_instpack]) opt[te_instpack] {
   return *pack;
 }

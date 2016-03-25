@@ -211,7 +211,8 @@ func add_primitives(cs *checkstate) void {
 }
 
 func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool {
-  // TODO: This implementation should work on complete types, use proper scoping rules (once we get scoping rules).
+  // TODO: This implementation should work on complete types, use proper scoping rules
+  // (once we get scoping rules).
   if case &TeName(a te_name) = pt {
     im *identmap = cs->im;
     if a.value == im->cym.i8sym {
@@ -450,7 +451,8 @@ func add_ref_primitive_type(cs *checkstate) void {
     None,
     Has({None,
          @[type_properties]{
-           // Someday fat refs might exist, and the traits will depend on the referent, but right now they are just like pointers, as far as these traits go.
+           // Someday fat refs might exist, and the traits will depend on the referent,
+           // but right now they are just like pointers, as far as these traits go.
            cs->plat.ptrtraits.size,
            cs->plat.ptrtraits.alignment,
            DerivedMethodTrivial,
@@ -486,8 +488,10 @@ func add_function_primitive(cs *checkstate) void {
            DerivedMethodTrivial,
            IsScalarYes,
            IsPow2AllTheWayDown,
-           // We don't expose any types?  Okay.
-           // Note that this default_info field will need to be removed, the problem treated differently, we _do_ expose types here (in a way that depends on function type args).  Maybe fn types should just be primitive, like structs and such.
+           // We don't expose any types?  Okay.  Note that this default_info field will
+           // need to be removed, the problem treated differently, we _do_ expose types
+           // here (in a way that depends on function type args).  Maybe fn types should
+           // just be primitive, like structs and such.
            mk_shray@[exposed_type_name]()
          }}),
     mk_hash@[idy_genparms, deftype_inst_id]()

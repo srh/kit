@@ -5,7 +5,8 @@ enum allow_blanks {
   AllowBlanksYes void;
 }
 
-// This isn't passed recursively -- "No" is used whenever parsing always expects a concrete type anyway.
+// This isn't passed recursively -- "No" is used whenever parsing always expects a
+// concrete type anyway.
 enum allow_lifetimes {
   AllowLifetimesNo void;
   AllowLifetimesYes void;
@@ -46,7 +47,8 @@ enum prec_cmp {
 
 def kSemicolonPrec i32 = 205;
 def kCommaPrec i32 = 205;
-// This is 305 because it would prevent assignment in conditionals, if it weren't otherwise banned (which it is).
+// This is 305 because it would prevent assignment in conditionals, if it weren't
+// otherwise banned (which it is).
 def kConditionPrec i32 = 305;
 def kConversionRightPrec i32 = 905;
 // Every unary operator has the same precedence.
@@ -359,7 +361,8 @@ func parse_backtick_ident(p *ps, ident_meta ast_meta, out *ast_ident) parse_resu
   switch peek(p)->val {
   default:
     return Fail;
-  // NOTE: "Opers" such as "@" or maybe even "=" shouldn't really be allowed here -- only functional opers allowed.
+  // NOTE: "Opers" such as "@" or maybe even "=" shouldn't really be allowed here -- only
+  // functional opers allowed.
   case Oper(operch smallstr):
     backquote_step(p);
     #try_skip_token(p, @[tokval]Grouper(Backtick));
@@ -811,7 +814,9 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
           rhs ast_expr;
           #parse_expr(p, op_facts.op_prec.right, ab, IsNotStatementExpr, &rhs);
           m ast_meta = copyend(p, lhs.meta);
-          // NOTE: This is fragile.  What if we had a statement, "x = y ! z;", where "!" is a lower-precedence operator than "="?  Right now no such operators exist (besides comma, which doesn't work in expressions) so we're okay.
+          // NOTE: This is fragile.  What if we had a statement, "x = y ! z;", where "!"
+          // is a lower-precedence operator than "="?  Right now no such operators exist
+          // (besides comma, which doesn't work in expressions) so we're okay.
           #build_binop_expr(p, se, m, op_facts.user_assignment, oper, lhs, rhs, &lhs);
         }
       }
@@ -912,11 +917,18 @@ func binop_info(t tokval) opt[binop_facts] {
 
 // How precedence levels work:
 //   - See binop_info and unop_info.
-//   - Operators grab with a "binding strength" (a precedence level) and their left and right sides
-//   - If one operator beats the other by 2 or more, that operator wins.  Otherwise, they conflict (and we cannot parse).
-//   - As an exception, operators in the 410-499 range (bitwise ops) conflict with everything in the 400-699 range.  As an exception to the exception, if the precedence is in 410-414 or 416-499, the operator does _not_ conflict with identical binding strength -- it's left-associative instead.  (This is for associative bitwise operators: x ^ y ^ z is valid, but x ^ y & z is not.)
+//   - Operators grab with a "binding strength" (a precedence level) and their left and
+//     right sides
+//   - If one operator beats the other by 2 or more, that operator wins.  Otherwise, they
+//     conflict (and we cannot parse).
+//   - As an exception, operators in the 410-499 range (bitwise ops) conflict with
+//     everything in the 400-699 range.  As an exception to the exception, if the
+//     precedence is in 410-414 or 416-499, the operator does _not_ conflict with
+//     identical binding strength -- it's left-associative instead.  (This is for
+//     associative bitwise operators: x ^ y ^ z is valid, but x ^ y & z is not.)
 //   - This is just a convoluted way to describe a partial ordering of binding strengths.
-//   - An exercise for the reader:  The right-side binding strength of '/' is 605, unlike '*' for which it is 604.  Why?
+//   - An exercise for the reader:  The right-side binding strength of '/' is 605, unlike
+//     '*' for which it is 604.  Why?
 func compare_prec(left i32, right i32) prec_cmp {
   if left >= 410 && left < 500 {
     if right >= 400 && right < 700 {
@@ -1229,7 +1241,8 @@ func parse_rest_of_param_list(p *ps, out *array[ast_expr_consume]) parse_result 
   return parse_rest_of_expr_list(p, AllowBracesYes, RParen, out);
 }
 
-// ab is always "Yes" here but it's still a param because it's not this function's place to decide.
+// ab is always "Yes" here but it's still a param because it's not this function's place
+// to decide.
 func parse_rest_of_expr_list(p *ps, ab allow_braces, stop grouper, out *array[ast_expr_consume]) parse_result {
   exprs array[ast_expr_consume];
   for ;; {
@@ -1527,7 +1540,8 @@ func parse_switch_case(p *ps, out *ast_switch_case) parse_result {
       rbrace tokval = Grouper(RBrace);
       while !done {
         if equal(&peek(p)->val, &casekeyw) || equal(&peek(p)->val, &defaultkeyw) || equal(&peek(p)->val, &rbrace) {
-          // We disallow empty non-braced switch cases -- they look too much like fallthrough cases.
+          // We disallow empty non-braced switch cases -- they look too much like
+          // fallthrough cases.
           if count(&statements) == 0 {
             return Fail;
           }

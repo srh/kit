@@ -654,7 +654,8 @@ func test_check_more_cases(ctx *check_ctx) void {
         "def foo fn[ty, i32] = func(t ty) i32 {\n"
         "  return t.x;\n"
         "};\n"));
-  // Fails (unlike c068) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs, checks that field access is accessible.
+  // Fails (unlike c068) because ty is defclass, and the conversion operator is private.
+  // Or, now that defclasses must be structs, checks that field access is accessible.
   run_check_negtest(ctx, "c069",
     _u8("defclass ty { field i32; }\n"
         "def foo fn[ty, i32] = func(t ty) i32 {\n"
@@ -675,7 +676,8 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"
         "}\n"));
 
-  // Fails (like more_29) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs, checks that field access is accessible.
+  // Fails (like more_29) because ty is defclass, and the conversion operator is private.
+  // Or, now that defclasses must be structs, checks that field access is accessible.
   run_check_negtest(ctx, "c071",
     _u8("defclass[T] ty { field i32; }\n"
         "def[T] foo fn[ty[T], i32] = func(t ty[T]) i32 {\n"
@@ -698,7 +700,8 @@ func test_check_more_cases(ctx *check_ctx) void {
         "};\n"
         "}\n"
         "def bar fn[ty[u32], i32] = foo;\n"));
-  // Fails (unlike c068) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs, checks whether field access is accessible.
+  // Fails (unlike c068) because ty is defclass, and the conversion operator is private.
+  // Or, now that defclasses must be structs, checks whether field access is accessible.
   run_check_negtest(ctx, "c073",
     _u8("defclass ty i32;\n"
         "def foo fn[*ty, *i32] = func(t *ty) *i32 {\n"
@@ -711,7 +714,8 @@ func test_check_more_cases(ctx *check_ctx) void {
         "  return &t->field;\n"
         "};\n"
         "}\n"));
-  // Fails (like c069) because ty is defclass, and the conversion operator is private.  Or, now that defclasses must be structs...
+  // Fails (like c069) because ty is defclass, and the conversion operator is private.
+  // Or, now that defclasses must be structs...
   run_check_negtest(ctx, "c075",
     _u8("defclass[T] ty { field i32; }\n"
         "def[T] foo fn[*ty[T], *i32] = func(t *ty[T]) *i32 {\n"
@@ -1407,7 +1411,8 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "\n"
         "def t st = foo(- @[i32] 15);\n"));
 
-  // This used to fail because the padding of st was not zeroed, and defs must be fully initialized -- but now padding of structs is zeroed.
+  // This used to fail because the padding of st was not zeroed, and defs must be fully
+  // initialized -- but now padding of structs is zeroed.
   run_check_test(ctx, "c137-c",
     _u8("defclass copy cl { field i32; }\n"
         "access cl {\n"
@@ -1427,10 +1432,13 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "\n"
         "def t st = foo(- @[i32] 15);\n"));
 
-  // A defect of these padding tests is that they don't check copy/move padding behavior, because non-trivially-copyable types cannot be used in defs.
+  // A defect of these padding tests is that they don't check copy/move padding behavior,
+  // because non-trivially-copyable types cannot be used in defs.
 
-  // This used to fail because the padding of en was not zeroed, and defs must be fully initialized.  But now padding of enums is zeroed.
-  // This also used to fail because enum initialization was incorrectly derived to be non-trivial, when it had a class member.
+  // This used to fail because the padding of en was not zeroed, and defs must be fully
+  // initialized.  But now padding of enums is zeroed.  This also used to fail because
+  // enum initialization was incorrectly derived to be non-trivial, when it had a class
+  // member.
   run_check_test(ctx, "c137-d",
     _u8("defclass copy cl { field i16; }\n"
         "access cl {\n"
@@ -1449,7 +1457,8 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "\n"
         "def t en = bar();\n"));
 
-  // The next few tests involved switch statements and pattern-conditionals.  They come in direct/pointer variants with "/d" and "/p" in their names.
+  // The next few tests involved switch statements and pattern-conditionals.  They come in
+  // direct/pointer variants with "/d" and "/p" in their names.
 
   run_check_test(ctx, "c138-a/d",
     _u8("enum[T] opt {\n"
@@ -1517,7 +1526,13 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def d1 i32 = foo();\n"
         ));
 
-  // Maybe this test should fail, because the swartch should be alive during the default case, and the goto shouldn't be able to jump into the default case and default-initialize the swartch, the way it is doing right now.  Or should it?  Someday for non-scoped variables we'd want the swartch to die before entering the default case, so it seems fine to allow default-initialization now, especially since, for enum values (and ints, if we implement that), the default-constructed value is the trivially-initializable zero-tag value.
+  // Maybe this test should fail, because the swartch should be alive during the default
+  // case, and the goto shouldn't be able to jump into the default case and
+  // default-initialize the swartch, the way it is doing right now.  Or should it?
+  // Someday for non-scoped variables we'd want the swartch to die before entering the
+  // default case, so it seems fine to allow default-initialization now, especially since,
+  // for enum values (and ints, if we implement that), the default-constructed value is
+  // the trivially-initializable zero-tag value.
   run_check_test(ctx, "c139/d",
     _u8("enum[T] opt {\n"
         "  Has T;\n"
@@ -1538,7 +1553,8 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "def d1 i32 = foo();\n"
         ));
 
-  // Unlike 139/d, maybe this should not fail, no matter what, because the swartch is a pointer and doesn't get destructed at all.
+  // Unlike 139/d, maybe this should not fail, no matter what, because the swartch is a
+  // pointer and doesn't get destructed at all.
   run_check_test(ctx, "c139/p-a",
     _u8("enum[T] opt {\n"
         "  Has T;\n"
@@ -1822,7 +1838,9 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "\n"
         "def t i32 = bar();\n"));
 
-  // TODO: This fails with "Looking for structural type information on inaccessible..." when it should have a def matching error on "get" (in the return statement, since i16!=i32).  This is just bonkers.
+  // TODO: This fails with "Looking for structural type information on inaccessible..."
+  // when it should have a def matching error on "get" (in the return statement, since
+  // i16!=i32).  This is just bonkers.
   run_check_negtest(ctx, "c145-b",
     _u8("defclass copy cl { field i16; }\n"
         "access cl {\n"
@@ -2131,7 +2149,8 @@ func test_check_yet_more_cases(ctx *check_ctx) void {
         "}\n"
         "def glob opt = bar();\n"));
 
-  // (BTW, returning null is not defined behavior for do_index.  In these tests, we don't have any way to abort().)
+  // (BTW, returning null is not defined behavior for do_index.  In these tests, we don't
+  // have any way to abort().)
   run_check_test(ctx, "c167",
     _u8("struct ty { x i32; y i32; }\n"
         "func do_index(p *ty, k size) *i32 {\n"

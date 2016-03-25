@@ -14,7 +14,8 @@ enum cell_loc {
 }
 
 struct gn_annot {
-  // A checksum for the liveset before this node is evaluated. (Used for assertions.) It also has the checksum for app_time_live.
+  // A checksum for the liveset before this node is evaluated. (Used for assertions.) It
+  // also has the checksum for app_time_live.
   plainly_live nc[celltrack_checksum];
 
   // Only for GrApply.
@@ -44,9 +45,11 @@ struct frame {
   return_cell cell_num;
   gr *frame_graph;
   bas *basic_analyze_state;
-  // by_gn[i].fs shows what the state must is _before_ evaluating node i.  (All incoming nodes must agree!)
+  // by_gn[i].fs shows what the state must is _before_ evaluating node i.  (All incoming
+  // nodes must agree!)
   by_gn array[gn_annot];
-  // offsets[i] is the offset of a cell relative to the stack frame, or location of a cell, or something like that.
+  // offsets[i] is the offset of a cell relative to the stack frame, or location of a
+  // cell, or something like that.
   offsets nc[array[cell_loc]];
   low_offset nc[i32];
 
@@ -61,7 +64,8 @@ def `~` fn[size, jmp_targetnum] = wrapconvert;
 
 struct jmpdata {
   overwrite_location u32;
-  // On x86, this is overwrite_location + 4 for imm32 jmp and jcc instructions -- the location of the end of the instruction.
+  // On x86, this is overwrite_location + 4 for imm32 jmp and jcc instructions -- the
+  // location of the end of the instruction.
   relative_mathpoint u32;
   target jmp_targetnum;
 }
@@ -116,7 +120,9 @@ func get_size_loc(h *frame, c cell_num) cell_loc {
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) np {
   bas *basic_analyze_state = un(&g->inline_state);
-  h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas, repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed, NotComputed, mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed};
+  h frame = {cs, cs->im, g->argcells, g->graph.cell, &g->graph.gr, bas,
+             repeat(count(&g->graph.gr.ops), mk_gn_annot()), NotComputed, NotComputed,
+             mk_array@[nc[u32]](), mk_array@[jmpdata](), NotComputed};
 
   ctr celltrack;
   create(&h, &ctr, g->graph.cell);
@@ -198,7 +204,8 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
   // 0. Layout arg cells, return cell.
   switch h->cs->plat.callconv {
   case UniversalCdeclConvention:
-    // It's OK to hard-code numbers here, because we're under the bullshit "UniversalCDeclConvention".
+    // It's OK to hard-code numbers here, because we're under the bullshit
+    // "UniversalCDeclConvention".
     upward_offset i32 = 8;
     ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
     if for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props) {
@@ -237,7 +244,8 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
       c cell_num = ref(live, j)->cell;
       if isNope(ref(&offsets, c.x)) {
         if case &Has(cell_paramlistgn gr_num) = &ref(&h->bas->celldisp, c.x)->paramlist {
-          // Cells in other paramlists should already been processed -- and would have failed the isNone check just above.
+          // Cells in other paramlists should already been processed -- and would have
+          // failed the isNone check just above.
           if cell_paramlistgn != gn {
             ice(_u8("cell is in other paramlist, was not processed"));
           }
@@ -248,7 +256,8 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
       }
     }
 
-    // 2. Layout cells that _are_ part of the paramlist.  (They have to go beneath those which aren't.)
+    // 2. Layout cells that _are_ part of the paramlist.  (They have to go beneath those
+    // which aren't.)
     pcells *shray[cell_num] = paramlist_cells(h->gr, gn);
     npcells size = count(pcells);
     for j size = 0; j < npcells; j = j + 1 {
@@ -274,7 +283,8 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
     low_offset = min(low_offset, bumpline);
   }
 
-  // 3. Layout cells that aren't live during any function call -- maybe these are just used in dead code.
+  // 3. Layout cells that aren't live during any function call -- maybe these are just
+  // used in dead code.
   ncells size = count(&offsets);
   for i size = 0; i < ncells; i = i + 1 {
     if isNope(ref(&offsets, i)) {
@@ -292,7 +302,8 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
 
   noopt_offsets array[cell_loc] = flatten_offsets(h, &offsets);
   annotate(&h->offsets, noopt_offsets);
-  // We subtract 4 because we haven't accounted for the possible need to make a hidden return pointer for the x86 callconv.
+  // We subtract 4 because we haven't accounted for the possible need to make a hidden
+  // return pointer for the x86 callconv.
   annotate(&h->low_offset, low_offset - 4);
   return NoFail;
 }
@@ -417,7 +428,8 @@ func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
       if !nonzero_iterations {
         return None;
       } else if c == h->return_cell && cumulative_offset != 0 {
-        // TODO: Don't have such a hard-coded special case.  (When we support constant-virtual-plus-offset, we won't.)
+        // TODO: Don't have such a hard-coded special case.  (When we support
+        // constant-virtual-plus-offset, we won't.)
         return None;
       } else {
         return Has({c, cumulative_offset});
@@ -472,7 +484,8 @@ func st_def_to_fnid(cs *checkstate, ip instpair) opt[fn_body_id] {
       }
       return Has(fnid);
     } else {
-      // Weird, I don't know, maybe it's zero-initialized?  Something a graph could have, if not a real program.
+      // Weird, I don't know, maybe it's zero-initialized?  Something a graph could have,
+      // if not a real program.
       return None;
     }
   } else {
@@ -519,20 +532,25 @@ func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *typ
 func next_stack_offset(cs *checkstate, low_offset i32, ci *cell_info, numeric_out *i32) cell_loc {
   switch ci->location {
   case LocationVirtual:
-    num i32 = floor_aligned(low_offset - ~cs->plat.ptrtraits.size, max(cs->plat.min_stackvar_alignment, cs->plat.ptrtraits.size));
+    num i32 = floor_aligned(low_offset - ~cs->plat.ptrtraits.size,
+                            max(cs->plat.min_stackvar_alignment, cs->plat.ptrtraits.size));
     *numeric_out = num;
     return IndirectLoc(num);
   case LocationStatic:
-    num i32 = floor_aligned(low_offset - ~ci->props.flat_size, max(cs->plat.min_stackvar_alignment, ci->props.flat_alignment));
+    num i32 = floor_aligned(low_offset - ~ci->props.flat_size,
+                            max(cs->plat.min_stackvar_alignment, ci->props.flat_alignment));
     *numeric_out = num;
     return DirectLoc(num);
   }
 }
 
 func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array[gr_num]) np {
-  // Paramlists by in-degree, which is < the number of paramlists (since they can't point at themselves).
+  // Paramlists by in-degree, which is < the number of paramlists (since they can't point
+  // at themselves).
   nparamlists size = count(&h->bas->paramlists);
-  // nparamlists is an impossible in-degree, and nparamlists + 1 is more impossible -- there's no way it could be decremented to zero while having count(&ordering) end up equalling nparamlists, below.
+  // nparamlists is an impossible in-degree, and nparamlists + 1 is more impossible --
+  // there's no way it could be decremented to zero while having count(&ordering) end up
+  // equalling nparamlists, below.
   backmap array[size] = repeat(count(&h->by_gn), nparamlists + 1);
   nreachable_paramlists size = 0;
   zeroset hash[gr_num, void];
@@ -610,7 +628,8 @@ func dumbly_gen_function_exit(f *objfile, h *frame) void {
     } else {
       loc i32 = un_Direct(get_loc(h, h->return_cell));
 
-      // TODO: Investigate calling convention behavior on signed types.  Should we sign-extend?  (Also a question for s1.)
+      // TODO: Investigate calling convention behavior on signed types.  Should we
+      // sign-extend?  (Also a question for s1.)
 
       if retsize <= 4 {
         x86_load32_zeroextend(f, X86_EAX, X86_EBP, loc, retsize);
@@ -657,7 +676,8 @@ func dumbly_gen_function_exit(f *objfile, h *frame) void {
 func universal_cc_write_to_retcell(f *objfile, h *frame, c cell_num) void {
   ci *cell_info = ref_cell(h->gr, c);
   retsize u32 = ci->props.flat_size;
-  // TODO: The only time the retcell isn't static is in strinit and frame return_cell subcells.  Eventually we can use un_Direct here.
+  // TODO: The only time the retcell isn't static is in strinit and frame return_cell
+  // subcells.  Eventually we can use un_Direct here.
   dest_addr u8;
   dest_disp i32;
   x86_prep_loc_use(f, get_loc(h, c), X86_ECX, &dest_addr, &dest_disp);
@@ -807,7 +827,8 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
             done_a_push = true;
           }
           if case Has(default_target gr_branch_target) = a.default_case {
-            // No jmp for this case, since it's code-genned right after.  (Just like a.first in GrSequence.)
+            // No jmp for this case, since it's code-genned right after.  (Just like
+            // a.first in GrSequence.)
             push(&stack, @[dumbgen_stackent]{default_target.sn.x, se.jmpaft, done_a_push | se.jmp_necessary});
             done_a_push = true;
           } else {
@@ -958,13 +979,15 @@ func x86_gen_write_value(f *objfile, h *frame, dest_loc cell_loc, value *st_valu
   x86_gen_write_data(f, h, dest_addr, dest_disp, &value->words, w, len);
 }
 
-func x86_gen_write_data(f *objfile, h *frame, dest_addr u8, dest_disp i32, words *array[u32], begin u32, end u32) void {
+func x86_gen_write_data(f *objfile, h *frame, dest_addr u8, dest_disp i32, words *array[u32],
+                        begin u32, end u32) void {
   check(begin <= end);
   if begin == end {
     return;
   }
 
-  // TODO: We assume (in terms of the optimality of this code) that dest_addr+dest_disp is aligned modulo 4.
+  // TODO: We assume (in terms of the optimality of this code) that dest_addr+dest_disp is
+  // aligned modulo 4.
 
   i u32 = begin;
   if i / 4 < end / 4 {
@@ -1229,7 +1252,10 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
       case SignedTwos:
         if b.op_size == 1 {
           x86_movsx8_reg8(f, X86_EAX, X86_EAX);
-          // TODO: (Also in s1.) For this and the other negations, can't we just check OF after the fact?  (But do x86_neg_w16 on 16-bit)  I missed that in the docs on the first read?
+          // TODO: (Also in s1.) For this and the other negations, can't we just check OF
+          // after the fact?  (But do x86_neg_w16 on 16-bit) I missed that in the docs on
+          // the first read?
+
           // Crashes if the value is INT8_MIN by subtracting 1 and overflowign.
           if b.op_numtraits.trap_overflow {
             x86_cmp_reg8_imm8(f, X86_AL, 1);
@@ -1272,7 +1298,8 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
         ice(_u8("NumBitNot bad size"));
       }
     case NumShiftLeft:
-      // It is intentional that we always range check here, even if !trap_overflow.  It is also intentional that the shift could overflow.
+      // It is intentional that we always range check here, even if !trap_overflow.  It is
+      // also intentional that the shift could overflow.
       if b.op_size == 1 {
         x86_cmp_imm32(f, X86_ECX, @[u32]7);
         x86_gen_crash_jcc(f, h, X86_JCC_A);
@@ -1421,7 +1448,8 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
       case SignedTwos:
         check(b.to_numtraits.minval < bigu(0));
       }
-      if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.maxval < b.from_numtraits.maxval {
+      if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow &&
+          b.to_numtraits.maxval < b.from_numtraits.maxval {
         to_maxval u32;
         if !as_non_negative_u32(&b.to_numtraits.maxval, &to_maxval) {
           ice(_u8("conversion unsigned maxval outside u32 range"));
@@ -1436,7 +1464,8 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
       switch b.to_numtraits.repr {
       case Unsigned:
         check(b.to_numtraits.minval == bigu(0));
-        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.maxval >= b.from_numtraits.maxval {
+        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow &&
+            b.to_numtraits.maxval >= b.from_numtraits.maxval {
           // Just check for negativity.
           x86_test_regs32(f, X86_EAX, X86_EAX);
           x86_gen_crash_jcc(f, h, X86_JCC_S);
@@ -1451,7 +1480,8 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
         }
         x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
       case SignedTwos:
-        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.maxval < b.from_numtraits.maxval {
+        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow &&
+            b.to_numtraits.maxval < b.from_numtraits.maxval {
           to_maxval u32;
           if !as_non_negative_u32(&b.to_numtraits.maxval, &to_maxval) {
             ice(_u8("conversion unsigned maxval outside u32 range"));
@@ -1459,7 +1489,8 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
           x86_cmp_imm32(f, X86_EAX, to_maxval);
           x86_gen_crash_jcc(f, h, X86_JCC_G);
         }
-        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow && b.to_numtraits.minval > b.from_numtraits.minval {
+        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow &&
+            b.to_numtraits.minval > b.from_numtraits.minval {
           to_minval i32;
           if !as_i32(&b.to_numtraits.minval, &to_minval) {
             ice(_u8("conversion signed minval outside i32 range"));

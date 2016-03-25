@@ -6,7 +6,8 @@ func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, ctr *celltra
   case &Terminal:
     return NoFail;
   case &NonTerminal:
-    return ERR(_u8("ICE: Expecting terminal expression, for gn "), gn.x, _u8(" in "), lookup(h->im, gr->informal_name));
+    return ERR(_u8("ICE: Expecting terminal expression, for gn "), gn.x, _u8(" in "),
+               lookup(h->im, gr->informal_name));
   }
 }
 
@@ -22,7 +23,8 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
     if case &Computed(checksum celltrack_checksum) = &gnc->plainly_live {
       // TODO: We should also check that we're part of the same sequential _family_ of exprs.
       if !matches_checksum(ctr, &checksum) {
-        return ERR(_u8("ICE: Inconsistent liveness/active state when revisiting node ("), gn.x, _u8("), celltrack="), *ctr);
+        return ERR(_u8("ICE: Inconsistent liveness/active state when revisiting node ("), gn.x,
+                   _u8("), celltrack="), *ctr);
       }
       return NoFail(NonTerminal);
     }

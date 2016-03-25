@@ -7,7 +7,8 @@ struct err_printed {
   msg array[u8];
 }
 
-// Tells (a) if the operation failed, and (b) if it did, whether location info was printed.  Might be expanded to include other info.
+// Tells (a) if the operation failed, and (b) if it did, whether location info was
+// printed.  Might be expanded to include other info.
 enum np {
   // No failure happened.
   #NoFail void;

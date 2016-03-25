@@ -60,7 +60,8 @@ struct objfile_relocation {
   virtual_address u32;
   // Index into the symbol table.
   symbol_table_index sti;
-  // Only relevant for Diff32 -- the offset into the relocation's section that the relocation is relative to.
+  // Only relevant for Diff32 -- the offset into the relocation's section that the
+  // relocation is relative to.
   subtracted_offset u32;
   // What kind of relocation should be performed?
   type objfile_relocation_type;

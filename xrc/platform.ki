@@ -9,7 +9,8 @@ enum numeric_representation {
 }
 
 enum shift_behavior {
-  // When shifting, we merely range-check the RHS (that it's >= 0 and < bitsize), and then we perform a bitshift that,
+  // When shifting, we merely range-check the RHS (that it's >= 0 and < bitsize), and
+  // then we perform a bitshift that,
   //   - for right shifting, is
   //      -- logical, if repr is Unsigned
   //      -- arithmetic, if repr is SignedTwos
@@ -89,15 +90,18 @@ struct platform_info {
   fntraits flat_traits;
 
   opsys platform_os;
-  // There's no such thing as a universal calling convention, and as soon as this fiction goes away we'll remove/change this.
+  // There's no such thing as a universal calling convention, and as soon as this fiction
+  // goes away we'll remove/change this.
   callconv universal_calling_convention;
 }
 
 enum callconv_reg_style {
   // Size based, uses eax:edx for 0, 1, 2, 4, 8.
-  // TODO: This (on Windows) might be like RecursiveSizeBased, only arrays are treated as individual elements.
+  /* TODO: This (on Windows) might be like RecursiveSizeBased, only arrays are treated as
+  individual elements. */
   SizeBased void;
-  // Size based, uses eax:edx, but elems must be reg-style too, where an array "char x[3]" counts as a single elem (thus size 3 implies we must use HRP).
+  // Size based, uses eax:edx, but elems must be reg-style too, where an array "char x[3]"
+  // counts as a single elem (thus size 3 implies we must use HRP).
   RecursiveSizeBased void;
   // Uses HRP for any non-primitive type.
   PrimitiveBased void;

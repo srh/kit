@@ -7,13 +7,15 @@ struct cu_typeexpr { x te_typeexpr; }
 
 def `~` fn[te_typeexpr, cu_typeexpr] = wrapconvert;
 
-// A "check and computed" typeexpr -- if it's not complete, it should not be converted to a cu_typeexpr.
+// A "check and computed" typeexpr -- if it's not complete, it should not be converted to
+// a cu_typeexpr.
 struct cac_typeexpr {
   complete bool;
   te te_typeexpr;
 }
 
-// This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics replaced consistently.
+// This type is an expanded ast_typeexpr.  I hope aliases are expanded and generics
+// replaced consistently.
 enum te_typeexpr {
   TeName te_name;
   TeApp te_typeapp;
@@ -387,7 +389,8 @@ func help_pretty_vardecl(im *identmap, r *array[u8], a *shray[te_vardecl]) void 
   }
 }
 
-// Variadic generics doesn't support lifetime generics (for no particular reason, other than that we have no need for it) yet.
+// Variadic generics doesn't support lifetime generics (for no particular reason, other
+// than that we have no need for it) yet.
 struct te_variadic_generics {
   before shray[sym];
   variadic_name sym;

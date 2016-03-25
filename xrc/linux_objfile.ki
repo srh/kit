@@ -29,7 +29,9 @@ struct elf32_Header {
   e_shentsize le_u16;
   // Number of section headers.
   e_shnum le_u16;
-  // Section header table index of the entry associated with the section name string table.  Or SHN_UNDEF, if the file has no section name string table.  Must be less than SHN_LORESERVE (0xff00), otherwise the value is stored elsewhere.
+  // Section header table index of the entry associated with the section name string
+  // table.  Or SHN_UNDEF, if the file has no section name string table.  Must be less
+  // than SHN_LORESERVE (0xff00), otherwise the value is stored elsewhere.
   e_shstrndx le_u16;
 }
 
@@ -337,7 +339,9 @@ func linux32_append_relocations_and_mutate_section(sti_map *array[u32], d *array
 
 def kSymTabSectionNumber u32 = 3;
 
-func linux32_section_headers(prev_end_offset u32, sh_out_index u32, s *objfile_section, sh_strtab_rel_index u32, sh_strtab_index u32, sh_flags u32, rel_out *elf32_Section_Header, sh_out *elf32_Section_Header, end_out *u32) void {
+func linux32_section_headers(prev_end_offset u32, sh_out_index u32, s *objfile_section,
+                             sh_strtab_rel_index u32, sh_strtab_index u32, sh_flags u32,
+                             rel_out *elf32_Section_Header, sh_out *elf32_Section_Header, end_out *u32) void {
   rel_offset u32 = ceil_aligned(prev_end_offset, kRel_Section_Alignment);
   rel_size u32 = ~(count(&s->relocs) * sizeof@[elf32_Rel]);
   rel_end u32 = rel_offset + rel_size;
@@ -371,13 +375,16 @@ func linux32_section_headers(prev_end_offset u32, sh_out_index u32, s *objfile_s
   *end_out = sh_end;
 }
 
-func linux32_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *array[u8], strings_out *array[u8], sti_map_out *array[u32], end_locals_out *u32) void {
+func linux32_write_symbols_and_strings(im *identmap, f *objfile,
+                                       symbols_out *array[u8], strings_out *array[u8],
+                                       sti_map_out *array[u32], end_locals_out *u32) void {
   symbols array[u8];
   symbols_count u32 = 0;
   strings array[u8];
   ign var = strtab_add(&strings, _u8(""));
 
-  // Maps from f->symbol_table's indexes to symbols indexes, because they get reordered (and index zero cannot be used).
+  // Maps from f->symbol_table's indexes to symbols indexes, because they get reordered
+  // (and index zero cannot be used).
   sti_map array[u32] = repeat(count(&f->symbol_table), @[u32] 0);
 
   if true {

@@ -262,7 +262,8 @@ func osx32_append_relocations_and_mutate_output(d *array[u8], f *objfile, s *obj
   }
 }
 
-func osx32_write_symbols_and_strings(im *identmap, f *objfile, addrs section_addrs, symbols_out *array[u8], strings_out *array[u8]) void {
+func osx32_write_symbols_and_strings(im *identmap, f *objfile, addrs section_addrs,
+                                     symbols_out *array[u8], strings_out *array[u8]) void {
   symbols array[u8];
   strings array[u8];
   n size = count(&f->symbol_table);
@@ -315,12 +316,14 @@ func osx32_flatten(im *identmap, f *objfile) array[u8] {
     h.filetype = to_le(MACH32_HEADER_OBJFILE_FILETYPE);
     h.ncmds = to_le(ncmds);
     h.sizeofcmds = to_le(sizeofcmds);
-    // We use 0 for flags.  Clang outputs 0x2000 (MH_SUBSECTIONS_VIA_SYMBOLS) which I don't completely understand.
+    // We use 0 for flags.  Clang outputs 0x2000 (MH_SUBSECTIONS_VIA_SYMBOLS) which I
+    // don't completely understand.
     h.flags = to_le(0);
     append_reinterpret(&d, &h);
   }
 
-  // TODO: Align to max of max_requested_alignments when computing segment_fileoff, and when appending.
+  // TODO: Align to max of max_requested_alignments when computing segment_fileoff, and
+  // when appending.
   /* The [addr, ceil_aligned(addr + size, align)) segments seem to
   connect.  (That's what I observe in other mach-o files.) */
   text_addr u32 = 0;

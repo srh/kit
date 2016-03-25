@@ -1,7 +1,12 @@
 import celltrack;
 import check;
 
-// After goto, return statements, etc, "what cells are live" is faked -- the set of cells that are live (or soon, active) should be identical to that before the goto/return statement.  Once we control flow into something reachable, we'll have a consistent liveness state.  (That is, the liveness state is bogus (in a sense) for unreachable nodes.  Any liveness state would be bogus, ours is consistent.)  We also bogusly declare the return cell to be "active" after falling off the end of a fullbody.
+// After goto, return statements, etc, "what cells are live" is faked -- the set of cells
+// that are live (or soon, active) should be identical to that before the goto/return
+// statement.  Once we control flow into something reachable, we'll have a consistent
+// liveness state.  (That is, the liveness state is bogus (in a sense) for unreachable
+// nodes.  Any liveness state would be bogus, ours is consistent.)  We also bogusly
+// declare the return cell to be "active" after falling off the end of a fullbody.
 
 struct frame_graph {
   informal_name sym;
@@ -18,7 +23,8 @@ in. Location should be specified when:
 */
 
 enum cell_location {
-  // The "cell" is actually caused by dereferencing something, or maybe accessing something's field?
+  // The "cell" is actually caused by dereferencing something, or maybe accessing
+  // something's field?
   LocationVirtual void;
   LocationStatic void;
 }
@@ -66,7 +72,8 @@ struct gr_xnode {
   vs_xopped bool;
 }
 
-// The "in-degree" is the number of qnodes flowing into this (not as the first elem of a gr_sequence).
+// The "in-degree" is the number of qnodes flowing into this (not as the first elem of a
+// gr_sequence).
 struct gr_qnode_indegree {
   x u32;
 }
@@ -398,7 +405,8 @@ func addo(bu *sq_builder, ogn opt[gr_num]) void {
 }
 
 
-// Control flow connecting functions.  Every place we use these, we probably save/connect celltracking info in some explicit way.
+// Control flow connecting functions.  Every place we use these, we probably save/connect
+// celltracking info in some explicit way.
 
 func nopq(gr *frame_graph, seginfo gr_seginfo) sq_num {
   return addq(gr, seginfo, GrQNop);
@@ -432,7 +440,9 @@ func append(bu *sq_builder, enter_disposition gr_jmp_disposition, enter_rhs sq_n
   bu->last = rhs_nopq;
 }
 
-// Adds an unattached nopq afterward, with the given saved state restored (typically the variables-in-scope state before a return, break, continue, or goto statement).  This naturally means we're "exiting normalcy".
+// Adds an unattached nopq afterward, with the given saved state restored (typically the
+// variables-in-scope state before a return, break, continue, or goto statement).  This
+// naturally means we're "exiting normalcy".
 func append_and_nopq_exit_normalcy(bu *sq_builder, outflow sq_num, saved *gr_savetrack) void {
   reent sq_num = nopq(bu->gr, partof(bu->curseg));
   append(bu, @[gr_jmp_disposition]ExitNormalcy({reent}), outflow, reent);
@@ -460,7 +470,8 @@ func mut_connect(gs gr_statep, bu *sq_builder, outflow *tracked_target, disposit
 }
 
 func uni_connect(gs gr_statep, gn gr_num, outflow *tracked_target, disposition gr_jmp_disposition) sq_num {
-  // At one point this just did a seqq -- but we really do want the jmp disposition, so there's no gain over using mut_connect.
+  // At one point this just did a seqq -- but we really do want the jmp disposition, so
+  // there's no gain over using mut_connect.
   bu sq_builder = mk_builder(gs);
   add(&bu, gn);
   return mut_connect(gs, &bu, outflow, disposition);
@@ -570,7 +581,8 @@ struct gr_offset_const {
 }
 
 enum gr_field_info {
-  // The field index of the struct (or class) field we're accessing (from 0 to n-1 for a struct with n fields)
+  // The field index of the struct (or class) field we're accessing (from 0 to n-1 for a
+  // struct with n fields)
   StructField size;
   // The constructor index of the enum field we're accessing.
   EnumConstructorField size;
@@ -578,9 +590,12 @@ enum gr_field_info {
   EnumTagField void;
   // The field is some sort of padding.
   PaddingField void;
-  // The field is... being turned into some sort of padding, I guess.  Idk, maybe it's got a type, but we're doing a trivial op on it -- so maybe the field's type is the padding type.
+  // The field is... being turned into some sort of padding, I guess.  Idk, maybe it's got
+  // a type, but we're doing a trivial op on it -- so maybe the field's type is the
+  // padding type.
   TrivialField void;
-  // This isn't a field -- we're accessing the whole value.  (E.g. when we deref a pointer or occasionally alias two cells for convenience.)
+  // This isn't a field -- we're accessing the whole value.  (E.g. when we deref a pointer
+  // or occasionally alias two cells for convenience.)
   NoField void;
 }
 
@@ -590,7 +605,8 @@ enum gr_offset {
 }
 
 struct gr_active_xop {
-  // These happen simultaneously -- there's no ordering.  If there's just one op, the other one will be Nothing.
+  // These happen simultaneously -- there's no ordering.  If there's just one op, the
+  // other one will be Nothing.
   op1 gr_active_op;
   op2 gr_active_op;
 }
@@ -616,7 +632,8 @@ struct gr_branch_pair {
   target gr_branch_target;
 }
 
-// This could be computed from the bucket counts seen in the set of branch target dispositions... I think.
+// This could be computed from the bucket counts seen in the set of branch target
+// dispositions... I think.
 enum gr_branch_disposition {
   // An if/then/else branch, or switch, for which there's a join point, all ForwardTargets.
   ForwardBranch sq_num;
@@ -661,7 +678,8 @@ struct gr_jmp {
   disposition gr_jmp_disposition;
 }
 
-// Declares a cell to be live.  The cell may not have previously been live.  The cell location must be static -- otherwise, gr_deref or gr_subcell will make the cell live.
+// Declares a cell to be live.  The cell may not have previously been live.  The cell
+// location must be static -- otherwise, gr_deref or gr_subcell will make the cell live.
 struct gr_live {
   cell cell_num;
 }
@@ -767,18 +785,23 @@ func gr_fullbody(outer_gs gr_statep, x *ast_fullbody) cr[gr_num] {
   parameter_unwinding gr_num = gr_unwinding(gs, &info->parameter_destructions);
   add(&bu, parameter_unwinding);
 
-  // We artifically activate the return cell after aflling off the end of a fullbody.
-  // If the function returns void, this creates the desired effect for analysis in dumbanal, and correct behavior.
-  // If the function does not return void, this is unreachable anyway, but it gives us the right active state as we fall off the end.
+  // We artifically activate the return cell after aflling off the end of a fullbody.  If
+  // the function returns void, this creates the desired effect for analysis in dumbanal,
+  // and correct behavior.  If the function does not return void, this is unreachable
+  // anyway, but it gives us the right active state as we fall off the end.
   add(&bu, @[gr_xop]GrActiveXop({Activate(info->return_cell), Nothing}));
 
-  // TODO: This is crazy nonsense.  Detect reachability in a conservative fashion (e.g. everything after a label is reachable, everything after a break/continue/return is not).
+  // TODO: This is crazy nonsense.  Detect reachability in a conservative fashion
+  // (e.g. everything after a label is reachable, everything after a break/continue/return
+  // is not).
   gn sq_num = mut_connect(gs, &bu, &fb.final_node, JmpForward);
 
   return NoFail(gn.x);
 }
 
-// TODO: Stop needing this -- make label_info and goto_info more general and use that, or make some other sort of annotation.  The use of breakgrack duplicates the usage of breakpack in body.ki.  It's not _particularly_ unsafe though.
+// TODO: Stop needing this -- make label_info and goto_info more general and use that, or
+// make some other sort of annotation.  The use of breakgrack duplicates the usage of
+// breakpack in body.ki.  It's not _particularly_ unsafe though.
 struct breakgrack {
   break_target *tracked_target;
   continue_target *tracked_target;
@@ -833,7 +856,8 @@ func gr_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], x *ast_
   }
 }
 
-func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement, bu *sq_builder) void {
+func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_break_statement,
+                        bu *sq_builder) void {
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_break_statement_info = un(&a->info);
   uw gr_num = gr_unwinding(gs, &info->destructions);
@@ -841,7 +865,8 @@ func gr_break_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a
   append_and_nopq_exit_normalcy(bu, uw_target, &saved);
 }
 
-func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement, bu *sq_builder) void {
+func gr_continue_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_continue_statement,
+                           bu *sq_builder) void {
   saved gr_savetrack = save_celltrack(gs.ctr);
   info *ast_continue_statement_info = un(&a->info);
   uw gr_num = gr_unwinding(gs, &info->destructions);
@@ -866,8 +891,10 @@ func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement
   targ *tracked_target = ref(&fb->label_gn, un(&a->info)->label_number.x);
   note_celltrack(&targ->note, gs.ctr);
 
-  // It might become important (I predict) that the label target targ->sn is _in line_ with the control flow, and doesn't point _into_ the control flow.  That way, the ReenterNormaly annotations for goto statements point _in line_ instead of one node before the line.
-  // There's presently no downside to our having targ->sn be in line.
+  // It might become important (I predict) that the label target targ->sn is _in line_
+  // with the control flow, and doesn't point _into_ the control flow.  That way, the
+  // ReenterNormaly annotations for goto statements point _in line_ instead of one node
+  // before the line.  There's presently no downside to our having targ->sn be in line.
 
   qn *gr_qnode = access_qnop(gs.gr, targ->sn);
   check(could_be_garbage(qn->seginfo));
@@ -875,9 +902,11 @@ func gr_label_statement(gs gr_statep, fb *fullbody_state, a *ast_label_statement
   append(bu, JmpForward, targ->sn, targ->sn);
 }
 
-func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_switch_statement, bu *sq_builder) np {
+func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], a *ast_switch_statement,
+                         bu *sq_builder) np {
   param_discard *te_typeexpr;
-  is_ptr bool = decompose_typeapp(&expr_complete_type(&oo(&a->swartch)->expr)->x, primitive_pointer_puretype(gs.clq->cs), &param_discard);
+  is_ptr bool = decompose_typeapp(&expr_complete_type(&oo(&a->swartch)->expr)->x,
+                                  primitive_pointer_puretype(gs.clq->cs), &param_discard);
 
   #gr_live_and_expr_consume(gs, oo(&a->swartch), bu);
 
@@ -1189,7 +1218,8 @@ func gr_ifthen_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
   return NoFail;
 }
 
-func gr_expr_condition(gs gr_statep, a *ast_expr_consume, then_target gr_branch_target, else_target gr_branch_target, disposition gr_branch_disposition) cr[sq_num] {
+func gr_expr_condition(gs gr_statep, a *ast_expr_consume, then_target gr_branch_target, else_target gr_branch_target,
+                       disposition gr_branch_disposition) cr[sq_num] {
   bu sq_builder = mk_builder(gs);
   #gr_live_and_expr_consume(gs, a, &bu);
   cases shray[gr_branch_pair] = mk_shray({@[gr_const]ConstInt(bigu(0)), else_target});
@@ -1198,8 +1228,10 @@ func gr_expr_condition(gs gr_statep, a *ast_expr_consume, then_target gr_branch_
   return NoFail(ret);
 }
 
-// Leaves the celltrack state in a garbage state -- caller needs to restore thentrack or elsetrack, depending on which it processes first.
-func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_target gr_branch_target, else_target gr_branch_target, thentrack_out *gr_savetrack, elsetrack_out *gr_savetrack, disposition gr_branch_disposition) cr[sq_num] {
+// Leaves the celltrack state in a garbage state -- caller needs to restore thentrack or
+// elsetrack, depending on which it processes first.
+func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_target gr_branch_target, else_target gr_branch_target,
+                  thentrack_out *gr_savetrack, elsetrack_out *gr_savetrack, disposition gr_branch_disposition) cr[sq_num] {
   switch a {
     case &ExprCondition(bec box[ast_expr_consume]): {
       ret sq_num = #gr_expr_condition(gs, oo(&bec), then_target, else_target, disposition);
@@ -1256,7 +1288,9 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_targe
         }
       }
       if !saved_elsecase {
-        // We need to output an elsecase savetrack even if it's never reachable, because this function's API doesn't have a way to tell the caller the elsecase is not reachable.
+        // We need to output an elsecase savetrack even if it's never reachable, because
+        // this function's API doesn't have a way to tell the caller the elsecase is not
+        // reachable.
         restore_celltrack(gs.ctr, &postcond_save);
         tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
         *elsetrack_out = save_celltrack(gs.ctr);
@@ -1295,7 +1329,8 @@ func gr_return_statement(gs gr_statep, fb *fullbody_state, a *ast_return_stateme
     add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Deactivate(subcell)}));
     add(bu, @[gr_xop]GrVirtualDead({subcell}));
   } else {
-    // Write _some_ void value... out of politeness?  Keeping these void 0 ops for now on the assumption some sort of constant value optimization logic might use it later.
+    // Write _some_ void value... out of politeness?  Keeping these void 0 ops for now on
+    // the assumption some sort of constant value optimization logic might use it later.
     add(bu, @[gr_xop]GrWriteConst({fb->return_cell, ConstInt(bigu(0))}));
     add(bu, @[gr_xop]GrActiveXop({Activate(fb->return_cell), Nothing}));
   }
@@ -1371,7 +1406,8 @@ func gr_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
 
 // Callees of this have to deactivate the result_cell later, of course.
 func gr_live_and_expr_consume(gs gr_statep, x *ast_expr_consume, bu *sq_builder) np {
-  // TODO: We could certainly assert that result_cell is the only one made live or active.  (If that remains a valid assertion.)
+  // TODO: We could certainly assert that result_cell is the only one made live or active.
+  // (If that remains a valid assertion.)
   add(bu, @[gr_xop]GrLive({result_cell(x)}));
   #gr_expr_consume(gs, x, bu);
   return NoFail;
@@ -1390,7 +1426,8 @@ func gr_expr_and_consume(gs gr_statep, x *ast_expr, aft *ast_expr_after_consume,
 }
 
 func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
-  // TODO: Honestly we could have some general assertions about what cells are made live or active, based on lval/rval info.
+  // TODO: Honestly we could have some general assertions about what cells are made live
+  // or active, based on lval/rval info.
   cs *checkstate = gs.clq->cs;
   switch &x->u {
   case &NameExpr(a ast_name_expr):
@@ -1503,7 +1540,8 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
       add(&case_bu, @[gr_xop]GrWriteConst({info->return_tag_cell, ConstInt(~ mk_enum_tag_value(i).x)}));
       add(&case_bu, @[gr_xop]GrVirtualDead({info->return_tag_cell}));
 
-      // TODO: Support treating types with move ctor more efficiently, when we can.  This is possible when the rhs is a whole-cell rval.
+      // TODO: Support treating types with move ctor more efficiently, when we can.  This
+      // is possible when the rhs is a whole-cell rval.
       copy_ctor_desc ctor_desc = #behavior_to_desc(&field_props.copy_behavior);
 
       copy_gn gr_num = gr_bi_ctor(gs, return_field_cell, field_cell, &copy_ctor_desc, BiCopy);
@@ -1623,7 +1661,8 @@ func gr_mk_ternary(gs gr_statep, x *ast_expr, a *ast_ternary, bu *sq_builder) np
   jmp_qnop_node(gs.gr, else_nop, else_sn, JmpForward);
   append(bu, JmpForward, cond_sn, join_target.sn);
 
-  // TODO: We do the condcleanup at the end instead of repeating it twice right after the branch... do it right after the branch.
+  // TODO: We do the condcleanup at the end instead of repeating it twice right after the
+  // branch... do it right after the branch.
   condcleanupgn gr_num = gr_later_discard(gs, &oo(&a->condition)->discard);
   add(bu, condcleanupgn);
 
@@ -1643,7 +1682,8 @@ func gr_mk_strinit(gs gr_statep, x *ast_expr, a *ast_strinit, bu *sq_builder) np
   // Now switch activations over to the whole thing.
   add(bu, @[gr_xop]GrManyActiveXop({freeze(&activation_ops)}));
 
-  // We declare the virtual cells dead after we're done the whole thing -- because we'll need them for unwinding.
+  // We declare the virtual cells dead after we're done the whole thing -- because we'll
+  // need them for unwinding.
   for i size = nparams; i > 0; {
     i = i - 1;
     param *ast_strinit_param = ref(&a->exprs, i);
@@ -1749,7 +1789,11 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda) cr[gr_num] {
 
   #vt_graph(gs.clq, &lambda_gr, fullbody_gn);
 
-  id fn_body_id = add_fn_body(gs.clq->cs, {gs.gr->informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {move(&lambda_gr), fullbody_gn, info->return_cell}, info->arg_cells, parsed_inline_to_state_inline(a->is_inline), NotComputed})});
+  id fn_body_id = add_fn_body(
+      gs.clq->cs,
+      {gs.gr->informal_name, NotComputed, NotComputed,
+       @[fn_body_entry_enum]GraphedFnBody({FnBodyLambda(a), {move(&lambda_gr), fullbody_gn, info->return_cell},
+                                           info->arg_cells, parsed_inline_to_state_inline(a->is_inline), NotComputed})});
   bu sq_builder = mk_builder(gs);
   add(&bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstFnBody(id)}));
   add(&bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
@@ -2020,7 +2064,9 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
 func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunction, bu *sq_builder) np {
   end_nopq tracked_target = mk_tracked(nopq(gs));
 
-  // TODO: This is so incredibly lame -- we "know" that the values are of type bool, so we don't do later_discard or anything like that.  We manually deactivate the values.  Make this not be lame.
+  // TODO: This is so incredibly lame -- we "know" that the values are of type bool, so we
+  // don't do later_discard or anything like that.  We manually deactivate the values.
+  // Make this not be lame.
 
   #gr_live_and_expr_consume(gs, oo(&a->lhs), bu);
 
@@ -2098,7 +2144,8 @@ func gr_literal(gs gr_statep, x *ast_expr, value bigint, bu *sq_builder) void {
 }
 
 func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) void {
-  // Generally for rvalues we write constant values here -- we can activate *after* we've written a constant value.  No atomic activation necessary.
+  // Generally for rvalues we write constant values here -- we can activate *after* we've
+  // written a constant value.  No atomic activation necessary.
   switch un(&a->name_info) {
   case &LocalResolve(li local_info): { }
   case &GlobalResolve(gi global_info):
@@ -2294,7 +2341,9 @@ func gr_init_action(gs gr_statep, x *init_action) gr_num {
   add(&bu, @[gr_xop]GrLive({x->x.arg}));
   switch &x->x.ctor {
   case &TrivialCtor:
-    // It's OK to make the object active _after_ having written the zero data to the inactive value.  Instead of doing it atomically.  But if GrWriteConst gains that capability, we might as well change this code to use it.
+    // It's OK to make the object active _after_ having written the zero data to the
+    // inactive value.  Instead of doing it atomically.  But if GrWriteConst gains that
+    // capability, we might as well change this code to use it.
 
     add(&bu, @[gr_xop]GrWriteConst({x->x.arg, ConstInt(bigu(0))}));
     add(&bu, @[gr_xop]GrActiveXop({Activate(x->x.arg), Nothing}));
@@ -2310,7 +2359,8 @@ func gr_destroy_action(gs gr_statep, x *destroy_action, dad deadact_after_destro
 }
 
 func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechange bi_ctor_statechange) gr_num {
-  // In our "bi_fun" uses the dest and src have the same type.  It seems wrong for this menial code to know that, though.
+  // In our "bi_fun" uses the dest and src have the same type.  It seems wrong for this
+  // menial code to know that, though.
   destptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, dest)->type);
   srcptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, src)->type);
   voidret cu_typrop = compute_prim(gs.clq, primitive_void_type(gs.clq->cs));
@@ -2352,7 +2402,8 @@ func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechan
 }
 
 // TODO: There's a lot of duplicated code in the splay-out of this function.
-func gr_magic(clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num], inline_out *should_inline) np {
+func gr_magic(clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num,
+              return_cell_out *cell_num, arg_cells_out *array[cell_num], inline_out *should_inline) np {
   switch mag {
   case &MagicBzero(mb magic_bzero):
     gr_magic_bzero(clq, &mb, gr_out, gn_out, return_cell_out, arg_cells_out);
@@ -2442,7 +2493,8 @@ func gr_basics_cleanup(gs gr_statep, bas *gr_basics, bu *sq_builder) void {
   gr_minimal_basics_cleanup(gs, &bas->minimal, bu);
 }
 
-func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
+func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num,
+                         return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_nopdestroy")));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
@@ -2458,7 +2510,8 @@ func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num, retu
   *arg_cells_out = bas.argcells;
 }
 
-func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
+func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_out *gr_num,
+                      return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_memcopy")));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
@@ -2474,7 +2527,8 @@ func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_o
   *arg_cells_out = bas.minimal.argcells;
 }
 
-func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
+func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *gr_num,
+                    return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_bzero")));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
@@ -2490,8 +2544,10 @@ func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *
   *arg_cells_out = bas.minimal.argcells;
 }
 
-// Note that generally these magic ops have "holes" in active-tracking.  If constructors could throw exceptions, we wouldn't unwind properly.  Same with assignment.
-func gr_magic_ctor(clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
+// Note that generally these magic ops have "holes" in active-tracking.  If constructors
+// could throw exceptions, we wouldn't unwind properly.  Same with assignment.
+func gr_magic_ctor(clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num,
+                   return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   info *magic_ctor_info = un(&mc->info);
   switch info {
   case &MagicStructInfo(msi magic_struct_info):
@@ -2503,7 +2559,9 @@ func gr_magic_ctor(clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_gr
   }
 }
 
-func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
+func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_info,
+                             gr_out *frame_graph, gn_out *gr_num,
+                             return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   cs *checkstate = clq->cs;
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_arraytype")));
   ctr celltrack = mk_celltrack();
@@ -2604,7 +2662,9 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
         op_action = NumAdd;
       }
       add(&incr_bu, @[gr_xop]GrPrimApply({PrimNum({cs->plat.sizetraits.flat.size, cs->plat.sizetraits.numeric, op_action}), mk_shray(ic2cell, onecell), indexcell}));
-      // We just keep everything deactivated, our activation tracking is B.S.  The only important thing is that the return cell be activated, so that function inlining works.
+      // We just keep everything deactivated, our activation tracking is B.S.  The only
+      // important thing is that the return cell be activated, so that function inlining
+      // works.
       add(&incr_bu, @[gr_xop]GrActiveXop({Deactivate(indexcell), Nothing}));
       incrgn gr_num = done(&incr_bu);
       add(&loop_bu, incrgn);
@@ -2673,7 +2733,9 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   return NoFail;
 }
 
-func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
+func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info,
+                        gr_out *frame_graph, gn_out *gr_num,
+                        return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   cs *checkstate = clq->cs;
   init_padding bool = false;
   switch wc {
@@ -2788,7 +2850,8 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
         add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 
-      // TODO(): Really there should be a specific semantic here, if this graph is to be checked at all...
+      // TODO(): Really there should be a specific semantic here, if this graph is to be
+      // checked at all...
       add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, StandardApply, NoSemantic}));
       add(&sub_bu, @[gr_xop]GrActiveXop({Deactivate(fieldretcell), Nothing}));
       add(&sub_bu, @[gr_xop]GrDead({fieldretcell}));
@@ -2874,9 +2937,11 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info, gr_ou
   return NoFail;
 }
 
-func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
+func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, gr_out *frame_graph,
+                          gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   cs *checkstate = clq->cs;
-  // Destructors go in reverse order (which means we prepend them in the reverse of reverse order).
+  // Destructors go in reverse order (which means we prepend them in the reverse of
+  // reverse order).
   reverse_order bool = false;
   // Init, copy, and move requires initializing intervening padding.
   init_padding bool = true;
@@ -3058,7 +3123,8 @@ func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *
   *count_out = end - begin;
 }
 
-func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph, gn_out *gr_num, return_cell_out *cell_num, arg_cell_out *cell_num) np {
+func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph,
+                             gn_out *gr_num, return_cell_out *cell_num, arg_cell_out *cell_num) np {
   gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_enum_construct")));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
@@ -3137,13 +3203,18 @@ func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *fr
 enum bi_ctor_statechange {
   BiMove void;
   BiCopy void;
-  // These two don't activate the target of the copy or move.  They're used when assigning to some lvalue, which _also_ didn't get deactivated when destroyed.  This means it's sitting in an INVALID state in between the destroy and copy.  In other words, if an exception could be thrown in between (like an async exception) we have no way to have exception safety there.
-  // Another option would be to let cells get "anti-activated."  And exceptions can't happen while a cell is in such a state.
+  // These two don't activate the target of the copy or move.  They're used when assigning
+  // to some lvalue, which _also_ didn't get deactivated when destroyed.  This means it's
+  // sitting in an INVALID state in between the destroy and copy.  In other words, if an
+  // exception could be thrown in between (like an async exception) we have no way to have
+  // exception safety there.  Another option would be to let cells get "anti-activated."
+  // And exceptions can't happen while a cell is in such a state.
   BiDeactivateSrcButMove void;
   BiNothingButCopy void;
 }
 
-func gr_bi_ctor(gs gr_statep, destnum cell_num, srcnum cell_num, cd *ctor_desc, statechange bi_ctor_statechange) gr_num {
+func gr_bi_ctor(gs gr_statep, destnum cell_num, srcnum cell_num, cd *ctor_desc,
+                statechange bi_ctor_statechange) gr_num {
   bu sq_builder = mk_builder(gs);
   switch cd {
   case &TrivialCtor:
@@ -3344,7 +3415,8 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
   }
 }
 
-func mk_const_frame_regraphed(clq *clqueue, informal_name sym, type *cu_typeexpr, props *type_properties, c gr_const) frame_regraphed {
+func mk_const_frame_regraphed(clq *clqueue, informal_name sym, type *cu_typeexpr,
+                              props *type_properties, c gr_const) frame_regraphed {
   // I don't think we _actually_ use clq for anything.
   gr frame_graph = init_frame_graph_empty(informal_name);
   ctr celltrack = mk_celltrack();

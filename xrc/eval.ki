@@ -22,7 +22,8 @@ struct st_env {
 
   plat platform_info;
 
-  // Indexed by cell_num.  Contains the number of the object representing the cell -- if the cell/object currently exists.
+  // Indexed by cell_num.  Contains the number of the object representing the cell -- if
+  // the cell/object currently exists.
   framecells array[opt[st_obj_ref]];
 }
 
@@ -54,15 +55,21 @@ struct st_symbolref {
 }
 
 struct st_value {
-  // Note: Even when targeting big-endian systems, the lsB of a word is the still the least-addressable byte of that chunk of memory in this code here.  So, a 32-bit value of "5" would be represented by the array {0x05000000} when we target big-endian systems.  (Middle-endian on 16-bit systems could be a thing too.)
+  // Note: Even when targeting big-endian systems, the lsB of a word is the still the
+  // least-addressable byte of that chunk of memory in this code here.  So, a 32-bit value
+  // of "5" would be represented by the array {0x05000000} when we target big-endian
+  // systems.  (Middle-endian on 16-bit systems could be a thing too.)
   words array[u32];
   // Bits set to 1 for those bits (in [0:length)) that are not garbage, not covered by refs.
   datas array[u32];
   // The length of the value in bnnos.
   length u32;
-  // Values of external symbol references -- they start at a bnno offset, and have some size that depends on what kind of symbolref it is (or what platform, some only have one kind).
+  // Values of external symbol references -- they start at a bnno offset, and have some
+  // size that depends on what kind of symbolref it is (or what platform, some only have
+  // one kind).
   symbolrefs array[tup[u32, st_symbolref]];
-  // Pointers to other objects -- they start at a bnno offset, and have a specific size (on the HP Saturn, 5 bnnos, or 20 bits).
+  // Pointers to other objects -- they start at a bnno offset, and have a specific size
+  // (on the HP Saturn, 5 bnnos, or 20 bits).
   objrefs array[tup[u32, st_pointer]];
 }
 
@@ -217,7 +224,8 @@ func value_write(plat *platform_info, val *st_value, offset u32, ncount u32, in_
 
 func obj_write(env *st_env, oref st_obj_ref, in_ *st_value) np {
   if oref.count != in_->length {
-    ice(_u8("static eval writing object with non-matching length (oref.count="), oref.count, _u8(", in_->length="), in_->length, _u8(")"));
+    ice(_u8("static eval writing object with non-matching length (oref.count="), oref.count,
+        _u8(", in_->length="), in_->length, _u8(")"));
   }
   val *st_value;
   #ref_obj(env, oref.num, &val);
@@ -395,7 +403,9 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           c cell_num = get(&a.params, i);
           param_oref st_obj_ref = cell_obj_ref(env, c, "in II");
           if !is_full_oref(env, param_oref) {
-            ice(_u8("Function parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.x)->type), _u8(")"));
+            ice(_u8("Function parameter cell is sub-object (offset="), param_oref.offset,
+                _u8(", count="), param_oref.count,
+                _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.x)->type), _u8(")"));
           }
           push(&paramorefs, param_oref);
           *ref(&env->framecells, c.x) = None;
@@ -414,7 +424,9 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
           param_oref st_obj_ref = cell_obj_ref(env, c, "in IIIa");
           if !is_full_oref(env, param_oref) {
             // TODO: Kind of code duplication with GrApply case.
-            ice(_u8("Primitive op parameter cell is sub-object (offset="), param_oref.offset, _u8(", count="), param_oref.count, _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.x)->type), _u8(")"));
+            ice(_u8("Primitive op parameter cell is sub-object (offset="), param_oref.offset,
+                _u8(", count="), param_oref.count,
+                _u8(", type="), to_u8str(clq->cs->im, ref(&fg->gr.cells, c.x)->type), _u8(")"));
           }
           push(&paramorefs, param_oref);
           *ref(&env->framecells, c.x) = None;
@@ -514,8 +526,8 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
         st_deaden(env, a.cell);
 
       case &GrVirtualDead(a gr_virtual_dead):
-        // TODO: At some point we'll want to assert that virtual cells (and static cells) dead when we define them _active_.
-        // We mark the cell inactive.
+        // TODO: At some point we'll want to assert that virtual cells (and static cells)
+        // dead when we define them _active_.  We mark the cell inactive.
         if !isHas(ref(&env->framecells, a.cell.x)) {
           ice(_u8("GrVirtualDead deading inactive cell "), a.cell.x);
         }
@@ -584,13 +596,15 @@ func st_deaden(env *st_env, cell cell_num) void {
   *ref(&env->framecells, cell.x) = None;
 }
 
-func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, fnid fn_body_id) np {
+func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref],
+                     retvalref st_obj_ref, fnid fn_body_id) np {
   nparams size = count(paramorefs);
   switch &ref_fn_body(clq->cs, fnid)->u {
   case &GraphedFnBody(fnent graphed_fn_body):
     nargcells size = count(&fnent.argcells);
     if nparams != nargcells {
-      ice(_u8("Param list length ("), nparams, _u8(") mismatches function argcells length ("), nargcells, _u8(") for name "), lookup(clq->im, fnent.graph.gr.informal_name));
+      ice(_u8("Param list length ("), nparams, _u8(") mismatches function argcells length ("),
+          nargcells, _u8(") for name "), lookup(clq->im, fnent.graph.gr.informal_name));
     }
 
     subenv st_env = mk_env(env->pool, env->plat, count(&fnent.graph.gr.cells));
@@ -600,7 +614,8 @@ func st_eval_fn_body(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], r
     *ref(&subenv.framecells, fnent.graph.cell.x) = Has(retvalref);
 
     if case Unprinted(pm err_printed) = st_eval_frame_regraphed(clq, &subenv, &fnent.graph) {
-      return ERR_append(pm, err_string(_u8("(in evaling fn "), lookup(clq->im, fnent.graph.gr.informal_name), _u8(")")));
+      return ERR_append(pm, err_string(_u8("(in evaling fn "), lookup(clq->im, fnent.graph.gr.informal_name),
+                                       _u8(")")));
     }
     return NoFail;
   case &ExternFnBody(exent extern_fn_body):
@@ -634,7 +649,8 @@ func st_values_selfcontained_equal(plat *platform_info, a *st_value, b *st_value
   }
   expected_datas array[u32] = mk_ones(plat, a->length);
   if !array_equal(&a->datas, &expected_datas) || !array_equal(&b->datas, &expected_datas) {
-    // Arguably if just one of the initialized bits is different, we could deterministically declare the values non-equal.  But, no.
+    // Arguably if just one of the initialized bits is different, we could
+    // deterministically declare the values non-equal.  But, no.
     return ERR(_u8("Comparing non-initialized values"));
   }
 
@@ -658,7 +674,8 @@ func st_const_compute(clq *clqueue, plat *platform_info, c *gr_const, length u32
   return NoFail;
 }
 
-// Same as st_const_compute except for ConstDef -- we're at code-gen time, everything should be computed.
+// Same as st_const_compute except for ConstDef -- we're at code-gen time, everything
+// should be computed.
 func st_const_compute_for_gen(cs *checkstate, c *gr_const, length u32, out *st_value) void {
   switch c {
   case &ConstInt(b bigint):
@@ -884,7 +901,8 @@ func st_value_as_symbolref(plat *platform_info, val *st_value, out *st_symbolref
   return NoFail;
 }
 
-// Reads a value of the target platform's size type -- but outputs a u32 -- errors if truncation would happen.
+// Reads a value of the target platform's size type -- but outputs a u32 -- errors if
+// truncation would happen.
 func st_value_as_size(plat *platform_info, val *st_value, out *u32) np {
   if val->length != plat->sizetraits.flat.size {
     return ERR(_u8("Treating non-size-sized value as size."));
