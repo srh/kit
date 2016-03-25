@@ -359,6 +359,11 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
   }
 }
 
+func pretty_u8str(im *identmap, r *array[u8], a *cu_typeexpr) void {
+  pretty_u8str(im, r, &a->x);
+}
+
+
 func pretty_u8str_list(im *identmap, r *array[u8], a *shray[te_typeexpr]) void {
   n size = count(a);
   for i size = 0; i < n; i = i + 1 {
