@@ -1685,37 +1685,6 @@ func entry_matches(cs *checkstate, pt *te_typeexpr, generics *te_generics, gp *g
   }
 }
 
-enum type_matches_res {
-  TypeDoesNotMatch void;
-  // Provides partial types of some generic names.
-  TypeMatchesAmbiguously shray[te_typeexpr];
-  // Provides complete types of all generic names.
-  TypeMatchesPrecisely shray[te_typeexpr];
-}
-
-// t is complete, but it references the generic names in "names", whose corresponding
-// values in "parms" could be incomplete.  pt is the partial type of an expression we're
-// matching against this generic definition.  count(parms) == count(names).
-func type_matches(pt *te_typeexpr, names *shray[te_generik], parms *shray[te_typeexpr],
-                  t *te_typeexpr) type_matches_res {
-  check(count(names) == count(parms));
-  // We need to retain all new information we gain about the value of the generic param
-  // typeexprs as we compare the whole type, in order to make sure we don't match
-  // conflicting information about a generic parameter.
-  unif_parms array[te_typeexpr] = mk_copy(parms);
-  // Since t is complete, unified is irrelevant and must be identical to t.
-  unified te_typeexpr;
-  if !unify_under_generics(pt, names, &unif_parms, t, &unified) {
-    return TypeDoesNotMatch;
-  }
-  frozen_unif_parms shray[te_typeexpr] = freeze(&unif_parms);
-  if all_complete_computed(&frozen_unif_parms).complete {
-    return TypeMatchesPrecisely(frozen_unif_parms);
-  } else {
-    return TypeMatchesAmbiguously(frozen_unif_parms);
-  }
-}
-
 func all_complete_computed(types *shray[te_typeexpr]) complete_computed {
   n size = count(types);
   all_computed bool = true;
