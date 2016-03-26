@@ -1,5 +1,14 @@
 import typeexpr;
 
+struct unify_same_ipse {
+  name1 sym;
+  name2 sym;
+}
+
+enum unify_emission {
+  SameIpse unify_same_ipse;
+}
+
 // t references the generic names in "names", whose corresponding values in "unif_parms"
 // might be incomplete.  We update the values in unif_parms when necessary.  t does not
 // need to be complete -- this code is also used by unify_types.
@@ -9,9 +18,12 @@ import typeexpr;
 // (The reason is, we might not have gathered complete information about the generic
 // parameter when we've halfway-processed the type -- the caller can and should
 // reconstruct the correct values later.)
+//
+// _appends_ emissions onto emissions_append.
 func unify_under_generics(pt *te_typeexpr,
                           names *shray[te_generik], unif_parms *array[te_typeexpr],
-                          t *te_typeexpr, unified_out *te_typeexpr) bool {
+                          t *te_typeexpr, emissions_append *array[unify_emission],
+                          unified_out *te_typeexpr) bool {
   if case &TeUnknown = pt {
     // It's worth pointing out:  This _is_ correct behavior if t is a generic parameter.
     *unified_out = *t;
@@ -21,7 +33,7 @@ func unify_under_generics(pt *te_typeexpr,
     case &TeName(a te_name): {
       if case Has(ix size) = lookup_plain_name(names, a.value) {
         unified te_typeexpr;
-        if !unify_types(&unif_parms[ix], pt, &unified) {
+        if !unify_types(&unif_parms[ix], pt, emissions_append, &unified) {
           return false;
         }
         unif_parms[ix] = unified;
@@ -58,7 +70,7 @@ func unify_under_generics(pt *te_typeexpr,
         reserve(&unified_params, n);
         for i size = 0; i < n; i = i + 1 {
           unified te_typeexpr;
-          if !unify_under_generics(&pa_params[i], names, unif_parms, &a_params[i], &unified) {
+          if !unify_under_generics(&pa_params[i], names, unif_parms, &a_params[i], emissions_append, &unified) {
             return false;
           }
           push(&unified_params, unified);
@@ -84,7 +96,7 @@ func unify_under_generics(pt *te_typeexpr,
             return false;
           }
           unified te_typeexpr;
-          if !unify_under_generics(&pd->type, names, unif_parms, &d->type, &unified) {
+          if !unify_under_generics(&pd->type, names, unif_parms, &d->type, emissions_append, &unified) {
             return false;
           }
           push(&unified_fields, {d->name, unified});
@@ -113,7 +125,7 @@ func unify_under_generics(pt *te_typeexpr,
           unified_count = pa.count;
         }
         unified_type te_typeexpr;
-        if !unify_under_generics(oo(&pa.param), names, unif_parms, oo(&a.param), &unified_type) {
+        if !unify_under_generics(oo(&pa.param), names, unif_parms, oo(&a.param), emissions_append, &unified_type) {
           return false;
         }
         *unified_out = TeArraytype({unified_count, emshp(unified_type)});
@@ -128,7 +140,7 @@ func unify_under_generics(pt *te_typeexpr,
       // affect this function's callers, so treat this code with skepticism.
       if case Has(ix size) = lookup_ipse_name(names, a.name) {
         unified te_typeexpr;
-        if !unify_types(&unif_parms[ix], pt, &unified) {
+        if !unify_types(&unif_parms[ix], pt, emissions_append, &unified) {
           return false;
         }
         unif_parms[ix] = unified;
@@ -136,10 +148,9 @@ func unify_under_generics(pt *te_typeexpr,
         return true;
       } else {
         if case &TeIpse(pa te_ipse) = pt {
-          // NOTE: The TeName case says something about scopage for its analogue of this
-          // comparison.
+          // NOTE: Beware scopage, as with TeName, when that becomes a factor.
           if a.name != pa.name {
-            return false;
+            push(emissions_append, @[unify_emission]SameIpse({a.name, pa.name}));
           }
           *unified_out = TeIpse({a.name});
           return true;
@@ -183,10 +194,16 @@ func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) boo
   }
 }
 
-func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
+func unify_types(pta *te_typeexpr, ptb *te_typeexpr, emissions_append *array[unify_emission], out *te_typeexpr) bool {
   names shray[te_generik];
   unif_parms array[te_typeexpr];
-  return unify_under_generics(pta, &names, &unif_parms, ptb, out);
+  return unify_under_generics(pta, &names, &unif_parms, ptb, emissions_append, out);
+}
+
+// TODO(): Remove.
+func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
+  emissions array[unify_emission];
+  return unify_types(pta, ptb, &emissions, out);
 }
 
 
@@ -209,7 +226,8 @@ func type_matches(pt *te_typeexpr, names *shray[te_generik], parms *shray[te_typ
   unif_parms array[te_typeexpr] = mk_copy(parms);
   // Since t is complete, unified is irrelevant and must be identical to t.
   unified te_typeexpr;
-  if !unify_under_generics(pt, names, &unif_parms, t, &unified) {
+  emissions array[unify_emission];
+  if !unify_under_generics(pt, names, &unif_parms, t, &emissions, &unified) {
     return TypeDoesNotMatch;
   }
   frozen_unif_parms shray[te_typeexpr] = freeze(&unif_parms);
