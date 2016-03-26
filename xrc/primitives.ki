@@ -127,9 +127,8 @@ func primitive_unsigned_bnno_type(cs *checkstate) te_typeexpr {
 
 func unwrap_primitive_padding_type_size(cs *checkstate, t *cu_typeexpr) u32 {
   if case &TeArraytype(at te_arraytype) = &t->x {
-    archetype te_typeexpr = primitive_unsigned_bnno_type(cs);
-    unified te_typeexpr;
-    if !unify_types(oo(&at.param), &archetype, &unified) {
+    bnnotype te_typeexpr = primitive_unsigned_bnno_type(cs);
+    if !unifies(&bnnotype, oo(&at.param)) {
       ice(_u8("unwrap_primitive_padding_type_size on arraytype with bad param"));
     }
     return *unHas(&at.count);

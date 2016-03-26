@@ -206,6 +206,16 @@ func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
   return unify_types(pta, ptb, &emissions, out);
 }
 
+func unifies(complete *te_typeexpr, pt *te_typeexpr) bool {
+  unified te_typeexpr;
+  emissions array[unify_emission];
+  if unify_types(complete, pt, &emissions, &unified) {
+    check(empty(&emissions));
+    return true;
+  } else {
+    return false;
+  }
+}
 
 enum type_matches_res {
   TypeDoesNotMatch void;

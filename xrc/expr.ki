@@ -310,8 +310,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
       return NoFail(NoMatchConstructor);
     }
     void_type te_typeexpr = primitive_void_type(ds->cs);
-    unified te_typeexpr;
-    if !unify_types(&void_type, rhs_type, &unified) {
+    if !unifies(&void_type, rhs_type) {
       return NoFail(NoMatchConstructor);
     }
     return NoFail(@[ds_constructor_res]MatchedVoidConstructed({~ *pt, *et, mk_enum_tag_value(decl_index)}));
@@ -968,24 +967,11 @@ func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *
 
 func check_expr_assignment(es *framescope, a *ast_assignment, pt *te_typeexpr, x *ast_expr) np {
   void_type te_typeexpr = primitive_void_type(es->cs);
-  unified te_typeexpr;
-  if !unify_types(pt, &void_type, &unified) {
+  if !unifies(&void_type, pt) {
     return ERR(_u8("ICE: assignment in non-void place"));
   }
 
-  if !is_complete(&unified) {
-    ice(_u8("check_expr_assignment incomplete successful unification with void"));
-  }
-
-  c cac_typeexpr;
-  if !from_np(noscoped_check_and_compute_typeexpr(es->clq, &unified, &c)) {
-    ice(_u8("check_expr_assignment sees void bad type"));
-  }
-  check(c.complete);
-  props type_properties;
-  if !from_np(compute_complete_type_properties(es->clq, &c.te, &props)) {
-    ice(_u8("check_expr_assignment void bad props"));
-  }
+  void_typrop cu_typrop = compute_prim(es->clq, void_type);
 
   unknown te_typeexpr = TeUnknown;
   // We check the lhs independently of the rhs, deliberately, to ensure clarity.
@@ -998,7 +984,7 @@ func check_expr_assignment(es *framescope, a *ast_assignment, pt *te_typeexpr, x
     case &IsLvalYes(desc lval_description): {
       #check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), &lhs_info->cu.x);
       #annotate_disposal_for_assignment(es, desc.num, oo(&a->rhs), a);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~c.te, props})), ~c.te, props)));
+      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, void_typrop.cu, void_typrop.props})), void_typrop.cu, void_typrop.props)));
       return NoFail;
     }
   }
@@ -1285,8 +1271,7 @@ func check_expr_string_literal(es *framescope, a *ast_string_literal, pt *te_typ
   props type_properties;
   compute_prim(es->clq, primitive_string_literal_type(es->cs, count(&a->charspecs)),
                &type, &props);
-  unified te_typeexpr;
-  if !unify_types(pt, &type.x, &unified) {
+  if !unifies(&type.x, pt) {
     return ERR(_u8("string literal in bad place"));
   }
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, type, props})), type, props)));
@@ -1866,8 +1851,7 @@ func check_expr_logical_conjunction(es *framescope, a *ast_logical_conjunction, 
   props type_properties;
   compute_prim(es->clq, primitive_bool_type(es->cs), &type, &props);
 
-  unified te_typeexpr;
-  if !unify_types(pt, &type.x, &unified) {
+  if !unifies(&type.x, pt) {
     return ERR(_u8("logical conjunction in bad place"));
   }
   #check_expr_consume(es, oo(&a->lhs), &type.x);
