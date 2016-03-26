@@ -978,15 +978,13 @@ func check_expr_assignment(es *framescope, a *ast_assignment, pt *te_typeexpr, x
   #check_expr_ai(es, AllowIncompleteNo, oo(&a->lhs), &unknown);
   lhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
   switch &lhs_info->lval {
-    case &IsLvalNo(desc rval_description): {
-      return ERR(_u8("Assigning to non-lvalue"));
-    }
-    case &IsLvalYes(desc lval_description): {
-      #check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), &lhs_info->cu.x);
-      #annotate_disposal_for_assignment(es, desc.num, oo(&a->rhs), a);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, void_typrop.cu, void_typrop.props})), void_typrop.cu, void_typrop.props)));
-      return NoFail;
-    }
+  case &IsLvalNo(desc rval_description):
+    return ERR(_u8("Assigning to non-lvalue"));
+  case &IsLvalYes(desc lval_description):
+    #check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), &lhs_info->cu.x);
+    #annotate_disposal_for_assignment(es, desc.num, oo(&a->rhs), a);
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, void_typrop.cu, void_typrop.props})), void_typrop.cu, void_typrop.props)));
+    return NoFail;
   }
 }
 
