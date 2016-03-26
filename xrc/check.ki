@@ -2,7 +2,7 @@ import ast;
 import deferred;
 import expr;
 import kitutil;
-import lifetime;
+import ipse;
 import parse;
 import tok;
 import typeexpr;
@@ -141,8 +141,8 @@ func convert_typeexpr(a *ast_typeexpr) cr[te_typeexpr] {
     param shp[te_typeexpr];
     *oo(&param) = #convert_typeexpr(oo(&b.param));
     return NoFail!@[te_typeexpr]TeArraytype({count, param});
-  case &Lifetime(b ast_lifetime):
-    return NoFail!@[te_typeexpr]TeLifetime({b.name.value});
+  case &Ipse(b ast_ipse):
+    return NoFail!@[te_typeexpr]TeIpse({b.name.value});
   case &Unknown(b ast_unknown):
     return NoFail!@[te_typeexpr]TeUnknown;
   }
@@ -440,16 +440,16 @@ func check_and_compute_parms(clq *clqueue, t *genparms, out *idy_genparms) np {
         ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
       }
 
-      lifetime_names array[sym];
+      ipse_names array[sym];
       cu_params array[cu_typeexpr];
       n size = count(&params);
       reserve(&cu_params, n);
       for i size = 0; i < n; i = i + 1 {
         canonicalized te_typeexpr;
-        canonicalize_idy_lifetimes(clq->im, &lifetime_names, &params[i], &canonicalized);
+        canonicalize_idy_ipses(clq->im, &ipse_names, &params[i], &canonicalized);
         push(&cu_params, ~canonicalized);
       }
-      *out = {count(&lifetime_names), {freeze(&cu_params)}};
+      *out = {count(&ipse_names), {freeze(&cu_params)}};
       return NoFail;
     }
   }
@@ -492,14 +492,14 @@ func check_and_compute_typeexpr(clq *clqueue, g *te_generics, parms *idy_repls, 
       return NoFail;
     }
 
-    case &TeLifetime(a te_lifetime):
-      if case Has(ix size) = find_lifetime_generic(g, a.name) {
+    case &TeIpse(a te_ipse):
+      if case Has(ix size) = find_ipse_generic(g, a.name) {
         *out = {true, parms->tys[ix].x};
         return NoFail;
       }
-      // Assume it's a valid lifetime in scope, because what else can we do, keep track of that?
-      // TODO: Make sure that user-defined lifetimes we see are well-scoped... if it still seems worth it.
-      *out = {true, TeLifetime({a.name})};
+      // Assume it's a valid ipse in scope, because what else can we do, keep track of that?
+      // TODO: Make sure that user-defined ipses we see are well-scoped... if it still seems worth it.
+      *out = {true, TeIpse({a.name})};
       return NoFail;
 
     case &TeUnknown: {
@@ -618,14 +618,14 @@ func check_and_compute_app_type(clq *clqueue, g *te_generics, parms *idy_repls, 
       if params_complete {
         // TODO: This is quite duplicated with check_and_compute_parms.  With the changes
         // we're making we should definitely dedup this code.
-        lifetime_names array[sym];
+        ipse_names array[sym];
         canonical array[cu_typeexpr];
         foreach param *te_typeexpr in refs(&params) {
           canonicalized te_typeexpr;
-          canonicalize_idy_lifetimes(clq->im, &lifetime_names, param, &canonicalized);
+          canonicalize_idy_ipses(clq->im, &ipse_names, param, &canonicalized);
           push(&canonical, ~canonicalized);
         }
-        hp idy_genparms = {count(&lifetime_names), {freeze(&canonical)}};
+        hp idy_genparms = {count(&ipse_names), {freeze(&canonical)}};
         inst_id deftype_inst_id = enqueue_deftype_inst(clq, id, &hp);
         *out = {true, TeApp({TePureName(value), params, Has({id, inst_id})})};
       } else {
@@ -713,12 +713,12 @@ func find_plain_generic(g *te_generics, name sym) opt[size] {
   }
 }
 
-func find_lifetime_generic(g *te_generics, name sym) opt[size] {
+func find_ipse_generic(g *te_generics, name sym) opt[size] {
   switch g {
   case &TeNoGenerics:
     return None;
   case &TeHasGenerics(a shray[te_generik]):
-    return lookup_lifetime_name(&a, name);
+    return lookup_ipse_name(&a, name);
   case &TeVariadicGenerics(a te_variadic_generics):
     // We can't see variadic generics because there's no "RHS type" of a fn.
     ice(_u8("find_generic sees variadic generic."));
@@ -1059,9 +1059,9 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
       }
     }
 
-    case &TeLifetime(a te_lifetime):
+    case &TeIpse(a te_ipse):
       // Presumably this should be an ICE.
-      return ERR(_u8("ICE: compute_complete_type_properties on TeLifetime"));
+      return ERR(_u8("ICE: compute_complete_type_properties on TeIpse"));
 
     case &TeUnknown: {
       ice(_u8("compute_type_properties called on incomplete type."));
@@ -1508,15 +1508,15 @@ func convert_generik(cs *checkstate, a *ast_generik) cr[te_generik] {
   switch a {
   case &PlainGeneric(b ast_ident):
     return NoFail!TePlainGeneric(b.value);
-  case &LifetimeGeneric(b ast_lifetime_generik):
-    return NoFail!@[te_generik]TeLifetimeGeneric({b.name.value, #convert_typeexpr(&b.oftype)});
+  case &IpseGeneric(b ast_ipse_generik):
+    return NoFail!@[te_generik]TeIpseGeneric({b.name.value, #convert_typeexpr(&b.oftype)});
   }
 }
 
 func generik_human_name(a *ast_generik) *ast_ident {
   switch a {
   case &PlainGeneric(an ast_ident): return &an;
-  case &LifetimeGeneric(an ast_lifetime_generik): return &an.name;
+  case &IpseGeneric(an ast_ipse_generik): return &an.name;
   }
 }
 
@@ -1760,7 +1760,7 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
         return {false, false};
       }
     }
-    case &TeLifetime(a te_lifetime):
+    case &TeIpse(a te_ipse):
       // Yes, I guess.
       return {true, true};
 
@@ -1787,18 +1787,18 @@ func lookup_plain_name(arr *shray[te_generik], x sym) opt[size] {
       if b == x {
         return Has(i);
       }
-    case &TeLifetimeGeneric(b te_lifetime_generik): { }
+    case &TeIpseGeneric(b te_ipse_generik): { }
     }
   }
   return None;
 }
 
-func lookup_lifetime_name(arr *shray[te_generik], x sym) opt[size] {
+func lookup_ipse_name(arr *shray[te_generik], x sym) opt[size] {
   n size = count(arr);
   for i size = 0; i < n; i = i + 1 {
     switch &arr[i] {
     case &TePlainGeneric(b sym): { }
-    case &TeLifetimeGeneric(b te_lifetime_generik):
+    case &TeIpseGeneric(b te_ipse_generik):
       if b.name == x {
         return Has(i);
       }

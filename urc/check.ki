@@ -2,7 +2,7 @@ import ast;
 import deferred;
 import expr;
 import kitutil;
-import lifetime;
+import ipse;
 import parse;
 import tok;
 import typeexpr;
@@ -198,8 +198,8 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) np {
       *out = TeArraytype({count, param});
       return NoFail;
     }
-    case &Lifetime(b ast_lifetime):
-      *out = TeLifetime({b.name.value});
+    case &Ipse(b ast_ipse):
+      *out = TeIpse({b.name.value});
       return NoFail;
 
     case &Unknown(b ast_unknown): {
@@ -514,16 +514,16 @@ func check_and_compute_parms(clq *clqueue, t *genparms, out *idy_genparms) np {
         ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
       }
 
-      lifetime_names array[sym];
+      ipse_names array[sym];
       cu_params array[cu_typeexpr];
       n size = count(&params);
       reserve(&cu_params, n);
       for i size = 0; i < n; i = i + 1 {
         canonicalized te_typeexpr;
-        canonicalize_idy_lifetimes(clq->im, &lifetime_names, ref(&params, i), &canonicalized);
+        canonicalize_idy_ipses(clq->im, &ipse_names, ref(&params, i), &canonicalized);
         push(&cu_params, ~canonicalized);
       }
-      *out = {count(&lifetime_names), {freeze(&cu_params)}};
+      *out = {count(&ipse_names), {freeze(&cu_params)}};
       return NoFail;
     }
   }
@@ -572,14 +572,14 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
       return NoFail;
     }
 
-    case &TeLifetime(a te_lifetime):
-      if case Has(ix size) = find_lifetime_generic(g, a.name) {
+    case &TeIpse(a te_ipse):
+      if case Has(ix size) = find_ipse_generic(g, a.name) {
         *out = {true, ref(&parms->tys, ix)->x};
         return NoFail;
       }
-      // Assume it's a valid lifetime in scope, because what else can we do, keep track of that?
-      // TODO: Make sure that user-defined lifetimes we see are well-scoped... if it still seems worth it.
-      *out = {true, TeLifetime({a.name})};
+      // Assume it's a valid ipse in scope, because what else can we do, keep track of that?
+      // TODO: Make sure that user-defined ipses we see are well-scoped... if it still seems worth it.
+      *out = {true, TeIpse({a.name})};
       return NoFail;
 
     case &TeUnknown: {
@@ -703,15 +703,15 @@ func check_and_compute_app_type(clq *clqueue, g *ast_generics, parms *idy_repls,
 
       if params_complete {
         // TODO: This is quite duplicated with check_and_compute_parms.  With the changes we're making we should definitely dedup this code.
-        lifetime_names array[sym];
+        ipse_names array[sym];
         canonical array[cu_typeexpr];
         n size = count(&params);
         for i size = 0; i < n; i = i + 1 {
           canonicalized te_typeexpr;
-          canonicalize_idy_lifetimes(clq->im, &lifetime_names, ref(&params, i), &canonicalized);
+          canonicalize_idy_ipses(clq->im, &ipse_names, ref(&params, i), &canonicalized);
           push(&canonical, ~canonicalized);
         }
-        hp idy_genparms = {count(&lifetime_names), {freeze(&canonical)}};
+        hp idy_genparms = {count(&ipse_names), {freeze(&canonical)}};
         inst_id deftype_inst_id = enqueue_deftype_inst(clq, id, &hp);
         *out = {true, TeApp({TePureName(value), params, Has({id, inst_id})})};
       } else {
@@ -798,12 +798,12 @@ func find_plain_generic(g *ast_generics, name sym) opt[size] {
   }
 }
 
-func find_lifetime_generic(g *ast_generics, name sym) opt[size] {
+func find_ipse_generic(g *ast_generics, name sym) opt[size] {
   switch g {
   case &NoGenerics:
     return None;
   case &HasGenerics(a array[ast_generik]):
-    return lookup_lifetime_name(&a, name);
+    return lookup_ipse_name(&a, name);
   case &VariadicGenerics(a ast_variadic_generics):
     // We can't see variadic generics because there's no "RHS type" of a fn.
     ice(_u8("find_generic sees variadic generic."));
@@ -1086,9 +1086,9 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
       }
     }
 
-    case &TeLifetime(a te_lifetime):
+    case &TeIpse(a te_ipse):
       // Presumably this should be an ICE.
-      return ERR(_u8("ICE: compute_complete_type_properties on TeLifetime"));
+      return ERR(_u8("ICE: compute_complete_type_properties on TeIpse"));
 
     case &TeUnknown: {
       ice(_u8("compute_type_properties called on incomplete type."));
@@ -1547,7 +1547,7 @@ func check_generics_unique(cs *checkstate, a *ast_generics) np {
 func generik_human_name(a *ast_generik) *ast_ident {
   switch a {
   case &PlainGeneric(an ast_ident): return &an;
-  case &LifetimeGeneric(an ast_ident): return &an;
+  case &IpseGeneric(an ast_ident): return &an;
   }
 }
 
@@ -1784,7 +1784,7 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
         return {false, false};
       }
     }
-    case &TeLifetime(a te_lifetime):
+    case &TeIpse(a te_ipse):
       // Yes, I guess.
       return {true, true};
 
@@ -1919,23 +1919,23 @@ func unify_under_generics(pt *te_typeexpr,
       }
     }
 
-    case &TeLifetime(a te_lifetime):
+    case &TeIpse(a te_ipse):
       // NOTE: I mimicked the TeName case, and haven't fully thought out how that would affect this function's callers, so treat this code with skepticism.
-      if case Has(ix size) = lookup_lifetime_name(names, a.name) {
+      if case Has(ix size) = lookup_ipse_name(names, a.name) {
         unified te_typeexpr;
         if !unify_types(ref(unif_parms, ix), pt, &unified) {
           return false;
         }
         *ref(unif_parms, ix) = unified;
-        *unified_out = TeLifetime({a.name});
+        *unified_out = TeIpse({a.name});
         return true;
       } else {
-        if case &TeLifetime(pa te_lifetime) = pt {
+        if case &TeIpse(pa te_ipse) = pt {
           // NOTE: The TeName case says something about scopage for its analogue of this comparison.
           if a.name != pa.name {
             return false;
           }
-          *unified_out = TeLifetime({a.name});
+          *unified_out = TeIpse({a.name});
           return true;
         } else {
           return false;
@@ -1959,18 +1959,18 @@ func lookup_plain_name(arr *array[ast_generik], x sym) opt[size] {
       if b.value == x {
         return Has(i);
       }
-    case &LifetimeGeneric(b ast_ident): { }
+    case &IpseGeneric(b ast_ident): { }
     }
   }
   return None;
 }
 
-func lookup_lifetime_name(arr *array[ast_generik], x sym) opt[size] {
+func lookup_ipse_name(arr *array[ast_generik], x sym) opt[size] {
   n size = count(arr);
   for i size = 0; i < n; i = i + 1 {
     switch ref(arr, i) {
     case &PlainGeneric(b ast_ident): { }
-    case &LifetimeGeneric(b ast_ident):
+    case &IpseGeneric(b ast_ident):
       if b.value == x {
         return Has(i);
       }

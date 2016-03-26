@@ -154,7 +154,7 @@ struct ast_arraytype {
   param box[ast_typeexpr];
 }
 
-struct ast_lifetime {
+struct ast_ipse {
   name ast_ident;
 }
 
@@ -166,7 +166,7 @@ enum ast_typeexpr {
   App ast_typeapp;
   Union ast_union;
   Arraytype ast_arraytype;
-  Lifetime ast_lifetime;
+  Ipse ast_ipse;
   Unknown ast_unknown;
 }
 
@@ -584,11 +584,11 @@ struct lval_description {
   num cell_num;
   // DeadMe if the lval cell is only carried by the lval.
   deadme lval_deadme;
-  // The lval's lifetime.
-  // TODO: Maybe deadme could be obviated by the lifetime field.
-  // TODO: Maybe this field should be a te_lifetime.
+  // The lval's ipse.
+  // TODO: Maybe deadme could be obviated by the ipse field.
+  // TODO: Maybe this field should be a te_ipse.
   // TODO: Maybe this field should be a cu_typeexpr.
-  lifetime te_typeexpr;
+  ipse te_typeexpr;
 }
 
 enum is_lval {
@@ -800,7 +800,7 @@ func discard(expr ast_expr) ast_expr_discard {
   return {NotComputed, move(&expr)};
 }
 
-struct ast_lifetime_generik {
+struct ast_ipse_generik {
   name ast_ident;
   oftype ast_typeexpr;
 }
@@ -808,7 +808,7 @@ struct ast_lifetime_generik {
 // This is named with a k to prevent typos with ast_generics.
 enum ast_generik {
   PlainGeneric ast_ident;
-  LifetimeGeneric ast_lifetime_generik;
+  IpseGeneric ast_ipse_generik;
 }
 
 enum ast_generics {

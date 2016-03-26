@@ -7,9 +7,9 @@ enum allow_blanks {
 
 // This isn't passed recursively -- "No" is used whenever parsing always expects a
 // concrete type anyway.
-enum allow_lifetimes {
-  AllowLifetimesNo void;
-  AllowLifetimesYes void;
+enum allow_ipses {
+  AllowIpsesNo void;
+  AllowIpsesYes void;
 }
 
 enum force_assignment {
@@ -345,7 +345,7 @@ func parse_lambdaspec(p *ps, params_out *array[ast_vardecl], return_type_out *as
 }
 
 func parse_typeexpr(p *ps, out *ast_typeexpr) parse_result {
-  return help_parse_typeexpr(p, AllowBlanksNo, AllowLifetimesNo, out);
+  return help_parse_typeexpr(p, AllowBlanksNo, AllowIpsesNo, out);
 }
 
 func parse_ident(p *ps, out *ast_ident) parse_result {
@@ -439,7 +439,7 @@ func parse_generik(p *ps, out *ast_generik) parse_result {
     #parse_ident(p, &name);
     oftype ast_typeexpr;
     #parse_typeexpr(p, &oftype);
-    *out = LifetimeGeneric({name, oftype});
+    *out = IpseGeneric({name, oftype});
     return Success;
   }
   name ast_ident;
@@ -505,7 +505,7 @@ func try_underscore_if_allowed(p *ps, ab allow_blanks, out *ast_typeexpr) try_pa
   }
 }
 
-func help_parse_typeexpr(p *ps, ab allow_blanks, al allow_lifetimes, out *ast_typeexpr) parse_result {
+func help_parse_typeexpr(p *ps, ab allow_blanks, al allow_ipses, out *ast_typeexpr) parse_result {
   switch help_triparse_typeexpr(p, ab, al, out) {
     case Success: { return Success; }
     default: { return Fail; }
@@ -521,7 +521,7 @@ inline func success_or_fail(res parse_result) triparse_result {
   }
 }
 
-func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_lifetimes, out *ast_typeexpr) triparse_result {
+func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_ipses, out *ast_typeexpr) triparse_result {
   voidmeta ast_meta;
   if case Has(m ast_meta) = try_parse_keyw(p, Void) {
     *out = Name({m, p->im->cym.voidsym});
@@ -544,11 +544,11 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_lifetimes, out *ast
     return success_or_fail(parse_rest_of_arraytype(p, ab, out));
   }
 
-  if case AllowLifetimesYes = al {
-    lifetime ast_lifetime;
-    switch triparse_lifetime(p, &lifetime) {
+  if case AllowIpsesYes = al {
+    ipse ast_ipse;
+    switch triparse_ipse(p, &ipse) {
     case Success:
-      *out = Lifetime(lifetime);
+      *out = Ipse(ipse);
       return Success;
     case Quickfail: { }
     case Error:
@@ -594,7 +594,7 @@ func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) parse_re
       if +try_skip_keyw(p, Underscore) {
         param box[ast_typeexpr];
         #try_skip_token(p, @[tokval]Grouper(RBracket));
-        #help_parse_typeexpr(p, ab, AllowLifetimesNo, oo(&param));
+        #help_parse_typeexpr(p, ab, AllowIpsesNo, oo(&param));
 
         *out = Arraytype({None, param});
         return Success;
@@ -615,25 +615,25 @@ func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) parse_re
 
 func parse_rest_of_pointer(p *ps, ab allow_blanks, oper ast_ident, out *ast_typeexpr) parse_result {
   arg ast_typeexpr;
-  #help_parse_typeexpr(p, ab, AllowLifetimesNo, &arg);
+  #help_parse_typeexpr(p, ab, AllowIpsesNo, &arg);
   *out = App({embox(Name(oper)),
               mk_array(arg)});
   return Success;
 }
 
 func parse_rest_of_reference(p *ps, ab allow_blanks, oper ast_ident, out *ast_typeexpr) parse_result {
-  lifetime_arg ast_lifetime;
-  if case Success = triparse_lifetime(p, &lifetime_arg) {
+  ipse_arg ast_ipse;
+  if case Success = triparse_ipse(p, &ipse_arg) {
     arg ast_typeexpr;
-    #help_parse_typeexpr(p, ab, AllowLifetimesNo, &arg);
-    *out = App({embox(Name(oper)), mk_array(Lifetime(lifetime_arg), arg)});
+    #help_parse_typeexpr(p, ab, AllowIpsesNo, &arg);
+    *out = App({embox(Name(oper)), mk_array(Ipse(ipse_arg), arg)});
     return Success;
   } else {
     return Fail;
   }
 }
 
-func triparse_lifetime(p *ps, out *ast_lifetime) triparse_result {
+func triparse_ipse(p *ps, out *ast_ipse) triparse_result {
   if ! +try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
     return Quickfail;
   }
@@ -658,7 +658,7 @@ func parse_rest_of_type_param_list(p *ps, ab allow_blanks, out *array[ast_typeex
     }
 
     typeexpr ast_typeexpr;
-    #help_parse_typeexpr(p, ab, AllowLifetimesYes, &typeexpr);
+    #help_parse_typeexpr(p, ab, AllowIpsesYes, &typeexpr);
     push(&args, typeexpr);
   }
 }
@@ -715,7 +715,7 @@ func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) parse_result {
   switch ab {
     case AllowBlanksYes: {
       type ast_typeexpr;
-      switch help_triparse_typeexpr(p, ab, AllowLifetimesNo, &type) {
+      switch help_triparse_typeexpr(p, ab, AllowIpsesNo, &type) {
         case Success: {
           *out = {name, type};
           return Success;
@@ -731,7 +731,7 @@ func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) parse_result {
     }
     case AllowBlanksNo: {
       type ast_typeexpr;
-      #help_parse_typeexpr(p, ab, AllowLifetimesNo, &type);
+      #help_parse_typeexpr(p, ab, AllowIpsesNo, &type);
       *out = {name, type};
       return Success;
     }
@@ -1119,7 +1119,7 @@ func parse_atomic_expr_upon_oper(p *ps, ab allow_braces, operch *smallstr, out *
     type ast_typeexpr;
     expr ast_expr;
     #try_skip_token(p, @[tokval]Grouper(LBracket));
-    #help_parse_typeexpr(p, AllowBlanksYes, AllowLifetimesYes, &type);
+    #help_parse_typeexpr(p, AllowBlanksYes, AllowIpsesYes, &type);
     #try_skip_token(p, @[tokval]Grouper(RBracket));
     #parse_expr(p, kConversionRightPrec, ab, IsNotStatementExpr, &expr);
     end(p, m);
@@ -1632,7 +1632,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
     return Success;
   } else {
     type ast_typeexpr;
-    switch help_triparse_typeexpr(p, AllowBlanksYes, AllowLifetimesNo, &type) {
+    switch help_triparse_typeexpr(p, AllowBlanksYes, AllowIpsesNo, &type) {
       case Quickfail: {
         m ast_meta = copystart(p, name.meta);
         lhs ast_expr = mk(name.meta, NameExpr(mk(name, None)));

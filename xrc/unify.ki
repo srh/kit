@@ -123,25 +123,25 @@ func unify_under_generics(pt *te_typeexpr,
       }
     }
 
-    case &TeLifetime(a te_lifetime):
+    case &TeIpse(a te_ipse):
       // NOTE: I mimicked the TeName case, and haven't fully thought out how that would
       // affect this function's callers, so treat this code with skepticism.
-      if case Has(ix size) = lookup_lifetime_name(names, a.name) {
+      if case Has(ix size) = lookup_ipse_name(names, a.name) {
         unified te_typeexpr;
         if !unify_types(&unif_parms[ix], pt, &unified) {
           return false;
         }
         unif_parms[ix] = unified;
-        *unified_out = TeLifetime({a.name});
+        *unified_out = TeIpse({a.name});
         return true;
       } else {
-        if case &TeLifetime(pa te_lifetime) = pt {
+        if case &TeIpse(pa te_ipse) = pt {
           // NOTE: The TeName case says something about scopage for its analogue of this
           // comparison.
           if a.name != pa.name {
             return false;
           }
-          *unified_out = TeLifetime({a.name});
+          *unified_out = TeIpse({a.name});
           return true;
         } else {
           return false;

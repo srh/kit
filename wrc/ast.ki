@@ -154,7 +154,7 @@ struct ast_arraytype {
   param box[ast_typeexpr];
 }
 
-struct ast_lifetime {
+struct ast_ipse {
   name ast_ident;
 }
 
@@ -166,7 +166,7 @@ enum ast_typeexpr {
   App ast_typeapp;
   Union ast_union;
   Arraytype ast_arraytype;
-  Lifetime ast_lifetime;
+  Ipse ast_ipse;
   Unknown ast_unknown;
 }
 
@@ -572,11 +572,11 @@ struct lval_description {
   num cell_num;
   // DeadMe if the lval cell is only carried by the lval.
   deadme lval_deadme;
-  // The lval's lifetime.
-  // TODO: Maybe deadme could be obviated by the lifetime field.
-  // TODO: Maybe this field should be a te_lifetime.
+  // The lval's ipse.
+  // TODO: Maybe deadme could be obviated by the ipse field.
+  // TODO: Maybe this field should be a te_ipse.
   // TODO: Maybe this field should be a cu_typeexpr.
-  lifetime te_typeexpr;
+  ipse te_typeexpr;
 }
 
 enum is_lval {
@@ -781,7 +781,7 @@ func discard(expr ast_expr) ast_expr_discard {
   return {NotComputed, move(&expr)};
 }
 
-// Variadic generics doesn't support lifetime generics (for no particular reason, other than that we have no need for it) yet.  NOTE: type_from_inst assumes the fact that this doesn't support lifetime generics.
+// Variadic generics doesn't support ipse generics (for no particular reason, other than that we have no need for it) yet.  NOTE: type_from_inst assumes the fact that this doesn't support ipse generics.
 struct ast_variadic_generics {
   before array[ast_ident];
   variadic_name ast_ident;
@@ -791,7 +791,7 @@ struct ast_variadic_generics {
 // This is named with a k to prevent typos with ast_generics.
 enum ast_generik {
   PlainGeneric ast_ident;
-  LifetimeGeneric ast_ident;
+  IpseGeneric ast_ident;
 }
 
 enum ast_generics {

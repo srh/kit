@@ -18,8 +18,8 @@ struct framescope {
   // These var_numbers are always in increasing order.
   current_vars array[var_number];
 
-  // Used for auto-generating $frame_1, $frame_2, ... lifetimes.
-  lifetime_gen_counter size;
+  // Used for auto-generating $frame_1, $frame_2, ... ipses.
+  ipse_gen_counter size;
 
   // The return type... if we're in a body that has a return type -- used for QuickReturn
   // expressions.
@@ -93,7 +93,7 @@ struct var_info {
   props type_properties;
   cell cell_num;
   name opt[sym];
-  lifetime cu_typeexpr;
+  ipse cu_typeexpr;
   // Can a goto statement enter this var's scope and construct the var?  True if the var
   // is self-contained.  I.e. true if the variable is not bound by a case-pattern.  (Also
   // true for lambda parameters, out of general principle.)  This also means the var needs
@@ -150,7 +150,7 @@ func do_destroy(vp *varpopper) void {
   vp->es = null;
 }
 
-func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], lifetime cu_typeexpr,
+func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], ipse cu_typeexpr,
                  computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) np {
   osymname opt[sym];
   if case Has(ident *ast_ident) = name {
@@ -164,7 +164,7 @@ func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ide
   props type_properties;
   #compute_type_properties(es->clq, computed_type, &props);
   num var_number = ~count(&es->all_vars);
-  push(&es->all_vars, {num, *computed_type, props, cell, osymname, lifetime, binding, None, None});
+  push(&es->all_vars, {num, *computed_type, props, cell, osymname, ipse, binding, None, None});
   push(&es->current_vars, num);
   push(&vp->nums, num);
   *vn_out = num;
@@ -713,7 +713,7 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
     switch &rhs_info->lval {
     case &IsLvalYes(desc lval_description):
       lval = IsLvalYes({add_cell(es, {LocationVirtual, success_case_cu, success_case_props}), DeadMe,
-            enum_field_lifetime(desc.lifetime)});
+            enum_field_ipse(desc.ipse)});
     case &IsLvalNo(desc rval_description):
       lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, success_case_cu, success_case_props})});
     }
@@ -737,9 +737,9 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
     return ERR(_u8("RefOf expr in non-ref context"));
   }
 
-  pt_lifetime *te_typeexpr;
+  pt_ipse *te_typeexpr;
   pt_param *te_typeexpr;
-  if !decompose_ref(&unif_pt, es->cs, &pt_lifetime, &pt_param) {
+  if !decompose_ref(&unif_pt, es->cs, &pt_ipse, &pt_param) {
     ice(_u8("RefOf sees non-ref after unifying with ref."));
   }
 
@@ -754,17 +754,17 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
     // expires... when it can.
     return ERR(_u8("Taking reference of a non-lvalue"));
   case &IsLvalYes(desc lval_description):
-    unified_lifetime te_typeexpr;
-    if !unify_types(pt_lifetime, &desc.lifetime, &unified_lifetime) {
-      return ERR(_u8("Refof lifetime types do not match."));
+    unified_ipse te_typeexpr;
+    if !unify_types(pt_ipse, &desc.ipse, &unified_ipse) {
+      return ERR(_u8("Refof ipse types do not match."));
     }
 
-    ref_type te_typeexpr = mk_ref_type(es->cs, unified_lifetime, rhs_info->cu.x);
+    ref_type te_typeexpr = mk_ref_type(es->cs, unified_ipse, rhs_info->cu.x);
     ref_computed cac_typeexpr;
     #noscoped_check_and_compute_typeexpr(es->clq, &ref_type, &ref_computed);
-    // (TODO: Make lval desc.lifetime be a te_lifetime, so it can't be incomplete?)
+    // (TODO: Make lval desc.ipse be a te_ipse, so it can't be incomplete?)
     if !ref_computed.complete {
-      return ERR(_u8("ICE?  lval desc.lifetime must have been incomplete (after complete type-check)."));
+      return ERR(_u8("ICE?  lval desc.ipse must have been incomplete (after complete type-check)."));
     }
 
     ref_props type_properties;
@@ -822,9 +822,9 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   unknown te_typeexpr = TeUnknown;
   #check_consume_then_discard_expr(es, oo(&a->lhs), &unknown, &a->ptr_discard);
   info *ast_expr_complete_info = expr_complete_info(&oo(&a->lhs)->expr);
-  lifetime te_typeexpr;
+  ipse te_typeexpr;
   param *te_typeexpr;
-  if !decompose_ref_or_ptr(&info->cu.x, es->cs, &lifetime, &param) {
+  if !decompose_ref_or_ptr(&info->cu.x, es->cs, &ipse, &param) {
     return ERR(_u8("Expected pointer for lhs of deref field"));
   }
   cu_param cu_typeexpr = ~ *param;
@@ -837,7 +837,7 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   switch cf_res {
     case InheritsLval(off check_field_offset_and_index): {
       // We deref, so it's always an lval.
-      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe, field_lifetime(lifetime)});
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe, field_ipse(ipse)});
       annotate(&a->info, DerefFieldName(@[ast_field_info]{off.offset, off.index}));
     }
     case ConstantField(value u32): {
@@ -849,31 +849,31 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   return NoFail;
 }
 
-// Right now fields have the same lifetime as what they're part of -- they're part of the
-// same object!  So, having equal lifetimes does not mean you're the same object.
-func field_lifetime(outer_lifetime te_typeexpr) te_typeexpr {
-  return outer_lifetime;
+// Right now fields have the same ipse as what they're part of -- they're part of the
+// same object!  So, having equal ipses does not mean you're the same object.
+func field_ipse(outer_ipse te_typeexpr) te_typeexpr {
+  return outer_ipse;
 }
 
-// This is halfway B.S. the same way that field_lifetime is.
-func enum_field_lifetime(outer_lifetime te_typeexpr) te_typeexpr {
-  return outer_lifetime;
+// This is halfway B.S. the same way that field_ipse is.
+func enum_field_ipse(outer_ipse te_typeexpr) te_typeexpr {
+  return outer_ipse;
 }
 
-// Varnames aren't supposed to shadow, so... we have user-friendly lifetime names.  (Note
-// that vars could shadow generic lifetime parameters, for now, so we add the $var_
+// Varnames aren't supposed to shadow, so... we have user-friendly ipse names.  (Note
+// that vars could shadow generic ipse parameters, for now, so we add the $var_
 // prefix.)
-func varname_lifetime(im *identmap, name sym) te_typeexpr {
+func varname_ipse(im *identmap, name sym) te_typeexpr {
   n sym = intern(im, _s("$var_") + lookup(im, name));
-  return TeLifetime({n});
+  return TeIpse({n});
 }
 
-// TODO: Most uses of this will get replaced by some rval lifetime getter.  (We'll set
-// rval lifetimes with this value, though.)
-func unnamed_lifetime(es *framescope) te_typeexpr {
-  n sym = intern(es->im, _s("$frame_") + from_u8(to_u8str(void, es->lifetime_gen_counter)));
-  es->lifetime_gen_counter = es->lifetime_gen_counter + 1;
-  return TeLifetime({n});
+// TODO: Most uses of this will get replaced by some rval ipse getter.  (We'll set
+// rval ipses with this value, though.)
+func unnamed_ipse(es *framescope) te_typeexpr {
+  n sym = intern(es->im, _s("$frame_") + from_u8(to_u8str(void, es->ipse_gen_counter)));
+  es->ipse_gen_counter = es->ipse_gen_counter + 1;
+  return TeIpse({n});
 }
 
 func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr, x *ast_expr) np {
@@ -891,7 +891,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
       switch &info->lval {
         case &IsLvalYes(desc lval_description): {
           lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe,
-                            field_lifetime(desc.lifetime)});
+                            field_ipse(desc.ipse)});
         }
         case &IsLvalNo(desc rval_description): {
           lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, fieldtype, props})});
@@ -916,9 +916,9 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
   // Let's force the rhs to be a complete type.  Because why not!
   #check_consume_then_discard_expr(es, oo(&a->rhs), &ptr_pt, &a->ptr_discard);
   rhs_type *cu_typeexpr = expr_complete_type(&oo(&a->rhs)->expr);
-  lifetime te_typeexpr;
+  ipse te_typeexpr;
   param *te_typeexpr;
-  if decompose_ref_or_ptr(&rhs_type->x, es->cs, &lifetime, &param) {
+  if decompose_ref_or_ptr(&rhs_type->x, es->cs, &ipse, &param) {
     // param is already complete.
     unified_discard te_typeexpr;
     if !unify_types(pt, param, &unified_discard) {
@@ -928,7 +928,7 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
     props type_properties;
     #compute_complete_type_properties(es->clq, param, &props);
     annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}),
-                                                           DeadMe, lifetime}),
+                                                           DeadMe, ipse}),
                                       ~ *param, props)));
     return NoFail;
   }
@@ -1126,10 +1126,10 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
 
 func make_comparecells(es *framescope, dest cell_num) instpair {
   if case Has(ent def_entry_id) = es->cs->prims.ptr_eq {
-    lifetime_names array[sym];
+    ipse_names array[sym];
     canonical te_typeexpr;
-    canonicalize_idy_lifetimes(es->im, &lifetime_names, &ref_cell(es, dest)->type.x, &canonical);
-    parms idy_genparms = {count(&lifetime_names), {mk_shray(~canonical)}};
+    canonicalize_idy_ipses(es->im, &ipse_names, &ref_cell(es, dest)->type.x, &canonical);
+    parms idy_genparms = {count(&ipse_names), {mk_shray(~canonical)}};
     inst_id def_inst_id = enqueue_def_inst(es->clq, ent, &parms);
     return {ent, inst_id};
   } else {
@@ -1273,7 +1273,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &OneLocalMatch(v local_info): {
       annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({v.varnum}));
       vi *var_info = ref_var(es, v.varnum);
-      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe, vi->lifetime.x}),
+      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe, vi->ipse.x}),
                                         vi->type, vi->props)));
       return NoFail;
     }
@@ -1425,7 +1425,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
     push(&arg_cells, cell);
     vn var_number;
     name *ast_ident = &a->args[i].name;
-    #es_push_var(&bs->es, &vp, cell, Has(name), ~varname_lifetime(bs->im, name->value), &cu_param,
+    #es_push_var(&bs->es, &vp, cell, Has(name), ~varname_ipse(bs->im, name->value), &cu_param,
                  VarSelfContained, &vn);
     #es_note_var_destroyer(&bs->es, vn);
   }
@@ -1488,21 +1488,21 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
 
 // You really should use this, in case we decide to rearrange the order of parameters of
 // the ref type.
-func decompose_ref(t *te_typeexpr, cs *checkstate, lifetime_out **te_typeexpr, param_out **te_typeexpr) bool {
-  return decompose_typeapp(t, primitive_ref_puretype(cs), lifetime_out, param_out);
+func decompose_ref(t *te_typeexpr, cs *checkstate, ipse_out **te_typeexpr, param_out **te_typeexpr) bool {
+  return decompose_typeapp(t, primitive_ref_puretype(cs), ipse_out, param_out);
 }
 
-// Writes a fake lifetime in the case of pointer, a real lifetime in the case of a reference.
-func decompose_ref_or_ptr(t *te_typeexpr, cs *checkstate, lifetime_out *te_typeexpr, param_out **te_typeexpr) bool {
+// Writes a fake ipse in the case of pointer, a real ipse in the case of a reference.
+func decompose_ref_or_ptr(t *te_typeexpr, cs *checkstate, ipse_out *te_typeexpr, param_out **te_typeexpr) bool {
   lt *te_typeexpr;
   param *te_typeexpr;
   if decompose_ref(t, cs, &lt, &param) {
-    *lifetime_out = *lt;
+    *ipse_out = *lt;
     *param_out = param;
     return true;
   }
   if decompose_typeapp(t, primitive_pointer_puretype(cs), &param) {
-    *lifetime_out = fake_lifetime(cs);
+    *ipse_out = fake_ipse(cs);
     *param_out = param;
     return true;
   }
@@ -1817,8 +1817,8 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
       }
       return NoFail;
     }
-    case &TeLifetime(a te_lifetime):
-      return ERR(_u8("ICE: Looking up name field of... a lifetime type?"));
+    case &TeIpse(a te_ipse):
+      return ERR(_u8("ICE: Looking up name field of... a ipse type?"));
 
     case &TeUnknown: {
       ice(_u8("lookup_field sees incomplete type"));
@@ -1994,7 +1994,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       switch &lhs_info->lval {
         case &IsLvalYes(desc lval_description): {
           lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
-                            DeadMe, field_lifetime(desc.lifetime)});
+                            DeadMe, field_ipse(desc.ipse)});
         }
         case &IsLvalNo(desc rval_description): {
           lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *result_type, result_props})});
@@ -2005,7 +2005,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     } else {
       // Dereferencing a pointer always makes an lvalue.
       lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
-                        DeadMe, field_lifetime(fake_lifetime(es->cs))});
+                        DeadMe, field_ipse(fake_ipse(es->cs))});
       ie_info_after nc[ast_expr_after_consume] = NotComputed;
       lhs_later ast_later_discard_info = mk_later();
       #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
@@ -2028,7 +2028,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       switch &lhs_info->lval {
       case &IsLvalYes(desc lval_description):
         lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
-                          DeadMe, fake_lifetime(es->cs)});
+                          DeadMe, fake_ipse(es->cs)});
       case &IsLvalNo(desc rval_description):
         return ERR(_u8("User-defined array indexing only works on lvalues"));
       }
@@ -2038,7 +2038,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       #check_expr_consume(es, oo(&a->rhs), &key_type);
 
       lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
-                        DeadMe, fake_lifetime(es->cs)});
+                        DeadMe, fake_ipse(es->cs)});
       ie_info_after nc[ast_expr_after_consume] = NotComputed;
       lhs_later ast_later_discard_info = mk_later();
       #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);

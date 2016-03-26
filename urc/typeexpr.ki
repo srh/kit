@@ -19,7 +19,7 @@ enum te_typeexpr {
   TeApp te_typeapp;
   TeUnion te_union;
   TeArraytype te_arraytype;
-  TeLifetime te_lifetime;
+  TeIpse te_ipse;
   TeUnknown void;
 }
 
@@ -55,8 +55,8 @@ struct te_arraytype {
   param shp[te_typeexpr];
 }
 
-// We better not allow name shadowing of lifetimes!
-struct te_lifetime {
+// We better not allow name shadowing of ipses!
+struct te_ipse {
   name sym;
 }
 
@@ -117,8 +117,8 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
         return ax.count == bx.count && help_idy_typeexpr_equal(oo(&ax.param), oo(&bx.param));
       }
     }
-    case &TeLifetime(ax te_lifetime):
-      if case &TeLifetime(bx te_lifetime) = b {
+    case &TeIpse(ax te_ipse):
+      if case &TeIpse(bx te_ipse) = b {
         return ax.name == bx.name;
       }
     case &TeUnknown: {
@@ -210,8 +210,8 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
     case &TeArraytype(b te_arraytype): {
       wrap_u8str(help, r, _u8("TeArraytype"), &b);
     }
-    case &TeLifetime(b te_lifetime):
-      wrap_u8str(help, r, _u8("TeLifetime"), &b);
+    case &TeIpse(b te_ipse):
+      wrap_u8str(help, r, _u8("TeIpse"), &b);
     case &TeUnknown: {
       append(r, _u8("TeUnknown"));
     }
@@ -246,7 +246,7 @@ func[H] build_u8str(help H, r *array[u8], a *te_arraytype) void {
   push(r, '}');
 }
 
-func[H] build_u8str(help H, r *array[u8], a *te_lifetime) void {
+func[H] build_u8str(help H, r *array[u8], a *te_ipse) void {
   build_u8str(help, r, &a->name);
 }
 
@@ -294,7 +294,7 @@ func help_compute_hash(a *te_typeexpr) osize {
     if case Has(n u32) = ax.count {
       return (@[osize]~n * 0x3001) + help_compute_hash(oo(&ax.param));
     }
-  case &TeLifetime(ax te_lifetime):
+  case &TeIpse(ax te_ipse):
     return 0x4 ^ hash_compute_hash(&ax.name);
   case &TeUnknown:
     ice(_u8("help_compute_hash sees TeUnknown"));
@@ -351,7 +351,7 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
     }
     push(r, ']');
     pretty_u8str(im, r, oo(&b.param));
-  case &TeLifetime(b te_lifetime):
+  case &TeIpse(b te_ipse):
     push(r, '\'');
     build_u8str(im, r, &b.name);
   case &TeUnknown:

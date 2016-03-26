@@ -14,7 +14,7 @@ enum generics_arity {
   VariadicArity variadic_arity;
 }
 
-// TODO: The so-called "arity" might need to include information whether it's a lifetime
+// TODO: The so-called "arity" might need to include information whether it's a ipse
 // generic or plain generic.
 func arity(a *te_generics) generics_arity {
   switch a {

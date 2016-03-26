@@ -389,12 +389,12 @@ func ptr_type(cs *checkstate, t te_typeexpr) te_typeexpr {
   return TeApp({primitive_pointer_puretype(cs), mk_shray(t), None});
 }
 
-func mk_ref_type(cs *checkstate, lifetime te_typeexpr, param te_typeexpr) te_typeexpr {
-  return TeApp({primitive_ref_puretype(cs), mk_shray(lifetime, param), None});
+func mk_ref_type(cs *checkstate, ipse te_typeexpr, param te_typeexpr) te_typeexpr {
+  return TeApp({primitive_ref_puretype(cs), mk_shray(ipse, param), None});
 }
 
-func fake_lifetime(cs *checkstate) te_typeexpr {
-  return TeLifetime({cs->im->cym.fakesym});
+func fake_ipse(cs *checkstate) te_typeexpr {
+  return TeIpse({cs->im->cym.fakesym});
 }
 
 func add_pointer_primitive(cs *checkstate) void {
@@ -437,7 +437,7 @@ func add_pointer_primitive_type(cs *checkstate) void {
 }
 
 func add_ref_primitive_type(cs *checkstate) void {
-  two_generic array[ast_generik] = mk_array(@[ast_generik]LifetimeGeneric({fake_ast_meta(), intern(cs->im, _s("a"))}), @[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym}));
+  two_generic array[ast_generik] = mk_array(@[ast_generik]IpseGeneric({fake_ast_meta(), intern(cs->im, _s("a"))}), @[ast_generik]PlainGeneric({fake_ast_meta(), cs->im->cym.tee_sym}));
   ent deftype_entry = {
     cs->im->cym.primitive_module_sym,
     cs->im->cym.reftype_sym,
