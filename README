@@ -53,8 +53,9 @@ The current directory structure is:
 
    trc - s1, implemented in C.  Compiles s2.
    urc - s2, implemented in proto-Kit.  Compiles s2 and s3.
-   vrc - s3, implemented in proto-Kit.  Compiles s3 and s4. (and s2, probably).
-   wrc - s4, implemented in proto-Kit.  Compiles s4 (and s2 and s3, probably).
+   vrc - s3, implemented in proto-Kit.  Compiles s3 and s4.
+   wrc - s4, implemented in proto-Kit.  Compiles s4 and s5.
+   xrc - s5, implemented in proto-Kit.  Compiles s5.
    examples - examples to run, disorganized junk
 
   ABOUT THE VERSIONS
@@ -64,6 +65,8 @@ destructors, elementary encapsulation, tagged enum types, no
 implicit conversions."  s2's is very similar to s1's, but with some
 worthwhile enhancements that s1 does not support.  s3 uses s2's
 quick-return expressions.  s4 uses s3's generalize indexing
-expressions.  s1 will someday be capable of compiling s4 directly.
-At some point the highest-numbered version will use features that
-s1 will never support.  See FEATURES for more information.
+expressions.  s5 uses s4's foreach loops, and is "in-development"
+-- it might not work, from commit to commit.  s1 will someday be
+capable of compiling s5 directly.  At some point the
+highest-numbered version will use features that s1 will never
+support.  See FEATURES for more information.
