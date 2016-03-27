@@ -367,6 +367,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
     case &MultiMatch:
       ice(_u8("magic_enum_ctor lookup sees MultiMatch"));
     case &OneMatch(m ent_and_parms):
+      // EMISSIONS: We've already established the emissions when creating the ctor_type?  No?  So we ignore m.emissions?
       inst_id def_inst_id;
       if !from_np(make_inst(ds->clq, m.ent, &m.parms, &inst_id)) {
         ice(_u8("lookup_or_make_enum_constructor_def make_inst failed after match"));
