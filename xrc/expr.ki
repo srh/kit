@@ -363,19 +363,15 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
     res match_def_res;
     #match_def(ds->cs, defname, &nogp, ctor_type, &res);
     switch &res {
-      case &NoMatch: {
-        // Do nothing.
+    case &NoMatch: { } // Do nothing.
+    case &MultiMatch:
+      ice(_u8("magic_enum_ctor lookup sees MultiMatch"));
+    case &OneMatch(m ent_and_parms):
+      inst_id def_inst_id;
+      if !from_np(make_inst(ds->clq, m.ent, &m.parms, &inst_id)) {
+        ice(_u8("lookup_or_make_enum_constructor_def make_inst failed after match"));
       }
-      case &MultiMatch: {
-        ice(_u8("magic_enum_ctor lookup sees MultiMatch"));
-      }
-      case &OneMatch(m ent_and_parms): {
-        inst_id def_inst_id;
-        if !from_np(make_inst(ds->clq, m.ent, &m.parms, &inst_id)) {
-          ice(_u8("lookup_or_make_enum_constructor_def make_inst failed after match"));
-        }
-        return NoFail({m.ent, inst_id});
-      }
+      return NoFail({m.ent, inst_id});
     }
   }
 
