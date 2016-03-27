@@ -2125,12 +2125,13 @@ func expr_complete_type(a *ast_expr) *cu_typeexpr {
 
 func expr_type_complete(a *ast_expr) bool {
   switch &a->info {
-    case &NoInfo: {
-      ice(_u8("expr_type_complete sees NoInfo"));
-      return fake();
-    }
-    case &IncompleteCheck: { return false; }
-    case &CompleteCheck(t ast_expr_complete_info): { return true; }
+  case &NoInfo:
+    ice(_u8("expr_type_complete sees NoInfo"));
+    return fake();
+  case &IncompleteCheck:
+    return false;
+  case &CompleteCheck(t ast_expr_complete_info):
+    return true;
   }
 }
 
