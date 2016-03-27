@@ -1197,6 +1197,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value),
                   _u8("', maybe with parms, not found, matching type '"), pretty(es->im, pt), _u8("'"));
     }
+
     case &AmbigGlobalMatch: {
       if ai == AllowIncompleteYes {
         // NOTE: We could annotate this more precisely in ambiguous-single-match cases.
@@ -1217,7 +1218,9 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
                     pretty(es->im, pt));
       }
     }
+
     case &OneEnumConstructorMatch(ci constructor_info): {
+      // EMISSIONS(): Handle ci.emissions
       annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip}));
       props type_properties;
       #compute_type_properties(es->clq, &ci.type, &props);
@@ -1234,6 +1237,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       return NoFail;
     }
     case &OneGlobalMatch(egm es_global_match): {
+      // EMISSIONS(): Handle egm.emissions
       ent *def_entry = ref_def_entry(es->cs, egm.ent_id);
 
       // This parallels or plagairizes ensure_def_inst_type_computed.
@@ -1257,7 +1261,9 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
                                         cu_computed, props)));
       return NoFail;
     }
+
     case &OneLocalMatch(elm es_local_match): {
+      // EMISSIONS(): Handle elm.emissions.
       annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({elm.info.varnum}));
       vi *var_info = ref_var(es, elm.info.varnum);
       annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe, vi->ipse.x}),
