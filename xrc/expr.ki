@@ -420,6 +420,12 @@ struct es_global_match {
   ent_id def_entry_id;
   inst_id def_inst_id;
   parms genparms;
+  emissions shray[unify_emission];
+}
+
+struct es_local_match {
+  info local_info;
+  emissions shray[unify_emission];
 }
 
 enum es_match_res {
@@ -427,7 +433,7 @@ enum es_match_res {
   AmbigGlobalMatch void;
   NoGlobalAmbigEnumConstructorMatch void;
   OneGlobalMatch es_global_match;
-  OneLocalMatch local_info;
+  OneLocalMatch es_local_match;
   OneEnumConstructorMatch constructor_info;
   EnumVoidConstructedMatch voidconstructed_info;
 }
@@ -435,13 +441,14 @@ enum es_match_res {
 func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res_out *es_match_res) np {
   if case &NoParms = gp {
     if case Has(num var_number) = es_find_current_local(es, name) {
-      type te_typeexpr;
       vartype *cu_typeexpr = &ref_var(es, num)->type;
-      if !unify_types(pt, &vartype->x, &type) {
+      type te_typeexpr;
+      emissions array[unify_emission];
+      if !unify_types(pt, &vartype->x, &emissions, &type) {
         return ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"),
                    pretty(es->im, vartype), _u8("' where '"), pretty(es->im, pt), _u8("' expected"));
       }
-      *res_out = OneLocalMatch({num});
+      *res_out = OneLocalMatch({@[local_info]{num}, freeze(&emissions)});
       return NoFail;
     }
   }
@@ -467,10 +474,9 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
     *res_out = AmbigGlobalMatch;
     return NoFail;
   case &OneMatch(m ent_and_parms):
-    // EMISSIONS(): We'll want to emit emissions here.
     inst_id def_inst_id;
     #make_inst(es->clq, m.ent, &m.parms, &inst_id);
-    *res_out = OneGlobalMatch({m.ent, inst_id, m.parms});
+    *res_out = OneGlobalMatch({m.ent, inst_id, m.parms, m.emissions});
     return NoFail;
   }
 }
@@ -1251,9 +1257,9 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
                                         cu_computed, props)));
       return NoFail;
     }
-    case &OneLocalMatch(v local_info): {
-      annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({v.varnum}));
-      vi *var_info = ref_var(es, v.varnum);
+    case &OneLocalMatch(elm es_local_match): {
+      annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({elm.info.varnum}));
+      vi *var_info = ref_var(es, elm.info.varnum);
       annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe, vi->ipse.x}),
                                         vi->type, vi->props)));
       return NoFail;
