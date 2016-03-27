@@ -465,6 +465,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
     *res_out = AmbigGlobalMatch;
     return NoFail;
   case &OneMatch(m ent_and_parms):
+    // EMISSIONS(): We'll want to emit emissions here.
     inst_id def_inst_id;
     #make_inst(es->clq, m.ent, &m.parms, &inst_id);
     *res_out = OneGlobalMatch({m.ent, inst_id, m.parms});
@@ -2063,6 +2064,7 @@ func decompose_indexable(clq *clqueue, typ *te_typeexpr,
     return ERR(_u8("indexing on type with multiple '"), lookup(clq->im, clq->im->cym.do_indexsym),
                _u8("' definitions"));
   case &OneMatch(m ent_and_parms):
+    // EMISSIONS(): We'll totally want to emit emissions here.
     inst_id def_inst_id;
     #make_inst(clq, m.ent, &m.parms, &inst_id);
     ty *cu_typrop;
