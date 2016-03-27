@@ -2100,16 +2100,13 @@ func decompose_arraytype(t *te_typeexpr, out **te_typeexpr) bool {
 
 func expr_type(a *ast_expr) te_typeexpr {
   switch &a->info {
-    case &NoInfo: {
-      ice(_u8("expr_type sees NoInfo"));
-      return fake();
-    }
-    case &IncompleteCheck: {
-      return TeUnknown;
-    }
-    case &CompleteCheck(t ast_expr_complete_info): {
-      return t.cu.x;
-    }
+  case &NoInfo:
+    ice(_u8("expr_type sees NoInfo"));
+    return fake();
+  case &IncompleteCheck:
+    return TeUnknown;
+  case &CompleteCheck(t ast_expr_complete_info):
+    return t.cu.x;
   }
 }
 
