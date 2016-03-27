@@ -192,8 +192,7 @@ func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
 
 enum type_matches_res {
   TypeDoesNotMatch void;
-  // Provides partial types of some generic names.
-  TypeMatchesAmbiguously shray[te_typeexpr];
+  TypeMatchesAmbiguously void;
   // Provides complete types of all generic names.
   TypeMatchesPrecisely shray[te_typeexpr];
 }
@@ -217,6 +216,6 @@ func type_matches(pt *te_typeexpr, names *shray[te_generik], parms *shray[te_typ
   if all_complete_computed(&frozen_unif_parms).complete {
     return TypeMatchesPrecisely(frozen_unif_parms);
   } else {
-    return TypeMatchesAmbiguously(frozen_unif_parms);
+    return TypeMatchesAmbiguously;
   }
 }

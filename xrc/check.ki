@@ -1636,7 +1636,7 @@ func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res
     case &TypeDoesNotMatch: {
       return EntryDoesNotMatch;
     }
-    case &TypeMatchesAmbiguously(a): {
+    case &TypeMatchesAmbiguously: {
       return EntryMatchesAmbigously;
     }
     case &TypeMatchesPrecisely(a shray[te_typeexpr]): {
