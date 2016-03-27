@@ -1633,19 +1633,16 @@ enum entry_matches_res {
 
 func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res {
   switch x {
-    case &TypeDoesNotMatch: {
-      return EntryDoesNotMatch;
-    }
-    case &TypeMatchesAmbiguously: {
-      return EntryMatchesAmbigously;
-    }
-    case &TypeMatchesPrecisely(a shray[te_typeexpr]): {
-      if hasparms {
-        return EntryMatchesPrecisely(HasParms(a));
-      } else {
-        check(count(&a) == 0);
-        return EntryMatchesPrecisely(NoParms);
-      }
+  case &TypeDoesNotMatch:
+    return EntryDoesNotMatch;
+  case &TypeMatchesAmbiguously:
+    return EntryMatchesAmbigously;
+  case &TypeMatchesPrecisely(a shray[te_typeexpr]):
+    if hasparms {
+      return EntryMatchesPrecisely(HasParms(a));
+    } else {
+      check(count(&a) == 0);
+      return EntryMatchesPrecisely(NoParms);
     }
   }
 }
