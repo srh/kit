@@ -1603,8 +1603,8 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
           *res_out = MultiMatch;
           return NoFail;
         }
-        case EntryMatchesPrecisely(complete_parms genparms): {
-          push(&matches, {id, complete_parms});
+        case EntryMatchesPrecisely(emp entry_matches_precisely): {
+          push(&matches, {id, emp.parms});
         }
       }
     }
@@ -1625,10 +1625,15 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
   }
 }
 
+struct entry_matches_precisely {
+  // Complete types.
+  parms genparms;
+}
+
 enum entry_matches_res {
   EntryDoesNotMatch void;
   EntryMatchesAmbigously void;
-  EntryMatchesPrecisely genparms;
+  EntryMatchesPrecisely entry_matches_precisely;
 }
 
 func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res {
@@ -1637,12 +1642,12 @@ func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res
     return EntryDoesNotMatch;
   case &TypeMatchesAmbiguously:
     return EntryMatchesAmbigously;
-  case &TypeMatchesPrecisely(a shray[te_typeexpr]):
+  case &TypeMatchesPrecisely(a type_matches_precisely):
     if hasparms {
-      return EntryMatchesPrecisely(HasParms(a));
+      return EntryMatchesPrecisely({HasParms(a.parms_types)});
     } else {
-      check(count(&a) == 0);
-      return EntryMatchesPrecisely(NoParms);
+      check(count(&a.parms_types) == 0);
+      return EntryMatchesPrecisely({NoParms});
     }
   }
 }

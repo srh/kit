@@ -217,11 +217,15 @@ func unifies(complete *te_typeexpr, pt *te_typeexpr) bool {
   }
 }
 
+struct type_matches_precisely {
+  // Complete types for all the template/generic names.
+  parms_types shray[te_typeexpr];
+}
+
 enum type_matches_res {
   TypeDoesNotMatch void;
   TypeMatchesAmbiguously void;
-  // Provides complete types of all generic names.
-  TypeMatchesPrecisely shray[te_typeexpr];
+  TypeMatchesPrecisely type_matches_precisely;
 }
 
 // t is complete, but it references the generic names in "names", whose corresponding
@@ -242,7 +246,7 @@ func type_matches(pt *te_typeexpr, names *shray[te_generik], parms *shray[te_typ
   }
   frozen_unif_parms shray[te_typeexpr] = freeze(&unif_parms);
   if all_complete_computed(&frozen_unif_parms).complete {
-    return TypeMatchesPrecisely(frozen_unif_parms);
+    return TypeMatchesPrecisely({frozen_unif_parms});
   } else {
     return TypeMatchesAmbiguously;
   }
