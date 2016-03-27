@@ -257,6 +257,7 @@ struct constructor_info {
   type cu_typeexpr;
   constructor_tag enum_tag_value;
   ip instpair;
+  emissions shray[unify_emission];
 }
 
 struct voidconstructed_info {
@@ -337,7 +338,8 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     }
     // rhs_type is complete.
     unified te_typeexpr;
-    if !unify_types(arg_type, rhs_type, &unified) {
+    emissions array[unify_emission];
+    if !unify_types(arg_type, rhs_type, &emissions, &unified) {
       return NoFail(NoMatchConstructor);
     }
     ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
@@ -347,7 +349,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
 
     ip instpair = #lookup_or_make_enum_constructor_def(ds, et, &cac_return_type.te, &cac_ctor_type.te, decl_index);
 
-    return NoFail(@[ds_constructor_res]MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index), ip}));
+    return NoFail(@[ds_constructor_res]MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index), ip, freeze(&emissions)}));
   }
 }
 
