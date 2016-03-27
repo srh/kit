@@ -1569,6 +1569,7 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
 struct ent_and_parms {
   ent def_entry_id;
   parms genparms;
+  emissions shray[unify_emission];
 }
 
 enum match_def_res {
@@ -1604,7 +1605,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
           return NoFail;
         }
         case EntryMatchesPrecisely(emp entry_matches_precisely): {
-          push(&matches, {id, emp.parms});
+          push(&matches, {id, emp.parms, emp.emissions});
         }
       }
     }
@@ -1628,6 +1629,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
 struct entry_matches_precisely {
   // Complete types.
   parms genparms;
+  emissions shray[unify_emission];
 }
 
 enum entry_matches_res {
@@ -1644,10 +1646,10 @@ func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res
     return EntryMatchesAmbigously;
   case &TypeMatchesPrecisely(a type_matches_precisely):
     if hasparms {
-      return EntryMatchesPrecisely({HasParms(a.parms_types)});
+      return EntryMatchesPrecisely({HasParms(a.parms_types), a.emissions});
     } else {
       check(count(&a.parms_types) == 0);
-      return EntryMatchesPrecisely({NoParms});
+      return EntryMatchesPrecisely({NoParms, a.emissions});
     }
   }
 }

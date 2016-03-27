@@ -220,6 +220,7 @@ func unifies(complete *te_typeexpr, pt *te_typeexpr) bool {
 struct type_matches_precisely {
   // Complete types for all the template/generic names.
   parms_types shray[te_typeexpr];
+  emissions shray[unify_emission];
 }
 
 enum type_matches_res {
@@ -246,7 +247,7 @@ func type_matches(pt *te_typeexpr, names *shray[te_generik], parms *shray[te_typ
   }
   frozen_unif_parms shray[te_typeexpr] = freeze(&unif_parms);
   if all_complete_computed(&frozen_unif_parms).complete {
-    return TypeMatchesPrecisely({frozen_unif_parms});
+    return TypeMatchesPrecisely({frozen_unif_parms, freeze(&emissions)});
   } else {
     return TypeMatchesAmbiguously;
   }
