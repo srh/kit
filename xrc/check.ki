@@ -1106,6 +1106,7 @@ func make_magic_inst(clq *clqueue, magic_name sym, arity size, type *te_typeexpr
     ice(_u8("Multiple matches for magic def (is there a user-defined one?"));
     return fake();
   case &OneMatch(m ent_and_parms):
+    // EMISSIONS: We just ignore m.emissions.  make_inst canonicalizes idy parms anyway, and no meaningful emission should be created from our caller.
     inst_id def_inst_id;
     if !from_np(make_inst(clq, m.ent, &m.parms, &inst_id)) {
       ice(_u8("make_inst (check_and_compute_parms) seeing error in match_def"));
