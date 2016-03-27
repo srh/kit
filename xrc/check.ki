@@ -1098,22 +1098,19 @@ func make_magic_inst(clq *clqueue, magic_name sym, arity size, type *te_typeexpr
   }
 
   switch &res {
-    case &NoMatch: {
-      ice(_u8("No match for magic def"));
-      return fake();
+  case &NoMatch:
+    ice(_u8("No match for magic def"));
+    return fake();
+  case &MultiMatch:
+    // NOTE: This should be impossible.  Pick a less likely name...
+    ice(_u8("Multiple matches for magic def (is there a user-defined one?"));
+    return fake();
+  case &OneMatch(m ent_and_parms):
+    inst_id def_inst_id;
+    if !from_np(make_inst(clq, m.ent, &m.parms, &inst_id)) {
+      ice(_u8("make_inst (check_and_compute_parms) seeing error in match_def"));
     }
-    case &MultiMatch: {
-      // NOTE: This should be impossible.  Pick a less likely name...
-      ice(_u8("Multiple matches for magic def (is there a user-defined one?"));
-      return fake();
-    }
-    case &OneMatch(m ent_and_parms): {
-      inst_id def_inst_id;
-      if !from_np(make_inst(clq, m.ent, &m.parms, &inst_id)) {
-        ice(_u8("make_inst (check_and_compute_parms) seeing error in match_def"));
-      }
-      return {m.ent, inst_id};
-    }
+    return {m.ent, inst_id};
   }
 }
 
