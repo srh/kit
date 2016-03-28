@@ -698,7 +698,7 @@ func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties) ast_expr_complet
 
 enum ast_expr_info {
   NoInfo void;
-  IncompleteCheck te_typeexpr;
+  IncompleteCheck void;
   CompleteCheck ast_expr_complete_info;
 }
 
@@ -713,7 +713,7 @@ func annotate_info(a *ast_expr, info ast_expr_info) void {
     case &CompleteCheck(t ast_expr_complete_info): {
       ice(_u8("expr already completely annotated"));
     }
-    case &IncompleteCheck(pt te_typeexpr): {
+    case &IncompleteCheck: {
       switch &info {
         case &CompleteCheck(t ast_expr_complete_info): { /* Do nothing. */ }
         default: {

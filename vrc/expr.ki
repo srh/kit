@@ -495,7 +495,7 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
 
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~c.te, props})), ~c.te, props)));
   } else {
-    annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown));
+    annotate_info(x, @[ast_expr_info]IncompleteCheck);
   }
   return NoFail;
 }
@@ -1161,7 +1161,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &AmbigGlobalMatch: {
       if ai == AllowIncompleteYes {
         // NOTE: We could annotate this more precisely in ambiguous-single-match cases.
-        annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown));
+        annotate_info(x, @[ast_expr_info]IncompleteCheck);
         return NoFail;
       } else {
         return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, matches ambiguously over "), pretty(es->im, pt));
@@ -1169,7 +1169,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     }
     case &NoGlobalAmbigEnumConstructorMatch: {
       if ai == AllowIncompleteYes {
-        annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown));
+        annotate_info(x, @[ast_expr_info]IncompleteCheck);
         return NoFail;
       } else {
         return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value), _u8("', maybe with parms, not found, but cannot rule out enum constructor, on type '"), pretty(es->im, pt));
@@ -1238,7 +1238,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
   if !is_complete(pt) {
     if ai == AllowIncompleteYes {
       // NOTE: We could have more specific info, like number of fields and their incomplete types.
-      annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown));
+      annotate_info(x, @[ast_expr_info]IncompleteCheck);
       return NoFail;
     } else {
       return ERR(_u8("Structure literal used ambiguously."));
@@ -1401,7 +1401,7 @@ func numeric_literal_value(a *ast_numeric_literal) bigint {
 func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr, n bigint, x *ast_expr) np {
   if case &TeUnknown = pt {
     if ai == AllowIncompleteYes {
-      annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown));
+      annotate_info(x, @[ast_expr_info]IncompleteCheck);
       return NoFail;
     } else {
       return ERR(_u8("Numeric literal usage is ambiguous."));
@@ -1812,7 +1812,7 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
 
   if expr_type_incomplete(&funec->expr) {
     check(ai == AllowIncompleteYes);
-    annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown));
+    annotate_info(x, @[ast_expr_info]IncompleteCheck);
     return NoFail;
   }
 
@@ -2029,8 +2029,8 @@ func expr_type(a *ast_expr) te_typeexpr {
       ice(_u8("expr_type sees NoInfo"));
       return fake();
     }
-    case &IncompleteCheck(t te_typeexpr): {
-      return t;
+    case &IncompleteCheck: {
+      return TeUnknown;
     }
     case &CompleteCheck(t ast_expr_complete_info): {
       return t.cu.x;
@@ -2057,7 +2057,7 @@ func expr_type_complete(a *ast_expr) bool {
       ice(_u8("expr_type_complete sees NoInfo"));
       return fake();
     }
-    case &IncompleteCheck(t te_typeexpr): { return false; }
+    case &IncompleteCheck: { return false; }
     case &CompleteCheck(t ast_expr_complete_info): { return true; }
   }
 }
