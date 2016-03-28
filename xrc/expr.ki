@@ -498,10 +498,12 @@ func es_find_current_local(es *framescope, name sym) opt[var_number] {
 func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr,
                                errmsg_name array[u8], x *ast_expr) np {
   unified te_typeexpr;
-  if !unify_types(pt, &type, &unified) {
+  emissions array[unify_emission];
+  if !unify_types(pt, &type, &emissions, &unified) {
     return ERR(errmsg_name, _u8(" literal in bad place"));
   }
   if is_complete(&unified) {
+    // EMISSIONS(): Handle the emissions somehow.
     c cac_typeexpr;
     if !from_np(noscoped_check_and_compute_typeexpr(es->clq, &unified, &c)) {
       ice(_u8("help_check_simple_literal passed bad type"));
