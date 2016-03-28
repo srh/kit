@@ -494,7 +494,7 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
 
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~c.te, props})), ~c.te, props)));
   } else {
-    annotate_info(x, @[ast_expr_info]IncompleteCheck(type));
+    annotate_info(x, @[ast_expr_info]IncompleteCheck(TeUnknown));
   }
   return NoFail;
 }
