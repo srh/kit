@@ -503,7 +503,9 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
     return ERR(errmsg_name, _u8(" literal in bad place"));
   }
   if is_complete(&unified) {
-    // EMISSIONS(): Handle the emissions somehow.
+    // The type passed in by the caller is one of bool, void, `*`[_], which won't create emissions in unify_types.
+    check(empty(&emissions));
+
     c cac_typeexpr;
     if !from_np(noscoped_check_and_compute_typeexpr(es->clq, &unified, &c)) {
       ice(_u8("help_check_simple_literal passed bad type"));
