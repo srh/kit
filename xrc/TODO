@@ -3,7 +3,7 @@ TODO()
 --
 Chaseables for emissions:
 
-EMISSIONS() (from match_def)
+EMISSIONS()
 unify_types
 
 Double-check for emissions:
