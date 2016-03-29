@@ -387,6 +387,11 @@ struct ast_fullbody {
   bb ast_bracebody;
 }
 
+enum ast_isinline {
+  IsInline void;
+  IsNotInline void;
+}
+
 struct ast_lambda {
   // TODO: We put is_inline here mainly for convenience of implementation (in
   // gr_lambda_expr), it is unprincipled in the long run (I think?).
@@ -824,11 +829,6 @@ enum ast_generics {
 enum ast_isexport {
   IsExport void;
   IsNotExport void;
-}
-
-enum ast_isinline {
-  IsInline void;
-  IsNotInline void;
 }
 
 enum ast_isvar {
