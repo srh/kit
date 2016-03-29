@@ -965,7 +965,7 @@ func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_e
   } else if op.value == im->cym.refofsym {
     return mk(m, @[ast_expr_enum]RefOf({NotComputed, embox(rhs)}));
   } else if op.value == im->cym.derefsym {
-    return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(move(&rhs)))}));
+    return mk(m, @[ast_expr_enum]Deref({NotComputed, mk_later(), embox(consume(move(&rhs)))}));
   } else if op.value == im->cym.quickreturnsym {
     return mk(m, @[ast_expr_enum]QuickReturn({NotComputed, embox(rhs)}));
   } else {

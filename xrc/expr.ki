@@ -938,8 +938,9 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
   param *te_typeexpr;
   if decompose_ref_or_ptr(&rhs_type->x, es->cs, &ipse, &param) {
     // param is already complete.
+    emissions array[unify_emission];
     unified_discard te_typeexpr;
-    if !unify_types(pt, param, &unified_discard) {
+    if !unify_types(pt, param, &emissions, &unified_discard) {
       return ERR(_u8("Pointer dereferences into wrong type."));
     }
 
@@ -948,6 +949,7 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
     annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}),
                                                            DeadMe, ipse}),
                                       ~ *param, props)));
+    annotate(&a->emissions, {freeze(&emissions)});
     return NoFail;
   }
   return ERR(_u8("Trying to deref a non-pointer, non-reference."));

@@ -137,6 +137,7 @@ struct ast_refof {
 }
 
 struct ast_deref {
+  emissions nc[emissions_info];
   ptr_discard ast_later_discard_info;
   rhs box[ast_expr_consume];
 }
