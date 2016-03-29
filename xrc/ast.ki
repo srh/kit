@@ -532,6 +532,7 @@ func mk(lhs box[ast_expr], rhs box[ast_expr_consume]) ast_index_expr {
 
 
 struct ast_typed_expr {
+  emissions nc[emissions_info];
   type ast_typeexpr;
   expr box[ast_expr];
 }

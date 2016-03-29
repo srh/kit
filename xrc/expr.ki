@@ -812,8 +812,9 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_exp
   // than the eventual type error that would happen.
   computed cac_typeexpr;
   #check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &computed);
+  emissions array[unify_emission];
   unified te_typeexpr;
-  if !unify_types(pt, &computed.te, &unified) {
+  if !unify_types(pt, &computed.te, &emissions, &unified) {
     return ERR(_u8("TypedExpr is incompatible with contextual type."));
   }
   unified_computed cac_typeexpr;
@@ -826,6 +827,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_exp
   }
   #check_expr_ai(es, ai, oo(&a->expr), &unified_computed.te);
   annotate_info(x, oo(&a->expr)->info);
+  annotate(&a->emissions, {freeze(&emissions)});
   return NoFail;
 }
 

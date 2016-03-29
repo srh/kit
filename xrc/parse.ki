@@ -794,7 +794,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       m ast_meta = copyend(p, lhs.meta);
       note_original(p, m, IncrDecr);
       // (NOTE: Is expanding out this funcall/typed/addressof expr the best software design choice?  I think so, we can add layover information saying this is an incr expr, later.  Likewise with user assignment ops.)
-      *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
+      *out = mk(m, @[ast_expr_enum]TypedExpr({NotComputed, Name({m /* TODO */, p->im->cym.voidsym}),
          embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))))})))}));
       return Success;
     } else if case Has(op_facts binop_facts) = binop_info(peek(p)->val) {
@@ -994,7 +994,7 @@ func build_binop_expr(p *ps, se statement_expr, m ast_meta, user_assignment bool
         return Fail;
       }
       note_original(p, m, UserAssignment);
-      *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
+      *out = mk(m, @[ast_expr_enum]TypedExpr({NotComputed, Name({m /* TODO */, p->im->cym.voidsym}),
          embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(move(&rhs)))})))}));
     } else {
       *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))),
@@ -1123,7 +1123,7 @@ func parse_atomic_expr_upon_oper(p *ps, ab allow_braces, operch *smallstr, out *
     #try_skip_token(p, @[tokval]Grouper(RBracket));
     #parse_expr(p, kConversionRightPrec, ab, IsNotStatementExpr, &expr);
     end(p, m);
-    *out = mk(m, @[ast_expr_enum]TypedExpr({type, embox(expr)}));
+    *out = mk(m, @[ast_expr_enum]TypedExpr({NotComputed, type, embox(expr)}));
     return Success;
   } else {
     switch unop_info(operch) {
