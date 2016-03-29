@@ -693,8 +693,9 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
 
     success_case_type *te_typeexpr = &ref(&et->constructors, success_case_ix)->type;
 
+    emissions array[unify_emission];
     unified te_typeexpr;
-    if !unify_types(pt, success_case_type, &unified) {
+    if !unify_types(pt, success_case_type, &emissions, &unified) {
       return ERR(_u8("quick-return expr has bad type"));
     }
 
@@ -728,7 +729,7 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
 
     tag_cell cell_num = add_virtual_tag_cell(es, et);
     return_tag_cell cell_num = add_virtual_tag_cell(es, et);
-    annotate(&a->info, {tag_cell, *et, return_tag_cell, *return_et, constructor_mapping});
+    annotate(&a->info, {tag_cell, *et, return_tag_cell, *return_et, constructor_mapping, {freeze(&emissions)}});
 
     return NoFail;
   } else {
@@ -738,10 +739,13 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
 
 func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr) np {
   ref_skeleton te_typeexpr = mk_ref_type(es->cs, TeUnknown, TeUnknown);
+  emissions_discard array[unify_emission];
   unif_pt te_typeexpr;
-  if !unify_types(pt, &ref_skeleton, &unif_pt) {
+  if !unify_types(pt, &ref_skeleton, &emissions_discard, &unif_pt) {
     return ERR(_u8("RefOf expr in non-ref context"));
   }
+  // No emissions are possible, we used TeUnknown everywhere.
+  check(empty(&emissions_discard));
 
   pt_ipse *te_typeexpr;
   pt_param *te_typeexpr;
@@ -760,8 +764,9 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
     // expires... when it can.
     return ERR(_u8("Taking reference of a non-lvalue"));
   case &IsLvalYes(desc lval_description):
+    emissions array[unify_emission];
     unified_ipse te_typeexpr;
-    if !unify_types(pt_ipse, &desc.ipse, &unified_ipse) {
+    if !unify_types(pt_ipse, &desc.ipse, &emissions, &unified_ipse) {
       return ERR(_u8("Refof ipse types do not match."));
     }
 
@@ -777,6 +782,7 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
     #compute_complete_type_properties(es->clq, &ref_computed.te, &ref_props);
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ref_computed.te, ref_props})),
                                       ~ref_computed.te, ref_props)));
+    annotate(&a->emissions, {freeze(&emissions)});
     return NoFail;
   }
 }

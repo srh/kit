@@ -132,6 +132,7 @@ struct ast_addressof {
 }
 
 struct ast_refof {
+  emissions nc[emissions_info];
   rhs box[ast_expr];
 }
 
@@ -568,6 +569,8 @@ struct ast_quickreturn_info {
   // maintain identical constructor ordering, thus, get(&constructor_mapping, i) returns
   // i.
   constructor_mapping array[size];
+
+  emissions emissions_info;
 }
 
 struct ast_quickreturn {
