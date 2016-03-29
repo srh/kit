@@ -795,7 +795,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       note_original(p, m, IncrDecr);
       // (NOTE: Is expanding out this funcall/typed/addressof expr the best software design choice?  I think so, we can add layover information saying this is an incr expr, later.  Likewise with user assignment ops.)
       *out = mk(m, @[ast_expr_enum]TypedExpr({NotComputed, Name({m /* TODO */, p->im->cym.voidsym}),
-         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))))})))}));
+         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({NotComputed, embox(lhs)}))))})))}));
       return Success;
     } else if case Has(op_facts binop_facts) = binop_info(peek(p)->val) {
       op tok = *peek(p);
@@ -961,7 +961,7 @@ func oper_arr(tv tokval) smallstr {
 
 func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_expr {
   if op.value == im->cym.addressofsym {
-    return mk(m, @[ast_expr_enum]AddressOf({embox(rhs)}));
+    return mk(m, @[ast_expr_enum]AddressOf({NotComputed, embox(rhs)}));
   } else if op.value == im->cym.refofsym {
     return mk(m, @[ast_expr_enum]RefOf({NotComputed, embox(rhs)}));
   } else if op.value == im->cym.derefsym {
@@ -995,7 +995,7 @@ func build_binop_expr(p *ps, se statement_expr, m ast_meta, user_assignment bool
       }
       note_original(p, m, UserAssignment);
       *out = mk(m, @[ast_expr_enum]TypedExpr({NotComputed, Name({m /* TODO */, p->im->cym.voidsym}),
-         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(move(&rhs)))})))}));
+         embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({NotComputed, embox(lhs)}))), consume(move(&rhs)))})))}));
     } else {
       *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))),
                                             mk_array(consume(move(&lhs)), consume(move(&rhs)))}));
@@ -1467,7 +1467,7 @@ func wrapapply(m ast_meta, funcname sym, arg ast_expr) ast_expr {
 }
 
 func wrapaddressof(m ast_meta, argvar sym) ast_expr {
-  return {m, NoInfo, AddressOf({embox(wrapname(m, argvar))})};
+  return {m, NoInfo, AddressOf({NotComputed, embox(wrapname(m, argvar))})};
 }
 
 func parse_rest_of_foreach_statement_enum(p *ps, out *ast_statement_enum) parse_result {
