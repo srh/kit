@@ -1844,7 +1844,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
       rhs_later gr_num = gr_later_discard(gs, &ai.rhs_later);
       add(bu, rhs_later);
     }
-  case &FnIndexingInfo(ip instpair):
+  case &FnIndexingInfo(fninfo ast_fn_indexing_info):
     result_ptrtype cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, value_cell(x))->type);
     result_ptr_cell cell_num = add_cell(gs.gr, {LocationStatic, result_ptrtype.cu, result_ptrtype.props});
 
@@ -1856,7 +1856,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
 
       add(bu, @[gr_xop]GrLive({result_ptr_cell}));
       add(bu, @[gr_xop]GrLive({funcell}));
-      add(bu, @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
+      add(bu, @[gr_xop]GrWriteConst({funcell, ConstDef(fninfo.ip)}));
       add(bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
 
       add(bu, @[gr_xop]GrLive({result_cell(&di.lhs_after)}));
@@ -1875,7 +1875,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
 
       add(bu, @[gr_xop]GrLive({result_ptr_cell}));
       add(bu, @[gr_xop]GrLive({funcell}));
-      add(bu, @[gr_xop]GrWriteConst({funcell, ConstDef(ip)}));
+      add(bu, @[gr_xop]GrWriteConst({funcell, ConstDef(fninfo.ip)}));
       add(bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
       add(bu, @[gr_xop]GrLive({collection_ptr_cell}));
 

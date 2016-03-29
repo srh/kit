@@ -499,9 +499,14 @@ struct ast_array_indexing_info {
   rhs_later ast_later_discard_info;
 }
 
+struct ast_fn_indexing_info {
+  ip instpair;
+  emissions emissions_info;
+}
+
 enum ast_array_fn_indexing_info {
   ArrayIndexingInfo ast_array_indexing_info;
-  FnIndexingInfo instpair;
+  FnIndexingInfo ast_fn_indexing_info;
 }
 
 struct ast_deref_indexing_info {

@@ -2032,7 +2032,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
         return ERR(_u8("User-defined array indexing only works on lvalues"));
       }
 
-      annotate(&a->info, {None, FnIndexingInfo(fntech.ip)});
+      annotate(&a->info, {None, FnIndexingInfo({fntech.ip, {fntech.emissions}})});
     } else {
       #check_expr_consume(es, oo(&a->rhs), &key_type);
 
@@ -2042,7 +2042,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       lhs_later ast_later_discard_info = mk_later();
       #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
 
-      annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), FnIndexingInfo(fntech.ip)});
+      annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), FnIndexingInfo({fntech.ip, {fntech.emissions}})});
     }
   }
 
@@ -2052,6 +2052,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
 
 struct fn_indexing_technique {
   ip instpair;
+  emissions shray[unify_emission];
 }
 
 struct indexing_technique {
@@ -2090,7 +2091,6 @@ func decompose_indexable(clq *clqueue, typ *te_typeexpr,
     return ERR(_u8("indexing on type with multiple '"), lookup(clq->im, clq->im->cym.do_indexsym),
                _u8("' definitions"));
   case &OneMatch(m ent_and_parms):
-    // EMISSIONS(): We'll totally want to emit emissions here.
     inst_id def_inst_id;
     #make_inst(clq, m.ent, &m.parms, &inst_id);
     ty *cu_typrop;
@@ -2110,7 +2110,7 @@ func decompose_indexable(clq *clqueue, typ *te_typeexpr,
     }
     *result_type_out = result_type;
     *key_type_out = *key_type;
-    *tech_out = {Has({{m.ent, inst_id}}), deref};
+    *tech_out = {Has({{m.ent, inst_id}, m.emissions}), deref};
     return NoFail;
   }
 }
