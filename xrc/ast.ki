@@ -446,15 +446,22 @@ struct ast_deref_field {
 struct global_info {
   ent def_entry_id;
   inst def_inst_id;
+  emissions emissions_info;
 }
 
 struct local_info {
   varnum var_number;
+  emissions emissions_info;
+}
+
+struct emissions_info {
+  x shray[unify_emission];
 }
 
 struct enum_constructor_info {
   constructor_tag enum_tag_value;
   ip instpair;
+  emissions emissions_info;
 }
 
 struct enum_voidconstructed_info {

@@ -424,7 +424,7 @@ struct es_global_match {
 }
 
 struct es_local_match {
-  info local_info;
+  varnum var_number;
   emissions shray[unify_emission];
 }
 
@@ -448,7 +448,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
         return ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"),
                    pretty(es->im, vartype), _u8("' where '"), pretty(es->im, pt), _u8("' expected"));
       }
-      *res_out = OneLocalMatch({@[local_info]{num}, freeze(&emissions)});
+      *res_out = OneLocalMatch({num, freeze(&emissions)});
       return NoFail;
     }
   }
@@ -1222,8 +1222,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     }
 
     case &OneEnumConstructorMatch(ci constructor_info): {
-      // EMISSIONS(): Handle ci.emissions
-      annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip}));
+      annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip, {ci.emissions}}));
       props type_properties;
       #compute_type_properties(es->clq, &ci.type, &props);
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ci.type, props})),
@@ -1239,7 +1238,6 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       return NoFail;
     }
     case &OneGlobalMatch(egm es_global_match): {
-      // EMISSIONS(): Handle egm.emissions
       ent *def_entry = ref_def_entry(es->cs, egm.ent_id);
 
       // This parallels or plagairizes ensure_def_inst_type_computed.
@@ -1258,16 +1256,15 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       props type_properties;
       #compute_type_properties(es->clq, &cu_computed, &props);
 
-      annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id}));
+      annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id, {egm.emissions}}));
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, cu_computed, props})),
                                         cu_computed, props)));
       return NoFail;
     }
 
     case &OneLocalMatch(elm es_local_match): {
-      // EMISSIONS(): Handle elm.emissions.
-      annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({elm.info.varnum}));
-      vi *var_info = ref_var(es, elm.info.varnum);
+      annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({elm.varnum, {elm.emissions}}));
+      vi *var_info = ref_var(es, elm.varnum);
       annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe, vi->ipse.x}),
                                         vi->type, vi->props)));
       return NoFail;
