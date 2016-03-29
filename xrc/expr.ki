@@ -2012,7 +2012,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), ArrayIndexingInfo({rhs_later})});
     }
 
-  case Has(ip instpair):
+  case Has(fntech fn_indexing_technique):
     // What this becomes is:
     //   - If the lhs (possibly derefed) is an lvalue, we take its address, call ip,
     //     and deref the return value, which makes an lvalue.
@@ -2032,7 +2032,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
         return ERR(_u8("User-defined array indexing only works on lvalues"));
       }
 
-      annotate(&a->info, {None, FnIndexingInfo(ip)});
+      annotate(&a->info, {None, FnIndexingInfo(fntech.ip)});
     } else {
       #check_expr_consume(es, oo(&a->rhs), &key_type);
 
@@ -2042,7 +2042,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       lhs_later ast_later_discard_info = mk_later();
       #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
 
-      annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), FnIndexingInfo(ip)});
+      annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), FnIndexingInfo(fntech.ip)});
     }
   }
 
@@ -2050,9 +2050,13 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   return NoFail;
 }
 
+struct fn_indexing_technique {
+  ip instpair;
+}
+
 struct indexing_technique {
   // None = raw array, Has(...) = fn indexing
-  array opt[instpair];
+  array opt[fn_indexing_technique];
   deref bool;
 }
 
@@ -2106,7 +2110,7 @@ func decompose_indexable(clq *clqueue, typ *te_typeexpr,
     }
     *result_type_out = result_type;
     *key_type_out = *key_type;
-    *tech_out = {Has({m.ent, inst_id}), deref};
+    *tech_out = {Has({{m.ent, inst_id}}), deref};
     return NoFail;
   }
 }
