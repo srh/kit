@@ -903,16 +903,16 @@ func psd_exposed_types(fielddecls *shray[te_vardecl], psd *partial_struct_data) 
 
 // st had better be complete and computed.
 // Realtype is the name (or app) type (a struct or defclass) whose fields the structspec specifies.
-func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *te_typeexpr,
+func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *cu_typeexpr,
                                         constructor_mask u32, out *type_properties) np {
   psd partial_struct_data;
   #compute_partial_struct_data(clq, &st->fields, None, &psd);
   final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
   *out = {final_size, psd.max_alignment,
-          level_to_derived(clq, CtorInit, 1, realtype, mask_level(constructor_mask, ComputeInit, psd.init_level)),
-          level_to_derived(clq, CtorMove, 2, realtype, mask_level(constructor_mask, ComputeMove, psd.move_level)),
-          level_to_derived(clq, CtorCopy, 2, realtype, mask_level(constructor_mask, ComputeCopy, psd.copy_level)),
-          level_to_derived(clq, CtorDestroy, 1, realtype,
+          level_to_derived(clq, CtorInit, 1, &realtype->x, mask_level(constructor_mask, ComputeInit, psd.init_level)),
+          level_to_derived(clq, CtorMove, 2, &realtype->x, mask_level(constructor_mask, ComputeMove, psd.move_level)),
+          level_to_derived(clq, CtorCopy, 2, &realtype->x, mask_level(constructor_mask, ComputeCopy, psd.copy_level)),
+          level_to_derived(clq, CtorDestroy, 1, &realtype->x,
                            mask_level(constructor_mask, ComputeDestroy, psd.destroy_level)),
           IsScalarNo,
           psd.is_pow2,
@@ -931,7 +931,7 @@ inline func pluralize_array_exposed(etn *exposed_type_name) exposed_type_name {
   return *etn;
 }
 
-func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_typeexpr, out *type_properties) np {
+func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *cu_typeexpr, out *type_properties) np {
   tag_size u32 = clq->cs->plat.enum_tag_size;
   max_size u32 = tag_size;
   max_alignment u32 = tag_size;
@@ -963,9 +963,9 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *te_t
           // Enum initialization is always trivial -- initializes to zero-filled invalid
           // tag value.
           DerivedMethodTrivial,
-          level_to_derived(clq, CtorMove, 2, realtype, move_level),
-          level_to_derived(clq, CtorCopy, 2, realtype, copy_level),
-          level_to_derived(clq, CtorDestroy, 1, realtype, destroy_level),
+          level_to_derived(clq, CtorMove, 2, &realtype->x, move_level),
+          level_to_derived(clq, CtorCopy, 2, &realtype->x, copy_level),
+          level_to_derived(clq, CtorDestroy, 1, &realtype->x, destroy_level),
           IsScalarNo,
           is_pow2,
           freeze(&exposed_types)};
@@ -1173,12 +1173,12 @@ func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) np {
 
 // This does return a complete and computed typeexpr.  Note that it'll have some generic
 // parameters from an idy_genparms, so watch your scopage.
-func inst_type(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) te_typeexpr {
+func inst_type(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
   ent *deftype_entry = ref_deftype_entry(cs, ent_id);
   inst *deftype_inst = ref_deftype_inst(cs, inst_id);
   switch &ent->generics {
   case &TeNoGenerics:
-    return TeName({ent->name, Has({ent_id, inst_id})});
+    return ~@[te_typeexpr]TeName({ent->name, Has({ent_id, inst_id})});
   case &TeHasGenerics(a shray[te_generik]): { }
   case &TeVariadicGenerics(a te_variadic_generics): { }
   }
@@ -1189,7 +1189,7 @@ func inst_type(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id)
   for i size = 0; i < n; i = i + 1 {
     push(&te_params, ref(cu_params, i)->x);
   }
-  return TeApp({TePureName(ent->name), freeze(&te_params), Has({ent_id, inst_id})});
+  return ~@[te_typeexpr]TeApp({TePureName(ent->name), freeze(&te_params), Has({ent_id, inst_id})});
 }
 
 func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id deftype_inst_id) np {
@@ -1240,7 +1240,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(isBeganComputing(&inst->info));
           st structspec = {freeze(&rhs_fields)};
 
-          it te_typeexpr = inst_type(cs, ent_id, id);
+          it cu_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
           if case Unprinted(pm) = compute_complete_struct_properties(clq, &st, &it, ComputeAll, &rhs_props) {
             inst->info = FailedComputation;
@@ -1265,7 +1265,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(isBeganComputing(&inst->info));
           et enumspec = {freeze(&rhs_constructors), drs.success_case_ix};
 
-          it te_typeexpr = inst_type(cs, ent_id, id);
+          it cu_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
           if case Unprinted(pm) = compute_complete_enum_properties(clq, &et, &it, &rhs_props) {
             inst->info = FailedComputation;

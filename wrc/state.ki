@@ -606,25 +606,6 @@ access depth_rewinder {
   }
 }
 
-// TODO: The very concept of this function will soon be (when we have true generic non-instantiated parameters) broken?
-// Update: We only use this function in to_defclass_properties, so the question becomes one of whether its use makes sense for that situation.  It does, because we return a type that references ipses that are in fact generic parameters, but it's perfectly normal to do name lookup using types that have generic ipses without any sort of scopage information on those ipses -- that's just how it's done.
-func type_from_inst(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
-  ent *deftype_entry = ref_deftype_entry(cs, ent_id);
-  name sym = ent->name;
-  switch &ent->generics {
-  case &NoGenerics:
-    return ~ @[te_typeexpr]TeName({name, Has({ent_id, inst_id})});
-  default:
-    parms *idy_genparms = &ref_deftype_inst(cs, inst_id)->parms;
-    converted array[te_typeexpr];
-    n size = count(&parms->repls.tys);
-    reserve(&converted, n);
-    for i size = 0; i < n; i = i + 1 {
-      push(&converted, ref(&parms->repls.tys, i)->x);
-    }
-    return ~ @[te_typeexpr]TeApp({TePureName(name), freeze(&converted), Has({ent_id, inst_id})});
-  }
-}
 
 // True if the type is trivial enough to be used in a def.  In other words, it has trivial copy/move/destroy constructors, but initialization could be non-trivial.  (It could default-initialize to a nonzero value.)
 func is_defwise_trivial(props *type_properties) bool {
@@ -655,12 +636,11 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
 
 func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *structspec, out *type_properties) np {
   cs *checkstate = clq->cs;
-  it te_typeexpr = inst_type(cs, ent_id, inst_id);
+  type cu_typeexpr = inst_type(cs, ent_id, inst_id);
   switch a {
     case DefaultMoveCopyDestroy: {
       ret type_properties;
-      #compute_complete_struct_properties(clq, st, &it, (ComputeMove | ComputeCopy) | ComputeDestroy, &ret);
-      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      #compute_complete_struct_properties(clq, st, &type, (ComputeMove | ComputeCopy) | ComputeDestroy, &ret);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym, &ret.init_behavior);
@@ -669,8 +649,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
     }
     case DefaultMove: {
       ret type_properties;
-      #compute_complete_struct_properties(clq, st, &it, ComputeMove, &ret);
-      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      #compute_complete_struct_properties(clq, st, &type, ComputeMove, &ret);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
@@ -682,8 +661,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
     }
     case NoDefaults: {
       ret type_properties;
-      #compute_complete_struct_properties(clq, st, &it, ComputeNone, &ret);
-      type cu_typeexpr = type_from_inst(cs, ent_id, inst_id);
+      #compute_complete_struct_properties(clq, st, &type, ComputeNone, &ret);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
