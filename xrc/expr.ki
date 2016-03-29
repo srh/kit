@@ -1385,7 +1385,6 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   if !unify_types(pt, &computed.te, &emissions, &unified) {
     return ERR(_u8("Lambda is incompatible with contextual type."));
   }
-  // EMISSIONS(): Do something with emissions.
 
   computed_params *shray[te_typeexpr];
   if !decompose_typeapp(&computed.te, primitive_function_puretype(es->cs), &computed_params) {
@@ -1403,6 +1402,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   #compute_complete_type_properties(es->clq, &computed.te, &props);
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~computed.te, props})),
                                     ~computed.te, props)));
+  annotate(&a->emissions, {freeze(&emissions)});
   return NoFail;
 }
 
