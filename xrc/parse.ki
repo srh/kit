@@ -762,7 +762,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       fieldname ast_ident;
       #parse_ident(p, &fieldname);
       m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]LocalField(@[ast_local_field]mk(embox(lhs), {fieldname})));
+      lhs = mk(m, @[ast_expr_enum]LocalField(@[ast_local_field]{NotComputed, NotComputed, embox(lhs), {fieldname}}));
     } else if +try_skip_oper(p, '-', '>') {
       fieldname ast_ident;
       #parse_ident(p, &fieldname);

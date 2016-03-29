@@ -419,10 +419,6 @@ struct ast_local_field {
   fieldname ast_fieldname;
 }
 
-func mk(lhs box[ast_expr], fieldname ast_fieldname) ast_local_field {
-  return {NotComputed, NotComputed, lhs, fieldname};
-}
-
 struct ast_field_info {
   offset u32;
   // Its index in 0..n-1 for a struct with n fields.
