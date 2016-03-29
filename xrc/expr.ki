@@ -833,8 +833,9 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   }
   cu_param cu_typeexpr = ~ *param;
   fieldtype cu_typeexpr;
+  emissions shray[unify_emission];
   cf_res check_field_result;
-  #check_field(es, &cu_param, &a->fieldname, pt, &fieldtype, &cf_res);
+  #check_field(es, &cu_param, &a->fieldname, pt, &fieldtype, &emissions, &cf_res);
   props type_properties;
   #compute_type_properties(es->clq, &fieldtype, &props);
   lval is_lval;
@@ -849,6 +850,7 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
       annotate(&a->info, DerefArrayLength(value));
     }
   }
+  annotate(&a->emissions, {emissions});
   annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
   return NoFail;
 }
@@ -885,8 +887,9 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
   #check_expr_ai(es, AllowIncompleteNo, oo(&a->lhs), &unknown);
   info *ast_expr_complete_info = expr_complete_info(oo(&a->lhs));
   fieldtype cu_typeexpr;
+  emissions shray[unify_emission];
   cf_res check_field_result;
-  #check_field(es, &info->cu, &a->fieldname, pt, &fieldtype, &cf_res);
+  #check_field(es, &info->cu, &a->fieldname, pt, &fieldtype, &emissions, &cf_res);
   props type_properties;
   #compute_type_properties(es->clq, &fieldtype, &props);
   lval is_lval;
@@ -911,6 +914,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
       lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
     }
   }
+  annotate(&a->emissions, {emissions});
   annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
   return NoFail;
 }
@@ -1377,9 +1381,11 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   // Lambda exprs can't have partial types (yet!).
   check(computed.complete);
   unified te_typeexpr;
-  if !unify_types(pt, &computed.te, &unified) {
+  emissions array[unify_emission];
+  if !unify_types(pt, &computed.te, &emissions, &unified) {
     return ERR(_u8("Lambda is incompatible with contextual type."));
   }
+  // EMISSIONS(): Do something with emissions.
 
   computed_params *shray[te_typeexpr];
   if !decompose_typeapp(&computed.te, primitive_function_puretype(es->cs), &computed_params) {
@@ -1585,15 +1591,18 @@ enum check_field_result {
 }
 
 func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeexpr,
-                 fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
+                 fieldtype_out *cu_typeexpr, emissions_out *shray[unify_emission],
+                 res_out *check_field_result) np {
   fieldtype cu_typeexpr;
   res check_field_result;
   #lookup_field(es, t, a, &fieldtype, &res);
   unified te_typeexpr;
-  if !unify_types(pt, &fieldtype.x, &unified) {
+  emissions array[unify_emission];
+  if !unify_types(pt, &fieldtype.x, &emissions, &unified) {
     return ERR(_u8("field has wrong type."));
   }
   *fieldtype_out = fieldtype;
+  *emissions_out = freeze(&emissions);
   *res_out = res;
   return NoFail;
 }

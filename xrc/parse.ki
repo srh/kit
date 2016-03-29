@@ -767,7 +767,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       fieldname ast_ident;
       #parse_ident(p, &fieldname);
       m ast_meta = copyend(p, lhs.meta);
-      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed, mk_later(), embox(consume(move(&lhs))), {fieldname}}));
+      lhs = mk(m, @[ast_expr_enum]DerefField({NotComputed, NotComputed, mk_later(), embox(consume(move(&lhs))), {fieldname}}));
     } else if is_keyw(&peek(p)->val, Then) {
       switch compare_prec(prec_ctx, thenexpr_then_prec().left) {
       case Conflicts:
