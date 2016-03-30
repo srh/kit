@@ -200,12 +200,6 @@ func unify_types(pta *te_typeexpr, ptb *te_typeexpr, emissions_append *array[uni
   return unify_under_generics(pta, &names, &unif_parms, ptb, emissions_append, out);
 }
 
-// TODO(): Remove.
-func unify_types(pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
-  emissions array[unify_emission];
-  return unify_types(pta, ptb, &emissions, out);
-}
-
 func unifies(complete *te_typeexpr, pt *te_typeexpr) bool {
   unified te_typeexpr;
   emissions array[unify_emission];
