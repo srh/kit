@@ -1074,7 +1074,7 @@ func to_level(b *derived_method_behavior) behavior_level {
   switch b {
   case &DerivedMethodAbsent:
     return AbsentLevel;
-  case &DerivedMethodExplicit(ip instpair):
+  case &DerivedMethodExplicit(dme derived_method_explicit):
     return NontrivialLevel;
   case &DerivedMethodNontrivial(v instpair):
     return NontrivialLevel;

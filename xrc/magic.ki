@@ -320,7 +320,7 @@ func instpair_or_trivial_from_behavior(b *derived_method_behavior) opt[instpair]
       ice(_u8("instpair_or_trivial_from_behavior sees absent"));
       return fake();
     }
-    case &DerivedMethodExplicit(ip instpair): { return Has(ip); }
+    case &DerivedMethodExplicit(dme derived_method_explicit): { return Has(dme.ip); }
     case &DerivedMethodNontrivial(ip instpair): { return Has(ip); }
     case &DerivedMethodTrivial: { return None; }
   }

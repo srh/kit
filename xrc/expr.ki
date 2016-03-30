@@ -390,8 +390,8 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
       destroy_desc ctor_desc = #behavior_to_desc(&rhs_props.destroy_behavior);
       meco = EnumConstructCopyDestroy({copy_desc, destroy_desc});
     }
-    case &DerivedMethodExplicit(ip instpair): {
-      meco = EnumConstructMove(FunCtor(ip));
+    case &DerivedMethodExplicit(dme derived_method_explicit): {
+      meco = EnumConstructMove(FunCtor(dme.ip));
     }
     case &DerivedMethodNontrivial(ip instpair): {
       meco = EnumConstructMove(FunCtor(ip));
@@ -1015,8 +1015,8 @@ func behavior_to_desc(b *derived_method_behavior) cr[ctor_desc] {
   switch b {
   case &DerivedMethodAbsent:
     return ERR(_u8("Cannot find derived method."));
-  case &DerivedMethodExplicit(ip instpair):
-    return NoFail(FunCtor(ip));
+  case &DerivedMethodExplicit(dme derived_method_explicit):
+    return NoFail(FunCtor(dme.ip));
   case &DerivedMethodNontrivial(ip instpair):
     return NoFail(FunCtor(ip));
   case &DerivedMethodTrivial:

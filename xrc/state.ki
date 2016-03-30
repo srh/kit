@@ -212,13 +212,17 @@ struct module {
   access_blocks array[access_entry_id];
 }
 
+struct derived_method_explicit {
+  ip instpair;
+}
+
 // Describes the behavior of init/copy/move/destroy methods.
 enum derived_method_behavior {
   // Behavior would be explicitly defined by a method, but it doesn't exist -- behavior is
   // not allowed.
   DerivedMethodAbsent void;
   // Behavior's explicitly defined by a method.
-  DerivedMethodExplicit instpair;
+  DerivedMethodExplicit derived_method_explicit;
   // Behavior's derived structurally, and one of its fields/constructors has an explicit
   // method call.  Maybe the method doesn't exist, because one of its fields' doesn't.
   DerivedMethodNontrivial instpair;
@@ -678,7 +682,7 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
     // This function is called by to_defclass_properties, which means lifetimes come from idy_repls.  There is still the question of how to handle emissions from copy constructors and the like, and that might depend on what the emissions actually are.
     inst_id def_inst_id;
     #make_inst(clq, m.ent, &m.parms, &inst_id);
-    return NoFail(@[derived_method_behavior]DerivedMethodExplicit({m.ent, inst_id}));
+    return NoFail(@[derived_method_behavior]DerivedMethodExplicit({@[instpair]{m.ent, inst_id}}));
   }
 }
 
