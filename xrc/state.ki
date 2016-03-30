@@ -214,6 +214,8 @@ struct module {
 
 struct derived_method_explicit {
   ip instpair;
+  // EMISSIONS: Some(?) users of derived_method_explicit will want to use emissions (probably after they've been improved to describe funcall before/after emissions).
+  emissions emissions_info;
 }
 
 // Describes the behavior of init/copy/move/destroy methods.
@@ -678,11 +680,10 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
   case &MultiMatch:
     return ERR(_u8("Multiple explicit methods '"), lookup(clq->im, impl_name), _u8("'"));
   case &OneMatch(m ent_and_parms):
-    // EMISSIONS(): We need to emit emissions here -- this is your basic function lookup, and it could be implemented for foo['a, bar['a]] or something weird like that.
     // This function is called by to_defclass_properties, which means lifetimes come from idy_repls.  There is still the question of how to handle emissions from copy constructors and the like, and that might depend on what the emissions actually are.
     inst_id def_inst_id;
     #make_inst(clq, m.ent, &m.parms, &inst_id);
-    return NoFail(@[derived_method_behavior]DerivedMethodExplicit({@[instpair]{m.ent, inst_id}}));
+    return NoFail(@[derived_method_behavior]DerivedMethodExplicit({@[instpair]{m.ent, inst_id}, {m.emissions}}));
   }
 }
 
