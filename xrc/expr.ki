@@ -1988,8 +1988,9 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   tech indexing_technique;
   #decompose_indexable(es->clq, &lhs_info->cu.x, &result_type, &key_type, &tech);
 
+  result_emissions array[unify_emission];
   unified te_typeexpr;
-  if !unify_types(pt, result_type, &unified) {
+  if !unify_types(pt, result_type, &result_emissions, &unified) {
     return ERR(_u8("index expr returns wrong type"));
   }
 
@@ -2014,7 +2015,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
         }
       }
       // Nothing to dispose, it's a field access.
-      annotate(&a->info, {None, ArrayIndexingInfo({rhs_later})});
+      annotate(&a->info, {None, ArrayIndexingInfo({rhs_later}), {freeze(&result_emissions)}});
     } else {
       // Dereferencing a pointer always makes an lvalue.
       lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
@@ -2023,7 +2024,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       lhs_later ast_later_discard_info = mk_later();
       #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
 
-      annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), ArrayIndexingInfo({rhs_later})});
+      annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), ArrayIndexingInfo({rhs_later}), {freeze(&result_emissions)}});
     }
 
   case Has(fntech fn_indexing_technique):
@@ -2046,7 +2047,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
         return ERR(_u8("User-defined array indexing only works on lvalues"));
       }
 
-      annotate(&a->info, {None, FnIndexingInfo({fntech.ip, {fntech.emissions}})});
+      annotate(&a->info, {None, FnIndexingInfo({fntech.ip, {fntech.emissions}}), {freeze(&result_emissions)}});
     } else {
       #check_expr_consume(es, oo(&a->rhs), &key_type);
 
@@ -2056,7 +2057,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       lhs_later ast_later_discard_info = mk_later();
       #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
 
-      annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), FnIndexingInfo({fntech.ip, {fntech.emissions}})});
+      annotate(&a->info, {Has({*un(&ie_info_after), lhs_later}), FnIndexingInfo({fntech.ip, {fntech.emissions}}), {freeze(&result_emissions)}});
     }
   }
 

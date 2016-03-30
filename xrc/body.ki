@@ -378,15 +378,17 @@ func check_pattern(es *framescope, chk *swartch_checkobj, et *enumspec, patt *as
 }
 
 func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_type *te_typeexpr,
-                       vd *ast_vardecl, cu_expected_type_out *cu_typeexpr, varcell_out *cell_num) np {
+                       vd *ast_vardecl, cu_expected_type_out *cu_typeexpr, varcell_out *cell_num,
+                       emissions_out *shray[unify_emission]) np {
   // TODO: Cache converted?
   converted te_typeexpr = #convert_typeexpr(&vd->type);
 
   cac cac_typeexpr;
   #check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &cac);
 
+  emissions array[unify_emission];
   unified te_typeexpr;
-  if !unify_types(&cac.te, expected_type, &unified) {
+  if !unify_types(&cac.te, expected_type, &emissions, &unified) {
     return MERR(es->cs, patt->meta, _u8("constructor variable type mismatch"));
   }
 
@@ -394,6 +396,7 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
   expected_type_props type_properties;
   #compute_type_properties(es->clq, cu_expected_type_out, &expected_type_props);
   *varcell_out = add_cell(es, {LocationVirtual, *cu_expected_type_out, expected_type_props});
+  *emissions_out = freeze(&emissions);
   return NoFail;
 }
 
@@ -434,10 +437,11 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
         case_vp varpopper;
         init_vp(&case_vp, &bs->es);
         ovn opt[var_number];
+        decl_emissions shray[unify_emission];
         if case &Has(vd ast_vardecl) = &patt.decl {
           cu_expected_type cu_typeexpr;
           cell cell_num;
-          #check_pattern_var(&bs->es, &patt, expected_type, &vd, &cu_expected_type, &cell);
+          #check_pattern_var(&bs->es, &patt, expected_type, &vd, &cu_expected_type, &cell, &decl_emissions);
 
           vn var_number;
           #es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~chk.switchable_type_ipse,
@@ -450,7 +454,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
           }
           ovn = None;
         }
-        annotate(&patt.cp_info, {ovn, tag_value, enum_field_offset(bs->cs, et, tag_value)});
+        annotate(&patt.cp_info, {{decl_emissions}, ovn, tag_value, enum_field_offset(bs->cs, et, tag_value)});
 
         body_ee entryexit;
         #check_body(bs, obp, &cas->body, &body_ee);
@@ -694,10 +698,11 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
       annotate(&b.info, {{tag_cell, ~count(&et->constructors)}, mk_enum_tag_value(decl_index)});
 
       ovn opt[var_number];
+      decl_emissions shray[unify_emission];
       if case &Has(vd ast_vardecl) = &b.pattern.decl {
         cu_expected_type cu_typeexpr;
         cell cell_num;
-        #check_pattern_var(es, &b.pattern, expected_type, &vd, &cu_expected_type, &cell);
+        #check_pattern_var(es, &b.pattern, expected_type, &vd, &cu_expected_type, &cell, &decl_emissions);
 
         annotate(&cd->virtual_cell_dead, Has(cell));
         vn var_number;
@@ -715,7 +720,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
         ovn = None;
       }
       tag_value enum_tag_value = mk_enum_tag_value(decl_index);
-      annotate(&b.pattern.cp_info, {ovn, tag_value, enum_field_offset(es->cs, et, tag_value)});
+      annotate(&b.pattern.cp_info, {{decl_emissions}, ovn, tag_value, enum_field_offset(es->cs, et, tag_value)});
       return NoFail;
     }
   }

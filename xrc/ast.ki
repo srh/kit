@@ -345,6 +345,8 @@ enum ast_statement_enum {
 }
 
 struct ast_cp_info {
+  // Emissions between the swartch case type and pattern decl variable type.
+  decl_emissions emissions_info;
   ovn opt[var_number];
   tag_value enum_tag_value;
   // enum_field_offset(cs, et, tag_value) -- annotated here because getting a enum
@@ -520,6 +522,8 @@ struct ast_deref_indexing_info {
 struct ast_index_expr_info {
   deref opt[ast_deref_indexing_info];
   fn_info ast_array_fn_indexing_info;
+  // Not the only emissions info!  See fn_info for the function call.
+  result_emissions emissions_info;
 }
 
 struct ast_index_expr {
