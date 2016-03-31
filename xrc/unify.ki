@@ -222,7 +222,7 @@ enum type_matches_res {
 // t is complete, but it references the generic names in "names", whose corresponding
 // values in "parms" could be incomplete.  pt is the partial type of an expression we're
 // matching against this generic definition.  count(parms) == count(names).
-func type_matches(pt *te_typeexpr, names *shray[te_generik], parms *shray[te_typeexpr],
+func type_matches(parms *shray[te_typeexpr], pt *te_typeexpr, names *shray[te_generik],
                   t *te_typeexpr) type_matches_res {
   check(count(names) == count(parms));
   // We need to retain all new information we gain about the value of the generic param
