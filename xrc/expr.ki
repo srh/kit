@@ -363,7 +363,8 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
   nogp genparms = NoParms;
   if true {
     res match_def_res;
-    #match_def(ds->cs, defname, &nogp, ctor_type, &res);
+    scope te_scope;  // SCOPE(): No.
+    #match_def(ds->cs, defname, &scope, &nogp, ctor_type, &res);
     switch &res {
     case &NoMatch: { } // Do nothing.
     case &MultiMatch:
@@ -454,7 +455,8 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
   }
 
   res match_def_res;
-  #match_def(es->cs, name, gp, pt, &res);
+  scope te_scope;  // SCOPE(): No.
+  #match_def(es->cs, name, &scope, gp, pt, &res);
 
   switch &res {
   case &NoMatch:
@@ -2098,7 +2100,8 @@ func decompose_indexable(clq *clqueue, typ *te_typeexpr,
   fntype te_typeexpr = fn_type(clq->cs, ptr_type(clq->cs, *indexable), TeUnknown, TeUnknown);
   gp genparms = NoParms;
   res match_def_res;
-  #match_def(clq->cs, clq->im->cym.do_indexsym, &gp, &fntype, &res);
+  scope te_scope;  // SCOPE(): No.
+  #match_def(clq->cs, clq->im->cym.do_indexsym, &scope, &gp, &fntype, &res);
   switch &res {
   case &NoMatch:
     return ERR(_u8("indexing on non-indexable type"));

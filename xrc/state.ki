@@ -672,7 +672,8 @@ func is_defwise_trivial(props *type_properties) bool {
 func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, impl_name sym) cr[derived_method_behavior] {
   res match_def_res;
   gp genparms = NoParms;
-  #match_def(clq->cs, impl_name, &gp, fntype, &res);
+  scope te_scope;  // SCOPE(): No.
+  #match_def(clq->cs, impl_name, &scope, &gp, fntype, &res);
 
   switch &res {
   case &NoMatch:

@@ -20,10 +20,13 @@ enum unify_emission {
 // reconstruct the correct values later.)
 //
 // _appends_ emissions onto emissions_append.
-func unify_under_generics(unif_parms *array[te_typeexpr], pt *te_typeexpr,
+//
+// pt_scope covers unif_parms and pt.
+func unify_under_generics(pt_scope *te_scope, unif_parms *array[te_typeexpr], pt *te_typeexpr,
                           names *shray[te_generik], t *te_typeexpr,
                           emissions_append *array[unify_emission],
                           unified_out *te_typeexpr) bool {
+  // SCOPE() Use pt_scope.
   if case &TeUnknown = pt {
     // It's worth pointing out:  This _is_ correct behavior if t is a generic parameter.
     *unified_out = *t;
@@ -70,7 +73,7 @@ func unify_under_generics(unif_parms *array[te_typeexpr], pt *te_typeexpr,
         reserve(&unified_params, n);
         for i size = 0; i < n; i = i + 1 {
           unified te_typeexpr;
-          if !unify_under_generics(unif_parms, &pa_params[i], names, &a_params[i], emissions_append, &unified) {
+          if !unify_under_generics(pt_scope, unif_parms, &pa_params[i], names, &a_params[i], emissions_append, &unified) {
             return false;
           }
           push(&unified_params, unified);
@@ -96,7 +99,7 @@ func unify_under_generics(unif_parms *array[te_typeexpr], pt *te_typeexpr,
             return false;
           }
           unified te_typeexpr;
-          if !unify_under_generics(unif_parms, &pd->type, names, &d->type, emissions_append, &unified) {
+          if !unify_under_generics(pt_scope, unif_parms, &pd->type, names, &d->type, emissions_append, &unified) {
             return false;
           }
           push(&unified_fields, {d->name, unified});
@@ -125,7 +128,7 @@ func unify_under_generics(unif_parms *array[te_typeexpr], pt *te_typeexpr,
           unified_count = pa.count;
         }
         unified_type te_typeexpr;
-        if !unify_under_generics(unif_parms, oo(&pa.param), names, oo(&a.param), emissions_append, &unified_type) {
+        if !unify_under_generics(pt_scope, unif_parms, oo(&pa.param), names, oo(&a.param), emissions_append, &unified_type) {
           return false;
         }
         *unified_out = TeArraytype({unified_count, emshp(unified_type)});
@@ -193,7 +196,8 @@ func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) boo
 func unify_types(pta *te_typeexpr, ptb *te_typeexpr, emissions_append *array[unify_emission], out *te_typeexpr) bool {
   names shray[te_generik];
   unif_parms array[te_typeexpr];
-  return unify_under_generics(&unif_parms, pta, &names, ptb, emissions_append, out);
+  pt_scope te_scope;  // SCOPE(): Uh yeah, no.
+  return unify_under_generics(&pt_scope, &unif_parms, pta, &names, ptb, emissions_append, out);
 }
 
 func unifies(complete *te_typeexpr, pt *te_typeexpr) bool {
@@ -222,7 +226,8 @@ enum type_matches_res {
 // t is complete, but it references the generic names in "names", whose corresponding
 // values in "parms" could be incomplete.  pt is the partial type of an expression we're
 // matching against this generic definition.  count(parms) == count(names).
-func type_matches(parms *shray[te_typeexpr], pt *te_typeexpr, names *shray[te_generik],
+// pt_scope covers parms and pt.
+func type_matches(pt_scope *te_scope, parms *shray[te_typeexpr], pt *te_typeexpr, names *shray[te_generik],
                   t *te_typeexpr) type_matches_res {
   check(count(names) == count(parms));
   // We need to retain all new information we gain about the value of the generic param
@@ -232,7 +237,7 @@ func type_matches(parms *shray[te_typeexpr], pt *te_typeexpr, names *shray[te_ge
   // Since t is complete, unified is irrelevant and must be identical to t.
   unified te_typeexpr;
   emissions array[unify_emission];
-  if !unify_under_generics(&unif_parms, pt, names, t, &emissions, &unified) {
+  if !unify_under_generics(pt_scope, &unif_parms, pt, names, t, &emissions, &unified) {
     return TypeDoesNotMatch;
   }
   frozen_unif_parms shray[te_typeexpr] = freeze(&unif_parms);

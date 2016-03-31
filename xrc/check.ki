@@ -908,11 +908,12 @@ func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *
   psd partial_struct_data;
   #compute_partial_struct_data(clq, &st->fields, None, &psd);
   final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
+  scope te_scope;  // SCOPE(): No.
   *out = {final_size, psd.max_alignment,
-          level_to_derived(clq, CtorInit, 1, &realtype->x, mask_level(constructor_mask, ComputeInit, psd.init_level)),
-          level_to_derived(clq, CtorMove, 2, &realtype->x, mask_level(constructor_mask, ComputeMove, psd.move_level)),
-          level_to_derived(clq, CtorCopy, 2, &realtype->x, mask_level(constructor_mask, ComputeCopy, psd.copy_level)),
-          level_to_derived(clq, CtorDestroy, 1, &realtype->x,
+          level_to_derived(clq, CtorInit, 1, &scope, &realtype->x, mask_level(constructor_mask, ComputeInit, psd.init_level)),
+          level_to_derived(clq, CtorMove, 2, &scope, &realtype->x, mask_level(constructor_mask, ComputeMove, psd.move_level)),
+          level_to_derived(clq, CtorCopy, 2, &scope, &realtype->x, mask_level(constructor_mask, ComputeCopy, psd.copy_level)),
+          level_to_derived(clq, CtorDestroy, 1, &scope, &realtype->x,
                            mask_level(constructor_mask, ComputeDestroy, psd.destroy_level)),
           IsScalarNo,
           psd.is_pow2,
@@ -957,15 +958,17 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *cu_t
     }
   }
 
+  scope te_scope;  // SCOPE(): No.
+
   // See TeUnion for explanation of final_size.
   final_size u32 = ceil_aligned(max_size, max_alignment);
   *out = {final_size, max_alignment,
           // Enum initialization is always trivial -- initializes to zero-filled invalid
           // tag value.
           DerivedMethodTrivial,
-          level_to_derived(clq, CtorMove, 2, &realtype->x, move_level),
-          level_to_derived(clq, CtorCopy, 2, &realtype->x, copy_level),
-          level_to_derived(clq, CtorDestroy, 1, &realtype->x, destroy_level),
+          level_to_derived(clq, CtorMove, 2, &scope, &realtype->x, move_level),
+          level_to_derived(clq, CtorCopy, 2, &scope, &realtype->x, copy_level),
+          level_to_derived(clq, CtorDestroy, 1, &scope, &realtype->x, destroy_level),
           IsScalarNo,
           is_pow2,
           freeze(&exposed_types)};
@@ -1042,13 +1045,14 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
           push(&exposed_types, pluralize_array_exposed(etn));
         }
 
+        t_scope *te_scope = null;  // SCOPE(): Pardon me?
         // We _should_ maintain alignment for a zero-element array because the pointer to
         // such an array might hack in tag-bit logic.
         *out = {props.flat_size * c, props.flat_alignment,
-                level_to_derived(clq, CtorInit, 1, t, to_level(&props.init_behavior)),
-                level_to_derived(clq, CtorMove, 2, t, to_level(&props.move_behavior)),
-                level_to_derived(clq, CtorCopy, 2, t, to_level(&props.copy_behavior)),
-                level_to_derived(clq, CtorDestroy, 1, t, to_level(&props.destroy_behavior)),
+                level_to_derived(clq, CtorInit, 1, t_scope, t, to_level(&props.init_behavior)),
+                level_to_derived(clq, CtorMove, 2, t_scope, t, to_level(&props.move_behavior)),
+                level_to_derived(clq, CtorCopy, 2, t_scope, t, to_level(&props.copy_behavior)),
+                level_to_derived(clq, CtorDestroy, 1, t_scope, t, to_level(&props.destroy_behavior)),
                 IsScalarNo,
                 is_pow2,
                 freeze(&exposed_types)};
@@ -1083,7 +1087,7 @@ func to_level(b *derived_method_behavior) behavior_level {
   }
 }
 
-func make_magic_inst(clq *clqueue, magic_name sym, arity size, type *te_typeexpr) instpair {
+func make_magic_inst(clq *clqueue, magic_name sym, arity size, type_scope *te_scope, type *te_typeexpr) instpair {
   arr *array[def_entry_id] = unHas(lookup_ref(&clq->cs->defs_by_name, &magic_name));
   // There is only be one magic def for each name.
   check(count(arr) == 1);
@@ -1098,8 +1102,8 @@ func make_magic_inst(clq *clqueue, magic_name sym, arity size, type *te_typeexpr
   return {ent_id, inst_id};
 }
 
-func make_nontrivial(clq *clqueue, wc which_ctor, arity size, type *te_typeexpr) derived_method_behavior {
-  return DerivedMethodNontrivial(make_magic_inst(clq, magic_name(clq->im, wc), arity, type));
+func make_nontrivial(clq *clqueue, wc which_ctor, arity size, type_scope *te_scope, type *te_typeexpr) derived_method_behavior {
+  return DerivedMethodNontrivial(make_magic_inst(clq, magic_name(clq->im, wc), arity, type_scope, type));
 }
 
 func make_inst(clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_inst_id) np {
@@ -1110,13 +1114,13 @@ func make_inst(clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_in
   return NoFail;
 }
 
-func level_to_derived(clq *clqueue, wc which_ctor, arity size, type *te_typeexpr,
+func level_to_derived(clq *clqueue, wc which_ctor, arity size, type_scope *te_scope, type *te_typeexpr,
                       level behavior_level) derived_method_behavior {
   switch level {
   case TrivialLevel:
     return DerivedMethodTrivial;
   case NontrivialLevel:
-    return make_nontrivial(clq, wc, arity, type);
+    return make_nontrivial(clq, wc, arity, type_scope, type);
   case AbsentLevel:
     return DerivedMethodAbsent;
   }
@@ -1560,7 +1564,8 @@ enum match_def_res {
 }
 
 // Note that gp could be incomplete.
-func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
+// pt_scope covers gp and pt.
+func match_def(cs *checkstate, name sym, pt_scope *te_scope, gp *genparms, pt *te_typeexpr,
                res_out *match_def_res) np {
   if case Has(arr *array[def_entry_id]) = lookup_ref(&cs->defs_by_name, &name) {
     n size = count(arr);
@@ -1570,7 +1575,7 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
       ent *def_entry = ref_def_entry(cs, id);
       ent_typeexpr *te_typeexpr;
       #def_converted_typeexpr(ent, &ent_typeexpr);
-      match_result entry_matches_res = entry_matches(cs, gp, pt, &ent->generics, ent_typeexpr);
+      match_result entry_matches_res = entry_matches(cs, pt_scope, gp, pt, &ent->generics, ent_typeexpr);
       switch match_result {
         case EntryDoesNotMatch: {
           // Do nothing.
@@ -1635,8 +1640,9 @@ func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res
   }
 }
 
-func entry_matches(cs *checkstate, gp *genparms, pt *te_typeexpr, generics *te_generics,
-                   typeexpr *te_typeexpr) entry_matches_res {
+// pt_scope covers gp and pt.
+func entry_matches(cs *checkstate, pt_scope *te_scope, gp *genparms, pt *te_typeexpr,
+                   generics *te_generics, typeexpr *te_typeexpr) entry_matches_res {
   switch generics {
     case &TeNoGenerics: {
       switch gp {
@@ -1646,7 +1652,7 @@ func entry_matches(cs *checkstate, gp *genparms, pt *te_typeexpr, generics *te_g
         case &NoParms: {
           names shray[te_generik];
           parms shray[te_typeexpr];
-          res var = type_matches(&parms, pt, &names, typeexpr);
+          res var = type_matches(pt_scope, &parms, pt, &names, typeexpr);
           return from_type_matches_res(false, &res);
         }
       }
@@ -1657,12 +1663,12 @@ func entry_matches(cs *checkstate, gp *genparms, pt *te_typeexpr, generics *te_g
           if count(&parms) != count(&names) {
             return EntryDoesNotMatch;
           }
-          res var = type_matches(&parms, pt, &names, typeexpr);
+          res var = type_matches(pt_scope, &parms, pt, &names, typeexpr);
           return from_type_matches_res(true, &res);
         }
         case &NoParms: {
           parms shray[te_typeexpr] = repeat(count(&names), TeUnknown);
-          res var = type_matches(&parms, pt, &names, typeexpr);
+          res var = type_matches(pt_scope, &parms, pt, &names, typeexpr);
           return from_type_matches_res(true, &res);
         }
       }

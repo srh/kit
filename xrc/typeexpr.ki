@@ -410,3 +410,9 @@ enum te_generics {
   TeHasGenerics shray[te_generik];
   TeVariadicGenerics te_variadic_generics;
 }
+
+struct te_scope {
+
+}
+
+// TODO(): See SCOPE()

@@ -223,16 +223,19 @@ func check_non_magic_ctor(clq *clqueue, g *te_generics, parms *idy_repls, wc whi
 }
 
 func make_magic_bzero(clq *clqueue, size u32) instpair {
+  empty te_scope;
   type te_typeexpr = primitive_padding_type(clq->cs, size);
-  return make_magic_inst(clq, clq->im->cym.magic_bzero, 1, &type);
+  return make_magic_inst(clq, clq->im->cym.magic_bzero, 1, &empty, &type);
 }
 func make_magic_memcopy(clq *clqueue, size u32) instpair {
+  empty te_scope;
   type te_typeexpr = primitive_padding_type(clq->cs, size);
-  return make_magic_inst(clq, clq->im->cym.magic_memcopy, 2, &type);
+  return make_magic_inst(clq, clq->im->cym.magic_memcopy, 2, &empty, &type);
 }
 func make_magic_nopdestroy(clq *clqueue, size u32) instpair {
+  empty te_scope;
   type te_typeexpr = primitive_padding_type(clq->cs, size);
-  return make_magic_inst(clq, clq->im->cym.magic_nopdestroy, 1, &type);
+  return make_magic_inst(clq, clq->im->cym.magic_nopdestroy, 1, &empty, &type);
 }
 
 func check_magic_ctor(clq *clqueue, g *te_generics, parms *idy_repls, wc which_ctor, mc *magic_ctor) np {
