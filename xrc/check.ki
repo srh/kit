@@ -1564,8 +1564,7 @@ enum match_def_res {
 }
 
 // Note that gp could be incomplete.
-// pt_scope covers gp and pt.
-func match_def(cs *checkstate, name sym, pt_scope *te_scope, gp *genparms, pt *te_typeexpr,
+func match_def(cs *checkstate, name sym, scope *te_scope, gp *genparms, pt *te_typeexpr,
                res_out *match_def_res) np {
   if case Has(arr *array[def_entry_id]) = lookup_ref(&cs->defs_by_name, &name) {
     n size = count(arr);
@@ -1575,7 +1574,7 @@ func match_def(cs *checkstate, name sym, pt_scope *te_scope, gp *genparms, pt *t
       ent *def_entry = ref_def_entry(cs, id);
       ent_typeexpr *te_typeexpr;
       #def_converted_typeexpr(ent, &ent_typeexpr);
-      match_result entry_matches_res = entry_matches(cs, pt_scope, gp, pt, &ent->generics, ent_typeexpr);
+      match_result entry_matches_res = entry_matches(cs, scope, gp, pt, &ent->generics, ent_typeexpr);
       switch match_result {
         case EntryDoesNotMatch: {
           // Do nothing.
@@ -1640,8 +1639,7 @@ func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res
   }
 }
 
-// pt_scope covers gp and pt.
-func entry_matches(cs *checkstate, pt_scope *te_scope, gp *genparms, pt *te_typeexpr,
+func entry_matches(cs *checkstate, scope *te_scope, gp *genparms, pt *te_typeexpr,
                    generics *te_generics, typeexpr *te_typeexpr) entry_matches_res {
   switch generics {
     case &TeNoGenerics: {
@@ -1652,7 +1650,7 @@ func entry_matches(cs *checkstate, pt_scope *te_scope, gp *genparms, pt *te_type
         case &NoParms: {
           names shray[te_generik];
           parms shray[te_typeexpr];
-          res var = type_matches(pt_scope, &parms, pt, &names, typeexpr);
+          res var = type_matches(scope, &parms, pt, &names, typeexpr);
           return from_type_matches_res(false, &res);
         }
       }
@@ -1663,12 +1661,12 @@ func entry_matches(cs *checkstate, pt_scope *te_scope, gp *genparms, pt *te_type
           if count(&parms) != count(&names) {
             return EntryDoesNotMatch;
           }
-          res var = type_matches(pt_scope, &parms, pt, &names, typeexpr);
+          res var = type_matches(scope, &parms, pt, &names, typeexpr);
           return from_type_matches_res(true, &res);
         }
         case &NoParms: {
           parms shray[te_typeexpr] = repeat(count(&names), TeUnknown);
-          res var = type_matches(pt_scope, &parms, pt, &names, typeexpr);
+          res var = type_matches(scope, &parms, pt, &names, typeexpr);
           return from_type_matches_res(true, &res);
         }
       }

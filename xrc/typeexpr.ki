@@ -415,4 +415,12 @@ struct te_scope {
 
 }
 
+// For now, the only name shadowing possible is that the "names" shray[te_generik] param of unify_under_generics scopes some names of "t" te_typeexpr.  We actually check that such template lists cannot shadow the global scope -- but they could have the same names as those in the "pt" te_typeexpr param of unify_under_generics.  That is fine.
+//
+// When we have scoped types, presumably we'll update TeName to have scopage information necessary to avoid name conflicts.  The main worry is for types that represent run-time values -- it might be easy to make a mistake where ipse types are equal but really represent different trips around the same loop.
+//
+// We might need to make te_scope support "branched" te_scopes, where one te_scope is the "union" of two other te_scopes.  (te_scope would be an enum, with one alternative being a UnionOfTwo branch.  For now, functions like unify_under_generics (and whatnot) are going to take one scope parameter, which covers all the typeexprs.
+//
+// (Or maybe we'd use separate scope variables.)
+
 // TODO(): See SCOPE()
