@@ -34,7 +34,7 @@ func unify_under_generics(scope *te_scope, unif_parms *array[te_typeexpr], pt *t
     case &TeName(a te_name): {
       if case Has(ix size) = lookup_plain_name(names, a.value) {
         unified te_typeexpr;
-        if !unify_types(&unif_parms[ix], pt, emissions_append, &unified) {
+        if !unify_types(scope, &unif_parms[ix], pt, emissions_append, &unified) {
           return false;
         }
         unif_parms[ix] = unified;
@@ -141,7 +141,7 @@ func unify_under_generics(scope *te_scope, unif_parms *array[te_typeexpr], pt *t
       // affect this function's callers, so treat this code with skepticism.
       if case Has(ix size) = lookup_ipse_name(names, a.name) {
         unified te_typeexpr;
-        if !unify_types(&unif_parms[ix], pt, emissions_append, &unified) {
+        if !unify_types(scope, &unif_parms[ix], pt, emissions_append, &unified) {
           return false;
         }
         unif_parms[ix] = unified;
@@ -191,16 +191,23 @@ func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) boo
   }
 }
 
-func unify_types(pta *te_typeexpr, ptb *te_typeexpr, emissions_append *array[unify_emission], out *te_typeexpr) bool {
+func unify_types(scope *te_scope, pta *te_typeexpr, ptb *te_typeexpr, emissions_append *array[unify_emission], out *te_typeexpr) bool {
   names shray[te_generik];
   unif_parms array[te_typeexpr];
-  scope te_scope;  // SCOPE(): Uh yeah, no.
+  return unify_under_generics(scope, &unif_parms, pta, &names, ptb, emissions_append, out);
+}
+
+func unify_types(pta *te_typeexpr, ptb *te_typeexpr, emissions_append *array[unify_emission], out *te_typeexpr) bool {
+  scope te_scope;  // SCOPE(): Get rid of this function.
+  names shray[te_generik];
+  unif_parms array[te_typeexpr];
   return unify_under_generics(&scope, &unif_parms, pta, &names, ptb, emissions_append, out);
 }
 
 func unifies(complete *te_typeexpr, pt *te_typeexpr) bool {
   unified te_typeexpr;
   emissions array[unify_emission];
+  scope te_scope;  // SCOPE(): No.
   if unify_types(complete, pt, &emissions, &unified) {
     check(empty(&emissions));
     return true;
