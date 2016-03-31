@@ -171,26 +171,22 @@ func unify_under_generics(pt *te_typeexpr,
 
 func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) bool {
   switch ppta {
-    case &TePureName(as sym): {
-      switch pptb {
-        case &TePureName(bs sym): {
-          if as == bs {
-            *out = TePureName(as);
-            return true;
-          } else {
-            return false;
-          }
-        }
-        case &TePureUnknown: {
-          *out = *ppta;
-          return true;
-        }
+  case &TePureName(as sym):
+    switch pptb {
+    case &TePureName(bs sym):
+      if as == bs {
+        *out = TePureName(as);
+        return true;
+      } else {
+        return false;
       }
-    }
-    case &TePureUnknown: {
-      *out = *pptb;
+    case &TePureUnknown:
+      *out = *ppta;
       return true;
     }
+  case &TePureUnknown:
+    *out = *pptb;
+    return true;
   }
 }
 
