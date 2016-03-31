@@ -388,7 +388,7 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
 
   emissions array[unify_emission];
   unified te_typeexpr;
-  if !unify_types(&cac.te, expected_type, &emissions, &unified) {
+  if !unify_types(es->tscope, &cac.te, expected_type, &emissions, &unified) {
     return MERR(es->cs, patt->meta, _u8("constructor variable type mismatch"));
   }
 

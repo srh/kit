@@ -197,18 +197,11 @@ func unify_types(scope *te_scope, pta *te_typeexpr, ptb *te_typeexpr, emissions_
   return unify_under_generics(scope, &unif_parms, pta, &names, ptb, emissions_append, out);
 }
 
-func unify_types(pta *te_typeexpr, ptb *te_typeexpr, emissions_append *array[unify_emission], out *te_typeexpr) bool {
-  scope te_scope;  // SCOPE(): Get rid of this function.
-  names shray[te_generik];
-  unif_parms array[te_typeexpr];
-  return unify_under_generics(&scope, &unif_parms, pta, &names, ptb, emissions_append, out);
-}
-
 func unifies(complete *te_typeexpr, pt *te_typeexpr) bool {
   unified te_typeexpr;
   emissions array[unify_emission];
   scope te_scope;  // SCOPE(): No.
-  if unify_types(complete, pt, &emissions, &unified) {
+  if unify_types(&scope, complete, pt, &emissions, &unified) {
     check(empty(&emissions));
     return true;
   } else {

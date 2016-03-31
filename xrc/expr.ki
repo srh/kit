@@ -12,6 +12,8 @@ struct framescope {
   im *identmap;
   // Same as ds->clq.
   clq *clqueue;
+  // Same as &ds->tscope.
+  tscope *te_scope;
 
   all_vars array[var_info];
 
@@ -29,7 +31,7 @@ struct framescope {
 }
 
 func mk(ds *defscope, return_type opt[*cu_typeexpr]) framescope {
-  return {ds, ds->cs, ds->im, ds->clq,
+  return {ds, ds->cs, ds->im, ds->clq, &ds->tscope,
           mk_array@[var_info](), mk_array@[var_number](),
           0,
           return_type,
@@ -341,7 +343,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     // rhs_type is complete.
     unified te_typeexpr;
     emissions array[unify_emission];
-    if !unify_types(arg_type, rhs_type, &emissions, &unified) {
+    if !unify_types(&ds->tscope, arg_type, rhs_type, &emissions, &unified) {
       return NoFail(NoMatchConstructor);
     }
     ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
@@ -447,7 +449,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
       vartype *cu_typeexpr = &ref_var(es, num)->type;
       type te_typeexpr;
       emissions array[unify_emission];
-      if !unify_types(pt, &vartype->x, &emissions, &type) {
+      if !unify_types(es->tscope, pt, &vartype->x, &emissions, &type) {
         return ERR(_u8("local '"), lookup(es->im, name), _u8("' has wrong type: '"),
                    pretty(es->im, vartype), _u8("' where '"), pretty(es->im, pt), _u8("' expected"));
       }
@@ -503,7 +505,7 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
                                errmsg_name array[u8], x *ast_expr) np {
   unified te_typeexpr;
   emissions array[unify_emission];
-  if !unify_types(pt, &type, &emissions, &unified) {
+  if !unify_types(es->tscope, pt, &type, &emissions, &unified) {
     return ERR(errmsg_name, _u8(" literal in bad place"));
   }
   if is_complete(&unified) {
@@ -699,7 +701,7 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
 
     emissions array[unify_emission];
     unified te_typeexpr;
-    if !unify_types(pt, success_case_type, &emissions, &unified) {
+    if !unify_types(es->tscope, pt, success_case_type, &emissions, &unified) {
       return ERR(_u8("quick-return expr has bad type"));
     }
 
@@ -745,7 +747,7 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
   ref_skeleton te_typeexpr = mk_ref_type(es->cs, TeUnknown, TeUnknown);
   emissions_discard array[unify_emission];
   unif_pt te_typeexpr;
-  if !unify_types(pt, &ref_skeleton, &emissions_discard, &unif_pt) {
+  if !unify_types(es->tscope, pt, &ref_skeleton, &emissions_discard, &unif_pt) {
     return ERR(_u8("RefOf expr in non-ref context"));
   }
   // No emissions are possible, we used TeUnknown everywhere.
@@ -770,7 +772,7 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
   case &IsLvalYes(desc lval_description):
     emissions array[unify_emission];
     unified_ipse te_typeexpr;
-    if !unify_types(pt_ipse, &desc.ipse, &emissions, &unified_ipse) {
+    if !unify_types(es->tscope, pt_ipse, &desc.ipse, &emissions, &unified_ipse) {
       return ERR(_u8("Refof ipse types do not match."));
     }
 
@@ -818,7 +820,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_exp
   #check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &computed);
   emissions array[unify_emission];
   unified te_typeexpr;
-  if !unify_types(pt, &computed.te, &emissions, &unified) {
+  if !unify_types(es->tscope, pt, &computed.te, &emissions, &unified) {
     return ERR(_u8("TypedExpr is incompatible with contextual type."));
   }
   unified_computed cac_typeexpr;
@@ -944,7 +946,7 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
     // param is already complete.
     emissions array[unify_emission];
     unified_discard te_typeexpr;
-    if !unify_types(pt, param, &emissions, &unified_discard) {
+    if !unify_types(es->tscope, pt, param, &emissions, &unified_discard) {
       return ERR(_u8("Pointer dereferences into wrong type."));
     }
 
@@ -963,7 +965,7 @@ func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *
   ptr_skeleton te_typeexpr = ptr_type(es->cs, TeUnknown);
   emissions array[unify_emission];
   unif_pt te_typeexpr;
-  if !unify_types(pt, &ptr_skeleton, &emissions, &unif_pt) {
+  if !unify_types(es->tscope, pt, &ptr_skeleton, &emissions, &unif_pt) {
     return ERR(_u8("AddressOf expr in non-pointer context"));
   }
   param *te_typeexpr;
@@ -1400,7 +1402,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   check(computed.complete);
   unified te_typeexpr;
   emissions array[unify_emission];
-  if !unify_types(pt, &computed.te, &emissions, &unified) {
+  if !unify_types(es->tscope, pt, &computed.te, &emissions, &unified) {
     return ERR(_u8("Lambda is incompatible with contextual type."));
   }
 
@@ -1616,7 +1618,7 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
   #lookup_field(es, t, a, &fieldtype, &res);
   unified te_typeexpr;
   emissions array[unify_emission];
-  if !unify_types(pt, &fieldtype.x, &emissions, &unified) {
+  if !unify_types(es->tscope, pt, &fieldtype.x, &emissions, &unified) {
     return ERR(_u8("field has wrong type."));
   }
   *fieldtype_out = fieldtype;
@@ -1994,7 +1996,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
 
   result_emissions array[unify_emission];
   unified te_typeexpr;
-  if !unify_types(pt, result_type, &result_emissions, &unified) {
+  if !unify_types(es->tscope, pt, result_type, &result_emissions, &unified) {
     return ERR(_u8("index expr returns wrong type"));
   }
 
