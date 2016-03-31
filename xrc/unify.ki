@@ -200,7 +200,8 @@ func unify_types(scope *te_scope, pta *te_typeexpr, ptb *te_typeexpr, emissions_
 func unifies(complete *te_typeexpr, pt *te_typeexpr) bool {
   unified te_typeexpr;
   emissions array[unify_emission];
-  scope te_scope;  // SCOPE(): No.
+  // There shouldn't be lifetimes looking up scope (right?), since we don't care about emissions.
+  scope te_scope;
   if unify_types(&scope, complete, pt, &emissions, &unified) {
     check(empty(&emissions));
     return true;

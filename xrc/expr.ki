@@ -367,8 +367,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
   nogp genparms = NoParms;
   if true {
     res match_def_res;
-    scope te_scope;  // SCOPE(): No.
-    #match_def(ds->cs, defname, &scope, &nogp, ctor_type, &res);
+    #match_def(ds->cs, defname, &ds->tscope, &nogp, ctor_type, &res);
     switch &res {
     case &NoMatch: { } // Do nothing.
     case &MultiMatch:
@@ -459,8 +458,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
   }
 
   res match_def_res;
-  scope te_scope;  // SCOPE(): No.
-  #match_def(es->cs, name, &scope, gp, pt, &res);
+  #match_def(es->cs, name, es->tscope, gp, pt, &res);
 
   switch &res {
   case &NoMatch:
@@ -1992,7 +1990,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   result_type *te_typeexpr;
   key_type te_typeexpr;
   tech indexing_technique;
-  #decompose_indexable(es->clq, &lhs_info->cu.x, &result_type, &key_type, &tech);
+  #decompose_indexable(es->clq, es->tscope, &lhs_info->cu.x, &result_type, &key_type, &tech);
 
   result_emissions array[unify_emission];
   unified te_typeexpr;
@@ -2082,7 +2080,7 @@ struct indexing_technique {
   deref bool;
 }
 
-func decompose_indexable(clq *clqueue, typ *te_typeexpr,
+func decompose_indexable(clq *clqueue, scope *te_scope, typ *te_typeexpr,
                          result_type_out **te_typeexpr, key_type_out *te_typeexpr, tech_out *indexing_technique) np {
   // We specifically do _not_ support references here.  You can't index into a
   // reference... you'd need a slice type or something like that.
@@ -2104,8 +2102,7 @@ func decompose_indexable(clq *clqueue, typ *te_typeexpr,
   fntype te_typeexpr = fn_type(clq->cs, ptr_type(clq->cs, *indexable), TeUnknown, TeUnknown);
   gp genparms = NoParms;
   res match_def_res;
-  scope te_scope;  // SCOPE(): No.
-  #match_def(clq->cs, clq->im->cym.do_indexsym, &scope, &gp, &fntype, &res);
+  #match_def(clq->cs, clq->im->cym.do_indexsym, scope, &gp, &fntype, &res);
   switch &res {
   case &NoMatch:
     return ERR(_u8("indexing on non-indexable type"));
