@@ -1608,11 +1608,11 @@ func match_def(cs *checkstate, name sym, gp *genparms, pt *te_typeexpr,
       }
     }
     num_matches size = count(&matches);
-    if num_matches == 0 {
-      *res_out = NoMatch;
-      return NoFail;
-    } else if num_matches == 1 {
+    if num_matches == 1 {
       *res_out = OneMatch(matches[0]);
+      return NoFail;
+    } else if num_matches == 0 {
+      *res_out = NoMatch;
       return NoFail;
     } else {
       *res_out = MultiMatch;
