@@ -903,16 +903,16 @@ func psd_exposed_types(fielddecls *shray[te_vardecl], psd *partial_struct_data) 
 
 // st had better be complete and computed.
 // Realtype is the name (or app) type (a struct or defclass) whose fields the structspec specifies.
-func compute_complete_struct_properties(clq *clqueue, scope *te_scope, st *structspec, realtype *cu_typeexpr,
+func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *cu_typeexpr,
                                         constructor_mask u32, out *type_properties) np {
   psd partial_struct_data;
   #compute_partial_struct_data(clq, &st->fields, None, &psd);
   final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
   *out = {final_size, psd.max_alignment,
-          level_to_derived(clq, CtorInit, 1, scope, &realtype->x, mask_level(constructor_mask, ComputeInit, psd.init_level)),
-          level_to_derived(clq, CtorMove, 2, scope, &realtype->x, mask_level(constructor_mask, ComputeMove, psd.move_level)),
-          level_to_derived(clq, CtorCopy, 2, scope, &realtype->x, mask_level(constructor_mask, ComputeCopy, psd.copy_level)),
-          level_to_derived(clq, CtorDestroy, 1, scope, &realtype->x,
+          level_to_derived(clq, CtorInit, 1, &realtype->x, mask_level(constructor_mask, ComputeInit, psd.init_level)),
+          level_to_derived(clq, CtorMove, 2, &realtype->x, mask_level(constructor_mask, ComputeMove, psd.move_level)),
+          level_to_derived(clq, CtorCopy, 2, &realtype->x, mask_level(constructor_mask, ComputeCopy, psd.copy_level)),
+          level_to_derived(clq, CtorDestroy, 1, &realtype->x,
                            mask_level(constructor_mask, ComputeDestroy, psd.destroy_level)),
           IsScalarNo,
           psd.is_pow2,
@@ -931,7 +931,7 @@ inline func pluralize_array_exposed(etn *exposed_type_name) exposed_type_name {
   return *etn;
 }
 
-func compute_complete_enum_properties(clq *clqueue, scope *te_scope, et *enumspec, realtype *cu_typeexpr, out *type_properties) np {
+func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *cu_typeexpr, out *type_properties) np {
   tag_size u32 = clq->cs->plat.enum_tag_size;
   max_size u32 = tag_size;
   max_alignment u32 = tag_size;
@@ -963,9 +963,9 @@ func compute_complete_enum_properties(clq *clqueue, scope *te_scope, et *enumspe
           // Enum initialization is always trivial -- initializes to zero-filled invalid
           // tag value.
           DerivedMethodTrivial,
-          level_to_derived(clq, CtorMove, 2, scope, &realtype->x, move_level),
-          level_to_derived(clq, CtorCopy, 2, scope, &realtype->x, copy_level),
-          level_to_derived(clq, CtorDestroy, 1, scope, &realtype->x, destroy_level),
+          level_to_derived(clq, CtorMove, 2, &realtype->x, move_level),
+          level_to_derived(clq, CtorCopy, 2, &realtype->x, copy_level),
+          level_to_derived(clq, CtorDestroy, 1, &realtype->x, destroy_level),
           IsScalarNo,
           is_pow2,
           freeze(&exposed_types)};
@@ -1042,14 +1042,13 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
           push(&exposed_types, pluralize_array_exposed(etn));
         }
 
-        t_scope *te_scope = null;  // SCOPE(): Pardon me?
         // We _should_ maintain alignment for a zero-element array because the pointer to
         // such an array might hack in tag-bit logic.
         *out = {props.flat_size * c, props.flat_alignment,
-                level_to_derived(clq, CtorInit, 1, t_scope, t, to_level(&props.init_behavior)),
-                level_to_derived(clq, CtorMove, 2, t_scope, t, to_level(&props.move_behavior)),
-                level_to_derived(clq, CtorCopy, 2, t_scope, t, to_level(&props.copy_behavior)),
-                level_to_derived(clq, CtorDestroy, 1, t_scope, t, to_level(&props.destroy_behavior)),
+                level_to_derived(clq, CtorInit, 1, t, to_level(&props.init_behavior)),
+                level_to_derived(clq, CtorMove, 2, t, to_level(&props.move_behavior)),
+                level_to_derived(clq, CtorCopy, 2, t, to_level(&props.copy_behavior)),
+                level_to_derived(clq, CtorDestroy, 1, t, to_level(&props.destroy_behavior)),
                 IsScalarNo,
                 is_pow2,
                 freeze(&exposed_types)};
@@ -1084,7 +1083,7 @@ func to_level(b *derived_method_behavior) behavior_level {
   }
 }
 
-func make_magic_inst(clq *clqueue, magic_name sym, arity size, type_scope *te_scope, type *te_typeexpr) instpair {
+func make_magic_inst(clq *clqueue, magic_name sym, arity size, type *te_typeexpr) instpair {
   arr *array[def_entry_id] = unHas(lookup_ref(&clq->cs->defs_by_name, &magic_name));
   // There is only be one magic def for each name.
   check(count(arr) == 1);
@@ -1099,8 +1098,8 @@ func make_magic_inst(clq *clqueue, magic_name sym, arity size, type_scope *te_sc
   return {ent_id, inst_id};
 }
 
-func make_nontrivial(clq *clqueue, wc which_ctor, arity size, type_scope *te_scope, type *te_typeexpr) derived_method_behavior {
-  return DerivedMethodNontrivial(make_magic_inst(clq, magic_name(clq->im, wc), arity, type_scope, type));
+func make_nontrivial(clq *clqueue, wc which_ctor, arity size, type *te_typeexpr) derived_method_behavior {
+  return DerivedMethodNontrivial(make_magic_inst(clq, magic_name(clq->im, wc), arity, type));
 }
 
 func make_inst(clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_inst_id) np {
@@ -1111,13 +1110,14 @@ func make_inst(clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_in
   return NoFail;
 }
 
-func level_to_derived(clq *clqueue, wc which_ctor, arity size, type_scope *te_scope, type *te_typeexpr,
+func level_to_derived(clq *clqueue, wc which_ctor, arity size, type *te_typeexpr,
                       level behavior_level) derived_method_behavior {
   switch level {
   case TrivialLevel:
     return DerivedMethodTrivial;
   case NontrivialLevel:
-    return make_nontrivial(clq, wc, arity, type_scope, type);
+    // TODO: Remove make_nontrivial, just inline it here.
+    return make_nontrivial(clq, wc, arity, type);
   case AbsentLevel:
     return DerivedMethodAbsent;
   }
@@ -1227,10 +1227,9 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(isBeganComputing(&inst->info));
           st structspec = {freeze(&rhs_fields)};
 
-          i_scope te_scope = inst_scope(id);
           it cu_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
-          if case Unprinted(pm) = compute_complete_struct_properties(clq, &i_scope, &st, &it, ComputeAll, &rhs_props) {
+          if case Unprinted(pm) = compute_complete_struct_properties(clq, &st, &it, ComputeAll, &rhs_props) {
             inst->info = FailedComputation;
             return Unprinted(pm);
           }
@@ -1253,10 +1252,9 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           check(isBeganComputing(&inst->info));
           et enumspec = {freeze(&rhs_constructors), drs.success_case_ix};
 
-          i_scope te_scope = inst_scope(id);
           it cu_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
-          if case Unprinted(pm) = compute_complete_enum_properties(clq, &i_scope, &et, &it, &rhs_props) {
+          if case Unprinted(pm) = compute_complete_enum_properties(clq, &et, &it, &rhs_props) {
             inst->info = FailedComputation;
             return Unprinted(pm);
           }
