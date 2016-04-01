@@ -1021,36 +1021,18 @@ func to_level(b *derived_method_behavior) behavior_level {
 }
 
 func make_magic_inst(clq *clqueue, magic_name sym, arity size, type *te_typeexpr) instpair {
-  cs *checkstate = clq->cs;
-  params array[te_typeexpr] = repeat(arity, ptr_type(cs, *type));
-  push(&params, primitive_void_type(cs));
-  fntype te_typeexpr = fn_type(cs, freeze(&params));
+  arr *array[def_entry_id] = unHas(lookup_ref(&clq->cs->defs_by_name, &magic_name));
+  // There is only be one magic def for each name.
+  check(count(arr) == 1);
+  ent_id def_entry_id = arr[0];
 
+  // It is templatized on one type parameter (type).
   parms genparms = HasParms(mk_shray(*type));
-
-  res match_def_res;
-  if case Printed(pm) = match_def(cs, magic_name, &parms, &fntype, &res) {
-    ice(_u8("make_nontrivial seeing error from match_def"));
+  inst_id def_inst_id;
+  if !from_np(make_inst(clq, ent_id, &parms, &inst_id)) {
+    ice(_u8("make_inst (from make_magic_inst) seeing error... what?"));
   }
-
-  switch &res {
-    case &NoMatch: {
-      ice(_u8("No match for magic def"));
-      return fake();
-    }
-    case &MultiMatch: {
-      // NOTE: This should be impossible.  Pick a less likely name...
-      ice(_u8("Multiple matches for magic def (is there a user-defined one?"));
-      return fake();
-    }
-    case &OneMatch(m ent_and_parms): {
-      inst_id def_inst_id;
-      if !from_np(make_inst(clq, m.ent, &m.parms, &inst_id)) {
-        ice(_u8("make_inst (check_and_compute_parms) seeing error in match_def"));
-      }
-      return {m.ent, inst_id};
-    }
-  }
+  return {ent_id, inst_id};
 }
 
 func make_nontrivial(clq *clqueue, wc which_ctor, arity size, type *te_typeexpr) derived_method_behavior {
