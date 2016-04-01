@@ -24,7 +24,6 @@ func unify_under_generics(scope *type_scope, unif_parms *array[te_typeexpr], pt 
                           names *shray[te_generik], t *te_typeexpr,
                           emissions_append *array[unify_emission],
                           unified_out *te_typeexpr) bool {
-  // SCOPE(): Use scope.
   if case &TeUnknown = pt {
     // It's worth pointing out:  This _is_ correct behavior if t is a generic parameter.
     *unified_out = *t;
@@ -137,6 +136,7 @@ func unify_under_generics(scope *type_scope, unif_parms *array[te_typeexpr], pt 
     }
 
     case &TeIpse(a te_ipse):
+      // SCOPE(): Soon, use scope.
       // NOTE: I mimicked the TeName case, and haven't fully thought out how that would
       // affect this function's callers, so treat this code with skepticism.
       if case Has(ix size) = lookup_ipse_name(names, a.name) {

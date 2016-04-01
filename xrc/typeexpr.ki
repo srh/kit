@@ -416,9 +416,13 @@ struct type_scope {
 
 }
 
-// SCOPE(): Callers of this might need some values initialized...
+// (Check callers whenever this gets modified.)
 func mk_scope() type_scope {
   return { };
+}
+
+func mk_global() type_scope {
+  return mk_scope();
 }
 
 

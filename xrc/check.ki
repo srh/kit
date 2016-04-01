@@ -440,16 +440,17 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t *genparms, ou
         ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
       }
 
+      canonicalized_scope type_scope = mk_global();
       ipse_names array[sym];
       cu_params array[cu_typeexpr];
       n size = count(&params);
       reserve(&cu_params, n);
       for i size = 0; i < n; i = i + 1 {
         canonicalized te_typeexpr;
-        canonicalize_idy_ipses(clq->im, &ipse_names, &params[i], &canonicalized);
+        canonicalize_idy_ipses(clq->im, &ipse_names, &params[i], &canonicalized, &canonicalized_scope);
         push(&cu_params, ~canonicalized);
       }
-      *out = {count(&ipse_names), {freeze(&cu_params)}};
+      *out = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&cu_params)}};
       return NoFail;
     }
   }
@@ -618,14 +619,15 @@ func check_and_compute_app_type(clq *clqueue, g *te_generics, parms *idy_repls, 
       if params_complete {
         // TODO: This is quite duplicated with check_and_compute_parms.  With the changes
         // we're making we should definitely dedup this code.
+        canonicalized_scope type_scope = mk_global();
         ipse_names array[sym];
         canonical array[cu_typeexpr];
         foreach param *te_typeexpr in refs(&params) {
           canonicalized te_typeexpr;
-          canonicalize_idy_ipses(clq->im, &ipse_names, param, &canonicalized);
+          canonicalize_idy_ipses(clq->im, &ipse_names, param, &canonicalized, &canonicalized_scope);
           push(&canonical, ~canonicalized);
         }
-        hp idy_genparms = {count(&ipse_names), {freeze(&canonical)}};
+        hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
         inst_id deftype_inst_id = enqueue_deftype_inst(clq, id, &hp);
         *out = {true, TeApp({TePureName(value), params, Has({id, inst_id})})};
       } else {
@@ -1161,7 +1163,7 @@ func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) np {
   }
 }
 
-// SCOPE(): We might need a fancier implementation of this.
+// SCOPE(): Probably will pull this off idy_repls.
 func inst_scope(inst_id deftype_inst_id) type_scope {
   return mk_scope();
 }

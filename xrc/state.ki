@@ -458,6 +458,9 @@ struct idy_genparms {
   // (Also, in general, if we get rid of commonplace template instantiation, it might end
   // up moot.)
 
+  // This is behind a shp because while it's not going to get mutated, it is not efficiently deep- copyable.  This scope covers '$0, etc, i.e. any types in idy_repls.
+  scope shp[type_scope];
+
   // The number of distinct ipse types used in repls.
   num_ipse_types_used size;
 
@@ -467,7 +470,7 @@ struct idy_genparms {
 }
 
 inline func blank_idyparms() idy_genparms {
-  return {0, {mk_shray()}};
+  return {emshp(mk_global()), 0, {mk_shray()}};
 }
 
 struct idy_repls {
