@@ -411,12 +411,13 @@ enum te_generics {
   TeVariadicGenerics te_variadic_generics;
 }
 
-struct te_scope {
+// Named type_scope, not te_scope, because te_ types are immutable, copyable, use shared pointers.
+struct type_scope {
 
 }
 
 // SCOPE(): Callers of this might need some values initialized...
-func mk_scope() te_scope {
+func mk_scope() type_scope {
   return { };
 }
 
@@ -426,7 +427,7 @@ func mk_scope() te_scope {
 //
 // When we have scoped types, presumably we'll update TeName to have scopage information necessary to avoid name conflicts.  The main worry is for types that represent run-time values -- it might be easy to make a mistake where ipse types are equal but really represent different trips around the same loop.
 //
-// We might need to make te_scope support "branched" te_scopes, where one te_scope is the "union" of two other te_scopes.  (te_scope would be an enum, with one alternative being a UnionOfTwo branch.  For now, functions like unify_under_generics (and whatnot) are going to take one scope parameter, which covers all the typeexprs.
+// We might need to make type_scope support "branched" type_scopes, where one type_scope is the "union" of two other type_scopes.  (type_scope would be an enum, with one alternative being a UnionOfTwo branch.  For now, functions like unify_under_generics (and whatnot) are going to take one scope parameter, which covers all the typeexprs.
 //
 // (Or maybe we'd use separate scope variables.)
 

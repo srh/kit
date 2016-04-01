@@ -13,7 +13,7 @@ struct framescope {
   // Same as ds->clq.
   clq *clqueue;
   // Same as &ds->tscope.
-  tscope *te_scope;
+  tscope *type_scope;
 
   all_vars array[var_info];
 
@@ -68,7 +68,7 @@ struct defscope {
   repls *idy_repls;
   def_informal_name sym;
 
-  tscope te_scope;
+  tscope type_scope;
 }
 
 struct var_number { x size; }
@@ -2080,7 +2080,7 @@ struct indexing_technique {
   deref bool;
 }
 
-func decompose_indexable(clq *clqueue, scope *te_scope, typ *te_typeexpr,
+func decompose_indexable(clq *clqueue, scope *type_scope, typ *te_typeexpr,
                          result_type_out **te_typeexpr, key_type_out *te_typeexpr, tech_out *indexing_technique) np {
   // We specifically do _not_ support references here.  You can't index into a
   // reference... you'd need a slice type or something like that.

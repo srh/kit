@@ -1149,7 +1149,7 @@ func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) np {
 }
 
 // SCOPE(): We might need a fancier implementation of this.
-func inst_scope(inst_id deftype_inst_id) te_scope {
+func inst_scope(inst_id deftype_inst_id) type_scope {
   return mk_scope();
 }
 
@@ -1561,7 +1561,7 @@ enum match_def_res {
 }
 
 // Note that gp could be incomplete.
-func match_def(cs *checkstate, name sym, scope *te_scope, gp *genparms, pt *te_typeexpr,
+func match_def(cs *checkstate, name sym, scope *type_scope, gp *genparms, pt *te_typeexpr,
                res_out *match_def_res) np {
   if case Has(arr *array[def_entry_id]) = lookup_ref(&cs->defs_by_name, &name) {
     n size = count(arr);
@@ -1636,7 +1636,7 @@ func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res
   }
 }
 
-func entry_matches(cs *checkstate, scope *te_scope, gp *genparms, pt *te_typeexpr,
+func entry_matches(cs *checkstate, scope *type_scope, gp *genparms, pt *te_typeexpr,
                    generics *te_generics, typeexpr *te_typeexpr) entry_matches_res {
   switch generics {
     case &TeNoGenerics: {

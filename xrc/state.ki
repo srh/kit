@@ -669,7 +669,7 @@ func is_defwise_trivial(props *type_properties) bool {
   return isTrivial(props->move_behavior) && isTrivial(props->copy_behavior) && isTrivial(props->destroy_behavior);
 }
 
-func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype_scope *te_scope, fntype *te_typeexpr, impl_name sym) cr[derived_method_behavior] {
+func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype_scope *type_scope, fntype *te_typeexpr, impl_name sym) cr[derived_method_behavior] {
   res match_def_res;
   gp genparms = NoParms;
   #match_def(clq->cs, impl_name, fntype_scope, &gp, fntype, &res);
@@ -692,7 +692,7 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype_scope *te_scope
 // We call this before we've set the inst's info -- so we _have_ to take structspec as a param.  It's _good_ that we don't make the caller pass the type itself -- we can see here that it's constructed straight from the ent, which means we know that there are no "strange" (read: scoped to some function body) lifetime types involved, just the idy_repls -- see the emissions in lookup_explicit_method_or_lack_thereof.
 func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *structspec, out *type_properties) np {
   cs *checkstate = clq->cs;
-  i_scope te_scope = inst_scope(inst_id);
+  i_scope type_scope = inst_scope(inst_id);
   type cu_typeexpr = inst_type(cs, ent_id, inst_id);
   switch a {
     case DefaultMoveCopyDestroy: {
