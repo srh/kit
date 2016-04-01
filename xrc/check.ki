@@ -1098,10 +1098,6 @@ func make_magic_inst(clq *clqueue, magic_name sym, arity size, type *te_typeexpr
   return {ent_id, inst_id};
 }
 
-func make_nontrivial(clq *clqueue, wc which_ctor, arity size, type *te_typeexpr) derived_method_behavior {
-  return DerivedMethodNontrivial(make_magic_inst(clq, magic_name(clq->im, wc), arity, type));
-}
-
 func make_inst(clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_inst_id) np {
   idy_parms idy_genparms;
   #check_and_compute_parms_with_canonicalization(clq, parms, &idy_parms);
@@ -1116,8 +1112,7 @@ func level_to_derived(clq *clqueue, wc which_ctor, arity size, type *te_typeexpr
   case TrivialLevel:
     return DerivedMethodTrivial;
   case NontrivialLevel:
-    // TODO: Remove make_nontrivial, just inline it here.
-    return make_nontrivial(clq, wc, arity, type);
+    return DerivedMethodNontrivial(make_magic_inst(clq, magic_name(clq->im, wc), arity, type));
   case AbsentLevel:
     return DerivedMethodAbsent;
   }
