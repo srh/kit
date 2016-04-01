@@ -692,17 +692,15 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype_scope *te_scope
 // We call this before we've set the inst's info -- so we _have_ to take structspec as a param.  It's _good_ that we don't make the caller pass the type itself -- we can see here that it's constructed straight from the ent, which means we know that there are no "strange" (read: scoped to some function body) lifetime types involved, just the idy_repls -- see the emissions in lookup_explicit_method_or_lack_thereof.
 func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *structspec, out *type_properties) np {
   cs *checkstate = clq->cs;
+  i_scope te_scope = inst_scope(inst_id);
   type cu_typeexpr = inst_type(cs, ent_id, inst_id);
-  scope te_scope;  // SCOPE(): No.
-  // SCOPE(): Generally, anything getting the type off an inst needs its type variables in its scope.
-  // SCOPE(): And there's where it's real easy to get shadowing of type variables -- they're numbered '$1, '$2, '$3, ..., and even with gensym names, the same inst recursively calling itself would run into trouble.
   switch a {
     case DefaultMoveCopyDestroy: {
       props type_properties;
-      #compute_complete_struct_properties(clq, st, &type, ComputeMove | ComputeCopy | ComputeDestroy, &props);
+      #compute_complete_struct_properties(clq, &i_scope, st, &type, ComputeMove | ComputeCopy | ComputeDestroy, &props);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &scope, &fntype1, cs->im->cym.do_initsym);
+      init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &i_scope, &fntype1, cs->im->cym.do_initsym);
       *out = {props.flat_size, props.flat_alignment,
               init_behavior,
               props.move_behavior, props.copy_behavior, props.destroy_behavior, props.is_scalar, props.is_pow2, props.exposed_types};
@@ -710,13 +708,13 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
     }
     case DefaultMove: {
       props type_properties;
-      #compute_complete_struct_properties(clq, st, &type, ComputeMove, &props);
+      #compute_complete_struct_properties(clq, &i_scope, st, &type, ComputeMove, &props);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &scope, &fntype1, cs->im->cym.do_initsym);
-      copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &scope, &fntype2, cs->im->cym.do_copysym);
-      destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &scope, &fntype1, cs->im->cym.do_destroysym);
+      init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &i_scope, &fntype1, cs->im->cym.do_initsym);
+      copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &i_scope, &fntype2, cs->im->cym.do_copysym);
+      destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &i_scope, &fntype1, cs->im->cym.do_destroysym);
       *out = {props.flat_size, props.flat_alignment,
               init_behavior,
               props.move_behavior,
@@ -727,14 +725,14 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
     }
     case NoDefaults: {
       props type_properties;
-      #compute_complete_struct_properties(clq, st, &type, ComputeNone, &props);
+      #compute_complete_struct_properties(clq, &i_scope, st, &type, ComputeNone, &props);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &scope, &fntype1, cs->im->cym.do_initsym);
-      move_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &scope, &fntype2, cs->im->cym.do_movesym);
-      copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &scope, &fntype2, cs->im->cym.do_copysym);
-      destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &scope, &fntype1, cs->im->cym.do_destroysym);
+      init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &i_scope, &fntype1, cs->im->cym.do_initsym);
+      move_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &i_scope, &fntype2, cs->im->cym.do_movesym);
+      copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &i_scope, &fntype2, cs->im->cym.do_copysym);
+      destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &i_scope, &fntype1, cs->im->cym.do_destroysym);
       props.is_scalar = IsScalarNo;
       *out = {props.flat_size, props.flat_alignment,
               init_behavior,
