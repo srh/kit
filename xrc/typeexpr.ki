@@ -133,15 +133,13 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
 
 func te_puretype_equal(cs *checkstate, a *te_puretype, b *te_puretype) bool {
   switch a {
-    case &TePureName(an sym): {
-      if case &TePureName(bn sym) = b {
-        return an == bn;
-      }
+  case &TePureName(an sym):
+    if case &TePureName(bn sym) = b {
+      return an == bn;
     }
-    case &TePureUnknown: {
-      if case &TePureUnknown = b {
-        return true;
-      }
+  case &TePureUnknown:
+    if case &TePureUnknown = b {
+      return true;
     }
   }
   return false;
