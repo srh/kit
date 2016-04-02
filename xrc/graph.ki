@@ -3260,7 +3260,7 @@ func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_a
   return done(&bu);
 }
 
-func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op primitive_op) cr[fn_body_id] {
+func add_prim_fn_body(clq *clqueue, informal_name sym, scope *type_scope, type *cu_typeexpr, op primitive_op) cr[fn_body_id] {
   gr frame_graph = init_frame_graph_empty(informal_name);
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
@@ -3318,13 +3318,14 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
 
   ent *def_entry = ref_def_entry(clq->cs, ent_id);
   inst *def_inst = ref_inst(clq->cs, inst_id);
+  inst_typrop_scope *type_scope = ref_scope(&inst->parms);
   inst_typrop *cu_typrop = un(&inst->typrop);
   switch &inst->graph {
     case &NotComputed: {
       inst->graph = BeganComputing;
       switch &inst->rhs {
         case &InstRhsPrim(op primitive_op): {
-          id fn_body_id = #add_prim_fn_body(clq, ent->def_name, &inst_typrop->cu, op);
+          id fn_body_id = #add_prim_fn_body(clq, ent->def_name, inst_typrop_scope, &inst_typrop->cu, op);
           frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
           inst->graph = Computed(move(&frg));
           return NoFail;
