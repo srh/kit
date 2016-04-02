@@ -215,9 +215,9 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
   return NoFail;
 }
 
-func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *te_generics, parms *idy_repls,
+func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *te_generics, parms *idy_genparms,
                     x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
-  ds defscope = {clq->cs, clq->im, clq, accessible, g, parms, def_informal_name, mk_scope()};
+  ds defscope = {clq->cs, clq->im, clq, accessible, g, &parms->repls, def_informal_name, clone_scope(ref_scope(parms))};
   es framescope = mk(&ds, None);
   #check_expr_consume(&es, x, pt);
   *frame_info_out = {Has(move(&es.gr))};

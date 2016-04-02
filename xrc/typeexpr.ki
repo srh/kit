@@ -425,6 +425,9 @@ func mk_global() type_scope {
   return mk_scope();
 }
 
+func clone_scope(copyee *type_scope) type_scope {
+  return *copyee;
+}
 
 
 // For now, the only name shadowing possible is that the "names" shray[te_generik] param of unify_under_generics scopes some names of "t" te_typeexpr.  We actually check that such template lists cannot shadow the global scope -- but they could have the same names as those in the "pt" te_typeexpr param of unify_under_generics.  That is fine.
