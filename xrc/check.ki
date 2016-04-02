@@ -1163,11 +1163,6 @@ func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) np {
   }
 }
 
-// SCOPE(): Probably will pull this off idy_repls.
-func inst_scope(inst_id deftype_inst_id) type_scope {
-  return mk_scope();
-}
-
 // This does return a complete and computed typeexpr.  Note that it'll have some generic
 // parameters from an idy_genparms, so watch your scopage.
 func inst_type(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id) cu_typeexpr {
