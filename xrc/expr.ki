@@ -1143,7 +1143,7 @@ func make_comparecells(es *framescope, dest cell_num) instpair {
     canonicalized_scope type_scope = mk_global();
     ipse_names array[sym];
     canonical te_typeexpr;
-    canonicalize_idy_ipses(es->im, &ipse_names, &ref_cell(es, dest)->type.x, &canonical, &canonicalized_scope);
+    canonicalize_idy_ipses(es->im, &ref_cell(es, dest)->type.x, &canonical, &ipse_names, &canonicalized_scope);
     parms idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {mk_shray(~canonical)}};
     inst_id def_inst_id = enqueue_def_inst(es->clq, ent, &parms);
     return {ent, inst_id};

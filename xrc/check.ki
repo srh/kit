@@ -447,7 +447,7 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t *genparms, ou
       reserve(&cu_params, n);
       for i size = 0; i < n; i = i + 1 {
         canonicalized te_typeexpr;
-        canonicalize_idy_ipses(clq->im, &ipse_names, &params[i], &canonicalized, &canonicalized_scope);
+        canonicalize_idy_ipses(clq->im, &params[i], &canonicalized, &ipse_names, &canonicalized_scope);
         push(&cu_params, ~canonicalized);
       }
       *out = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&cu_params)}};
@@ -624,7 +624,7 @@ func check_and_compute_app_type(clq *clqueue, g *te_generics, parms *idy_repls, 
         canonical array[cu_typeexpr];
         foreach param *te_typeexpr in refs(&params) {
           canonicalized te_typeexpr;
-          canonicalize_idy_ipses(clq->im, &ipse_names, param, &canonicalized, &canonicalized_scope);
+          canonicalize_idy_ipses(clq->im, param, &canonicalized, &ipse_names, &canonicalized_scope);
           push(&canonical, ~canonicalized);
         }
         hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
