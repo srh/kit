@@ -731,9 +731,12 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
 
     annotate_info(x, CompleteCheck(mk(lval, success_case_cu, success_case_props)));
 
+    constructors_props array[type_properties];
+    #compute_complete_vardecl_properties(es->clq, &et->constructors, &constructors_props);
+
     tag_cell cell_num = add_virtual_tag_cell(es, et);
     return_tag_cell cell_num = add_virtual_tag_cell(es, et);
-    annotate(&a->info, {tag_cell, *et, return_tag_cell, *return_et, constructor_mapping, {freeze(&emissions)}});
+    annotate(&a->info, {tag_cell, *et, move(&constructors_props), return_tag_cell, *return_et, constructor_mapping, {freeze(&emissions)}});
 
     return NoFail;
   } else {

@@ -972,6 +972,19 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *cu_t
   return NoFail;
 }
 
+func compute_complete_vardecl_properties(clq *clqueue, decls *shray[te_vardecl], out *array[type_properties]) np {
+  ret array[type_properties];
+  foreach decl *te_vardecl in refs(decls) {
+    props type_properties;
+    #compute_complete_type_properties(clq, &decl->type, &props);
+    push(&ret, props);
+  }
+  swap(out, &ret);
+  return NoFail;
+}
+
+
+
 // t had better be complete and computed.
 func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_properties) np {
   cs *checkstate = clq->cs;

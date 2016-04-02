@@ -567,6 +567,8 @@ struct ast_ternary {
 struct ast_quickreturn_info {
   tag_cell cell_num;
   et enumspec;
+  // Type properties by constructor number.
+  et_constructor_props array[type_properties];
 
   return_tag_cell cell_num;
   return_et enumspec;
