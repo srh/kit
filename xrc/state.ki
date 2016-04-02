@@ -486,6 +486,7 @@ func ref_scope(parms *idy_genparms) *type_scope {
   return oo(&parms->scope);
 }
 
+// SCOPE(): Uh, we're going to have to account for the type_scope here.
 func hash_compute_hash(x *idy_genparms) osize {
   accum osize = hash_compute_hash(&x->num_ipse_types_used);
   n size = count(&x->repls.tys);
