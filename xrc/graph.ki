@@ -2583,9 +2583,6 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
     ice(_u8("gr_magic_arraytype_info sees non-array type"));
   }
 
-  param_props type_properties;
-  #compute_complete_type_properties(clq, param, &param_props);
-
   elemptrtype cu_typeexpr;
   elemptrtype_props type_properties;
   compute_prim(clq, ptr_type(cs, *param), &elemptrtype, &elemptrtype_props);
@@ -2682,11 +2679,11 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
 
       elemptrcells array[cell_num];
       for j size = 0; j < nargs; j = j + 1 {
-        ec cell_num = add_cell(&gr, {LocationVirtual, ~ *param, param_props});
+        ec cell_num = add_cell(&gr, {LocationVirtual, ~ *param, mai->param_props});
         indexcopycell cell_num = add_cell(&gr, {LocationStatic, size_type, size_type_props});
         add(&vd_bu, @[gr_xop]GrLive({indexcopycell}));
         add(&vd_bu, @[gr_xop]GrMemCopy({indexcopycell, indexcell}));
-        add(&vd_bu, @[gr_xop]GrSubcell({ec, get(&pointeecells, j), OffsetComputed({param_props.flat_size, indexcopycell})}));
+        add(&vd_bu, @[gr_xop]GrSubcell({ec, get(&pointeecells, j), OffsetComputed({mai->param_props.flat_size, indexcopycell})}));
         add(&vd_bu, @[gr_xop]GrDead({indexcopycell}));
         epc cell_num = add_cell(&gr, {LocationStatic, elemptrtype, elemptrtype_props});
         push(&elemptrcells, epc);

@@ -24,6 +24,7 @@ struct magic_enum_info {
 struct magic_arraytype_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
+  param_props type_properties;
   ip instpair;
 }
 
@@ -268,7 +269,7 @@ func check_magic_ctor(clq *clqueue, g *te_generics, parms *idy_repls, wc which_c
     case &TeArraytype(a te_arraytype): {
       props type_properties;
       #compute_complete_type_properties(clq, oo(&a.param), &props);
-      annotate(&mc->info, @[magic_ctor_info]MagicArraytypeInfo({~cac.te, cac_props, instpair_from_behavior(select_behavior(wc, &props))}));
+      annotate(&mc->info, @[magic_ctor_info]MagicArraytypeInfo({~cac.te, cac_props, props, instpair_from_behavior(select_behavior(wc, &props))}));
     }
     case &TeIpse(a te_ipse):
       return ERR(_u8("ICE: check_magic_ctor seeing TeIpse."));
