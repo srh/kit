@@ -2799,17 +2799,16 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info,
     tagval enum_tag_value = mk_enum_tag_value(i);
 
     fieldtype cu_typeexpr = ~ref(&et->constructors, i)->type;
-    fieldtype_props type_properties;
-    #compute_type_properties(clq, &fieldtype, &fieldtype_props);
+    fieldtype_props *type_properties = &mei->et_constructor_props[i];
 
     field_offset u32 = enum_field_offset(cs, et, tagval);
-    field_end u32 = field_offset + fieldtype_props.flat_size;
+    field_end u32 = field_offset + fieldtype_props->flat_size;
     tag_end u32 = enum_tag_offset + tagtype_props.flat_size;
 
     fieldcella array[cell_num];
     fieldcellops array[gr_xop];
     for j size = 0; j < nargs; j = j + 1 {
-      fc cell_num = add_cell(&gr, {LocationVirtual, fieldtype, fieldtype_props});
+      fc cell_num = add_cell(&gr, {LocationVirtual, fieldtype, *fieldtype_props});
       push(&fieldcella, fc);
       push(&fieldcellops, @[gr_xop]GrSubcell({get(&fieldcella, j), get(&pointeecells, j), OffsetConst({field_offset, EnumConstructorField(i)})}));
     }
