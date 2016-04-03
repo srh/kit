@@ -9,6 +9,10 @@ func canonicalized_pack(pack *opt[te_instpack]) opt[te_instpack] {
   return *pack;
 }
 
+func canonicalized_app_pack(pack *opt[te_app_pack]) opt[te_app_pack] {
+  return *pack;
+}
+
 func canonicalize_arraytype_count(a *opt[u32]) opt[u32] {
   return *a;
 }
@@ -32,7 +36,7 @@ func canonicalize_idy_ipses(im *identmap, t *te_typeexpr, out *te_typeexpr, ipse
       canonicalize_idy_ipses(im, ref(&a.params, i), &tmp, ipse_names_append, canonicalized_scope_append);
       push(&newparams, tmp);
     }
-    *out = TeApp({a.typefunc, freeze(&newparams), canonicalized_pack(&a.pack)});
+    *out = TeApp({a.typefunc, freeze(&newparams), canonicalized_app_pack(&a.pack)});
   case &TeUnion(a te_union):
     // Honestly, a union having ipses would be pretty weird.
     *out = TeUnion({canonicalize_idy_vardecls(im, &a.fields, ipse_names_append, canonicalized_scope_append)});

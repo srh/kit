@@ -257,9 +257,9 @@ func check_magic_ctor(clq *clqueue, g *te_generics, parms *idy_repls, wc which_c
       }
     }
     case &TeApp(a te_typeapp): {
-      if case &Has(p te_instpack) = &a.pack {
+      if case &Has(p te_app_pack) = &a.pack {
         info magic_ctor_info;
-        #check_pack_ctor(clq, &cac.te, &cac_props, &p, wc, &info);
+        #check_pack_ctor(clq, &cac.te, &cac_props, &p.tip, wc, &info);
         annotate(&mc->info, info);
       } else {
         ice(_u8("check_magic_ctor packless app type"));

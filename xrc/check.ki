@@ -629,7 +629,7 @@ func check_and_compute_app_type(clq *clqueue, g *te_generics, parms *idy_repls, 
         }
         hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
         inst_id deftype_inst_id = enqueue_deftype_inst(clq, id, &hp);
-        *out = {true, TeApp({TePureName(value), params, Has({id, inst_id})})};
+        *out = {true, TeApp({TePureName(value), params, Has({{id, inst_id}})})};
       } else {
         *out = {false, TeApp({TePureName(value), params, None})};
       }
@@ -1000,8 +1000,8 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
       }
     }
     case &TeApp(a te_typeapp): {
-      if case &Has(pack te_instpack) = &a.pack {
-        return compute_pack_properties(clq, &pack, out);
+      if case &Has(pack te_app_pack) = &a.pack {
+        return compute_pack_properties(clq, &pack.tip, out);
       } else {
         ice(_u8("compute_type_properties called on packless app type."));
         return fake();
@@ -1181,7 +1181,7 @@ func inst_type(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id)
   for i size = 0; i < n; i = i + 1 {
     push(&te_params, ref(cu_params, i)->x);
   }
-  return ~@[te_typeexpr]TeApp({TePureName(ent->name), freeze(&te_params), Has({ent_id, inst_id})});
+  return ~@[te_typeexpr]TeApp({TePureName(ent->name), freeze(&te_params), Has({{ent_id, inst_id}})});
 }
 
 func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id deftype_inst_id) np {

@@ -41,11 +41,16 @@ struct te_name {
   pack opt[te_instpack];
 }
 
+struct te_app_pack {
+  tip te_instpack;
+  // SCOPE(): When another field gets added, rename tip and check callers.
+}
+
 struct te_typeapp {
   typefunc te_puretype;
   params shray[te_typeexpr];
   // Only supplied if the type is complete, the lookup actually happened.
-  pack opt[te_instpack];
+  pack opt[te_app_pack];
 }
 
 struct te_union {
@@ -101,9 +106,9 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
     }
     case &TeApp(ax te_typeapp): {
       if case &TeApp(bx te_typeapp) = b {
-        if case &Has(p te_instpack) = &ax.pack {
-          if case &Has(q te_instpack) = &bx.pack {
-            return p.inst_id.x == q.inst_id.x;
+        if case &Has(p te_app_pack) = &ax.pack {
+          if case &Has(q te_app_pack) = &bx.pack {
+            return p.tip.inst_id.x == q.tip.inst_id.x;
           }
         }
         ice(_u8("idy_typeexpr_equal on non-pack-having app typeexpr"));
@@ -284,8 +289,8 @@ func help_compute_hash(a *te_typeexpr) osize {
     }
     ice(_u8("help_compute_hash on non-pack-having name typeexpr"));
   case &TeApp(ax te_typeapp):
-    if case &Has(p te_instpack) = &ax.pack {
-      return ~p.inst_id.x;
+    if case &Has(p te_app_pack) = &ax.pack {
+      return ~p.tip.inst_id.x;
     }
     ice(_u8("help_compute_hash on non-pack-having app typeexpr"));
   case &TeUnion(ax te_union):
