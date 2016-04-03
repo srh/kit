@@ -2956,8 +2956,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
 
   st *structspec = &msi->st;
 
-  psd partial_struct_data;
-  #compute_partial_struct_data(clq, &st->fields, None, &psd);
+  psd *partial_struct_data = &msi->psd;
 
   bu sq_builder = mk_builder(gs);
 
@@ -2998,10 +2997,10 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
     fieldcella array[cell_num];
     fieldcellops array[gr_xop];
     for j size = 0; j < nargs; j = j + 1 {
-      fc cell_num = add_cell(&gr, {LocationVirtual, ~ ref(&st->fields, i)->type, ref(&psd.fields, i)->props});
+      fc cell_num = add_cell(&gr, {LocationVirtual, ~ ref(&st->fields, i)->type, ref(&psd->fields, i)->props});
       push(&fieldcella, fc);
 
-      push(&fieldcellops, @[gr_xop]GrSubcell({fc, get(&pointeecells, j), OffsetConst({ref(&psd.fields, i)->offset, StructField(i)})}));
+      push(&fieldcellops, @[gr_xop]GrSubcell({fc, get(&pointeecells, j), OffsetConst({ref(&psd->fields, i)->offset, StructField(i)})}));
     }
 
     if case Has(ip instpair) = get(&msi->fips, i) {
@@ -3067,7 +3066,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
     if init_padding {
       padding_offset u32;
       padding_count u32;
-      postpadding_offset_and_count(&psd, i, &padding_offset, &padding_count);
+      postpadding_offset_and_count(psd, i, &padding_offset, &padding_count);
       addo(&bu, gr_bzero_padding(gs, get(&pointeecells, 0), padding_offset, padding_count));
     }
   }

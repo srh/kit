@@ -11,6 +11,7 @@ struct magic_struct_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
   st structspec;
+  psd partial_struct_data;
   fips array[opt[instpair]];
 }
 
@@ -336,7 +337,10 @@ func check_pack_ctor(clq *clqueue, complete_te *te_typeexpr, props *type_propert
     field_insts array[opt[instpair]];
     #check_vardecl_ctor(clq, &ri.fields, wc, &field_insts);
 
-    *info_out = MagicStructInfo({~ *complete_te, *props, ri, field_insts});
+    psd partial_struct_data;
+    #compute_partial_struct_data(clq, &ri.fields, None, &psd);
+
+    *info_out = MagicStructInfo({~ *complete_te, *props, ri, move(&psd), field_insts});
   case &RhsEnumInfo(ri enumspec):
     field_insts array[opt[instpair]];
     #check_vardecl_ctor(clq, &ri.constructors, wc, &field_insts);
