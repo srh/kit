@@ -1206,8 +1206,12 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
         case &ClassexprRhsSpec(crs classexpr_rhs_spec):
           rhs_fields array[te_vardecl];
           rhs_fields_complete bool;
-          #help_check_and_compute_fields(clq, &ent->generics, &inst->parms.repls, &crs.drs.fields,
-                                         &rhs_fields, &rhs_fields_complete);
+          if case Unprinted(pm) = help_check_and_compute_fields(
+              clq, &ent->generics, &inst->parms.repls, &crs.drs.fields,
+              &rhs_fields, &rhs_fields_complete) {
+            inst->info = FailedComputation;
+            return Unprinted(pm);
+          }
 
           check(rhs_fields_complete);
 
