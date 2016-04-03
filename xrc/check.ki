@@ -403,11 +403,11 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t *genparms, out *idy
     *out = blank_idyrepls();
     return NoFail;
   case &HasParms(ps shray[te_typeexpr]):
-    noscope_g te_generics = TeNoGenerics;
-    noscope_parms idy_repls = blank_idyrepls();
+    nogeneric_g te_generics = TeNoGenerics;
+    nogeneric_parms idy_repls = blank_idyrepls();
     params_complete bool;
     params shray[te_typeexpr];
-    #check_and_compute_typeexpr_shray(clq, &noscope_g, &noscope_parms, &ps, &params, &params_complete);
+    #check_and_compute_typeexpr_shray(clq, &nogeneric_g, &nogeneric_parms, &ps, &params, &params_complete);
 
     if !params_complete {
       ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
@@ -430,11 +430,11 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t *genparms, ou
       return NoFail;
     }
     case &HasParms(ps shray[te_typeexpr]): {
-      noscope_g te_generics = TeNoGenerics;
-      noscope_parms idy_repls = blank_idyrepls();
+      nogeneric_g te_generics = TeNoGenerics;
+      nogeneric_parms idy_repls = blank_idyrepls();
       params_complete bool;
       params shray[te_typeexpr];
-      #check_and_compute_typeexpr_shray(clq, &noscope_g, &noscope_parms, &ps, &params, &params_complete);
+      #check_and_compute_typeexpr_shray(clq, &nogeneric_g, &nogeneric_parms, &ps, &params, &params_complete);
 
       if !params_complete {
         ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
@@ -455,7 +455,7 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t *genparms, ou
   }
 }
 
-func noscoped_check_and_compute_typeexpr(clq *clqueue, t *te_typeexpr, out *cac_typeexpr) np {
+func nogeneric_check_and_compute_typeexpr(clq *clqueue, t *te_typeexpr, out *cac_typeexpr) np {
   ng te_generics = TeNoGenerics;
   np idy_repls = blank_idyrepls();
   return check_and_compute_typeexpr(clq, &ng, &np, t, out);

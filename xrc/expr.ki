@@ -323,7 +323,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     return NoFail(NoMatchConstructor);
   case Success:
     cac_return_type cac_typeexpr;
-    #noscoped_check_and_compute_typeexpr(ds->clq, return_type, &cac_return_type);
+    #nogeneric_check_and_compute_typeexpr(ds->clq, return_type, &cac_return_type);
     if !cac_return_type.complete {
       return NoFail(AmbigMatchConstructor);
     }
@@ -348,7 +348,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     }
     ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
     cac_ctor_type cac_typeexpr;
-    #noscoped_check_and_compute_typeexpr(ds->clq, &ctor_type, &cac_ctor_type);
+    #nogeneric_check_and_compute_typeexpr(ds->clq, &ctor_type, &cac_ctor_type);
     check(cac_ctor_type.complete);
 
     ip instpair = #lookup_or_make_enum_constructor_def(ds, et, &cac_return_type.te, &cac_ctor_type.te, decl_index);
@@ -511,7 +511,7 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
     check(empty(&emissions));
 
     c cac_typeexpr;
-    if !from_np(noscoped_check_and_compute_typeexpr(es->clq, &unified, &c)) {
+    if !from_np(nogeneric_check_and_compute_typeexpr(es->clq, &unified, &c)) {
       ice(_u8("help_check_simple_literal passed bad type"));
     }
     check(c.complete);
@@ -779,7 +779,7 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
 
     ref_type te_typeexpr = mk_ref_type(es->cs, unified_ipse, rhs_info->cu.x);
     ref_computed cac_typeexpr;
-    #noscoped_check_and_compute_typeexpr(es->clq, &ref_type, &ref_computed);
+    #nogeneric_check_and_compute_typeexpr(es->clq, &ref_type, &ref_computed);
     // (TODO: Make lval desc.ipse be a te_ipse, so it can't be incomplete?)
     if !ref_computed.complete {
       return ERR(_u8("ICE?  lval desc.ipse must have been incomplete (after complete type-check)."));
@@ -828,7 +828,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_exp
   if computed.complete {
     unified_computed = computed;
   } else {
-    if !from_np(noscoped_check_and_compute_typeexpr(es->clq, &unified, &unified_computed)) {
+    if !from_np(nogeneric_check_and_compute_typeexpr(es->clq, &unified, &unified_computed)) {
       return ERR(_u8("TypedExpr encounters un-computable unified type."));
     }
   }
@@ -985,7 +985,7 @@ func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *
 
   ptr_type te_typeexpr = ptr_type(es->cs, rhs_info->cu.x);
   ptr_computed cac_typeexpr;
-  #noscoped_check_and_compute_typeexpr(es->clq, &ptr_type, &ptr_computed);
+  #nogeneric_check_and_compute_typeexpr(es->clq, &ptr_type, &ptr_computed);
   check(ptr_computed.complete);
   ptr_props type_properties;
   #compute_complete_type_properties(es->clq, &ptr_computed.te, &ptr_props);
@@ -1964,7 +1964,7 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
 
 func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
   cac cac_typeexpr;
-  if !from_np(noscoped_check_and_compute_typeexpr(clq, &t, &cac)) {
+  if !from_np(nogeneric_check_and_compute_typeexpr(clq, &t, &cac)) {
     ice(_u8("compute_prim encounters uncomputable type"));
   }
   check(cac.complete);
@@ -2199,7 +2199,7 @@ func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[
   push(&type_params, *return_type);
   fntype te_typeexpr = TeApp({primitive_function_puretype(clq->cs), freeze(&type_params), None});
   cac cac_typeexpr;
-  #noscoped_check_and_compute_typeexpr(clq, &fntype, &cac);
+  #nogeneric_check_and_compute_typeexpr(clq, &fntype, &cac);
   *out = cac.te;
   return NoFail;
 }
