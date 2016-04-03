@@ -1629,6 +1629,7 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
   return NoFail;
 }
 
+// SCOPE(): The scopage of st_out is different from the scopage of t.
 func structural_structspec(ds *defscope, t *te_typeexpr, st_out **structspec) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
     st *structspec;
@@ -1648,6 +1649,7 @@ func structural_structspec(ds *defscope, t *te_typeexpr, st_out **structspec) st
 }
 
 // et_out is set to a complete/computed value.
+// SCOPE(): The scopage of et_out is different from the scopage of t.
 func structural_enumspec(ds *defscope, t *te_typeexpr, et_out **enumspec) structural_rhs_result {
   if case Has(pack te_instpack) = type_pack(t) {
     et *enumspec;
@@ -1769,6 +1771,7 @@ func help_structural_enumspec(ds *defscope, pack *te_instpack, et_out **enumspec
   }
 }
 
+// SCOPE(): All callers of this get st_out in the wrong scope.
 func help_structural_structspec(ds *defscope, pack *te_instpack, st_out **structspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
