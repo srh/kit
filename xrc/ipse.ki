@@ -5,7 +5,7 @@ import state;
 
 // I suspect instpacks might require ipse type name mapping information, so this is a
 // placeholder.
-func canonicalized_pack(pack *opt[te_instpack]) opt[te_instpack] {
+func canonicalized_pack(pack *te_instpack) te_instpack {
   return *pack;
 }
 
@@ -28,7 +28,7 @@ func make_canonicalized_ipse_name(im *identmap, ix size) sym {
 func canonicalize_idy_ipses(im *identmap, t *te_typeexpr, out *te_typeexpr, ipse_names_append *array[sym], canonicalized_scope_append *type_scope) void {
   switch t {
   case &TeName(a te_name):
-    *out = *t;
+    *out = TeName({a.value, Has!canonicalized_pack(unHas!&a.pack)});
   case &TeApp(a te_typeapp):
     newparams array[te_typeexpr];
     nparams size = count(&a.params);
