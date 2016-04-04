@@ -1726,21 +1726,15 @@ func help_structural_rhs_info(ds *defscope, pack *te_instpack,
   }
 }
 
-func map_enumspec_ipses(ipse_mappings *shray[sym], inn *enumspec, out *enumspec) void {
-  constructors shray[te_vardecl] = map_vardecl_ipses(ipse_mappings, &inn->constructors);
+func map_enumspec_ipses(im *identmap, ipse_mappings *shray[sym], inn *enumspec, out *enumspec) void {
+  constructors shray[te_vardecl] = map_vardecl_ipses(im, ipse_mappings, &inn->constructors);
   *out = {constructors, inn->success_case_ix};
 }
 
-func map_structspec_ipses(ipse_mappings *shray[sym], inn *structspec, out *structspec) void {
-  fields shray[te_vardecl] = map_vardecl_ipses(ipse_mappings, &inn->fields);
+func map_structspec_ipses(im *identmap, ipse_mappings *shray[sym], inn *structspec, out *structspec) void {
+  fields shray[te_vardecl] = map_vardecl_ipses(im, ipse_mappings, &inn->fields);
   *out = {fields};
 }
-
-func map_vardecl_ipses(ipse_mappings *shray[sym], inn *shray[te_vardecl]) shray[te_vardecl] {
-  // SCOPE(): Actually implement.
-  return *inn;
-}
-
 
 func help_structural_enumspec(ds *defscope, pack *te_instpack, ipse_mappings *shray[sym], et_out *enumspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
@@ -1752,7 +1746,7 @@ func help_structural_enumspec(ds *defscope, pack *te_instpack, ipse_mappings *sh
     case &RhsStructInfo(ri structspec):
       return NotAccessible;
     case &RhsEnumInfo(ri enumspec):
-      map_enumspec_ipses(ipse_mappings, &ri, et_out);
+      map_enumspec_ipses(ds->im, ipse_mappings, &ri, et_out);
       return Success;
     }
   case NotAccessible:
@@ -1769,7 +1763,7 @@ func help_structural_structspec(ds *defscope, pack *te_instpack, ipse_mappings *
   case Success:
     switch rhs_info {
     case &RhsStructInfo(ri structspec):
-      map_structspec_ipses(ipse_mappings, &ri, st_out);
+      map_structspec_ipses(ds->im, ipse_mappings, &ri, st_out);
       return Success;
     case &RhsEnumInfo(ri enumspec):
       return NotAccessible;

@@ -9,7 +9,8 @@ func canonicalized_pack(pack *opt[te_instpack]) opt[te_instpack] {
   return *pack;
 }
 
-func canonicalized_app_pack(pack *opt[te_app_pack]) opt[te_app_pack] {
+func canonicalized_app_pack(pack *te_app_pack) te_app_pack {
+  // SCOPE(): The ipse_mappings should also be canonicalized.
   return *pack;
 }
 
@@ -36,7 +37,7 @@ func canonicalize_idy_ipses(im *identmap, t *te_typeexpr, out *te_typeexpr, ipse
       canonicalize_idy_ipses(im, ref(&a.params, i), &tmp, ipse_names_append, canonicalized_scope_append);
       push(&newparams, tmp);
     }
-    *out = TeApp({a.typefunc, freeze(&newparams), canonicalized_app_pack(&a.pack)});
+    *out = TeApp({a.typefunc, freeze(&newparams), Has!canonicalized_app_pack(unHas!&a.pack)});
   case &TeUnion(a te_union):
     // Honestly, a union having ipses would be pretty weird.
     *out = TeUnion({canonicalize_idy_vardecls(im, &a.fields, ipse_names_append, canonicalized_scope_append)});
@@ -69,4 +70,65 @@ func canonicalize_idy_vardecls(im *identmap, a *shray[te_vardecl], ipse_names_ap
     push(&build, {decl->name, tmp});
   }
   return freeze(&build);
+}
+
+
+func map_ipses_arraytype_count(ipse_mappings *shray[sym], count *opt[u32]) opt[u32] {
+  return *count;
+}
+
+func map_vardecl_ipses(im *identmap, ipse_mappings *shray[sym], inn *shray[te_vardecl]) shray[te_vardecl] {
+  // A performant short-cut.
+  if empty(ipse_mappings) {
+    return *inn;
+  }
+
+  bu array[te_vardecl];
+  foreach vd *te_vardecl in refs(inn) {
+    push(&bu, {vd->name, map_ipses(im, ipse_mappings, &vd->type)});
+  }
+  return freeze(&bu);
+}
+
+func map_ipses_to_app_pack(im *identmap, ipse_mappings *shray[sym], pack *te_app_pack) te_app_pack {
+  build array[sym];
+  foreach s sym in elems(&pack->ipse_mappings) {
+    push(&build, map_ipse_sym(im, ipse_mappings, s));
+  }
+
+  return {pack->teip, freeze(&build)};
+}
+
+func map_ipse_sym(im *identmap, ipse_mappings *shray[sym], s sym) sym {
+  n size = count(ipse_mappings);
+  for i size = 0; i < n; i++ {
+    if s == make_canonicalized_ipse_name(im, i) {
+      return ipse_mappings[i];
+    }
+  }
+  DBG(_u8("map_ipse_sym symbol "), lookup(im, s), _u8(" unmapped"));
+  return s;
+}
+
+func map_ipses(im *identmap, ipse_mappings *shray[sym], t *te_typeexpr) te_typeexpr {
+  switch t {
+  case &TeName(a te_name):
+    return *t;
+  case &TeApp(a te_typeapp):
+    newparams array[te_typeexpr];
+    foreach param *te_typeexpr in refs(&a.params) {
+      push(&newparams, map_ipses(im, ipse_mappings, param));
+    }
+    return TeApp({a.typefunc, freeze(&newparams), Has!map_ipses_to_app_pack(im, ipse_mappings, unHas!&a.pack)});
+  case &TeUnion(a te_union):
+    return TeUnion({map_vardecl_ipses(im, ipse_mappings, &a.fields)});
+  case &TeArraytype(a te_arraytype):
+    count opt[u32] = map_ipses_arraytype_count(ipse_mappings, &a.count);
+    return TeArraytype({count, emshp(map_ipses(im, ipse_mappings, oo(&a.param)))});
+  case &TeIpse(a te_ipse):
+    return TeIpse({map_ipse_sym(im, ipse_mappings, a.name)});
+  case &TeUnknown:
+    ice(_u8("map_ipses sees TeUnknown"));
+    return fake();
+  }
 }
