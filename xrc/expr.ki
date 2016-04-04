@@ -1636,7 +1636,6 @@ func structural_structspec(ds *defscope, t *te_typeexpr, st_out *structspec) str
     ipse_mappings shray[sym];  // empty
     return help_structural_structspec(ds, unHas(&a.pack), &ipse_mappings, st_out);
   case &TeApp(a te_typeapp):
-    // SCOPE(): Use all of the pack.
     hp *te_app_pack = unHas(&a.pack);
     return help_structural_structspec(ds, &hp->teip, &hp->ipse_mappings, st_out);
   default:
@@ -1652,7 +1651,6 @@ func structural_enumspec(ds *defscope, t *te_typeexpr, et_out *enumspec) structu
     ipse_mappings shray[sym]; // empty
     return help_structural_enumspec(ds, unHas(&a.pack), &ipse_mappings, et_out);
   case &TeApp(a te_typeapp):
-    // SCOPE(): Use all of the pack.
     hp *te_app_pack = unHas(&a.pack);
     return help_structural_enumspec(ds, &hp->teip, &hp->ipse_mappings, et_out);
   default:
