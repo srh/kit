@@ -1001,7 +1001,7 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
     }
     case &TeApp(a te_typeapp): {
       if case &Has(pack te_app_pack) = &a.pack {
-        return compute_pack_properties(clq, &pack.tip, out);
+        return compute_pack_properties(clq, &pack.teip, out);
       } else {
         ice(_u8("compute_type_properties called on packless app type."));
         return fake();

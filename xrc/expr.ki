@@ -1709,7 +1709,8 @@ func type_pack(t *te_typeexpr) opt[te_instpack] {
     ice(_u8("type_pack called on uncomputed type"));
   case &TeApp(a te_typeapp):
     if case &Has(pack te_app_pack) = &a.pack {
-      return Has(pack.tip);
+      // SCOPE(): Gross, see callers, they have a SCOPE() comment on them.
+      return Has(pack.teip);
     }
     ice(_u8("type_pack called on uncomputed type"));
   case &TeUnknown:
@@ -1819,7 +1820,8 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
       return lookup_name_field(es, unHas(&a.pack), fieldname, fieldtype_out, res_out);
     }
     case &TeApp(a te_typeapp): {
-      return lookup_name_field(es, &unHas(&a.pack)->tip, fieldname, fieldtype_out, res_out);
+      // SCOPE(): No, ->teip is a problem here -- we need to use ipse_mappings.
+      return lookup_name_field(es, &unHas(&a.pack)->teip, fieldname, fieldtype_out, res_out);
     }
     case &TeUnion(a te_union): {
       // The offset's what it would be for a struct.
