@@ -1773,11 +1773,10 @@ func help_structural_structspec(ds *defscope, pack *te_instpack, ipse_mappings *
   }
 }
 
-func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident,
+func lookup_name_field(es *framescope, pack *te_instpack, ipse_mappings *shray[sym], fieldname *ast_ident,
                        fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
-  ipse_mappings shray[sym];  // SCOPE(): Completely fake, should be a param.
   st structspec;
-  switch help_structural_structspec(es->ds, pack, &ipse_mappings, &st) {
+  switch help_structural_structspec(es->ds, pack, ipse_mappings, &st) {
   case Error(pm):
     return Unprinted(pm);
   case Success:
@@ -1800,11 +1799,12 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
                             fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   switch &t->x {
     case &TeName(a te_name): {
-      return lookup_name_field(es, unHas(&a.pack), fieldname, fieldtype_out, res_out);
+      ipse_mappings shray[sym];  // empty
+      return lookup_name_field(es, unHas(&a.pack), &ipse_mappings, fieldname, fieldtype_out, res_out);
     }
     case &TeApp(a te_typeapp): {
-      // SCOPE(): No, ->teip is a problem here -- we need to use ipse_mappings.
-      return lookup_name_field(es, &unHas(&a.pack)->teip, fieldname, fieldtype_out, res_out);
+      hp *te_app_pack = unHas(&a.pack);
+      return lookup_name_field(es, &hp->teip, &hp->ipse_mappings, fieldname, fieldtype_out, res_out);
     }
     case &TeUnion(a te_union): {
       // The offset's what it would be for a struct.
