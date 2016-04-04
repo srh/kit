@@ -252,8 +252,9 @@ func check_magic_ctor(clq *clqueue, g *te_generics, scope *type_scope, parms *id
   switch &cac.te {
     case &TeName(a te_name): {
       if case &Has(p te_instpack) = &a.pack {
+        ipse_mappings shray[sym];  // empty
         info magic_ctor_info;
-        #check_pack_ctor(clq, scope, &cac.te, &cac_props, &p, wc, &info);
+        #check_pack_ctor(clq, scope, &cac.te, &cac_props, &p, &ipse_mappings, wc, &info);
         annotate(&mc->info, info);
       } else {
         ice(_u8("check_magic_ctor packless name type"));
@@ -262,7 +263,7 @@ func check_magic_ctor(clq *clqueue, g *te_generics, scope *type_scope, parms *id
     case &TeApp(a te_typeapp): {
       if case &Has(p te_app_pack) = &a.pack {
         info magic_ctor_info;
-        #check_pack_ctor(clq, scope, &cac.te, &cac_props, &p.teip, wc, &info);
+        #check_pack_ctor(clq, scope, &cac.te, &cac_props, &p.teip, &p.ipse_mappings, wc, &info);
         annotate(&mc->info, info);
       } else {
         ice(_u8("check_magic_ctor packless app type"));
@@ -332,11 +333,15 @@ func instpair_or_trivial_from_behavior(b *derived_method_behavior) opt[instpair]
   }
 }
 
-func check_pack_ctor(clq *clqueue, scope *type_scope, complete_te *te_typeexpr, props *type_properties, p *te_instpack, wc which_ctor, info_out *magic_ctor_info) np {
+func check_pack_ctor(clq *clqueue, scope *type_scope, complete_te *te_typeexpr, props *type_properties, p *te_instpack, p_ipse_mappings *shray[sym], wc which_ctor, info_out *magic_ctor_info) np {
   rhs_info *deftype_inst_rhs_info;
   #pack_rhs_info(clq, p, &rhs_info);
   switch rhs_info {
-  case &RhsStructInfo(ri structspec):
+  case &RhsStructInfo(ri1 structspec):
+    // Map the pack rhs back to the complete_te scope.  (Does this matter at all, for annotating a magic constructor?  I don't know.)
+    ri structspec;
+    map_structspec_ipses(clq->im, p_ipse_mappings, &ri1, &ri);
+
     field_insts array[opt[instpair]];
     #check_vardecl_ctor(clq, scope, &ri.fields, wc, &field_insts);
 
@@ -344,7 +349,11 @@ func check_pack_ctor(clq *clqueue, scope *type_scope, complete_te *te_typeexpr, 
     #compute_partial_struct_data(clq, scope, &ri.fields, None, &psd);
 
     *info_out = MagicStructInfo({~ *complete_te, *props, ri, move(&psd), field_insts});
-  case &RhsEnumInfo(ri enumspec):
+  case &RhsEnumInfo(ri1 enumspec):
+    // Map the pack rhs back, likewise.
+    ri enumspec;
+    map_enumspec_ipses(clq->im, p_ipse_mappings, &ri1, &ri);
+
     field_insts array[opt[instpair]];
     #check_vardecl_ctor(clq, scope, &ri.constructors, wc, &field_insts);
     constructor_props array[type_properties];
