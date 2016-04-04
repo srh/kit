@@ -323,7 +323,7 @@ struct swartch_checkobj {
   swartch_ipse te_typeexpr;
   switchable_type_ipse te_typeexpr;
   // Will be initialized to a complete type.
-  enum_type *enumspec;
+  enum_type enumspec;
   is_deref bool;
 }
 
@@ -344,7 +344,7 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
     checkobj_out->switchable_type_ipse = checkobj_out->swartch_ipse;
   }
   // switchable_type is complete, because swartch type is.
-  et *enumspec;
+  et enumspec;
   switch structural_enumspec(es->ds, switchable_type, &et) {
   case Error(pm):
     return Unprinted(pm);
@@ -409,7 +409,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
 
   exitnum statement_num = add_statement(bs);
 
-  et *enumspec = chk.enum_type;
+  et *enumspec = &chk.enum_type;
 
   ncases size = count(&a->cases);
   swartch_vp varpopper;
@@ -682,7 +682,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
       // enum_type is complete, because check_swartch says so.
 
-      et *enumspec = chk.enum_type;
+      et *enumspec = &chk.enum_type;
       if true {
         swartch_vn var_number;
         #es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_ipse,

@@ -300,7 +300,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     if !is_complete(pt) {
       return NoFail(AmbigMatchConstructor);
     }
-    et *enumspec;
+    et enumspec;
     switch structural_enumspec(ds, pt, &et) {
     case Error(pm):
       return Unprinted(pm);
@@ -311,14 +311,14 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
 
     rhs_type *te_typeexpr;
     decl_index size;
-    if !find_vardecl(&et->constructors, name, &rhs_type, &decl_index) {
+    if !find_vardecl(&et.constructors, name, &rhs_type, &decl_index) {
       return NoFail(NoMatchConstructor);
     }
     void_type te_typeexpr = primitive_void_type(ds->cs);
     if !unifies(&void_type, rhs_type) {
       return NoFail(NoMatchConstructor);
     }
-    return NoFail(@[ds_constructor_res]MatchedVoidConstructed({~ *pt, *et, mk_enum_tag_value(decl_index)}));
+    return NoFail(@[ds_constructor_res]MatchedVoidConstructed({~ *pt, et, mk_enum_tag_value(decl_index)}));
   case BadArity:
     return NoFail(NoMatchConstructor);
   case Success:
@@ -327,7 +327,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     if !cac_return_type.complete {
       return NoFail(AmbigMatchConstructor);
     }
-    et *enumspec;
+    et enumspec;
     switch structural_enumspec(ds, &cac_return_type.te, &et) {
     case Error(pm):
       return Unprinted(pm);
@@ -337,7 +337,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     }
     rhs_type *te_typeexpr;
     decl_index size;
-    if !find_vardecl(&et->constructors, name, &rhs_type, &decl_index) {
+    if !find_vardecl(&et.constructors, name, &rhs_type, &decl_index) {
       return NoFail(NoMatchConstructor);
     }
     // rhs_type is complete.
@@ -351,7 +351,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     #nogeneric_check_and_compute_typeexpr(ds->clq, &ctor_type, &cac_ctor_type);
     check(cac_ctor_type.complete);
 
-    ip instpair = #lookup_or_make_enum_constructor_def(ds, et, &cac_return_type.te, &cac_ctor_type.te, decl_index);
+    ip instpair = #lookup_or_make_enum_constructor_def(ds, &et, &cac_return_type.te, &cac_ctor_type.te, decl_index);
 
     return NoFail(@[ds_constructor_res]MatchedConstructor({~cac_ctor_type.te, mk_enum_tag_value(decl_index), ip, freeze(&emissions)}));
   }
@@ -618,13 +618,13 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
   }
 }
 
-func success_enum_case_info(ds *defscope, cu *cu_typeexpr, success_case_ix_out *size, et_out **enumspec) np {
-  et *enumspec;
+func success_enum_case_info(ds *defscope, cu *cu_typeexpr, success_case_ix_out *size, et_out *enumspec) np {
+  et enumspec;
   switch structural_enumspec(ds, &cu->x, &et) {
   case Error(pm err_printed):
     return Unprinted(pm);
   case Success:
-    if case Has(ix size) = et->success_case_ix {
+    if case Has(ix size) = et.success_case_ix {
       *success_case_ix_out = ix;
       *et_out = et;
       return NoFail;
@@ -692,10 +692,10 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
     rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
 
     success_case_ix size;
-    et *enumspec;
+    et enumspec;
     #success_enum_case_info(es->ds, &rhs_info->cu, &success_case_ix, &et);
 
-    success_case_type *te_typeexpr = &ref(&et->constructors, success_case_ix)->type;
+    success_case_type *te_typeexpr = &ref(&et.constructors, success_case_ix)->type;
 
     emissions array[unify_emission];
     unified te_typeexpr;
@@ -704,13 +704,13 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
     }
 
     return_success_case_ix size;
-    return_et *enumspec;
+    return_et enumspec;
     #success_enum_case_info(es->ds, return_type, &return_success_case_ix, &return_et);
 
     is_structurally_convertible bool;
     constructor_mapping array[size];
-    #structurally_convertible_in_non_success(es->ds, success_case_ix, &et->constructors,
-                                             return_success_case_ix, return_et, &is_structurally_convertible,
+    #structurally_convertible_in_non_success(es->ds, success_case_ix, &et.constructors,
+                                             return_success_case_ix, &return_et, &is_structurally_convertible,
                                              &constructor_mapping);
     if !is_structurally_convertible {
       return ERR(_u8("quick-return types not structurally convertible"));
@@ -732,11 +732,11 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
     annotate_info(x, CompleteCheck(mk(lval, success_case_cu, success_case_props)));
 
     constructors_props array[type_properties];
-    #compute_complete_vardecl_properties(es->clq, &et->constructors, &constructors_props);
+    #compute_complete_vardecl_properties(es->clq, &et.constructors, &constructors_props);
 
-    tag_cell cell_num = add_virtual_tag_cell(es, et);
-    return_tag_cell cell_num = add_virtual_tag_cell(es, et);
-    annotate(&a->info, {tag_cell, *et, move(&constructors_props), return_tag_cell, *return_et, constructor_mapping, {freeze(&emissions)}});
+    tag_cell cell_num = add_virtual_tag_cell(es, &et);
+    return_tag_cell cell_num = add_virtual_tag_cell(es, &et);
+    annotate(&a->info, {tag_cell, et, move(&constructors_props), return_tag_cell, return_et, constructor_mapping, {freeze(&emissions)}});
 
     return NoFail;
   } else {
@@ -1353,7 +1353,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
     return NoFail;
   } else {
-    b *structspec;
+    b structspec;
     switch structural_structspec(es->ds, pt, &b) {
     case Error(pm):
       return Unprinted(pm);
@@ -1362,7 +1362,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       return MERR(es->cs, a->meta, _u8("Strinit for inaccessible or non-structural type, "), pretty(es->im, pt));
     }
 
-    n size = count(&b->fields);
+    n size = count(&b.fields);
     if n != count(&a->exprs) {
       return MERR(es->cs, a->meta, _u8("Structure literal has wrong number of fields."));
     }
@@ -1370,11 +1370,11 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     offsets array[u32];
     for i size = 0; i < n; i = i + 1 {
       x_i *ast_expr_consume = &ref(&a->exprs, i)->ec;
-      field *te_vardecl = ref(&b->fields, i);
+      field *te_vardecl = ref(&b.fields, i);
       #check_expr_consume(es, x_i, &field->type);
       reannotate_static_to_virtual(es, result_cell(x_i));
       psd partial_struct_data;
-      #compute_partial_struct_data(es->clq, &b->fields, Has(field->name), &psd);
+      #compute_partial_struct_data(es->clq, &b.fields, Has(field->name), &psd);
       check(psd.found_field);
       push(&offsets, psd.offset);
     }
@@ -1630,13 +1630,15 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
 }
 
 // SCOPE(): The scopage of st_out is different from the scopage of t.
-func structural_structspec(ds *defscope, t *te_typeexpr, st_out **structspec) structural_rhs_result {
+func structural_structspec(ds *defscope, t *te_typeexpr, st_out *structspec) structural_rhs_result {
   switch t {
   case &TeName(a te_name):
-    return help_structural_structspec(ds, unHas(&a.pack), st_out);
+    ipse_mappings shray[sym];  // empty
+    return help_structural_structspec(ds, unHas(&a.pack), &ipse_mappings, st_out);
   case &TeApp(a te_typeapp):
     // SCOPE(): Use all of the pack.
-    return help_structural_structspec(ds, &unHas(&a.pack)->teip, st_out);
+    hp *te_app_pack = unHas(&a.pack);
+    return help_structural_structspec(ds, &hp->teip, &hp->ipse_mappings, st_out);
   default:
     return NotAccessible;
   }
@@ -1644,13 +1646,15 @@ func structural_structspec(ds *defscope, t *te_typeexpr, st_out **structspec) st
 
 // et_out is set to a complete/computed value.
 // SCOPE(): The scopage of et_out is different from the scopage of t.
-func structural_enumspec(ds *defscope, t *te_typeexpr, et_out **enumspec) structural_rhs_result {
+func structural_enumspec(ds *defscope, t *te_typeexpr, et_out *enumspec) structural_rhs_result {
   switch t {
   case &TeName(a te_name):
-    return help_structural_enumspec(ds, unHas(&a.pack), et_out);
+    ipse_mappings shray[sym]; // empty
+    return help_structural_enumspec(ds, unHas(&a.pack), &ipse_mappings, et_out);
   case &TeApp(a te_typeapp):
     // SCOPE(): Use all of the pack.
-    return help_structural_enumspec(ds, &unHas(&a.pack)->teip, et_out);
+    hp *te_app_pack = unHas(&a.pack);
+    return help_structural_enumspec(ds, &hp->teip, &hp->ipse_mappings, et_out);
   default:
     return NotAccessible;
   }
@@ -1694,6 +1698,7 @@ enum structural_rhs_result {
   NotAccessible void;
 }
 
+// Note that the caller will need to use its ipse_mappings to map the rhs type's ipses to the caller's ipses.
 func help_structural_rhs_info(ds *defscope, pack *te_instpack,
                               rhs_info_out **deftype_inst_rhs_info) structural_rhs_result {
   accessible_result bool;
@@ -1721,7 +1726,23 @@ func help_structural_rhs_info(ds *defscope, pack *te_instpack,
   }
 }
 
-func help_structural_enumspec(ds *defscope, pack *te_instpack, et_out **enumspec) structural_rhs_result {
+func map_enumspec_ipses(ipse_mappings *shray[sym], inn *enumspec, out *enumspec) void {
+  constructors shray[te_vardecl] = map_vardecl_ipses(ipse_mappings, &inn->constructors);
+  *out = {constructors, inn->success_case_ix};
+}
+
+func map_structspec_ipses(ipse_mappings *shray[sym], inn *structspec, out *structspec) void {
+  fields shray[te_vardecl] = map_vardecl_ipses(ipse_mappings, &inn->fields);
+  *out = {fields};
+}
+
+func map_vardecl_ipses(ipse_mappings *shray[sym], inn *shray[te_vardecl]) shray[te_vardecl] {
+  // SCOPE(): Actually implement.
+  return *inn;
+}
+
+
+func help_structural_enumspec(ds *defscope, pack *te_instpack, ipse_mappings *shray[sym], et_out *enumspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
@@ -1731,7 +1752,7 @@ func help_structural_enumspec(ds *defscope, pack *te_instpack, et_out **enumspec
     case &RhsStructInfo(ri structspec):
       return NotAccessible;
     case &RhsEnumInfo(ri enumspec):
-      *et_out = &ri;
+      map_enumspec_ipses(ipse_mappings, &ri, et_out);
       return Success;
     }
   case NotAccessible:
@@ -1740,7 +1761,7 @@ func help_structural_enumspec(ds *defscope, pack *te_instpack, et_out **enumspec
 }
 
 // SCOPE(): All callers of this get st_out in the wrong scope.
-func help_structural_structspec(ds *defscope, pack *te_instpack, st_out **structspec) structural_rhs_result {
+func help_structural_structspec(ds *defscope, pack *te_instpack, ipse_mappings *shray[sym], st_out *structspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
@@ -1748,7 +1769,7 @@ func help_structural_structspec(ds *defscope, pack *te_instpack, st_out **struct
   case Success:
     switch rhs_info {
     case &RhsStructInfo(ri structspec):
-      *st_out = &ri;
+      map_structspec_ipses(ipse_mappings, &ri, st_out);
       return Success;
     case &RhsEnumInfo(ri enumspec):
       return NotAccessible;
@@ -1760,12 +1781,13 @@ func help_structural_structspec(ds *defscope, pack *te_instpack, st_out **struct
 
 func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident,
                        fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
-  st *structspec;
-  switch help_structural_structspec(es->ds, pack, &st) {
+  ipse_mappings shray[sym];  // SCOPE(): Completely fake, should be a param.
+  st structspec;
+  switch help_structural_structspec(es->ds, pack, &ipse_mappings, &st) {
   case Error(pm):
     return Unprinted(pm);
   case Success:
-    return help_lookup_struct_field(es, st, fieldname, fieldtype_out, res_out);
+    return help_lookup_struct_field(es, &st, fieldname, fieldtype_out, res_out);
   case NotAccessible:
     return ERR(_u8("Looking up field on inaccessible defclass or primitive type"));
   }
