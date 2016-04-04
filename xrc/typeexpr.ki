@@ -464,4 +464,7 @@ func clone_scope(copyee *type_scope) type_scope {
 //
 // (Or maybe we'd use separate scope variables.)
 
-// TODO(): See SCOPE()
+// TODO(): See "SCOPE()"
+// TODO: See "SCOPE"
+
+

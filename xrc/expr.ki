@@ -1397,7 +1397,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   type ast_typeexpr = lambda_declared_type(es->im, a);
   // TODO: Cache converted.
   converted te_typeexpr = #convert_typeexpr(&type);
-  // SCOPE(): Lambdas, _right now_, are globally scoped, they don't capture any variables, they're C-style functions.  So it's quite weird that we pass in the type_scope of es here.
+  // SCOPE: Lambdas, _right now_, are globally scoped, they don't capture any variables, they're C-style functions.  So it's quite weird that we pass in the type_scope of es here.
   // Right now scope is just going to be a lookup table for oftypes, so we'll see how things go.
   lambda_global_scope type_scope = mk_global();
   // TODO: I see some duplicated logic with the TypedExpr case.
@@ -1632,7 +1632,6 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
   return NoFail;
 }
 
-// SCOPE(): The scopage of st_out is different from the scopage of t.
 func structural_structspec(ds *defscope, t *te_typeexpr, st_out *structspec) structural_rhs_result {
   switch t {
   case &TeName(a te_name):
@@ -1647,7 +1646,6 @@ func structural_structspec(ds *defscope, t *te_typeexpr, st_out *structspec) str
 }
 
 // et_out is set to a complete/computed value.
-// SCOPE(): The scopage of et_out is different from the scopage of t.
 func structural_enumspec(ds *defscope, t *te_typeexpr, et_out *enumspec) structural_rhs_result {
   switch t {
   case &TeName(a te_name):
@@ -1755,7 +1753,6 @@ func help_structural_enumspec(ds *defscope, pack *te_instpack, ipse_mappings *sh
   }
 }
 
-// SCOPE(): All callers of this get st_out in the wrong scope.
 func help_structural_structspec(ds *defscope, pack *te_instpack, ipse_mappings *shray[sym], st_out *structspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
