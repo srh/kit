@@ -166,7 +166,7 @@ func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ide
     osymname = None;
   }
   props type_properties;
-  #compute_type_properties(es->clq, computed_type, &props);
+  #compute_type_properties(es->clq, es->tscope, computed_type, &props);
   num var_number = ~count(&es->all_vars);
   push(&es->all_vars, {num, *computed_type, props, cell, osymname, ipse, binding, None, None});
   push(&es->current_vars, num);
@@ -200,7 +200,7 @@ func es_note_var_initter(es *framescope, vn var_number) np {
   if case &Has(desc ctor_desc) = &info->initter {
     return NoFail;
   }
-  desc ctor_desc = #get_init_ctor(es->clq, &info->type);
+  desc ctor_desc = #get_init_ctor(es, &info->type);
   info->initter = Has(desc);
   return NoFail;
 }
@@ -210,7 +210,7 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
   if case &Has(desc ctor_desc) = &info->destroyer {
     return NoFail;
   }
-  desc ctor_desc = #get_destroy_ctor(es->clq, &info->type);
+  desc ctor_desc = #get_destroy_ctor(es, &info->type);
   info->destroyer = Has(desc);
   return NoFail;
 }
@@ -245,7 +245,7 @@ func replaced_name_parms(ds *defscope, a *ast_name_expr, out *genparms) np {
     for i size = 0; i < n; i = i + 1 {
       converted te_typeexpr = #convert_typeexpr(ref(&arr, i));
       computed cac_typeexpr;
-      #check_and_compute_typeexpr(ds->clq, ds->generics, ds->repls, &converted, &computed);
+      #check_and_compute_typeexpr(ds->clq, ds->generics, &ds->tscope, ds->repls, &converted, &computed);
       push(&replaced, computed.te);
     }
     *out = HasParms(freeze(&replaced));
@@ -323,7 +323,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     return NoFail(NoMatchConstructor);
   case Success:
     cac_return_type cac_typeexpr;
-    #nogeneric_check_and_compute_typeexpr(ds->clq, return_type, &cac_return_type);
+    #nogeneric_check_and_compute_typeexpr(ds->clq, &ds->tscope, return_type, &cac_return_type);
     if !cac_return_type.complete {
       return NoFail(AmbigMatchConstructor);
     }
@@ -348,7 +348,7 @@ func ds_lookup_constructor(ds *defscope, name sym, gp *genparms, pt *te_typeexpr
     }
     ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
     cac_ctor_type cac_typeexpr;
-    #nogeneric_check_and_compute_typeexpr(ds->clq, &ctor_type, &cac_ctor_type);
+    #nogeneric_check_and_compute_typeexpr(ds->clq, &ds->tscope, &ctor_type, &cac_ctor_type);
     check(cac_ctor_type.complete);
 
     ip instpair = #lookup_or_make_enum_constructor_def(ds, &et, &cac_return_type.te, &cac_ctor_type.te, decl_index);
@@ -375,7 +375,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
     case &OneMatch(m ent_and_parms):
       // EMISSIONS: We've already established the emissions when creating the ctor_type?  No?  So we ignore m.emissions?
       inst_id def_inst_id;
-      if !from_np(make_inst(ds->clq, m.ent, &m.parms, &inst_id)) {
+      if !from_np(make_inst(ds->clq, m.ent, &ds->tscope, &m.parms, &inst_id)) {
         ice(_u8("lookup_or_make_enum_constructor_def make_inst failed after match"));
       }
       return NoFail({m.ent, inst_id});
@@ -385,7 +385,7 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
   // There was no match -- so we make the def ourselves.
   rhs_type *te_typeexpr = &ref(&et->constructors, decl_index)->type;
   rhs_props type_properties;
-  #compute_complete_type_properties(ds->clq, rhs_type, &rhs_props);
+  #compute_complete_type_properties(ds->clq, &ds->tscope, rhs_type, &rhs_props);
 
   meco magic_enum_construct_op;
   switch &rhs_props.move_behavior {
@@ -406,14 +406,14 @@ func lookup_or_make_enum_constructor_def(ds *defscope, et *enumspec, return_type
   }
 
   return_type_props type_properties;
-  #compute_complete_type_properties(ds->clq, return_type, &return_type_props);
+  #compute_complete_type_properties(ds->clq, &ds->tscope, return_type, &return_type_props);
 
   mec magic_enum_construct = {*et, ~ *return_type, return_type_props, decl_index, rhs_props, meco};
 
   ent def_entry_id = add_def_primitive(ds->cs, defname, TeNoGenerics, *ctor_type,
                                        @[def_definition]DefnMagic(MagicEnumConstruct(mec)));
   inst_id def_inst_id;
-  if !from_np(make_inst(ds->clq, ent, &nogp, &inst_id)) {
+  if !from_np(make_inst(ds->clq, ent, &ds->tscope, &nogp, &inst_id)) {
     ice(_u8("lookup_or_make_enum_constructor_def make_inst failed on fresh def"));
   }
 
@@ -479,7 +479,7 @@ func es_lookup_name(es *framescope, name sym, gp *genparms, pt *te_typeexpr, res
     return NoFail;
   case &OneMatch(m ent_and_parms):
     inst_id def_inst_id;
-    #make_inst(es->clq, m.ent, &m.parms, &inst_id);
+    #make_inst(es->clq, m.ent, es->tscope, &m.parms, &inst_id);
     *res_out = OneGlobalMatch({m.ent, inst_id, m.parms, m.emissions});
     return NoFail;
   }
@@ -511,12 +511,12 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
     check(empty(&emissions));
 
     c cac_typeexpr;
-    if !from_np(nogeneric_check_and_compute_typeexpr(es->clq, &unified, &c)) {
+    if !from_np(nogeneric_check_and_compute_typeexpr(es->clq, es->tscope, &unified, &c)) {
       ice(_u8("help_check_simple_literal passed bad type"));
     }
     check(c.complete);
     props type_properties;
-    if !from_np(compute_complete_type_properties(es->clq, &c.te, &props)) {
+    if !from_np(compute_complete_type_properties(es->clq, es->tscope, &c.te, &props)) {
       ice(_u8("help_check_simple_literal passed type with bad properties"));
     }
 
@@ -718,7 +718,7 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
 
     success_case_cu cu_typeexpr = ~ *success_case_type;
     success_case_props type_properties;
-    #compute_type_properties(es->clq, &success_case_cu, &success_case_props);
+    #compute_type_properties(es->clq, es->tscope, &success_case_cu, &success_case_props);
 
     lval is_lval;
     switch &rhs_info->lval {
@@ -732,7 +732,7 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
     annotate_info(x, CompleteCheck(mk(lval, success_case_cu, success_case_props)));
 
     constructors_props array[type_properties];
-    #compute_complete_vardecl_properties(es->clq, &et.constructors, &constructors_props);
+    #compute_complete_vardecl_properties(es->clq, es->tscope, &et.constructors, &constructors_props);
 
     tag_cell cell_num = add_virtual_tag_cell(es, &et);
     return_tag_cell cell_num = add_virtual_tag_cell(es, &et);
@@ -779,14 +779,14 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
 
     ref_type te_typeexpr = mk_ref_type(es->cs, unified_ipse, rhs_info->cu.x);
     ref_computed cac_typeexpr;
-    #nogeneric_check_and_compute_typeexpr(es->clq, &ref_type, &ref_computed);
+    #nogeneric_check_and_compute_typeexpr(es->clq, es->tscope, &ref_type, &ref_computed);
     // (TODO: Make lval desc.ipse be a te_ipse, so it can't be incomplete?)
     if !ref_computed.complete {
       return ERR(_u8("ICE?  lval desc.ipse must have been incomplete (after complete type-check)."));
     }
 
     ref_props type_properties;
-    #compute_complete_type_properties(es->clq, &ref_computed.te, &ref_props);
+    #compute_complete_type_properties(es->clq, es->tscope, &ref_computed.te, &ref_props);
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ref_computed.te, ref_props})),
                                       ~ref_computed.te, ref_props)));
     annotate(&a->emissions, {freeze(&emissions)});
@@ -818,7 +818,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_exp
   // We call check_and_compute_typeexpr to disallow totally bogus typeexprs more directly
   // than the eventual type error that would happen.
   computed cac_typeexpr;
-  #check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &computed);
+  #check_and_compute_typeexpr(es->clq, es->ds->generics, es->tscope, es->ds->repls, &converted, &computed);
   emissions array[unify_emission];
   unified te_typeexpr;
   if !unify_types(es->tscope, pt, &computed.te, &emissions, &unified) {
@@ -828,7 +828,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_exp
   if computed.complete {
     unified_computed = computed;
   } else {
-    if !from_np(nogeneric_check_and_compute_typeexpr(es->clq, &unified, &unified_computed)) {
+    if !from_np(nogeneric_check_and_compute_typeexpr(es->clq, es->tscope, &unified, &unified_computed)) {
       return ERR(_u8("TypedExpr encounters un-computable unified type."));
     }
   }
@@ -854,7 +854,7 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   cf_res check_field_result;
   #check_field(es, &cu_param, &a->fieldname, pt, &fieldtype, &emissions, &cf_res);
   props type_properties;
-  #compute_type_properties(es->clq, &fieldtype, &props);
+  #compute_type_properties(es->clq, es->tscope, &fieldtype, &props);
   lval is_lval;
   switch cf_res {
     case InheritsLval(off check_field_offset_and_index): {
@@ -908,7 +908,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
   cf_res check_field_result;
   #check_field(es, &info->cu, &a->fieldname, pt, &fieldtype, &emissions, &cf_res);
   props type_properties;
-  #compute_type_properties(es->clq, &fieldtype, &props);
+  #compute_type_properties(es->clq, es->tscope, &fieldtype, &props);
   lval is_lval;
   switch cf_res {
     case InheritsLval(off check_field_offset_and_index): {
@@ -952,7 +952,7 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
     }
 
     props type_properties;
-    #compute_complete_type_properties(es->clq, param, &props);
+    #compute_complete_type_properties(es->clq, es->tscope, param, &props);
     annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}),
                                                            DeadMe, ipse}),
                                       ~ *param, props)));
@@ -985,10 +985,10 @@ func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *
 
   ptr_type te_typeexpr = ptr_type(es->cs, rhs_info->cu.x);
   ptr_computed cac_typeexpr;
-  #nogeneric_check_and_compute_typeexpr(es->clq, &ptr_type, &ptr_computed);
+  #nogeneric_check_and_compute_typeexpr(es->clq, es->tscope, &ptr_type, &ptr_computed);
   check(ptr_computed.complete);
   ptr_props type_properties;
-  #compute_complete_type_properties(es->clq, &ptr_computed.te, &ptr_props);
+  #compute_complete_type_properties(es->clq, es->tscope, &ptr_computed.te, &ptr_props);
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ptr_computed.te, ptr_props})),
                                     ~ptr_computed.te, ptr_props)));
   annotate(&a->emissions, {freeze(&emissions)});
@@ -1035,27 +1035,27 @@ func computed_ptr_type(clq *clqueue, t *cu_typeexpr) cu_typrop {
   return compute_prim(clq, ptr_type(clq->cs, t->x));
 }
 
-func get_init_ctor(clq *clqueue, t *cu_typeexpr) cr[ctor_desc] {
+func get_init_ctor(es *framescope, t *cu_typeexpr) cr[ctor_desc] {
   props type_properties;
-  #compute_type_properties(clq, t, &props);
+  #compute_type_properties(es->clq, es->tscope, t, &props);
   return behavior_to_desc(&props.init_behavior);
 }
 
-func get_copy_ctor(clq *clqueue, t *cu_typeexpr) cr[ctor_desc] {
+func get_copy_ctor(es *framescope, t *cu_typeexpr) cr[ctor_desc] {
   props type_properties;
-  #compute_type_properties(clq, t, &props);
+  #compute_type_properties(es->clq, es->tscope, t, &props);
   return behavior_to_desc(&props.copy_behavior);
 }
 
-func get_move_ctor(clq *clqueue, t *cu_typeexpr) cr[ctor_desc] {
+func get_move_ctor(es *framescope, t *cu_typeexpr) cr[ctor_desc] {
   props type_properties;
-  #compute_type_properties(clq, t, &props);
+  #compute_type_properties(es->clq, es->tscope, t, &props);
   return behavior_to_desc(&props.move_behavior);
 }
 
-func get_destroy_ctor(clq *clqueue, t *cu_typeexpr) cr[ctor_desc] {
+func get_destroy_ctor(es *framescope, t *cu_typeexpr) cr[ctor_desc] {
   props type_properties;
-  #compute_type_properties(clq, t, &props);
+  #compute_type_properties(es->clq, es->tscope, t, &props);
   return behavior_to_desc(&props.destroy_behavior);
 }
 
@@ -1076,8 +1076,8 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
       if whole_temporary(&desc) {
         annotate(after, mk_after(@[consume_actions]ConsumeByInPlace, desc.whole_num));
       } else {
-        copy ctor_desc = #get_copy_ctor(es->clq, &info->cu);
-        destroy ctor_desc = #get_destroy_ctor(es->clq, &ref_cell(es, desc.whole_num)->type);
+        copy ctor_desc = #get_copy_ctor(es, &info->cu);
+        destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, desc.whole_num)->type);
         dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
         annotate(after,
           mk_after(@[consume_actions]ConsumeByCopyDestroy({+{copy, dest, desc.partial_num},
@@ -1089,11 +1089,11 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
     case &IsLvalYes(desc lval_description): {
       dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
       if case Has(ix size) = find(movable_cells, Has(desc.num)) {
-        move ctor_desc = #get_move_ctor(es->clq, &info->cu);
+        move ctor_desc = #get_move_ctor(es, &info->cu);
         annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]+{move, dest, desc.num}), dest));
         *moved_cell_ix_out = Has(ix);
       } else {
-        copy ctor_desc = #get_copy_ctor(es->clq, &info->cu);
+        copy ctor_desc = #get_copy_ctor(es, &info->cu);
         annotate(after, mk_after(@[consume_actions]ConsumeByCopy({@[copy_action]+{copy, dest, desc.num},
                                                                   desc.deadme}),
                                  dest));
@@ -1109,7 +1109,7 @@ func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_ex
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      destroy ctor_desc = #get_destroy_ctor(es->clq, &ref_cell(es, desc.whole_num)->type);
+      destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, desc.whole_num)->type);
       annotate(after, mk_after_discard(@[destroy_action]+{destroy, desc.whole_num}));
     }
     case &IsLvalYes(desc lval_description): {
@@ -1132,7 +1132,7 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
   #annotate_disposal_for_consume(es, a, after);
 
   info *ast_expr_complete_info = expr_complete_info(a);
-  destroy ctor_desc = #get_destroy_ctor(es->clq, &info->cu);
+  destroy ctor_desc = #get_destroy_ctor(es, &info->cu);
   annotate(&later->action, @[destroy_action]+{destroy, result_cell(un(after))});
 
   return NoFail;
@@ -1143,7 +1143,7 @@ func make_comparecells(es *framescope, dest cell_num) instpair {
     canonicalized_scope type_scope = mk_global();
     ipse_names array[sym];
     canonical te_typeexpr;
-    canonicalize_idy_ipses(es->im, &ref_cell(es, dest)->type.x, &canonical, &ipse_names, &canonicalized_scope);
+    canonicalize_idy_ipses(es->im, es->tscope, &ref_cell(es, dest)->type.x, &canonical, &ipse_names, &canonicalized_scope);
     parms idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {mk_shray(~canonical)}};
     inst_id def_inst_id = enqueue_def_inst(es->clq, ent, &parms);
     return {ent, inst_id};
@@ -1157,17 +1157,17 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
     case &IsLvalNo(desc rval_description): {
-      target_destroy ctor_desc = #get_destroy_ctor(es->clq, &ref_cell(es, dest)->type);
+      target_destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, dest)->type);
       if whole_temporary(&desc) {
-        move ctor_desc = #get_move_ctor(es->clq, &ref_cell(es, dest)->type);
+        move ctor_desc = #get_move_ctor(es, &ref_cell(es, dest)->type);
         annotate(&assignment->info,
           @[ast_assignment_info]
           SimpleMoveAssignment({@[destroy_action]+{target_destroy, dest},
                                 @[move_action]+{move, dest, desc.whole_num}}));
       } else {
         // TODO: This dups code with other makers of DisposeCopyAndDestroy.
-        copy ctor_desc = #get_copy_ctor(es->clq, &ref_cell(es, dest)->type);
-        destroy ctor_desc = #get_destroy_ctor(es->clq, &ref_cell(es, desc.whole_num)->type);
+        copy ctor_desc = #get_copy_ctor(es, &ref_cell(es, dest)->type);
+        destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, desc.whole_num)->type);
 
         annotate(&assignment->info,
           @[ast_assignment_info]
@@ -1181,8 +1181,8 @@ func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr
         // Static self-assignment!
         annotate(&assignment->info, StaticSelfAssignment);
       } else {
-        target_destroy ctor_desc = #get_destroy_ctor(es->clq, &ref_cell(es, dest)->type);
-        copy ctor_desc = #get_copy_ctor(es->clq, &ref_cell(es, dest)->type);
+        target_destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, dest)->type);
+        copy ctor_desc = #get_copy_ctor(es, &ref_cell(es, dest)->type);
         do_conditional bool;
         switch &target_destroy {
         case &TrivialCtor:
@@ -1250,7 +1250,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &OneEnumConstructorMatch(ci constructor_info): {
       annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip, {ci.emissions}}));
       props type_properties;
-      #compute_type_properties(es->clq, &ci.type, &props);
+      #compute_type_properties(es->clq, es->tscope, &ci.type, &props);
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ci.type, props})),
                                         ci.type, props)));
       return NoFail;
@@ -1258,7 +1258,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &EnumVoidConstructedMatch(vci voidconstructed_info): {
       annotate(&a->name_info, @[ast_name_expr_info]EnumVoidConstructed({vci.constructor_tag, vci.et}));
       props type_properties;
-      #compute_type_properties(es->clq, &vci.constructed_type, &props);
+      #compute_type_properties(es->clq, es->tscope, &vci.constructed_type, &props);
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.constructed_type, props})),
                                         vci.constructed_type, props)));
       return NoFail;
@@ -1269,18 +1269,18 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       // This parallels or plagairizes ensure_def_inst_type_computed.
       // TODO: Dedup anything?
       matched_parms idy_repls;
-      #check_and_compute_parms_no_canonicalize(es->clq, &egm.parms, &matched_parms);
+      #check_and_compute_parms_no_canonicalize(es->clq, es->tscope, &egm.parms, &matched_parms);
 
       ent_typeexpr *te_typeexpr;
       #def_converted_typeexpr(ent, &ent_typeexpr);
 
       computed cac_typeexpr;
-      #check_and_compute_typeexpr(es->clq, &ent->generics, &matched_parms, ent_typeexpr, &computed);
+      #check_and_compute_typeexpr(es->clq, &ent->generics, es->tscope, &matched_parms, ent_typeexpr, &computed);
 
       check(computed.complete);
       cu_computed cu_typeexpr = ~computed.te;
       props type_properties;
-      #compute_type_properties(es->clq, &cu_computed, &props);
+      #compute_type_properties(es->clq, es->tscope, &cu_computed, &props);
 
       annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id, {egm.emissions}}));
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, cu_computed, props})),
@@ -1340,11 +1340,11 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
 
     // We checked is_computed(pt).
     props type_properties;
-    #compute_complete_type_properties(es->clq, pt, &props);
+    #compute_complete_type_properties(es->clq, es->tscope, pt, &props);
 
     // We checked is_computed(pt)
     param_props type_properties;
-    #compute_complete_type_properties(es->clq, oo(&b.param), &param_props);
+    #compute_complete_type_properties(es->clq, es->tscope, oo(&b.param), &param_props);
 
     for i u32 = 0; i < n; i = i + 1 {
       p_i *ast_strinit_param = ref(&a->exprs, ~i);
@@ -1374,14 +1374,14 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       #check_expr_consume(es, x_i, &field->type);
       reannotate_static_to_virtual(es, result_cell(x_i));
       psd partial_struct_data;
-      #compute_partial_struct_data(es->clq, &b.fields, Has(field->name), &psd);
+      #compute_partial_struct_data(es->clq, es->tscope, &b.fields, Has(field->name), &psd);
       check(psd.found_field);
       push(&offsets, psd.offset);
     }
 
     // We checked is_computed(pt).
     props type_properties;
-    #compute_complete_type_properties(es->clq, pt, &props);
+    #compute_complete_type_properties(es->clq, es->tscope, pt, &props);
 
     for i size = 0; i < n; i = i + 1 {
       p_i *ast_strinit_param = &a->exprs[i];
@@ -1397,9 +1397,12 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   type ast_typeexpr = lambda_declared_type(es->im, a);
   // TODO: Cache converted.
   converted te_typeexpr = #convert_typeexpr(&type);
+  // SCOPE(): Lambdas, _right now_, are globally scoped, they don't capture any variables, they're C-style functions.  So it's quite weird that we pass in the type_scope of es here.
+  // Right now scope is just going to be a lookup table for oftypes, so we'll see how things go.
+  lambda_global_scope type_scope = mk_global();
   // TODO: I see some duplicated logic with the TypedExpr case.
   computed cac_typeexpr;
-  #check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &computed);
+  #check_and_compute_typeexpr(es->clq, es->ds->generics, es->tscope, es->ds->repls, &converted, &computed);
   // Lambda exprs can't have partial types (yet!).
   check(computed.complete);
   unified te_typeexpr;
@@ -1421,7 +1424,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   }
 
   props type_properties;
-  #compute_complete_type_properties(es->clq, &computed.te, &props);
+  #compute_complete_type_properties(es->clq, es->tscope, &computed.te, &props);
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~computed.te, props})),
                                     ~computed.te, props)));
   annotate(&a->emissions, {freeze(&emissions)});
@@ -1439,7 +1442,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
   for i size = 0; i < nargs; i = i + 1 {
     cu_param cu_typeexpr = ~computed_params[i];
     cu_param_props type_properties;
-    #compute_type_properties(bs->clq, &cu_param, &cu_param_props);
+    #compute_type_properties(bs->clq, &bs->ds->tscope, &cu_param, &cu_param_props);
     cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
     push(&arg_cells, cell);
     vn var_number;
@@ -1458,7 +1461,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
 
   return_type *te_typeexpr = ref(computed_params, nargs);
   return_type_props type_properties;
-  #compute_complete_type_properties(bs->clq, return_type, &return_type_props);
+  #compute_complete_type_properties(bs->clq, bs->tscope, return_type, &return_type_props);
   return_cell cell_num = add_cell(&bs->es, {LocationStatic, ~ *return_type, return_type_props});
 
   info ast_fullbody_info = {destructions, bs->es.all_vars, Has(bs->es.gr), bs->gotos, bs->labels,
@@ -1500,7 +1503,7 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   // it's computed.
   check(is_complete_computed(pt).computed);
   props type_properties;
-  #compute_complete_type_properties(es->clq, pt, &props);
+  #compute_complete_type_properties(es->clq, es->tscope, pt, &props);
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
   return NoFail;
 }
@@ -1788,7 +1791,7 @@ func help_lookup_struct_field(es *framescope, st *structspec, fieldname *ast_ide
                               fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   offset u32;
   index size;
-  #lookup_field_from_list(es->clq, &st->fields, fieldname->value, fieldtype_out, &offset, &index);
+  #lookup_field_from_list(es->clq, es->tscope, &st->fields, fieldname->value, fieldtype_out, &offset, &index);
   *res_out = InheritsLval({offset, index});
   return NoFail;
 }
@@ -1808,7 +1811,7 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
       // The offset's what it would be for a struct.
       offset_discard u32;
       index size;
-      #lookup_field_from_list(es->clq, &a.fields, fieldname->value, fieldtype_out, &offset_discard, &index);
+      #lookup_field_from_list(es->clq, es->tscope, &a.fields, fieldname->value, fieldtype_out, &offset_discard, &index);
       // Offset's always 0 for a union.
       *res_out = InheritsLval({0, index});
       return NoFail;
@@ -1854,10 +1857,10 @@ func find_vardecl(a *shray[te_vardecl], name sym, out **te_typeexpr, index_out *
 }
 
 // fields is supposed to be complete.
-func lookup_field_from_list(clq *clqueue, fields *shray[te_vardecl], fieldname sym,
+func lookup_field_from_list(clq *clqueue, scope *type_scope, fields *shray[te_vardecl], fieldname sym,
                             fieldtype_out *cu_typeexpr, offset_out *u32, index_out *size) np {
   psd partial_struct_data;
-  #compute_partial_struct_data(clq, fields, Has(fieldname), &psd);
+  #compute_partial_struct_data(clq, scope, fields, Has(fieldname), &psd);
 
   if !psd.found_field {
     return ERR(_u8("fieldname '"), lookup(clq->im, fieldname), _u8("' not found"));
@@ -1896,7 +1899,7 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   #check_funcall_params_firsttime(es, &a->params, &a_param_incomplete);
 
   func_pt te_typeexpr;
-  #make_fn_partial_type(es->clq, pt, &a->params, &func_pt);
+  #make_fn_partial_type(es->clq, es->tscope, pt, &a->params, &func_pt);
   funec *ast_expr_consume = oo(&a->fun);
   #check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes), &funec->expr, &func_pt);
 
@@ -1912,7 +1915,7 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
 
   return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(&oo(&a->fun)->expr)->x);
   props type_properties;
-  #compute_complete_type_properties(es->clq, return_type, &props);
+  #compute_complete_type_properties(es->clq, es->tscope, return_type, &props);
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *return_type, props})),
                                     ~ *return_type, props)));
   return NoFail;
@@ -1950,8 +1953,9 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
 }
 
 func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
+  global_scope type_scope = mk_global();  // SCOPE(): Maybe no good.
   cac cac_typeexpr;
-  if !from_np(nogeneric_check_and_compute_typeexpr(clq, &t, &cac)) {
+  if !from_np(nogeneric_check_and_compute_typeexpr(clq, &global_scope, &t, &cac)) {
     ice(_u8("compute_prim encounters uncomputable type"));
   }
   check(cac.complete);
@@ -1965,8 +1969,9 @@ func compute_prim(clq *clqueue, t te_typeexpr) cu_typrop {
 }
 
 func compute_prim(clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
+  global_scope type_scope = mk_global();  // SCOPE(): Maybe no good.
   type cu_typeexpr = compute_prim(clq, t);
-  if !from_np(compute_type_properties(clq, &type, props_out)) {
+  if !from_np(compute_type_properties(clq, &global_scope, &type, props_out)) {
     ice(_u8("compute_prim fails to compute type properties"));
   }
   *out = type;
@@ -1989,7 +1994,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
   }
 
   result_props type_properties;
-  #compute_complete_type_properties(es->clq, result_type, &result_props);
+  #compute_complete_type_properties(es->clq, es->tscope, result_type, &result_props);
 
   lval is_lval;
   switch tech.array {
@@ -2101,7 +2106,7 @@ func decompose_indexable(clq *clqueue, scope *type_scope, typ *te_typeexpr,
                _u8("' definitions"));
   case &OneMatch(m ent_and_parms):
     inst_id def_inst_id;
-    #make_inst(clq, m.ent, &m.parms, &inst_id);
+    #make_inst(clq, m.ent, scope, &m.parms, &inst_id);
     ty *cu_typrop;
     #ensure_def_inst_type_computed(clq->cs, clq, ref_def_entry(clq->cs, m.ent), inst_id, &ty);
     arr_ptr_type *te_typeexpr;
@@ -2175,7 +2180,7 @@ func expr_type_incomplete(a *ast_expr) bool {
   return !expr_type_complete(a);
 }
 
-func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[ast_expr_consume],
+func make_fn_partial_type(clq *clqueue, scope *type_scope, return_type *te_typeexpr, params *array[ast_expr_consume],
                           out *te_typeexpr) np {
   type_params array[te_typeexpr];
   n size = count(params);
@@ -2186,7 +2191,7 @@ func make_fn_partial_type(clq *clqueue, return_type *te_typeexpr, params *array[
   push(&type_params, *return_type);
   fntype te_typeexpr = TeApp({primitive_function_puretype(clq->cs), freeze(&type_params), None});
   cac cac_typeexpr;
-  #nogeneric_check_and_compute_typeexpr(clq, &fntype, &cac);
+  #nogeneric_check_and_compute_typeexpr(clq, scope, &fntype, &cac);
   *out = cac.te;
   return NoFail;
 }

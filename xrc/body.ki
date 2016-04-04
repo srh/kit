@@ -37,6 +37,7 @@ struct bodystate {
   cs *checkstate;
   im *identmap;
   clq *clqueue;
+  tscope *type_scope;  // Same as es->tscope.
   return_type *cu_typeexpr;
 
   gotos array[goto_info];
@@ -45,14 +46,18 @@ struct bodystate {
 }
 
 func mk(ds *defscope, return_type *cu_typeexpr) bodystate {
-  ret bodystate;
-  ret.es = mk(ds, Has(return_type));
-  ret.ds = ds;
-  ret.cs = ds->cs;
-  ret.im = ds->im;
-  ret.clq = ds->clq;
-  ret.return_type = return_type;
-  return ret;
+  return {
+    mk(ds, Has(return_type)),
+    ds,
+    ds->cs,
+    ds->im,
+    ds->clq,
+    &ds->tscope,
+    return_type,
+    mk_array@[goto_info](),
+    mk_array@[label_info](),
+    mk_array@[statement_info]()
+  };
 }
 
 struct statement_num { x size; }
@@ -99,7 +104,7 @@ func check_body(bs *bodystate, obp opt[*breakpack], a *ast_bracebody, ee_out *en
 
 func make_init_action(es *framescope, vn var_number, out *init_action) np {
   vi *var_info = ref_var(es, vn);
-  init ctor_desc = #get_init_ctor(es->clq, &vi->type);
+  init ctor_desc = #get_init_ctor(es, &vi->type);
   ia init_action = +{init, vi->cell};
   *out = ia;
   return NoFail;
@@ -119,7 +124,7 @@ func make_initializations(es *framescope, vns *array[var_number], out *array[ini
 
 func make_destroy_action(es *framescope, vn var_number, out *destroy_action) np {
   vi *var_info = ref_var(es, vn);
-  destroy ctor_desc = #get_destroy_ctor(es->clq, &vi->type);
+  destroy ctor_desc = #get_destroy_ctor(es, &vi->type);
   da destroy_action = +{destroy, vi->cell};
   *out = da;
   return NoFail;
@@ -384,7 +389,7 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
   converted te_typeexpr = #convert_typeexpr(&vd->type);
 
   cac cac_typeexpr;
-  #check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &cac);
+  #check_and_compute_typeexpr(es->clq, es->ds->generics, es->tscope, es->ds->repls, &converted, &cac);
 
   emissions array[unify_emission];
   unified te_typeexpr;
@@ -394,7 +399,7 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
 
   *cu_expected_type_out = ~ *expected_type;
   expected_type_props type_properties;
-  #compute_type_properties(es->clq, cu_expected_type_out, &expected_type_props);
+  #compute_type_properties(es->clq, es->tscope, cu_expected_type_out, &expected_type_props);
   *varcell_out = add_cell(es, {LocationVirtual, *cu_expected_type_out, expected_type_props});
   *emissions_out = freeze(&emissions);
   return NoFail;
@@ -536,7 +541,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   converted te_typeexpr = #convert_typeexpr(&a->decl.type);
 
   computed cac_typeexpr;
-  #check_and_compute_typeexpr(bs->clq, bs->ds->generics, bs->ds->repls, &converted, &computed);
+  #check_and_compute_typeexpr(bs->clq, bs->ds->generics, bs->tscope, bs->ds->repls, &converted, &computed);
   cu_computed cu_typeexpr;
 
   complete_type *cu_typeexpr;
@@ -557,7 +562,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
       cu_computed = ~computed.te;
       complete_type = &cu_computed;
       cu_props type_properties;
-      #compute_type_properties(bs->clq, complete_type, &cu_props);
+      #compute_type_properties(bs->clq, bs->tscope, complete_type, &cu_props);
       note_initter = true;
       cell = add_cell(&bs->es, {LocationStatic, *complete_type, cu_props});
     }
@@ -575,7 +580,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
         ice(_u8("note_initter true, on HasExpr, locally impossible"));
       }
       case &AutoInit(x opt[init_action]): {
-        init ctor_desc = #get_init_ctor(bs->clq, complete_type);
+        init ctor_desc = #get_init_ctor(&bs->es, complete_type);
         ia init_action = +{init, cell};
         x = Has(ia);
       }

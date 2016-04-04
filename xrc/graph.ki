@@ -3275,7 +3275,7 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, scope *type_scope, type *
   for i size = 0; i < nfn_params; i = i + 1 {
     ty *te_typeexpr = ref(typarams, i);
     props type_properties;
-    if case Unprinted(pm) = compute_complete_type_properties(clq, ty, &props) {
+    if case Unprinted(pm) = compute_complete_type_properties(clq, scope, ty, &props) {
       dump_err_printed(pm);
       ice(_u8("add_prim_fn_body typrops"));
     }
@@ -3284,7 +3284,7 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, scope *type_scope, type *
   }
   retty *te_typeexpr = ref(typarams, ntyparams - 1);
   retprops type_properties;
-  if case Unprinted(pm) = compute_complete_type_properties(clq, retty, &retprops) {
+  if case Unprinted(pm) = compute_complete_type_properties(clq, scope, retty, &retprops) {
     dump_err_printed(pm);
     ice(_u8("add_prim_fn_body retprops"));
   }

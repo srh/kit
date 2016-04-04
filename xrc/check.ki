@@ -316,11 +316,13 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
         return Unprinted(pm);
       }
 
+      inst_scope *type_scope = ref_scope(&inst->parms);
+
       // Important: We check the typeexpr first.  If that typeexpr cyclically refers to
       // this def, we fail.  If there is no typeexpr, we need to compute it from the rhs
       // (and that also needs to not depend cyclically on this def's own typeexpr).
       computed cac_typeexpr;
-      if case Unprinted(pm) = check_and_compute_typeexpr(clq, &ent->generics, &inst->parms.repls,
+      if case Unprinted(pm) = check_and_compute_typeexpr(clq, &ent->generics, inst_scope, &inst->parms.repls,
                                                          ent_typeexpr, &computed) {
         inst->typrop = FailedComputation;
         return Unprinted(pm);
@@ -328,7 +330,7 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       check(computed.complete);
       props type_properties;
       cu_computed cu_typeexpr = ~computed.te;
-      if case Unprinted(pm) = compute_type_properties(clq, &cu_computed, &props) {
+      if case Unprinted(pm) = compute_type_properties(clq, inst_scope, &cu_computed, &props) {
         inst->typrop = FailedComputation;
         return Unprinted(pm);
       }
@@ -378,10 +380,10 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
           annotate(&rhs.frame_info, move(&info));
         }
         case &InstRhsNonMagic(nonmag def_non_magic): {
-          #check_non_magic(clq, &ent->generics, &inst->parms.repls, &nonmag);
+          #check_non_magic(clq, &ent->generics, ref_scope(&inst->parms), &inst->parms.repls, &nonmag);
         }
         case &InstRhsMagic(mag def_magic): {
-          #check_magic(clq, &ent->generics, &inst->parms.repls, &mag);
+          #check_magic(clq, &ent->generics, ref_scope(&inst->parms), &inst->parms.repls, &mag);
         }
       }
       inst->rhs_status = FinishedCheckingRhs;
@@ -397,7 +399,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
 }
 
 // parms have already had generics replaced.  They should also be complete.
-func check_and_compute_parms_no_canonicalize(clq *clqueue, t *genparms, out *idy_repls) np {
+func check_and_compute_parms_no_canonicalize(clq *clqueue, t_scope *type_scope, t *genparms, out *idy_repls) np {
   switch t {
   case &NoParms:
     *out = blank_idyrepls();
@@ -407,7 +409,7 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t *genparms, out *idy
     nogeneric_parms idy_repls = blank_idyrepls();
     params_complete bool;
     params shray[te_typeexpr];
-    #check_and_compute_typeexpr_shray(clq, &nogeneric_g, &nogeneric_parms, &ps, &params, &params_complete);
+    #check_and_compute_typeexpr_shray(clq, &nogeneric_g, t_scope, &nogeneric_parms, &ps, &params, &params_complete);
 
     if !params_complete {
       ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
@@ -423,7 +425,7 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t *genparms, out *idy
 }
 
 // parms have already had generics replaced.  They should also be complete.
-func check_and_compute_parms_with_canonicalization(clq *clqueue, t *genparms, out *idy_genparms) np {
+func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_scope, t *genparms, out *idy_genparms) np {
   switch t {
     case &NoParms: {
       *out = blank_idyparms();
@@ -434,7 +436,7 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t *genparms, ou
       nogeneric_parms idy_repls = blank_idyrepls();
       params_complete bool;
       params shray[te_typeexpr];
-      #check_and_compute_typeexpr_shray(clq, &nogeneric_g, &nogeneric_parms, &ps, &params, &params_complete);
+      #check_and_compute_typeexpr_shray(clq, &nogeneric_g, t_scope, &nogeneric_parms, &ps, &params, &params_complete);
 
       if !params_complete {
         ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
@@ -447,7 +449,7 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t *genparms, ou
       reserve(&cu_params, n);
       for i size = 0; i < n; i = i + 1 {
         canonicalized te_typeexpr;
-        canonicalize_idy_ipses(clq->im, &params[i], &canonicalized, &ipse_names, &canonicalized_scope);
+        canonicalize_idy_ipses(clq->im, t_scope, &params[i], &canonicalized, &ipse_names, &canonicalized_scope);
         push(&cu_params, ~canonicalized);
       }
       *out = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&cu_params)}};
@@ -456,15 +458,15 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t *genparms, ou
   }
 }
 
-func nogeneric_check_and_compute_typeexpr(clq *clqueue, t *te_typeexpr, out *cac_typeexpr) np {
+func nogeneric_check_and_compute_typeexpr(clq *clqueue, scope *type_scope, t *te_typeexpr, out *cac_typeexpr) np {
   ng te_generics = TeNoGenerics;
   np idy_repls = blank_idyrepls();
-  return check_and_compute_typeexpr(clq, &ng, &np, t, out);
+  return check_and_compute_typeexpr(clq, &ng, scope, &np, t, out);
 }
 
 // NOTE: Generics replacement should really be a separate phase.  (Why?)  (Performance is
 // one counter-argument -- we'd create an extra intermediate te_typeexpr.)
-func check_and_compute_typeexpr(clq *clqueue, g *te_generics, parms *idy_repls, t *te_typeexpr,
+func check_and_compute_typeexpr(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls, t *te_typeexpr,
                                 out *cac_typeexpr) np {
   switch t {
     case &TeName(a te_name): {
@@ -474,21 +476,21 @@ func check_and_compute_typeexpr(clq *clqueue, g *te_generics, parms *idy_repls, 
       return NoFail;
     }
     case &TeApp(a te_typeapp): {
-      #check_and_compute_app_type(clq, g, parms, &a, out);
+      #check_and_compute_app_type(clq, g, scope, parms, &a, out);
       return NoFail;
     }
 
     case &TeUnion(a te_union): {
       computed_fields_complete bool;
       computed_fields array[te_vardecl];
-      #help_check_and_compute_fields(clq, g, parms, &a.fields, &computed_fields, &computed_fields_complete);
+      #help_check_and_compute_fields(clq, g, scope, parms, &a.fields, &computed_fields, &computed_fields_complete);
       *out = {computed_fields_complete, TeUnion({freeze(&computed_fields)})};
       return NoFail;
     }
 
     case &TeArraytype(a te_arraytype): {
       param cac_typeexpr;
-      #check_and_compute_typeexpr(clq, g, parms, oo(&a.param), &param);
+      #check_and_compute_typeexpr(clq, g, scope, parms, oo(&a.param), &param);
       *out = {param.complete && isHas(&a.count), TeArraytype({a.count, emshp(param.te)})};
       return NoFail;
     }
@@ -499,6 +501,7 @@ func check_and_compute_typeexpr(clq *clqueue, g *te_generics, parms *idy_repls, 
         return NoFail;
       }
       // Assume it's a valid ipse in scope, because what else can we do, keep track of that?
+      // SCOPE(): Uh yeah, we can keep track of that.
       // TODO: Make sure that user-defined ipses we see are well-scoped... if it still seems worth it.
       *out = {true, TeIpse({a.name})};
       return NoFail;
@@ -550,7 +553,7 @@ func fake_eval_arraytype_count(x *ast_expr, count_out *u32) np {
   }
 }
 
-func help_check_and_compute_fields(clq *clqueue, g *te_generics, parms *idy_repls, a *shray[te_vardecl],
+func help_check_and_compute_fields(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls, a *shray[te_vardecl],
                                    computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) np {
   all_complete bool = true;
   all_computed array[te_vardecl];
@@ -562,7 +565,7 @@ func help_check_and_compute_fields(clq *clqueue, g *te_generics, parms *idy_repl
       }
     }
     computed cac_typeexpr;
-    #check_and_compute_typeexpr(clq, g, parms, &decl->type, &computed);
+    #check_and_compute_typeexpr(clq, g, scope, parms, &decl->type, &computed);
     all_complete = all_complete & computed.complete;
     push(&all_computed, {decl->name, computed.te});
   }
@@ -587,7 +590,7 @@ func check_and_compute_name_type(clq *clqueue, g *te_generics, parms *idy_repls,
   return NoFail;
 }
 
-func check_and_compute_typeexpr_shray(clq *clqueue, g *te_generics, parms *idy_repls,
+func check_and_compute_typeexpr_shray(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls,
                                       t *shray[te_typeexpr], computed_out *shray[te_typeexpr],
                                       computed_complete_out *bool) np {
   complete bool = true;
@@ -596,7 +599,7 @@ func check_and_compute_typeexpr_shray(clq *clqueue, g *te_generics, parms *idy_r
   reserve(&computed, n);
   for i size = 0; i < n; i = i + 1 {
     c cac_typeexpr;
-    #check_and_compute_typeexpr(clq, g, parms, ref(t, i), &c);
+    #check_and_compute_typeexpr(clq, g, scope, parms, ref(t, i), &c);
     push(&computed, c.te);
     complete = complete & c.complete;
   }
@@ -605,11 +608,11 @@ func check_and_compute_typeexpr_shray(clq *clqueue, g *te_generics, parms *idy_r
   return NoFail;
 }
 
-func check_and_compute_app_type(clq *clqueue, g *te_generics, parms *idy_repls, a *te_typeapp,
+func check_and_compute_app_type(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls, a *te_typeapp,
                                 out *cac_typeexpr) np {
   params_complete bool;
   params shray[te_typeexpr];
-  #check_and_compute_typeexpr_shray(clq, g, parms, &a->params, &params, &params_complete);
+  #check_and_compute_typeexpr_shray(clq, g, scope, parms, &a->params, &params, &params_complete);
 
   switch &a->typefunc {
     case &TePureName(value sym): {
@@ -624,7 +627,7 @@ func check_and_compute_app_type(clq *clqueue, g *te_generics, parms *idy_repls, 
         canonical array[cu_typeexpr];
         foreach param *te_typeexpr in refs(&params) {
           canonicalized te_typeexpr;
-          canonicalize_idy_ipses(clq->im, param, &canonicalized, &ipse_names, &canonicalized_scope);
+          canonicalize_idy_ipses(clq->im, scope, param, &canonicalized, &ipse_names, &canonicalized_scope);
           push(&canonical, ~canonicalized);
         }
         hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
@@ -810,8 +813,8 @@ func compute_pack_properties(clq *clqueue, pack *te_instpack, out *type_properti
   return NoFail;
 }
 
-func compute_type_properties(clq *clqueue, t *cu_typeexpr, out *type_properties) np {
-  return compute_complete_type_properties(clq, &t->x, out);
+func compute_type_properties(clq *clqueue, scope *type_scope, t *cu_typeexpr, out *type_properties) np {
+  return compute_complete_type_properties(clq, scope, &t->x, out);
 }
 
 struct struct_field_info {
@@ -839,7 +842,7 @@ inline func psd_index(psd *partial_struct_data) size {
 }
 
 // fields had better damn well be complete
-func compute_partial_struct_data(clq *clqueue, fields *shray[te_vardecl],
+func compute_partial_struct_data(clq *clqueue, scope *type_scope, fields *shray[te_vardecl],
                                  name opt[sym], out *partial_struct_data) np {
   ret partial_struct_data = {false, 0, 1, TrivialLevel, TrivialLevel, TrivialLevel, TrivialLevel,
                              IsPow2AllTheWayDown, mk_array@[struct_field_info]()};
@@ -847,7 +850,7 @@ func compute_partial_struct_data(clq *clqueue, fields *shray[te_vardecl],
   for i size = 0; i < n; i = i + 1 {
     vd *te_vardecl = ref(fields, i);
     props type_properties;
-    #compute_complete_type_properties(clq, &vd->type, &props);
+    #compute_complete_type_properties(clq, scope, &vd->type, &props);
 
     ret.offset = ceil_aligned(ret.offset, props.flat_alignment);
     if Has(vd->name) == name {
@@ -905,16 +908,16 @@ func psd_exposed_types(fielddecls *shray[te_vardecl], psd *partial_struct_data) 
 
 // st had better be complete and computed.
 // Realtype is the name (or app) type (a struct or defclass) whose fields the structspec specifies.
-func compute_complete_struct_properties(clq *clqueue, st *structspec, realtype *cu_typeexpr,
+func compute_complete_struct_properties(clq *clqueue, scope *type_scope, st *structspec, realtype *cu_typeexpr,
                                         constructor_mask u32, out *type_properties) np {
   psd partial_struct_data;
-  #compute_partial_struct_data(clq, &st->fields, None, &psd);
+  #compute_partial_struct_data(clq, scope, &st->fields, None, &psd);
   final_size u32 = ceil_aligned(psd.offset, psd.max_alignment);
   *out = {final_size, psd.max_alignment,
-          level_to_derived(clq, CtorInit, 1, &realtype->x, mask_level(constructor_mask, ComputeInit, psd.init_level)),
-          level_to_derived(clq, CtorMove, 2, &realtype->x, mask_level(constructor_mask, ComputeMove, psd.move_level)),
-          level_to_derived(clq, CtorCopy, 2, &realtype->x, mask_level(constructor_mask, ComputeCopy, psd.copy_level)),
-          level_to_derived(clq, CtorDestroy, 1, &realtype->x,
+          level_to_derived(clq, CtorInit, 1, scope, &realtype->x, mask_level(constructor_mask, ComputeInit, psd.init_level)),
+          level_to_derived(clq, CtorMove, 2, scope, &realtype->x, mask_level(constructor_mask, ComputeMove, psd.move_level)),
+          level_to_derived(clq, CtorCopy, 2, scope, &realtype->x, mask_level(constructor_mask, ComputeCopy, psd.copy_level)),
+          level_to_derived(clq, CtorDestroy, 1, scope, &realtype->x,
                            mask_level(constructor_mask, ComputeDestroy, psd.destroy_level)),
           IsScalarNo,
           psd.is_pow2,
@@ -933,7 +936,7 @@ inline func pluralize_array_exposed(etn *exposed_type_name) exposed_type_name {
   return *etn;
 }
 
-func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *cu_typeexpr, out *type_properties) np {
+func compute_complete_enum_properties(clq *clqueue, scope *type_scope, et *enumspec, realtype *cu_typeexpr, out *type_properties) np {
   tag_size u32 = clq->cs->plat.enum_tag_size;
   max_size u32 = tag_size;
   max_alignment u32 = tag_size;
@@ -945,7 +948,7 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *cu_t
   n size = count(&et->constructors);
   for i size = 0; i < n; i = i + 1 {
     props type_properties;
-    #compute_complete_type_properties(clq, &ref(&et->constructors, i)->type, &props);
+    #compute_complete_type_properties(clq, scope, &ref(&et->constructors, i)->type, &props);
     tagged_size u32 = ceil_aligned(tag_size, props.flat_alignment) + props.flat_size;
     max_size = max(max_size, tagged_size);
     max_alignment = max(max_alignment, props.flat_alignment);
@@ -965,20 +968,20 @@ func compute_complete_enum_properties(clq *clqueue, et *enumspec, realtype *cu_t
           // Enum initialization is always trivial -- initializes to zero-filled invalid
           // tag value.
           DerivedMethodTrivial,
-          level_to_derived(clq, CtorMove, 2, &realtype->x, move_level),
-          level_to_derived(clq, CtorCopy, 2, &realtype->x, copy_level),
-          level_to_derived(clq, CtorDestroy, 1, &realtype->x, destroy_level),
+          level_to_derived(clq, CtorMove, 2, scope, &realtype->x, move_level),
+          level_to_derived(clq, CtorCopy, 2, scope, &realtype->x, copy_level),
+          level_to_derived(clq, CtorDestroy, 1, scope, &realtype->x, destroy_level),
           IsScalarNo,
           is_pow2,
           freeze(&exposed_types)};
   return NoFail;
 }
 
-func compute_complete_vardecl_properties(clq *clqueue, decls *shray[te_vardecl], out *array[type_properties]) np {
+func compute_complete_vardecl_properties(clq *clqueue, scope *type_scope, decls *shray[te_vardecl], out *array[type_properties]) np {
   ret array[type_properties];
   foreach decl *te_vardecl in refs(decls) {
     props type_properties;
-    #compute_complete_type_properties(clq, &decl->type, &props);
+    #compute_complete_type_properties(clq, scope, &decl->type, &props);
     push(&ret, props);
   }
   swap(out, &ret);
@@ -988,7 +991,7 @@ func compute_complete_vardecl_properties(clq *clqueue, decls *shray[te_vardecl],
 
 
 // t had better be complete and computed.
-func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_properties) np {
+func compute_complete_type_properties(clq *clqueue, scope *type_scope, t *te_typeexpr, out *type_properties) np {
   cs *checkstate = clq->cs;
   switch t {
     case &TeName(a te_name): {
@@ -1017,7 +1020,7 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
       n size = count(&a.fields);
       for i size = 0; i < n; i = i + 1 {
         props type_properties;
-        #compute_complete_type_properties(clq, &ref(&a.fields, i)->type, &props);
+        #compute_complete_type_properties(clq, scope, &ref(&a.fields, i)->type, &props);
         max_size = max(max_size, props.flat_size);
         max_alignment = max(max_alignment, props.flat_alignment);
         is_pow2 = combine_pow2(is_pow2, props.is_pow2);
@@ -1043,7 +1046,7 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
     case &TeArraytype(a te_arraytype): {
       if case Has(c u32) = a.count {
         props type_properties;
-        #compute_complete_type_properties(clq, oo(&a.param), &props);
+        #compute_complete_type_properties(clq, scope, oo(&a.param), &props);
 
         is_pow2 pow2_turtles;
         if c == 0 || (c & (c - 1)) == 0 {
@@ -1060,10 +1063,10 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
         // We _should_ maintain alignment for a zero-element array because the pointer to
         // such an array might hack in tag-bit logic.
         *out = {props.flat_size * c, props.flat_alignment,
-                level_to_derived(clq, CtorInit, 1, t, to_level(&props.init_behavior)),
-                level_to_derived(clq, CtorMove, 2, t, to_level(&props.move_behavior)),
-                level_to_derived(clq, CtorCopy, 2, t, to_level(&props.copy_behavior)),
-                level_to_derived(clq, CtorDestroy, 1, t, to_level(&props.destroy_behavior)),
+                level_to_derived(clq, CtorInit, 1, scope, t, to_level(&props.init_behavior)),
+                level_to_derived(clq, CtorMove, 2, scope, t, to_level(&props.move_behavior)),
+                level_to_derived(clq, CtorCopy, 2, scope, t, to_level(&props.copy_behavior)),
+                level_to_derived(clq, CtorDestroy, 1, scope, t, to_level(&props.destroy_behavior)),
                 IsScalarNo,
                 is_pow2,
                 freeze(&exposed_types)};
@@ -1098,7 +1101,7 @@ func to_level(b *derived_method_behavior) behavior_level {
   }
 }
 
-func make_magic_inst(clq *clqueue, magic_name sym, arity size, type *te_typeexpr) instpair {
+func make_magic_inst(clq *clqueue, magic_name sym, arity size, scope *type_scope, type *te_typeexpr) instpair {
   arr *array[def_entry_id] = unHas(lookup_ref(&clq->cs->defs_by_name, &magic_name));
   // There is only be one magic def for each name.
   check(count(arr) == 1);
@@ -1107,27 +1110,27 @@ func make_magic_inst(clq *clqueue, magic_name sym, arity size, type *te_typeexpr
   // It is templatized on one type parameter (type).
   parms genparms = HasParms(mk_shray(*type));
   inst_id def_inst_id;
-  if !from_np(make_inst(clq, ent_id, &parms, &inst_id)) {
+  if !from_np(make_inst(clq, ent_id, scope, &parms, &inst_id)) {
     ice(_u8("make_inst (from make_magic_inst) seeing error... what?"));
   }
   return {ent_id, inst_id};
 }
 
-func make_inst(clq *clqueue, ent def_entry_id, parms *genparms, inst_out *def_inst_id) np {
+func make_inst(clq *clqueue, ent def_entry_id, parms_scope *type_scope, parms *genparms, inst_out *def_inst_id) np {
   idy_parms idy_genparms;
-  #check_and_compute_parms_with_canonicalization(clq, parms, &idy_parms);
+  #check_and_compute_parms_with_canonicalization(clq, parms_scope, parms, &idy_parms);
   inst_id def_inst_id = enqueue_def_inst(clq, ent, &idy_parms);
   *inst_out = inst_id;
   return NoFail;
 }
 
-func level_to_derived(clq *clqueue, wc which_ctor, arity size, type *te_typeexpr,
+func level_to_derived(clq *clqueue, wc which_ctor, arity size, scope *type_scope, type *te_typeexpr,
                       level behavior_level) derived_method_behavior {
   switch level {
   case TrivialLevel:
     return DerivedMethodTrivial;
   case NontrivialLevel:
-    return DerivedMethodNontrivial(make_magic_inst(clq, magic_name(clq->im, wc), arity, type));
+    return DerivedMethodNontrivial(make_magic_inst(clq, magic_name(clq->im, wc), arity, scope, type));
   case AbsentLevel:
     return DerivedMethodAbsent;
   }
@@ -1210,7 +1213,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           rhs_fields array[te_vardecl];
           rhs_fields_complete bool;
           if case Unprinted(pm) = help_check_and_compute_fields(
-              clq, &ent->generics, &inst->parms.repls, &crs.drs.fields,
+              clq, &ent->generics, ref_scope(&inst->parms), &inst->parms.repls, &crs.drs.fields,
               &rhs_fields, &rhs_fields_complete) {
             inst->info = FailedComputation;
             return Unprinted(pm);
@@ -1229,10 +1232,12 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo(st)), class_props});
 
         case &DefstructRhsSpec(drs structspec):
+          inst_scope *type_scope = ref_scope(&inst->parms);
+
           rhs_fields array[te_vardecl];
           rhs_fields_complete bool;
 
-          if case Unprinted(pm) = help_check_and_compute_fields(clq, &ent->generics, &inst->parms.repls,
+          if case Unprinted(pm) = help_check_and_compute_fields(clq, &ent->generics, inst_scope, &inst->parms.repls,
                                                                 &drs.fields, &rhs_fields, &rhs_fields_complete) {
             inst->info = FailedComputation;
             return Unprinted(pm);
@@ -1244,7 +1249,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
 
           it cu_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
-          if case Unprinted(pm) = compute_complete_struct_properties(clq, &st, &it, ComputeAll, &rhs_props) {
+          if case Unprinted(pm) = compute_complete_struct_properties(clq, inst_scope, &st, &it, ComputeAll, &rhs_props) {
             inst->info = FailedComputation;
             return Unprinted(pm);
           }
@@ -1253,10 +1258,12 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo(st)), rhs_props});
 
         case &DefenumRhsSpec(drs enumspec):
+          inst_scope *type_scope = ref_scope(&inst->parms);
+
           rhs_constructors array[te_vardecl];
           rhs_constructors_complete bool;
 
-          if case Unprinted(pm) = help_check_and_compute_fields(clq, &ent->generics, &inst->parms.repls,
+          if case Unprinted(pm) = help_check_and_compute_fields(clq, &ent->generics, inst_scope, &inst->parms.repls,
                                                                 &drs.constructors, &rhs_constructors,
                                                                 &rhs_constructors_complete) {
             inst->info = FailedComputation;
@@ -1269,7 +1276,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
 
           it cu_typeexpr = inst_type(cs, ent_id, id);
           rhs_props type_properties;
-          if case Unprinted(pm) = compute_complete_enum_properties(clq, &et, &it, &rhs_props) {
+          if case Unprinted(pm) = compute_complete_enum_properties(clq, inst_scope, &et, &it, &rhs_props) {
             inst->info = FailedComputation;
             return Unprinted(pm);
           }

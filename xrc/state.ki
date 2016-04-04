@@ -691,7 +691,7 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype_scope *type_sco
   case &OneMatch(m ent_and_parms):
     // This function is called by to_defclass_properties, which means lifetimes come from idy_repls.  There is still the question of how to handle emissions from copy constructors and the like, and that might depend on what the emissions actually are.
     inst_id def_inst_id;
-    #make_inst(clq, m.ent, &m.parms, &inst_id);
+    #make_inst(clq, m.ent, fntype_scope, &m.parms, &inst_id);
     return NoFail(@[derived_method_behavior]DerivedMethodExplicit({@[instpair]{m.ent, inst_id}, {m.emissions}}));
   }
 }
@@ -699,6 +699,7 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype_scope *type_sco
 // TODO(): This blindly returns back exposed_types of its inner struct.  Update this
 // to... not do that.
 // We call this before we've set the inst's info -- so we _have_ to take structspec as a param.  It's _good_ that we don't make the caller pass the type itself -- we can see here that it's constructed straight from the ent, which means we know that there are no "strange" (read: scoped to some function body) lifetime types involved, just the idy_repls -- see the emissions in lookup_explicit_method_or_lack_thereof.
+// st is scoped to the inst, so i_scope (in the fn body) is its scope.
 func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *structspec, out *type_properties) np {
   cs *checkstate = clq->cs;
   i_scope *type_scope = ref_scope(&ref_deftype_inst(clq->cs, inst_id)->parms);
@@ -706,7 +707,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
   switch a {
     case DefaultMoveCopyDestroy: {
       props type_properties;
-      #compute_complete_struct_properties(clq, st, &type, ComputeMove | ComputeCopy | ComputeDestroy, &props);
+      #compute_complete_struct_properties(clq, i_scope, st, &type, ComputeMove | ComputeCopy | ComputeDestroy, &props);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_initsym);
@@ -717,7 +718,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
     }
     case DefaultMove: {
       props type_properties;
-      #compute_complete_struct_properties(clq, st, &type, ComputeMove, &props);
+      #compute_complete_struct_properties(clq, i_scope, st, &type, ComputeMove, &props);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
@@ -734,7 +735,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
     }
     case NoDefaults: {
       props type_properties;
-      #compute_complete_struct_properties(clq, st, &type, ComputeNone, &props);
+      #compute_complete_struct_properties(clq, i_scope, st, &type, ComputeNone, &props);
       ptrtype te_typeexpr = ptr_type(cs, type.x);
       fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
       fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
