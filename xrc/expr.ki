@@ -1631,19 +1631,13 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
 
 // SCOPE(): The scopage of st_out is different from the scopage of t.
 func structural_structspec(ds *defscope, t *te_typeexpr, st_out **structspec) structural_rhs_result {
-  if case Has(pack te_instpack) = type_pack(t) {
-    st *structspec;
-    switch help_structural_structspec(ds, &pack, &st) {
-    case Error(pm):
-      return Error(pm);
-    case Success:
-      *st_out = st;
-      return Success;
-    case NotAccessible:
-      return NotAccessible;
-    }
-  } else {
-    // We don't allow strinit exprs on raw struct types anymore.
+  switch t {
+  case &TeName(a te_name):
+    return help_structural_structspec(ds, unHas(&a.pack), st_out);
+  case &TeApp(a te_typeapp):
+    // SCOPE(): Use all of the pack.
+    return help_structural_structspec(ds, &unHas(&a.pack)->teip, st_out);
+  default:
     return NotAccessible;
   }
 }
@@ -1651,19 +1645,13 @@ func structural_structspec(ds *defscope, t *te_typeexpr, st_out **structspec) st
 // et_out is set to a complete/computed value.
 // SCOPE(): The scopage of et_out is different from the scopage of t.
 func structural_enumspec(ds *defscope, t *te_typeexpr, et_out **enumspec) structural_rhs_result {
-  if case Has(pack te_instpack) = type_pack(t) {
-    et *enumspec;
-    switch help_structural_enumspec(ds, &pack, &et) {
-    case Error(pm):
-      return Error(pm);
-    case Success:
-      *et_out = et;
-      return Success;
-    case NotAccessible:
-      return NotAccessible;
-    }
-  } else {
-    // We don't allow constructors/switching on raw enum types anymore.
+  switch t {
+  case &TeName(a te_name):
+    return help_structural_enumspec(ds, unHas(&a.pack), et_out);
+  case &TeApp(a te_typeapp):
+    // SCOPE(): Use all of the pack.
+    return help_structural_enumspec(ds, &unHas(&a.pack)->teip, et_out);
+  default:
     return NotAccessible;
   }
 }
@@ -1698,27 +1686,6 @@ func deftype_rhs_info_accessible(ds *defscope, id deftype_entry_id, result_out *
     *result_out = false;
     return NoFail;
   }
-}
-
-func type_pack(t *te_typeexpr) opt[te_instpack] {
-  switch t {
-  case &TeName(a te_name):
-    if case &Has(pack te_instpack) = &a.pack {
-      return Has(pack);
-    }
-    ice(_u8("type_pack called on uncomputed type"));
-  case &TeApp(a te_typeapp):
-    if case &Has(pack te_app_pack) = &a.pack {
-      // SCOPE(): Gross, see callers, they have a SCOPE() comment on them.
-      return Has(pack.teip);
-    }
-    ice(_u8("type_pack called on uncomputed type"));
-  case &TeUnknown:
-    ice(_u8("type_pack called on incomplete type"));
-  default:
-    return None;
-  }
-  return fake();
 }
 
 enum structural_rhs_result {
