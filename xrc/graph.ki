@@ -717,11 +717,13 @@ struct gr_statep {
 }
 
 func compute_prim(gs gr_statep, t te_typeexpr) cu_typeexpr {
-  return compute_prim(gs.clq, t);
+  return compute_prim_with_scope(gs.clq, &gs.gr->scope, t);
 }
 
 func compute_prim(gs gr_statep, t te_typeexpr) cu_typrop {
-  return compute_prim(gs.clq, t);
+  ret cu_typrop;
+  compute_prim_with_scope(gs.clq, &gs.gr->scope, t, &ret.cu, &ret.props);
+  return ret;
 }
 
 struct gr_savetrack {

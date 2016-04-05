@@ -1960,8 +1960,12 @@ func compute_void(clq *clqueue) cu_typrop { return compute_prim(clq, primitive_v
 
 func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
   global_scope type_scope = mk_global();
+  return compute_prim_with_scope(clq, &global_scope, t);
+}
+
+func compute_prim_with_scope(clq *clqueue, scope *type_scope, t te_typeexpr) cu_typeexpr {
   cac cac_typeexpr;
-  if !from_np(nogeneric_check_and_compute_typeexpr(clq, &global_scope, &t, &cac)) {
+  if !from_np(nogeneric_check_and_compute_typeexpr(clq, scope, &t, &cac)) {
     ice(_u8("compute_prim encounters uncomputable type"));
   }
   check(cac.complete);
@@ -1976,8 +1980,12 @@ func compute_prim(clq *clqueue, t te_typeexpr) cu_typrop {
 
 func compute_prim(clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
   global_scope type_scope = mk_global();
+  compute_prim_with_scope(clq, &global_scope, t, out, props_out);
+}
+
+func compute_prim_with_scope(clq *clqueue, scope *type_scope, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
   type cu_typeexpr = compute_prim(clq, t);
-  if !from_np(compute_type_properties(clq, &global_scope, &type, props_out)) {
+  if !from_np(compute_type_properties(clq, scope, &type, props_out)) {
     ice(_u8("compute_prim fails to compute type properties"));
   }
   *out = type;
