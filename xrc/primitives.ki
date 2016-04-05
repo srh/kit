@@ -396,6 +396,7 @@ func mk_ref_type(cs *checkstate, ipse te_typeexpr, param te_typeexpr) te_typeexp
 }
 
 func fake_ipse(cs *checkstate) te_typeexpr {
+  // SCOPE(): Add this to the scope?  Ugh.
   return TeIpse({cs->im->cym.fakesym});
 }
 

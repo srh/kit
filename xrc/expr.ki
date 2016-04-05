@@ -888,6 +888,7 @@ func enum_field_ipse(outer_ipse te_typeexpr) te_typeexpr {
 // that vars could shadow generic ipse parameters, for now, so we add the $var_
 // prefix.)
 func varname_ipse(im *identmap, name sym) te_typeexpr {
+  // SCOPE(): Add this to the scope.
   n sym = intern(im, _s("$var_") + lookup(im, name));
   return TeIpse({n});
 }
@@ -895,6 +896,7 @@ func varname_ipse(im *identmap, name sym) te_typeexpr {
 // TODO: Most uses of this will get replaced by some rval ipse getter.  (We'll set
 // rval ipses with this value, though.)
 func unnamed_ipse(es *framescope) te_typeexpr {
+  // SCOPE(): Add this to the scope.
   n sym = intern(es->im, _s("$frame_") + from_u8(to_u8str(void, es->ipse_gen_counter)));
   es->ipse_gen_counter = es->ipse_gen_counter + 1;
   return TeIpse({n});
