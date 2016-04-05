@@ -726,6 +726,10 @@ func gr_prim(gs gr_statep, t te_typeexpr) cu_typrop {
   return ret;
 }
 
+func computed_ptr_type(gs gr_statep, t *cu_typeexpr) cu_typrop {
+  return gr_prim(gs, ptr_type(gs.clq->cs, t->x));
+}
+
 struct gr_savetrack {
   ctr celltrack;
 }
@@ -1855,7 +1859,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
       add(bu, rhs_later);
     }
   case &FnIndexingInfo(fninfo ast_fn_indexing_info):
-    result_ptrtype cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, value_cell(x))->type);
+    result_ptrtype cu_typrop = computed_ptr_type(gs, &ref_cell(gs.gr, value_cell(x))->type);
     result_ptr_cell cell_num = add_cell(gs.gr, {LocationStatic, result_ptrtype.cu, result_ptrtype.props});
 
     if case &Has(di ast_deref_indexing_info) = &info->deref {
@@ -1877,7 +1881,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
       add(bu, @[gr_xop]GrApply({funcell, mk_shray(result_cell(&di.lhs_after), result_cell(oo(&a->rhs))), result_ptr_cell, StandardApply, NoSemantic}));
       // Now I have a result pointer.  Ho ho ho!
     } else {
-      collection_ptrtype cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, value_cell(oo(&a->lhs)))->type);
+      collection_ptrtype cu_typrop = computed_ptr_type(gs, &ref_cell(gs.gr, value_cell(oo(&a->lhs)))->type);
       collection_ptr_cell cell_num = add_cell(gs.gr, {LocationStatic, collection_ptrtype.cu, collection_ptrtype.props});
 
       fun_ptrtype cu_typrop = gr_prim(gs, fn_type(gs.clq->cs, collection_ptrtype.cu.x, ref_cell(gs.gr, result_cell(oo(&a->rhs)))->type.x, result_ptrtype.cu.x));
@@ -1997,7 +2001,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
     case &ConditionalAssignment(ci ast_conditional_assignment_info): {
       destcell cell_num = value_cell(oo(&a->lhs));
       valuetype *cu_typeexpr = &ref_cell(gs.gr, destcell)->type;
-      ptrtype cu_typrop = computed_ptr_type(gs.clq, valuetype);
+      ptrtype cu_typrop = computed_ptr_type(gs, valuetype);
       booltype cu_typrop = compute_bool(gs.clq);
       fntype cu_typrop = gr_prim(gs, fn_type(gs.clq->cs, ptrtype.cu.x, ptrtype.cu.x, booltype.cu.x));
 
@@ -2314,7 +2318,7 @@ enum uni_fun_statechange {
 }
 
 func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num, statechange uni_fun_statechange) gr_num {
-  argptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, arg)->type);
+  argptr cu_typrop = computed_ptr_type(gs, &ref_cell(gs.gr, arg)->type);
   voidret cu_typrop = compute_void(gs.clq);
   fnptr cu_typrop = gr_prim(gs, fn_type(gs.clq->cs, argptr.cu.x, voidret.cu.x));
   funcell cell_num = add_cell(gs.gr, {LocationStatic, fnptr.cu, fnptr.props});
@@ -2369,8 +2373,8 @@ func gr_destroy_action(gs gr_statep, x *destroy_action, dad deadact_after_destro
 func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechange bi_ctor_statechange) gr_num {
   // In our "bi_fun" uses the dest and src have the same type.  It seems wrong for this
   // menial code to know that, though.
-  destptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, dest)->type);
-  srcptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, src)->type);
+  destptr cu_typrop = computed_ptr_type(gs, &ref_cell(gs.gr, dest)->type);
+  srcptr cu_typrop = computed_ptr_type(gs, &ref_cell(gs.gr, src)->type);
   voidret cu_typrop = compute_void(gs.clq);
   fnptr cu_typrop = gr_prim(gs, fn_type(gs.clq->cs, destptr.cu.x, srcptr.cu.x, voidret.cu.x));
   funcell cell_num = add_cell(gs.gr, {LocationStatic, fnptr.cu, fnptr.props});

@@ -1032,10 +1032,6 @@ func behavior_to_desc(b *derived_method_behavior) cr[ctor_desc] {
   }
 }
 
-func computed_ptr_type(clq *clqueue, t *cu_typeexpr) cu_typrop {
-  return compute_prim(clq, ptr_type(clq->cs, t->x));
-}
-
 func get_init_ctor(es *framescope, t *cu_typeexpr) cr[ctor_desc] {
   props type_properties;
   #compute_type_properties(es->clq, es->tscope, t, &props);
