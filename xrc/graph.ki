@@ -12,6 +12,7 @@ struct frame_graph {
   informal_name sym;
   cells array[cell_info];
   ops array[gr_node];
+  scope type_scope;
 }
 
 /* A cell location is tricky: the location of an expr's return value
@@ -166,7 +167,7 @@ func init_frame_graph_from_incomplete(incomplete_graph *opt[frame_graph]) frame_
 }
 
 func init_frame_graph_empty(informal_name sym) frame_graph {
-  return {informal_name, mk_array@[cell_info](), mk_array@[gr_node]()};
+  return {informal_name, mk_array@[cell_info](), mk_array@[gr_node](), mk_scope()};
 }
 
 func add_cellp(gr *frame_graph, info *cell_info) cell_num {

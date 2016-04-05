@@ -220,6 +220,8 @@ func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *te_gener
   ds defscope = {clq->cs, clq->im, clq, accessible, g, &parms->repls, def_informal_name, clone_scope(ref_scope(parms))};
   es framescope = mk(&ds, None);
   #check_expr_consume(&es, x, pt);
+  // SCOPE: This is such a ghetto hack.
+  es.gr.scope = ds.tscope;
   *frame_info_out = {Has(move(&es.gr))};
   return NoFail;
 }
