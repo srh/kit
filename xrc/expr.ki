@@ -65,6 +65,7 @@ struct defscope {
   accessible array[access_entry_id];
   // Generics and their _complete_ replacements.
   generics *te_generics;
+  deflevel_parms_scope *type_scope;
   repls *idy_repls;
   def_informal_name sym;
 }
@@ -215,7 +216,7 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
 
 func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *te_generics, parms *idy_genparms,
                     x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
-  ds defscope = {clq->cs, clq->im, clq, accessible, g, &parms->repls, def_informal_name};
+  ds defscope = {clq->cs, clq->im, clq, accessible, g, ref_scope(parms), &parms->repls, def_informal_name};
   es framescope = mk(&ds, ref_scope(parms), None);
   #check_expr_consume(&es, x, pt);
   // SCOPE: This is such a ghetto hack.
@@ -1393,14 +1394,17 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   // TODO: Cache converted.
   converted te_typeexpr = #convert_typeexpr(&type);
 
+  // SCOPE: Local lifetimes can't be in scope -- the lambda doesn't capture anything.  When lambdas do capture, we'll have to handle that appropriately (depending on how capturing works).
+  lambda_scope *type_scope = es->ds->deflevel_parms_scope;
+
   // TODO: I see some duplicated logic with the TypedExpr case.
   computed cac_typeexpr;
-  #check_and_compute_typeexpr(es->clq, es->ds->generics, &es->tscope, es->ds->repls, &converted, &computed);
+  #check_and_compute_typeexpr(es->clq, es->ds->generics, lambda_scope, es->ds->repls, &converted, &computed);
   // Lambda exprs can't have partial types (yet!).
   check(computed.complete);
   unified te_typeexpr;
   emissions array[unify_emission];
-  if !unify_types(&es->tscope, pt, &computed.te, &emissions, &unified) {
+  if !unify_types(lambda_scope, pt, &computed.te, &emissions, &unified) {
     return ERR(_u8("Lambda is incompatible with contextual type."));
   }
 
@@ -1412,11 +1416,11 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   if true {
     nargs size = count(&a->args);
     return_type cu_typeexpr = ~computed_params[nargs];
-    #help_check_lambda_body(es->ds, &es->tscope, &return_type, a, computed_params);
+    #help_check_lambda_body(es->ds, lambda_scope, &return_type, a, computed_params);
   }
 
   props type_properties;
-  #compute_complete_type_properties(es->clq, &es->tscope, &computed.te, &props);
+  #compute_complete_type_properties(es->clq, lambda_scope, &computed.te, &props);
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~computed.te, props})),
                                     ~computed.te, props)));
   annotate(&a->emissions, {freeze(&emissions)});
