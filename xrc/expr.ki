@@ -795,7 +795,7 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
 }
 
 func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt *te_typeexpr, x *ast_expr) np {
-  boolean cu_typeexpr = compute_prim(es->clq, primitive_bool_type(es->cs));
+  boolean cu_typeexpr = compute_bool(es->clq);
   #check_consume_then_discard_expr(es, oo(&oo(&a->condition)->expr), &boolean.x, &oo(&a->condition)->discard);
   #check_expr_consume(es, oo(&a->then_clause), pt);
   #check_expr_consume(es, oo(&a->else_clause), pt);
@@ -1870,16 +1870,14 @@ func lookup_field_from_list(clq *clqueue, scope *type_scope, fields *shray[te_va
 }
 
 func check_expr_logical_conjunction(es *framescope, a *ast_logical_conjunction, pt *te_typeexpr, x *ast_expr) np {
-  type cu_typeexpr;
-  props type_properties;
-  compute_prim(es->clq, primitive_bool_type(es->cs), &type, &props);
+  ty cu_typrop = compute_bool(es->clq);
 
-  if !unifies(&type.x, pt) {
+  if !unifies(&ty.cu.x, pt) {
     return ERR(_u8("logical conjunction in bad place"));
   }
-  #check_expr_consume(es, oo(&a->lhs), &type.x);
-  #check_expr_consume(es, oo(&a->rhs), &type.x);
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, type, props})), type, props)));
+  #check_expr_consume(es, oo(&a->lhs), &ty.cu.x);
+  #check_expr_consume(es, oo(&a->rhs), &ty.cu.x);
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ty.cu, ty.props})), ty.cu, ty.props)));
   return NoFail;
 }
 
@@ -1948,6 +1946,10 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
   }
   return NoFail;
 }
+
+// We have these helpful wrappers to limit usages of compute_prim, so that it's easier to feel comfortable about its use of global_scope.
+func compute_bool(clq *clqueue) cu_typeexpr { return compute_prim(clq, primitive_bool_type(clq->cs)); }
+func compute_bool(clq *clqueue) cu_typrop { return compute_prim(clq, primitive_bool_type(clq->cs)); }
 
 func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
   global_scope type_scope = mk_global();  // SCOPE(): Maybe no good.

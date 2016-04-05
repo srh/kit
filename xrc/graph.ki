@@ -1987,7 +1987,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       destcell cell_num = value_cell(oo(&a->lhs));
       valuetype *cu_typeexpr = &ref_cell(gs.gr, destcell)->type;
       ptrtype cu_typrop = computed_ptr_type(gs.clq, valuetype);
-      booltype cu_typrop = compute_prim(gs.clq, primitive_bool_type(gs.clq->cs));
+      booltype cu_typrop = compute_bool(gs.clq);
       fntype cu_typrop = compute_prim(gs.clq, fn_type(gs.clq->cs, ptrtype.cu.x, ptrtype.cu.x, booltype.cu.x));
 
       funcell cell_num = add_cell(gs.gr, {LocationStatic, fntype.cu, fntype.props});
