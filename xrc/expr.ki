@@ -1945,7 +1945,7 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
   return NoFail;
 }
 
-// We have these helpful wrappers to limit usages of compute_prim, so that it's easier to feel comfortable about its use of global_scope.
+// We have these helpful wrappers to limit usages of compute_prim, so that it's easier to feel comfortable about its use of global_scope.  Of course, some things like graph actually pass in their scope.
 func compute_bool(clq *clqueue) cu_typeexpr { return compute_prim(clq, primitive_bool_type(clq->cs)); }
 func compute_bool(clq *clqueue) cu_typrop { return compute_prim(clq, primitive_bool_type(clq->cs)); }
 
@@ -1953,10 +1953,6 @@ func compute_void(clq *clqueue) cu_typeexpr { return compute_prim(clq, primitive
 func compute_void(clq *clqueue) cu_typrop { return compute_prim(clq, primitive_void_type(clq->cs)); }
 
 func compute_size(clq *clqueue) cu_typeexpr { return compute_prim(clq, primitive_size_type(clq->cs)); }
-
-// SCOPE(): The following compute_prim usages are bad:  fns and ptrs to some user-specified type.  We'll break things when doing ipse canonicalization (when we can't lookup the ipse's oftype in scope).  Also, we can't just pass in the scope -- from graph time.  (We can't?)
-// Solution:  Just hard-code fn-type and ptr-type typrops?
-// No, because we need "complete types" to make cells.  Maybe we could just permit cell_info to not have complete types.  Who says it has to be complete?
 
 func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
   global_scope type_scope = mk_global();
