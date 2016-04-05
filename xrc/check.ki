@@ -500,12 +500,14 @@ func check_and_compute_typeexpr(clq *clqueue, g *te_generics, scope *type_scope,
       if case Has(ix size) = find_ipse_generic(g, a.name) {
         *out = {true, parms->tys[ix].x};
         return NoFail;
+      } else {
+        if !ipse_in_scope(scope, a.name) {
+          return ERR(_u8("Ipse '"), lookup(clq->im, a.name), _u8(" not in scope"));
+        } else {
+          *out = {true, TeIpse({a.name})};
+          return NoFail;
+        }
       }
-      // Assume it's a valid ipse in scope, because what else can we do, keep track of that?
-      // SCOPE: Uh yeah, we can keep track of that.
-      // TODO: Make sure that user-defined ipses we see are well-scoped... if it still seems worth it.
-      *out = {true, TeIpse({a.name})};
-      return NoFail;
 
     case &TeUnknown: {
       *out = {false, TeUnknown};
