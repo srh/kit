@@ -44,9 +44,9 @@ struct bodystate {
   statements array[statement_info];
 }
 
-func mk(ds *defscope, return_type *cu_typeexpr) bodystate {
+func mk(ds *defscope, scope *type_scope, return_type *cu_typeexpr) bodystate {
   return {
-    mk(ds, Has(return_type)),
+    mk(ds, scope, Has(return_type)),
     ds,
     ds->cs,
     ds->im,

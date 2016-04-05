@@ -30,8 +30,8 @@ struct framescope {
   gr frame_graph;
 }
 
-func mk(ds *defscope, return_type opt[*cu_typeexpr]) framescope {
-  return {ds, ds->cs, ds->im, ds->clq, mk_global(),
+func mk(ds *defscope, scope *type_scope, return_type opt[*cu_typeexpr]) framescope {
+  return {ds, ds->cs, ds->im, ds->clq, clone_scope(scope),
           mk_array@[var_info](), mk_array@[var_number](),
           0,
           return_type,
@@ -216,7 +216,7 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
 func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *te_generics, parms *idy_genparms,
                     x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
   ds defscope = {clq->cs, clq->im, clq, accessible, g, &parms->repls, def_informal_name};
-  es framescope = mk(&ds, None);
+  es framescope = mk(&ds, ref_scope(parms), None);
   #check_expr_consume(&es, x, pt);
   // SCOPE: This is such a ghetto hack.
   es.gr.scope = Has(move(&es.tscope));
@@ -1392,9 +1392,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   type ast_typeexpr = lambda_declared_type(es->im, a);
   // TODO: Cache converted.
   converted te_typeexpr = #convert_typeexpr(&type);
-  // SCOPE: Lambdas, _right now_, are globally scoped, they don't capture any variables, they're C-style functions.  So it's quite weird that we pass in the type_scope of es here.
-  // Right now scope is just going to be a lookup table for oftypes, so we'll see how things go.
-  lambda_global_scope type_scope = mk_global();
+
   // TODO: I see some duplicated logic with the TypedExpr case.
   computed cac_typeexpr;
   #check_and_compute_typeexpr(es->clq, es->ds->generics, &es->tscope, es->ds->repls, &converted, &computed);
@@ -1414,7 +1412,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   if true {
     nargs size = count(&a->args);
     return_type cu_typeexpr = ~computed_params[nargs];
-    #help_check_lambda_body(es->ds, &return_type, a, computed_params);
+    #help_check_lambda_body(es->ds, &es->tscope, &return_type, a, computed_params);
   }
 
   props type_properties;
@@ -1427,8 +1425,8 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
 
 // This helper method shields its code from using the wrong (outer) framescope variable in
 // check_expr_lambda.
-func help_check_lambda_body(ds *defscope, return_type *cu_typeexpr, a *ast_lambda, computed_params *shray[te_typeexpr]) np {
-  bs bodystate = mk(ds, return_type);
+func help_check_lambda_body(ds *defscope, scope *type_scope, return_type *cu_typeexpr, a *ast_lambda, computed_params *shray[te_typeexpr]) np {
+  bs bodystate = mk(ds, scope, return_type);
   vp varpopper;
   init_vp(&vp, &bs.es);
   nargs size = count(&a->args);
