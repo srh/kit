@@ -136,7 +136,6 @@ func unify_under_generics(scope *type_scope, unif_parms *array[te_typeexpr], pt 
     }
 
     case &TeIpse(a te_ipse):
-      // SCOPE(): Soon, use scope.
       // NOTE: I mimicked the TeName case, and haven't fully thought out how that would
       // affect this function's callers, so treat this code with skepticism.
       if case Has(ix size) = lookup_ipse_name(names, a.name) {
@@ -151,7 +150,20 @@ func unify_under_generics(scope *type_scope, unif_parms *array[te_typeexpr], pt 
         if case &TeIpse(pa te_ipse) = pt {
           // NOTE: Beware scopage, as with TeName, when that becomes a factor.
           if a.name != pa.name {
+            a_oftype cu_typeexpr = scope_lookup(scope, a.name);
+            pa_oftype cu_typeexpr = scope_lookup(scope, pa.name);
+            // If a.name isn't in "names", it cannot have an oftype that references "names".  So we can just use unify_types.  I mean generally a cu_typeexpr can't reference "names", so if they types share the same local scope, ditto, we already replaced its generics and cac'd the oftype.
+
+            // unified_oftype is unnecessary, we're unifying complete types just to check equivalence.
+            unified_oftype te_typeexpr;
+            if !unify_types(scope, &a_oftype.x, &pa_oftype.x, emissions_append, &unified_oftype) {
+              return false;
+            }
+
             push(emissions_append, @[unify_emission]SameIpse({a.name, pa.name}));
+          } else {
+            // Just to assert the scope actually has the name.
+            discard cu_typeexpr = scope_lookup(scope, a.name);
           }
           *unified_out = TeIpse({a.name});
           return true;

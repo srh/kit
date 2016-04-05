@@ -455,6 +455,21 @@ func clone_scope(copyee *type_scope) type_scope {
   return *copyee;
 }
 
+func scope_add(scope *type_scope, name sym, oftype cu_typeexpr) void {
+  if !try_insert_ref(&scope->oftypes, &name, &oftype) {
+    ice(_u8("scope_add: already added"));
+  }
+}
+
+func scope_lookup(scope *type_scope, name sym) cu_typeexpr {
+  if case Has(t *cu_typeexpr) = lookup_ref(&scope->oftypes, &name) {
+    return *t;
+  } else {
+    ice(_u8("scope_lookup: not found"));
+    return fake();
+  }
+}
+
 
 // For now, the only name shadowing possible is that the "names" shray[te_generik] param of unify_under_generics scopes some names of "t" te_typeexpr.  We actually check that such template lists cannot shadow the global scope -- but they could have the same names as those in the "pt" te_typeexpr param of unify_under_generics.  That is fine.
 //
