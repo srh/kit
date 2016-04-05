@@ -37,7 +37,6 @@ struct bodystate {
   cs *checkstate;
   im *identmap;
   clq *clqueue;
-  tscope *type_scope;  // Same as es->tscope.
   return_type *cu_typeexpr;
 
   gotos array[goto_info];
@@ -52,7 +51,6 @@ func mk(ds *defscope, return_type *cu_typeexpr) bodystate {
     ds->cs,
     ds->im,
     ds->clq,
-    &ds->tscope,
     return_type,
     mk_array@[goto_info](),
     mk_array@[label_info](),
@@ -389,17 +387,17 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
   converted te_typeexpr = #convert_typeexpr(&vd->type);
 
   cac cac_typeexpr;
-  #check_and_compute_typeexpr(es->clq, es->ds->generics, es->tscope, es->ds->repls, &converted, &cac);
+  #check_and_compute_typeexpr(es->clq, es->ds->generics, &es->tscope, es->ds->repls, &converted, &cac);
 
   emissions array[unify_emission];
   unified te_typeexpr;
-  if !unify_types(es->tscope, &cac.te, expected_type, &emissions, &unified) {
+  if !unify_types(&es->tscope, &cac.te, expected_type, &emissions, &unified) {
     return MERR(es->cs, patt->meta, _u8("constructor variable type mismatch"));
   }
 
   *cu_expected_type_out = ~ *expected_type;
   expected_type_props type_properties;
-  #compute_type_properties(es->clq, es->tscope, cu_expected_type_out, &expected_type_props);
+  #compute_type_properties(es->clq, &es->tscope, cu_expected_type_out, &expected_type_props);
   *varcell_out = add_cell(es, {LocationVirtual, *cu_expected_type_out, expected_type_props});
   *emissions_out = freeze(&emissions);
   return NoFail;
@@ -540,7 +538,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   converted te_typeexpr = #convert_typeexpr(&a->decl.type);
 
   computed cac_typeexpr;
-  #check_and_compute_typeexpr(bs->clq, bs->ds->generics, bs->tscope, bs->ds->repls, &converted, &computed);
+  #check_and_compute_typeexpr(bs->clq, bs->ds->generics, &bs->es.tscope, bs->ds->repls, &converted, &computed);
   cu_computed cu_typeexpr;
 
   complete_type *cu_typeexpr;
@@ -561,7 +559,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
       cu_computed = ~computed.te;
       complete_type = &cu_computed;
       cu_props type_properties;
-      #compute_type_properties(bs->clq, bs->tscope, complete_type, &cu_props);
+      #compute_type_properties(bs->clq, &bs->es.tscope, complete_type, &cu_props);
       note_initter = true;
       cell = add_cell(&bs->es, {LocationStatic, *complete_type, cu_props});
     }
