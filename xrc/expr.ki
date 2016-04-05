@@ -1953,8 +1953,9 @@ func compute_bool(clq *clqueue) cu_typrop { return compute_prim(clq, primitive_b
 func compute_void(clq *clqueue) cu_typeexpr { return compute_prim(clq, primitive_void_type(clq->cs)); }
 func compute_void(clq *clqueue) cu_typrop { return compute_prim(clq, primitive_void_type(clq->cs)); }
 
-// SCOPE(): The following compute_prim usages are bad:  fns and ptrs to some user-specified type.  We'll break things when doing ipse canonicalization (when we can't lookup the ipse's oftype in scope).  Also, we can't just pass in the scope -- from graph time.
+// SCOPE(): The following compute_prim usages are bad:  fns and ptrs to some user-specified type.  We'll break things when doing ipse canonicalization (when we can't lookup the ipse's oftype in scope).  Also, we can't just pass in the scope -- from graph time.  (We can't?)
 // Solution:  Just hard-code fn-type and ptr-type typrops?
+// No, because we need "complete types" to make cells.  Maybe we could just permit cell_info to not have complete types.  Who says it has to be complete?
 
 func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
   global_scope type_scope = mk_global();
