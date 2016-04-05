@@ -1418,8 +1418,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   if true {
     nargs size = count(&a->args);
     return_type cu_typeexpr = ~computed_params[nargs];
-    bs bodystate = mk(es->ds, &return_type);
-    #help_check_lambda_body(&bs, a, computed_params);
+    #help_check_lambda_body(es->ds, &return_type, a, computed_params);
   }
 
   props type_properties;
@@ -1432,39 +1431,39 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
 
 // This helper method shields its code from using the wrong (outer) framescope variable in
 // check_expr_lambda.
-func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray[te_typeexpr]) np {
+func help_check_lambda_body(ds *defscope, return_type *cu_typeexpr, a *ast_lambda, computed_params *shray[te_typeexpr]) np {
+  bs bodystate = mk(ds, return_type);
   vp varpopper;
-  init_vp(&vp, &bs->es);
+  init_vp(&vp, &bs.es);
   nargs size = count(&a->args);
   check(nargs + 1 == count(computed_params));
   arg_cells array[cell_num];
   for i size = 0; i < nargs; i = i + 1 {
     cu_param cu_typeexpr = ~computed_params[i];
     cu_param_props type_properties;
-    #compute_type_properties(bs->clq, &bs->ds->tscope, &cu_param, &cu_param_props);
-    cell cell_num = add_cell(&bs->es, {LocationStatic, cu_param, cu_param_props});
+    #compute_type_properties(bs.clq, bs.tscope, &cu_param, &cu_param_props);
+    cell cell_num = add_cell(&bs.es, {LocationStatic, cu_param, cu_param_props});
     push(&arg_cells, cell);
     vn var_number;
     name *ast_ident = &a->args[i].name;
-    #es_push_var(&bs->es, &vp, cell, Has(name), ~varname_ipse(bs->im, name->value), &cu_param,
+    #es_push_var(&bs.es, &vp, cell, Has(name), ~varname_ipse(bs.im, name->value), &cu_param,
                  VarSelfContained, &vn);
-    #es_note_var_destroyer(&bs->es, vn);
+    #es_note_var_destroyer(&bs.es, vn);
   }
 
   ee entryexit;
-  #check_body(bs, None, &a->body.bb, &ee);
-  #finish_lambda_body(bs, ee);
+  #check_body(&bs, None, &a->body.bb, &ee);
+  #finish_lambda_body(&bs, ee);
 
   destructions array[var_destruction];
-  #make_destructions(&bs->es, read_nums(&vp), &destructions);
+  #make_destructions(&bs.es, read_nums(&vp), &destructions);
 
-  return_type *te_typeexpr = ref(computed_params, nargs);
   return_type_props type_properties;
-  #compute_complete_type_properties(bs->clq, bs->tscope, return_type, &return_type_props);
-  return_cell cell_num = add_cell(&bs->es, {LocationStatic, ~ *return_type, return_type_props});
+  #compute_type_properties(bs.clq, bs.tscope, return_type, &return_type_props);
+  return_cell cell_num = add_cell(&bs.es, {LocationStatic, *return_type, return_type_props});
 
-  info ast_fullbody_info = {destructions, bs->es.all_vars, Has(bs->es.gr), bs->gotos, bs->labels,
-                            bs->statements, return_cell, arg_cells};
+  info ast_fullbody_info = {destructions, move(&bs.es.all_vars), Has(move(&bs.es.gr)), bs.gotos, bs.labels,
+                            move(&bs.statements), return_cell, arg_cells};
   annotate(&a->body.info, info);
 
   return NoFail;
