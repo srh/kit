@@ -469,7 +469,6 @@ struct idy_genparms {
   repls idy_repls;
 }
 
-// SCOPE(): Really check callers of this.
 inline func blank_idyparms() idy_genparms {
   return {emshp(mk_global()), 0, {mk_shray()}};
 }
