@@ -43,7 +43,6 @@ struct te_name {
 
 struct te_app_pack {
   teip te_instpack;
-  // SCOPE(): When another field gets added, rename tip and check callers.
   // Maps ipse's to the deftype inst's ipses.  e.g. ipse_mappings[3] gives the local ipse name (in this typeexpr's type_scope)
   ipse_mappings shray[sym];
 }
