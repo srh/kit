@@ -35,7 +35,7 @@ func mk(ds *defscope, scope *type_scope, return_type opt[*cu_typeexpr]) framesco
           mk_array@[var_info](), mk_array@[var_number](),
           0,
           return_type,
-          init_frame_graph_empty(ds->def_informal_name, None)};
+          init_frame_graph_empty(ds->def_informal_name, NotComputed)};
 }
 
 inline func add_cell(es *framescope, info cell_info) cell_num {
@@ -220,7 +220,7 @@ func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *te_gener
   es framescope = mk(&ds, ref_scope(parms), None);
   #check_expr_consume(&es, x, pt);
   // SCOPE: This is such a ghetto hack.
-  es.gr.scope = Has(move(&es.tscope));
+  es.gr.scope = Computed(move(&es.tscope));
   *frame_info_out = {Has(move(&es.gr))};
   return NoFail;
 }
@@ -1461,7 +1461,7 @@ func help_check_lambda_body(ds *defscope, scope *type_scope, return_type *cu_typ
   return_cell cell_num = add_cell(&bs.es, {LocationStatic, *return_type, return_type_props});
 
   // SCOPE: Another even _more_ ghetto hack.
-  bs.es.gr.scope = Has(move(&bs.es.tscope));
+  bs.es.gr.scope = Computed(move(&bs.es.tscope));
   info ast_fullbody_info = {destructions, move(&bs.es.all_vars), Has(move(&bs.es.gr)), bs.gotos, bs.labels,
                             move(&bs.statements), return_cell, arg_cells};
   annotate(&a->body.info, info);

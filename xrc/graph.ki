@@ -12,7 +12,8 @@ struct frame_graph {
   informal_name sym;
   cells array[cell_info];
   ops array[gr_node];
-  scope opt[type_scope];
+  // This was the exprscope's type scope, or something like that -- it gets initialized before we start graphing.
+  scope nc[type_scope];
 }
 
 /* A cell location is tricky: the location of an expr's return value
@@ -166,7 +167,7 @@ func init_frame_graph_from_incomplete(incomplete_graph *opt[frame_graph]) frame_
   return ret;
 }
 
-func init_frame_graph_empty(informal_name sym, scope opt[type_scope]) frame_graph {
+func init_frame_graph_empty(informal_name sym, scope nc[type_scope]) frame_graph {
   return {informal_name, mk_array@[cell_info](), mk_array@[gr_node](), move(&scope)};
 }
 
@@ -717,12 +718,12 @@ struct gr_statep {
 }
 
 func gr_prim(gs gr_statep, t te_typeexpr) cu_typeexpr {
-  return compute_prim_with_scope(gs.clq, unHas(&gs.gr->scope), t);
+  return compute_prim_with_scope(gs.clq, un(&gs.gr->scope), t);
 }
 
 func gr_prim(gs gr_statep, t te_typeexpr) cu_typrop {
   ret cu_typrop;
-  compute_prim_with_scope(gs.clq, unHas(&gs.gr->scope), t, &ret.cu, &ret.props);
+  compute_prim_with_scope(gs.clq, un(&gs.gr->scope), t, &ret.cu, &ret.props);
   return ret;
 }
 
@@ -2507,7 +2508,7 @@ func gr_basics_cleanup(gs gr_statep, bas *gr_basics, bu *sq_builder) void {
 
 func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num,
                          return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
-  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_nopdestroy")), Has(mk_global()));
+  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_nopdestroy")), Computed(mk_global()));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -2524,7 +2525,7 @@ func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num,
 
 func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_out *gr_num,
                       return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
-  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_memcopy")), Has(mk_global()));
+  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_memcopy")), Computed(mk_global()));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -2541,7 +2542,7 @@ func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_o
 
 func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *gr_num,
                     return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
-  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_bzero")), Has(mk_global()));
+  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_bzero")), Computed(mk_global()));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -2575,7 +2576,7 @@ func gr_magic_arraytype_info(clq *clqueue, scope *type_scope, wc which_ctor, mai
                              gr_out *frame_graph, gn_out *gr_num,
                              return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   cs *checkstate = clq->cs;
-  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_arraytype")), Has(*scope));
+  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_arraytype")), Computed(*scope));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -2750,7 +2751,7 @@ func gr_magic_enum_info(clq *clqueue, scope *type_scope, wc which_ctor, mei *mag
     init_padding = true;
   case CtorDestroy: { /* don't init padding. */ }
   }
-  gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_info")), Has(*scope));
+  gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_info")), Computed(*scope));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -2946,7 +2947,7 @@ func gr_magic_struct_info(clq *clqueue, scope *type_scope, wc which_ctor, msi *m
     init_padding = false;
   }
 
-  gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_struct_info")), Has(*scope));
+  gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_struct_info")), Computed(*scope));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -3116,7 +3117,7 @@ func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *
 
 func gr_magic_enum_construct(clq *clqueue, scope *type_scope, mec *magic_enum_construct, gr_out *frame_graph,
                              gn_out *gr_num, return_cell_out *cell_num, arg_cell_out *cell_num) np {
-  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_enum_construct")), Has(*scope));
+  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_enum_construct")), Computed(*scope));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -3256,7 +3257,7 @@ func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_a
 }
 
 func add_prim_fn_body(clq *clqueue, informal_name sym, scope *type_scope, type *cu_typeexpr, op primitive_op) cr[fn_body_id] {
-  gr frame_graph = init_frame_graph_empty(informal_name, Has(*scope));
+  gr frame_graph = init_frame_graph_empty(informal_name, Computed(*scope));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -3410,7 +3411,7 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
 func mk_const_frame_regraphed(clq *clqueue, informal_name sym, scope *type_scope, type *cu_typeexpr,
                               props *type_properties, c gr_const) frame_regraphed {
   // I don't think we _actually_ use clq for anything.
-  gr frame_graph = init_frame_graph_empty(informal_name, Has(*scope));
+  gr frame_graph = init_frame_graph_empty(informal_name, Computed(*scope));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
