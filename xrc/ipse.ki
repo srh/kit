@@ -10,7 +10,7 @@ func canonicalized_pack(pack *te_instpack) te_instpack {
 }
 
 func canonicalized_ipse_sym(im *identmap, s sym, ipse_names_append *array[sym], canonicalized_scope_append *type_scope) sym {
-  *canonicalized_scope_append = { };  // to break code later
+  // SCOPE(): Actually build the canonicalized scope.  was:   *canonicalized_scope_append = { };  // to break code later
   if case Has(ix size) = find(ipse_names_append, s) {
     return make_canonicalized_ipse_name(im, ix);
   } else {

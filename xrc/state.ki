@@ -486,8 +486,7 @@ func ref_scope(parms *idy_genparms) *type_scope {
 }
 
 func hash_compute_hash(x *idy_genparms) osize {
-  // SCOPE: When type scopes have stuff, we'll have to compare them.
-  discard type_scope = { };
+  // SCOPE(): Likewise with hash_equal, we should use type scopes for oftypes when we run into them.
   accum osize = hash_compute_hash(&x->num_ipse_types_used);
   n size = count(&x->repls.tys);
   p * ^[0]cu_typeexpr = data(&x->repls.tys);
@@ -498,8 +497,7 @@ func hash_compute_hash(x *idy_genparms) osize {
 }
 
 func hash_equal(x *idy_genparms, y *idy_genparms) bool {
-  // SCOPE: When type scopes have stuff, we'll have to compare them.
-  discard type_scope = { };
+  // SCOPE(): Must we use the type scopes?  I think it's provably unnecessary, but we should compare ipse oftypes when we run into them.
   return x->num_ipse_types_used == y->num_ipse_types_used && idy_typeexpr_list_equal(&x->repls.tys, &y->repls.tys);
 }
 
