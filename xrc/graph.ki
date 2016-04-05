@@ -716,11 +716,11 @@ struct gr_statep {
   fb opt[*fullbody_state];
 }
 
-func compute_prim(gs gr_statep, t te_typeexpr) cu_typeexpr {
+func gr_prim(gs gr_statep, t te_typeexpr) cu_typeexpr {
   return compute_prim_with_scope(gs.clq, unHas(&gs.gr->scope), t);
 }
 
-func compute_prim(gs gr_statep, t te_typeexpr) cu_typrop {
+func gr_prim(gs gr_statep, t te_typeexpr) cu_typrop {
   ret cu_typrop;
   compute_prim_with_scope(gs.clq, unHas(&gs.gr->scope), t, &ret.cu, &ret.props);
   return ret;
@@ -1522,7 +1522,7 @@ func gr_mk_quickreturn(gs gr_statep, x *ast_expr, a *ast_quickreturn, bu *sq_bui
 
   cases array[gr_branch_pair];
 
-  tag_ty cu_typrop = compute_prim(gs, enum_tag_type(gs.clq->cs, &info->return_et));
+  tag_ty cu_typrop = gr_prim(gs, enum_tag_type(gs.clq->cs, &info->return_et));
   return_cell_size u32 = ref_cell(gs.gr, fb->return_cell)->props.flat_size;
 
   nconstructors size = count(&et->constructors);
@@ -1861,7 +1861,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
     if case &Has(di ast_deref_indexing_info) = &info->deref {
       // TODO: di.lhs_later is (rightfully) unused.
 
-      fun_ptrtype cu_typrop = compute_prim(gs, fn_type(gs.clq->cs, ref_cell(gs.gr, result_cell(&di.lhs_after))->type.x, ref_cell(gs.gr, result_cell(oo(&a->rhs)))->type.x, result_ptrtype.cu.x));
+      fun_ptrtype cu_typrop = gr_prim(gs, fn_type(gs.clq->cs, ref_cell(gs.gr, result_cell(&di.lhs_after))->type.x, ref_cell(gs.gr, result_cell(oo(&a->rhs)))->type.x, result_ptrtype.cu.x));
       funcell cell_num = add_cell(gs.gr, {LocationStatic, fun_ptrtype.cu, fun_ptrtype.props});
 
       add(bu, @[gr_xop]GrLive({result_ptr_cell}));
@@ -1880,7 +1880,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
       collection_ptrtype cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, value_cell(oo(&a->lhs)))->type);
       collection_ptr_cell cell_num = add_cell(gs.gr, {LocationStatic, collection_ptrtype.cu, collection_ptrtype.props});
 
-      fun_ptrtype cu_typrop = compute_prim(gs, fn_type(gs.clq->cs, collection_ptrtype.cu.x, ref_cell(gs.gr, result_cell(oo(&a->rhs)))->type.x, result_ptrtype.cu.x));
+      fun_ptrtype cu_typrop = gr_prim(gs, fn_type(gs.clq->cs, collection_ptrtype.cu.x, ref_cell(gs.gr, result_cell(oo(&a->rhs)))->type.x, result_ptrtype.cu.x));
       funcell cell_num = add_cell(gs.gr, {LocationStatic, fun_ptrtype.cu, fun_ptrtype.props});
 
       add(bu, @[gr_xop]GrLive({result_ptr_cell}));
@@ -1999,7 +1999,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
       valuetype *cu_typeexpr = &ref_cell(gs.gr, destcell)->type;
       ptrtype cu_typrop = computed_ptr_type(gs.clq, valuetype);
       booltype cu_typrop = compute_bool(gs.clq);
-      fntype cu_typrop = compute_prim(gs, fn_type(gs.clq->cs, ptrtype.cu.x, ptrtype.cu.x, booltype.cu.x));
+      fntype cu_typrop = gr_prim(gs, fn_type(gs.clq->cs, ptrtype.cu.x, ptrtype.cu.x, booltype.cu.x));
 
       funcell cell_num = add_cell(gs.gr, {LocationStatic, fntype.cu, fntype.props});
       destptr cell_num = add_cell(gs.gr, {LocationStatic, ptrtype.cu, ptrtype.props});
@@ -2167,7 +2167,7 @@ func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) v
   case &EnumVoidConstructed(vi enum_voidconstructed_info):
     info *ast_expr_complete_info = expr_complete_info(x);
     x_cell cell_num = rval_cell(x);
-    tagty cu_typrop = compute_prim(gs, enum_tag_type(gs.clq->cs, &vi.et));
+    tagty cu_typrop = gr_prim(gs, enum_tag_type(gs.clq->cs, &vi.et));
     tag_cell cell_num = add_cell(gs.gr, {LocationVirtual, tagty.cu, tagty.props});
     field_offset u32 = enum_field_offset(gs.clq->cs, &vi.et, vi.constructor_tag);
     add(bu, @[gr_xop]GrSubcell({tag_cell, x_cell, OffsetConst({enum_tag_offset, EnumTagField})}));
@@ -2316,7 +2316,7 @@ enum uni_fun_statechange {
 func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num, statechange uni_fun_statechange) gr_num {
   argptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, arg)->type);
   voidret cu_typrop = compute_void(gs.clq);
-  fnptr cu_typrop = compute_prim(gs, fn_type(gs.clq->cs, argptr.cu.x, voidret.cu.x));
+  fnptr cu_typrop = gr_prim(gs, fn_type(gs.clq->cs, argptr.cu.x, voidret.cu.x));
   funcell cell_num = add_cell(gs.gr, {LocationStatic, fnptr.cu, fnptr.props});
   argptrcell cell_num = add_cell(gs.gr, {LocationStatic, argptr.cu, argptr.props});
   retvoid cell_num = add_cell(gs.gr, {LocationStatic, voidret.cu, voidret.props});
@@ -2372,7 +2372,7 @@ func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechan
   destptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, dest)->type);
   srcptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, src)->type);
   voidret cu_typrop = compute_void(gs.clq);
-  fnptr cu_typrop = compute_prim(gs, fn_type(gs.clq->cs, destptr.cu.x, srcptr.cu.x, voidret.cu.x));
+  fnptr cu_typrop = gr_prim(gs, fn_type(gs.clq->cs, destptr.cu.x, srcptr.cu.x, voidret.cu.x));
   funcell cell_num = add_cell(gs.gr, {LocationStatic, fnptr.cu, fnptr.props});
   destptrcell cell_num = add_cell(gs.gr, {LocationStatic, destptr.cu, destptr.props});
   srcptrcell cell_num = add_cell(gs.gr, {LocationStatic, srcptr.cu, srcptr.props});
@@ -2450,8 +2450,8 @@ struct gr_basics {
 
 func add_minimal_basics(gs gr_statep, size u32, arity size, out *gr_minimal_basics) void {
   cs *checkstate = gs.clq->cs;
-  pointee_tp cu_typrop = compute_prim(gs, primitive_padding_type(cs, size));
-  argtp cu_typrop = compute_prim(gs, ptr_type(cs, pointee_tp.cu.x));
+  pointee_tp cu_typrop = gr_prim(gs, primitive_padding_type(cs, size));
+  argtp cu_typrop = gr_prim(gs, ptr_type(cs, pointee_tp.cu.x));
   voidtp cu_typrop = compute_void(gs.clq);
   ret gr_minimal_basics;
   ret.return_cell = add_cell(gs.gr, {LocationStatic, voidtp.cu, voidtp.props});
@@ -2470,7 +2470,7 @@ func gr_add_basics(gs gr_statep, size u32, arity size, out *gr_basics, bu *sq_bu
   ret gr_basics;
   add_minimal_basics(gs, size, arity, &ret.minimal);
 
-  pointee_tp cu_typrop = compute_prim(gs, primitive_padding_type(cs, size));
+  pointee_tp cu_typrop = gr_prim(gs, primitive_padding_type(cs, size));
   for i size = 0; i < arity; i = i + 1 {
     pc cell_num = add_cell(gs.gr, {LocationVirtual, pointee_tp.cu, pointee_tp.props});
     push(&ret.pointeecells, pc);
@@ -2575,7 +2575,7 @@ func gr_magic_arraytype_info(clq *clqueue, scope *type_scope, wc which_ctor, mai
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
-  argtp cu_typrop = compute_prim(gs, ptr_type(cs, mai->cu_type.x));
+  argtp cu_typrop = gr_prim(gs, ptr_type(cs, mai->cu_type.x));
 
   voidtp cu_typrop = compute_void(clq);
 
@@ -2592,13 +2592,13 @@ func gr_magic_arraytype_info(clq *clqueue, scope *type_scope, wc which_ctor, mai
     ice(_u8("gr_magic_arraytype_info sees non-array type"));
   }
 
-  elemptrty cu_typrop = compute_prim(gs, ptr_type(cs, *param));
+  elemptrty cu_typrop = gr_prim(gs, ptr_type(cs, *param));
 
   nargs size = num_args(wc);
 
-  fnty cu_typrop = compute_prim(gs, fn_type(cs, @[shray[_]]repeat(nargs, elemptrty.cu.x), voidtp.cu.x));
+  fnty cu_typrop = gr_prim(gs, fn_type(cs, @[shray[_]]repeat(nargs, elemptrty.cu.x), voidtp.cu.x));
 
-  size_ty cu_typrop = compute_prim(gs, primitive_size_type(cs));
+  size_ty cu_typrop = gr_prim(gs, primitive_size_type(cs));
 
   return_cell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
   gr_create(&ctr, return_cell);
@@ -2751,13 +2751,13 @@ func gr_magic_enum_info(clq *clqueue, scope *type_scope, wc which_ctor, mei *mag
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
 
-  argtp cu_typrop = compute_prim(gs, ptr_type(cs, mei->cu_type.x));
+  argtp cu_typrop = gr_prim(gs, ptr_type(cs, mei->cu_type.x));
 
   voidtp cu_typrop = compute_void(clq);
 
   et *enumspec = &mei->et;
 
-  tagty cu_typrop = compute_prim(gs, enum_tag_type(cs, et));
+  tagty cu_typrop = gr_prim(gs, enum_tag_type(cs, et));
 
   argcells array[cell_num];
   pointeecells array[cell_num];
@@ -2820,12 +2820,12 @@ func gr_magic_enum_info(clq *clqueue, scope *type_scope, wc which_ctor, mei *mag
 
     sub_bu sq_builder = mk_builder(gs);
     if case &Has(ip instpair) = ref(&mei->cips, i) {
-      fieldptrty cu_typrop = compute_prim(gs, ptr_type(cs, fieldtype.x));
+      fieldptrty cu_typrop = gr_prim(gs, ptr_type(cs, fieldtype.x));
 
       fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
       add(&sub_bu, @[gr_xop]GrLive({fieldretcell}));
 
-      fnty cu_typrop = compute_prim(gs, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrty.cu.x), voidtp.cu.x));
+      fnty cu_typrop = gr_prim(gs, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrty.cu.x), voidtp.cu.x));
 
       func_cell cell_num = add_cell(&gr, {LocationStatic, fnty.cu, fnty.props});
       add(&sub_bu, @[gr_xop]GrLive({func_cell}));
@@ -2947,7 +2947,7 @@ func gr_magic_struct_info(clq *clqueue, scope *type_scope, wc which_ctor, msi *m
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
 
-  argtp cu_typrop = compute_prim(gs, ptr_type(cs, msi->cu_type.x));
+  argtp cu_typrop = gr_prim(gs, ptr_type(cs, msi->cu_type.x));
 
   voidtp cu_typrop = compute_void(clq);
 
@@ -3001,12 +3001,12 @@ func gr_magic_struct_info(clq *clqueue, scope *type_scope, wc which_ctor, msi *m
     }
 
     if case Has(ip instpair) = get(&msi->fips, i) {
-      fieldptrty cu_typrop = compute_prim(gs, ptr_type(cs, ref(&st->fields, i)->type));
+      fieldptrty cu_typrop = gr_prim(gs, ptr_type(cs, ref(&st->fields, i)->type));
 
       fieldretcell cell_num = add_cell(&gr, {LocationStatic, voidtp.cu, voidtp.props});
       add(&bu, @[gr_xop]GrLive({fieldretcell}));
 
-      fnty cu_typrop = compute_prim(gs, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrty.cu.x), voidtp.cu.x));
+      fnty cu_typrop = gr_prim(gs, fn_type(cs, @[shray[_]]repeat(nargs, fieldptrty.cu.x), voidtp.cu.x));
 
       func_cell cell_num = add_cell(&gr, {LocationStatic, fnty.cu, fnty.props});
 
@@ -3089,7 +3089,7 @@ func gr_bzero_padding(gs gr_statep, c cell_num, offset u32, size u32) opt[gr_num
     return None;
   }
   bu sq_builder = mk_builder(gs);
-  padtype cu_typrop = compute_prim(gs, primitive_padding_type(gs.clq->cs, size));
+  padtype cu_typrop = gr_prim(gs, primitive_padding_type(gs.clq->cs, size));
   pad_cell cell_num = add_cell(gs.gr, {LocationVirtual, padtype.cu, padtype.props});
   add(&bu, @[gr_xop]GrSubcell({pad_cell, c, OffsetConst({offset, PaddingField})}));
   add(&bu, @[gr_xop]GrWriteConst({pad_cell, ConstInt(bigu(0))}));
@@ -3127,7 +3127,7 @@ func gr_magic_enum_construct(clq *clqueue, scope *type_scope, mec *magic_enum_co
   tag_end u32;
   tag_cell cell_num;
   if true {
-    tagty cu_typrop = compute_prim(gs, enum_tag_type(clq->cs, &mec->et));
+    tagty cu_typrop = gr_prim(gs, enum_tag_type(clq->cs, &mec->et));
     tag_end = tagty.props.flat_size;
     tag_cell = add_cell(&gr, {LocationVirtual, tagty.cu, tagty.props});
   }
