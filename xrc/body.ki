@@ -566,7 +566,8 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   }
 
   vn var_number;
-  #es_push_var(&bs->es, vp, cell, Has(&a->decl.name), ~varname_ipse(bs->im, a->decl.name.value),
+  #es_push_var(&bs->es, vp, cell, Has(&a->decl.name),
+               ~varname_ipse(&bs->es, a->decl.name.value, *complete_type, &bs->es.tscope),
                complete_type, VarSelfContained, &vn);
   annotate(&a->info, {vn});
   #es_note_var_destroyer(&bs->es, vn);

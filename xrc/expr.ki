@@ -21,6 +21,7 @@ struct framescope {
   current_vars array[var_number];
 
   // Used for auto-generating $frame_1, $frame_2, ... ipses.
+  // And $var_abc_1, $var_abc_2, ...
   ipse_gen_counter size;
 
   // The return type... if we're in a body that has a return type -- used for QuickReturn
@@ -887,9 +888,10 @@ func enum_field_ipse(outer_ipse te_typeexpr) te_typeexpr {
 // Varnames aren't supposed to shadow, so... we have user-friendly ipse names.  (Note
 // that vars could shadow generic ipse parameters, for now, so we add the $var_
 // prefix.)
-func varname_ipse(im *identmap, name sym) te_typeexpr {
-  // SCOPE(): Add this to the scope.
-  n sym = intern(im, _s("$var_") + lookup(im, name));
+func varname_ipse(es *framescope, name sym, oftype cu_typeexpr, scope_append *type_scope) te_typeexpr {
+  n sym = intern(es->im, _s("$var_") + lookup(es->im, name) + _s("_") + from_u8(to_u8str(es->ipse_gen_counter)));
+  es->ipse_gen_counter++;
+  scope_add(scope_append, n, oftype);
   return TeIpse({n});
 }
 
@@ -898,7 +900,7 @@ func varname_ipse(im *identmap, name sym) te_typeexpr {
 func unnamed_ipse(es *framescope) te_typeexpr {
   // SCOPE(): Add this to the scope.
   n sym = intern(es->im, _s("$frame_") + from_u8(to_u8str(void, es->ipse_gen_counter)));
-  es->ipse_gen_counter = es->ipse_gen_counter + 1;
+  es->ipse_gen_counter++;
   return TeIpse({n});
 }
 
@@ -1446,7 +1448,7 @@ func help_check_lambda_body(ds *defscope, scope *type_scope, return_type *cu_typ
     push(&arg_cells, cell);
     vn var_number;
     name *ast_ident = &a->args[i].name;
-    #es_push_var(&bs.es, &vp, cell, Has(name), ~varname_ipse(bs.im, name->value), &cu_param,
+    #es_push_var(&bs.es, &vp, cell, Has(name), ~varname_ipse(&bs.es, name->value, cu_param, scope), &cu_param,
                  VarSelfContained, &vn);
     #es_note_var_destroyer(&bs.es, vn);
   }
