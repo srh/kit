@@ -485,8 +485,9 @@ func ref_scope(parms *idy_genparms) *type_scope {
   return oo(&parms->scope);
 }
 
-// SCOPE(): Uh, we're going to have to account for the type_scope here.
 func hash_compute_hash(x *idy_genparms) osize {
+  // SCOPE: When type scopes have stuff, we'll have to compare them.
+  discard type_scope = { };
   accum osize = hash_compute_hash(&x->num_ipse_types_used);
   n size = count(&x->repls.tys);
   p * ^[0]cu_typeexpr = data(&x->repls.tys);
@@ -497,6 +498,8 @@ func hash_compute_hash(x *idy_genparms) osize {
 }
 
 func hash_equal(x *idy_genparms, y *idy_genparms) bool {
+  // SCOPE: When type scopes have stuff, we'll have to compare them.
+  discard type_scope = { };
   return x->num_ipse_types_used == y->num_ipse_types_used && idy_typeexpr_list_equal(&x->repls.tys, &y->repls.tys);
 }
 
