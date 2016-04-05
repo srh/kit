@@ -518,12 +518,10 @@ func check_and_compute_typeexpr(clq *clqueue, g *te_generics, scope *type_scope,
 
 func numeric_literal_to_u32(x *ast_numeric_literal, out *u32) bool {
   switch x {
-    case &HexLiteral(a ast_hex_literal): {
-      return convert_to_u32(16, &a.digits, out);
-    }
-    case &DecLiteral(a ast_dec_literal): {
-      return convert_to_u32(10, &a.digits, out);
-    }
+  case &HexLiteral(a ast_hex_literal):
+    return convert_to_u32(16, &a.digits, out);
+  case &DecLiteral(a ast_dec_literal):
+    return convert_to_u32(10, &a.digits, out);
   }
 }
 
