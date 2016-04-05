@@ -453,8 +453,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
                        &cu_expected_type, VarOverlay, &vn);
           ovn = Has(vn);
         } else {
-          voidtp cu_typrop = compute_prim(bs->clq, primitive_void_type(bs->cs));
-          if !unifies(&voidtp.cu.x, expected_type) {
+          if !type_is_void(bs->cs, expected_type) {
             return ERR(_u8("decl-free case pattern used with non-void case"));
           }
           ovn = None;
@@ -622,7 +621,7 @@ func check_return_statement(bs *bodystate, a *ast_return_statement, exit_out *st
     #check_expr_retconsume(&bs->es, oo(&c), &bs->return_type->x, &varcells, &moved_var_ix);
     reannotate_static_to_virtual(&bs->es, result_cell(oo(&c)));
   } else {
-    if !type_is_void(bs->cs, bs->return_type) {
+    if !type_is_void(bs->cs, &bs->return_type->x) {
       return ERR(_u8("Empty return statement with non-void return value."));
     }
     moved_var_ix = None;
@@ -716,9 +715,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
         ovn = Has(vn);
       } else {
-        // TODO: At some point we just need an "is_void" function.
-        voidtp cu_typrop = compute_prim(es->clq, primitive_void_type(es->cs));
-        if !unifies(&voidtp.cu.x, expected_type) {
+        if !type_is_void(es->cs, expected_type) {
           return ERR(_u8("decl-free case pattern used with non-void case"));
         }
         annotate(&cd->virtual_cell_dead, None);
@@ -731,15 +728,16 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
   }
 }
 
-func type_is_void(cs *checkstate, t *cu_typeexpr) bool {
+// t must be complete.
+func type_is_void(cs *checkstate, t *te_typeexpr) bool {
   void_type te_typeexpr = primitive_void_type(cs);
-  return unifies(&void_type, &t->x);
+  return unifies(&void_type, t);
 }
 
 func finish_lambda_body(bs *bodystate, ee entryexit) np {
   #connect_gotos(bs);
   mark_reachable(bs, ee.entry);
-  if ref(&bs->statements, ee.exit.x)->marked_reachable && !type_is_void(bs->cs, bs->return_type) {
+  if ref(&bs->statements, ee.exit.x)->marked_reachable && !type_is_void(bs->cs, &bs->return_type->x) {
     return ERR(_u8("Body can exit without return"));
   }
   return NoFail;

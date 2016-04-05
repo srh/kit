@@ -996,12 +996,11 @@ func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *
 }
 
 func check_expr_assignment(es *framescope, a *ast_assignment, pt *te_typeexpr, x *ast_expr) np {
-  void_type te_typeexpr = primitive_void_type(es->cs);
-  if !unifies(&void_type, pt) {
+  void_typrop cu_typrop = compute_void(es->clq);
+  if !unifies(&void_typrop.cu.x, pt) {
     return ERR(_u8("ICE: assignment in non-void place"));
   }
 
-  void_typrop cu_typrop = compute_prim(es->clq, void_type);
 
   unknown te_typeexpr = TeUnknown;
   // We check the lhs independently of the rhs, deliberately, to ensure clarity.
@@ -1950,6 +1949,9 @@ func check_funcall_params_secondtime(es *framescope, functype *cu_typeexpr, para
 // We have these helpful wrappers to limit usages of compute_prim, so that it's easier to feel comfortable about its use of global_scope.
 func compute_bool(clq *clqueue) cu_typeexpr { return compute_prim(clq, primitive_bool_type(clq->cs)); }
 func compute_bool(clq *clqueue) cu_typrop { return compute_prim(clq, primitive_bool_type(clq->cs)); }
+
+func compute_void(clq *clqueue) cu_typeexpr { return compute_prim(clq, primitive_void_type(clq->cs)); }
+func compute_void(clq *clqueue) cu_typrop { return compute_prim(clq, primitive_void_type(clq->cs)); }
 
 func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
   global_scope type_scope = mk_global();  // SCOPE(): Maybe no good.

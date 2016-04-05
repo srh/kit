@@ -2306,7 +2306,7 @@ enum uni_fun_statechange {
 
 func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num, statechange uni_fun_statechange) gr_num {
   argptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, arg)->type);
-  voidret cu_typrop = compute_prim(gs.clq, primitive_void_type(gs.clq->cs));
+  voidret cu_typrop = compute_void(gs.clq);
   fnptr cu_typrop = compute_prim(gs.clq, fn_type(gs.clq->cs, argptr.cu.x, voidret.cu.x));
   funcell cell_num = add_cell(gs.gr, {LocationStatic, fnptr.cu, fnptr.props});
   argptrcell cell_num = add_cell(gs.gr, {LocationStatic, argptr.cu, argptr.props});
@@ -2362,7 +2362,7 @@ func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechan
   // menial code to know that, though.
   destptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, dest)->type);
   srcptr cu_typrop = computed_ptr_type(gs.clq, &ref_cell(gs.gr, src)->type);
-  voidret cu_typrop = compute_prim(gs.clq, primitive_void_type(gs.clq->cs));
+  voidret cu_typrop = compute_void(gs.clq);
   fnptr cu_typrop = compute_prim(gs.clq, fn_type(gs.clq->cs, destptr.cu.x, srcptr.cu.x, voidret.cu.x));
   funcell cell_num = add_cell(gs.gr, {LocationStatic, fnptr.cu, fnptr.props});
   destptrcell cell_num = add_cell(gs.gr, {LocationStatic, destptr.cu, destptr.props});
@@ -2443,7 +2443,7 @@ func add_minimal_basics(gs gr_statep, size u32, arity size, out *gr_minimal_basi
   cs *checkstate = gs.clq->cs;
   pointee_tp cu_typrop = compute_prim(gs.clq, primitive_padding_type(cs, size));
   argtp cu_typrop = compute_prim(gs.clq, ptr_type(cs, pointee_tp.cu.x));
-  voidtp cu_typrop = compute_prim(gs.clq, primitive_void_type(cs));
+  voidtp cu_typrop = compute_void(gs.clq);
   ret gr_minimal_basics;
   ret.return_cell = add_cell(gs.gr, {LocationStatic, voidtp.cu, voidtp.props});
   gr_create(gs.ctr, ret.return_cell);
@@ -2568,7 +2568,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mai->cu_type.x));
 
-  voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
+  voidtp cu_typrop = compute_void(clq);
 
   param *te_typeexpr;
   arraycount u32;
@@ -2750,7 +2750,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info,
 
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, mei->cu_type.x));
 
-  voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
+  voidtp cu_typrop = compute_void(clq);
 
   et *enumspec = &mei->et;
 
@@ -2952,7 +2952,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
 
   argtp cu_typrop = compute_prim(clq, ptr_type(cs, msi->cu_type.x));
 
-  voidtp cu_typrop = compute_prim(clq, primitive_void_type(cs));
+  voidtp cu_typrop = compute_void(clq);
 
   st *structspec = &msi->st;
 
