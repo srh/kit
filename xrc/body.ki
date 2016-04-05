@@ -337,7 +337,7 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
 
   swartch_type *cu_typeexpr = expr_complete_type(&a->expr);
   checkobj_out->swartch_type = swartch_type;
-  checkobj_out->swartch_ipse = unnamed_ipse(es);
+  checkobj_out->swartch_ipse = unnamed_ipse(es, *swartch_type, &es->tscope);
   switchable_type *te_typeexpr;
   is_deref bool = decompose_ref_or_ptr(&swartch_type->x, es->cs,
                                        &checkobj_out->switchable_type_ipse,
@@ -512,7 +512,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
     #check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.x, &cond.discard);
     connect_statements(bs, loopnum, exitnum);
     cond_vn var_number;
-    #es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, ~unnamed_ipse(&bs->es),
+    #es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, ~unnamed_ipse(&bs->es, boolean, &bs->es.tscope),
                  &boolean, VarSelfContained, &cond_vn);
   }
   if case &Has(incr box[ast_expr_discard]) = &a->increment {
@@ -674,7 +674,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
       // immediately after the branch, but... this way makes the code here handle all
       // cases equivalently.)
       swartch_vn var_number;
-      #es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_ipse(es), &booltype,
+      #es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_ipse(es, booltype, &es->tscope), &booltype,
                    VarSelfContained, &swartch_vn);
       annotate(&cd->virtual_cell_dead, None);
       return NoFail;
