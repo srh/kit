@@ -138,11 +138,11 @@ func try_osize() void {
   ign var = putchar(10);
 }
 
-struct['a] reffer {
+struct['a osize] reffer {
   r &'a osize;
 }
 
-func['a] mk_reffer(x &'a osize) reffer['a] {
+func['a osize] mk_reffer(x &'a osize) reffer['a] {
   return {x};
 }
 
@@ -164,7 +164,7 @@ func try_ref2() void {
   ign = putchar(10);
 }
 
-func['a] un_ref(p &'a u32) u32 {
+func['a u32] un_ref(p &'a u32) u32 {
   r u32 = *p;
   return r;
 }
