@@ -847,7 +847,7 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   info *ast_expr_complete_info = expr_complete_info(&oo(&a->lhs)->expr);
   ipse te_typeexpr;
   param *te_typeexpr;
-  if !decompose_ref_or_ptr(&info->cu, es->cs, &ipse, &param) {
+  if !decompose_ref_or_ptr(&info->cu, es, &ipse, &param) {
     return ERR(_u8("Expected pointer for lhs of deref field"));
   }
   cu_param cu_typeexpr = ~ *param;
@@ -954,7 +954,7 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
   rhs_type *cu_typeexpr = expr_complete_type(&oo(&a->rhs)->expr);
   ipse te_typeexpr;
   param *te_typeexpr;
-  if decompose_ref_or_ptr(rhs_type, es->cs, &ipse, &param) {
+  if decompose_ref_or_ptr(rhs_type, es, &ipse, &param) {
     // param is already complete.
     emissions array[unify_emission];
     unified_discard te_typeexpr;
@@ -1523,16 +1523,16 @@ func decompose_ref(t *te_typeexpr, cs *checkstate, ipse_out **te_typeexpr, param
 }
 
 // Writes a fake ipse in the case of pointer, a real ipse in the case of a reference.
-func decompose_ref_or_ptr(t *cu_typeexpr, cs *checkstate, ipse_out *te_typeexpr, param_out **te_typeexpr) bool {
+func decompose_ref_or_ptr(t *cu_typeexpr, es *framescope, ipse_out *te_typeexpr, param_out **te_typeexpr) bool {
   lt *te_typeexpr;
   param *te_typeexpr;
-  if decompose_ref(&t->x, cs, &lt, &param) {
+  if decompose_ref(&t->x, es->cs, &lt, &param) {
     *ipse_out = *lt;
     *param_out = param;
     return true;
   }
-  if decompose_typeapp(&t->x, primitive_pointer_puretype(cs), &param) {
-    *ipse_out = fake_ipse(cs);
+  if decompose_typeapp(&t->x, primitive_pointer_puretype(es->cs), &param) {
+    *ipse_out = misc_ipse(es, ~*param, &es->tscope);
     *param_out = param;
     return true;
   }
