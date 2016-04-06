@@ -655,6 +655,7 @@ func arity_matches(a *te_generics, params opt[*shray[cu_typeexpr]]) bool {
 }
 
 func[T] help_arity_matches(a *te_generics, params opt[*shray[T]]) bool {
+  // SCOPE(): Um.  Arity is no longer a number -- we have to match ipses, their oftypes have to match, everything has to unify.
   switch arity(a) {
     case NoParamsArity: {
       if case None = params {
