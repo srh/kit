@@ -2038,7 +2038,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     } else {
       // Dereferencing a pointer always makes an lvalue.
       lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
-                        DeadMe, field_ipse(fake_ipse(es->cs))});
+                        DeadMe, misc_ipse(es, ~ *result_type)});  // Yes, this misc_ipse is a field_ipse of some indexee object that was pointed at.
       ie_info_after nc[ast_expr_after_consume] = NotComputed;
       lhs_later ast_later_discard_info = mk_later();
       #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
