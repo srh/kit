@@ -142,7 +142,7 @@ func num_args(wc which_ctor) size {
   }
 }
 
-func check_non_magic(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls, nonmag *def_non_magic) np {
+func check_non_magic(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, nonmag *def_non_magic) np {
   switch nonmag {
   case &NonMagicCtor(wnmc which_non_magic_ctor):
     return check_non_magic_ctor(clq, g, scope, parms, wnmc.wc, &wnmc.nmc);
@@ -151,7 +151,7 @@ func check_non_magic(clq *clqueue, g *te_generics, scope *type_scope, parms *idy
   }
 }
 
-func check_non_magic_prop(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls, nmp *non_magic_prop) np {
+func check_non_magic_prop(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, nmp *non_magic_prop) np {
   cac cac_typeexpr;
   #check_and_compute_typeexpr(clq, g, scope, parms, &nmp->type, &cac);
   check(cac.complete);
@@ -173,7 +173,7 @@ func padding_oneparm_size(cs *checkstate, parms *idy_repls) u32 {
   return unwrap_primitive_padding_type_size(cs, ref(&parms->tys, 0));
 }
 
-func check_magic(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls, mag *def_magic) np {
+func check_magic(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, mag *def_magic) np {
   switch mag {
     case &MagicBzero(mb magic_bzero):
       annotate(&mb.size, padding_oneparm_size(clq->cs, parms));
@@ -193,7 +193,7 @@ func check_magic(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_rep
   }
 }
 
-func check_non_magic_ctor(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls, wc which_ctor, nmc *non_magic_ctor) np {
+func check_non_magic_ctor(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, wc which_ctor, nmc *non_magic_ctor) np {
   cac cac_typeexpr;
   #check_and_compute_typeexpr(clq, g, scope, parms, &nmc->type, &cac);
   check(cac.complete);
@@ -241,7 +241,7 @@ func make_magic_nopdestroy(clq *clqueue, size u32) instpair {
   return make_magic_inst(clq, clq->im->cym.magic_nopdestroy, 1, &scope, &type);
 }
 
-func check_magic_ctor(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls, wc which_ctor, mc *magic_ctor) np {
+func check_magic_ctor(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, wc which_ctor, mc *magic_ctor) np {
   cac cac_typeexpr;
   #check_and_compute_typeexpr(clq, g, scope, parms, &mc->type, &cac);
   check(cac.complete);

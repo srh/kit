@@ -425,6 +425,28 @@ func mk(name sym, arity ast_access_arity) access_entry {
   return {name, arity, NotComputed};
 }
 
+// Flattened te_generics -- TeNoGenerics becomes empty, TeVariadicGenerics not allowed.
+// TODO: many callees should take a *te_generik_scope instead of copying (for performance)
+struct te_generik_scope {
+  sh shray[te_generik];
+}
+
+func empty_generik_scope() te_generik_scope {
+  return {mk_shray()};
+}
+
+func flatten(g *te_generics) te_generik_scope {
+  switch g {
+  case &TeNoGenerics:
+    return empty_generik_scope();
+  case &TeHasGenerics(sh shray[te_generik]):
+    return {sh};
+  case &TeVariadicGenerics(vg te_variadic_generics):
+    ice(_u8("flatten te_variadic_generics"));
+    return fake();
+  }
+}
+
 enum genparms {
   NoParms void;
   HasParms shray[te_typeexpr];

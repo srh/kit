@@ -65,7 +65,7 @@ struct defscope {
   clq *clqueue;
   accessible array[access_entry_id];
   // Generics and their _complete_ replacements.
-  generics *te_generics;
+  generics te_generik_scope;
   repls *idy_repls;
   deflevel_parms_scope *type_scope;
   def_informal_name sym;
@@ -215,7 +215,7 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
   return NoFail;
 }
 
-func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *te_generics, parms *idy_genparms,
+func check_def_expr(clq *clqueue, accessible array[access_entry_id], g te_generik_scope, parms *idy_genparms,
                     x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
   ds defscope = {clq->cs, clq->im, clq, accessible, g, &parms->repls, ref_scope(parms), def_informal_name};
   es framescope = mk(&ds, ref_scope(parms), None);
@@ -1278,7 +1278,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       #def_converted_typeexpr(ent, &ent_typeexpr);
 
       computed cac_typeexpr;
-      #check_and_compute_typeexpr(es->clq, &ent->generics, &es->tscope, &matched_parms, ent_typeexpr, &computed);
+      #check_and_compute_typeexpr(es->clq, flatten(&ent->generics), &es->tscope, &matched_parms, ent_typeexpr, &computed);
 
       check(computed.complete);
       cu_computed cu_typeexpr = ~computed.te;

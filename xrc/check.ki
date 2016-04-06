@@ -323,7 +323,7 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       // this def, we fail.  If there is no typeexpr, we need to compute it from the rhs
       // (and that also needs to not depend cyclically on this def's own typeexpr).
       computed cac_typeexpr;
-      if case Unprinted(pm) = check_and_compute_typeexpr(clq, &ent->generics, inst_scope, &inst->parms.repls,
+      if case Unprinted(pm) = check_and_compute_typeexpr(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
                                                          ent_typeexpr, &computed) {
         inst->typrop = FailedComputation;
         return Unprinted(pm);
@@ -376,15 +376,15 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         }
         case &InstRhsExpr(rhs def_inst_rhs_expr): {
           info frame_info;
-          #check_def_expr(clq, ent->accessible, &ent->generics, &inst->parms, &rhs.ec,
+          #check_def_expr(clq, ent->accessible, flatten(&ent->generics), &inst->parms, &rhs.ec,
                           &typrop->cu.x, ent->def_name, &info);
           annotate(&rhs.frame_info, move(&info));
         }
         case &InstRhsNonMagic(nonmag def_non_magic): {
-          #check_non_magic(clq, &ent->generics, ref_scope(&inst->parms), &inst->parms.repls, &nonmag);
+          #check_non_magic(clq, flatten(&ent->generics), ref_scope(&inst->parms), &inst->parms.repls, &nonmag);
         }
         case &InstRhsMagic(mag def_magic): {
-          #check_magic(clq, &ent->generics, ref_scope(&inst->parms), &inst->parms.repls, &mag);
+          #check_magic(clq, flatten(&ent->generics), ref_scope(&inst->parms), &inst->parms.repls, &mag);
         }
       }
       inst->rhs_status = FinishedCheckingRhs;
@@ -406,11 +406,11 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t_scope *type_scope, 
     *out = blank_idyrepls();
     return NoFail;
   case &HasParms(ps shray[te_typeexpr]):
-    nogeneric_g te_generics = TeNoGenerics;
+    nogeneric_g te_generik_scope = empty_generik_scope();
     nogeneric_parms idy_repls = blank_idyrepls();
     params_complete bool;
     params shray[te_typeexpr];
-    #check_and_compute_typeexpr_shray(clq, &nogeneric_g, t_scope, &nogeneric_parms, &ps, &params, &params_complete);
+    #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, &params, &params_complete);
 
     if !params_complete {
       ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
@@ -433,11 +433,11 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_s
       return NoFail;
     }
     case &HasParms(ps shray[te_typeexpr]): {
-      nogeneric_g te_generics = TeNoGenerics;
+      nogeneric_g te_generik_scope = empty_generik_scope();
       nogeneric_parms idy_repls = blank_idyrepls();
       params_complete bool;
       params shray[te_typeexpr];
-      #check_and_compute_typeexpr_shray(clq, &nogeneric_g, t_scope, &nogeneric_parms, &ps, &params, &params_complete);
+      #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, &params, &params_complete);
 
       if !params_complete {
         ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
@@ -460,14 +460,14 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_s
 }
 
 func nogeneric_check_and_compute_typeexpr(clq *clqueue, scope *type_scope, t *te_typeexpr, out *cac_typeexpr) np {
-  ng te_generics = TeNoGenerics;
+  ng te_generik_scope = empty_generik_scope();
   np idy_repls = blank_idyrepls();
-  return check_and_compute_typeexpr(clq, &ng, scope, &np, t, out);
+  return check_and_compute_typeexpr(clq, ng, scope, &np, t, out);
 }
 
 // NOTE: Generics replacement should really be a separate phase.  (Why?)  (Performance is
 // one counter-argument -- we'd create an extra intermediate te_typeexpr.)
-func check_and_compute_typeexpr(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls, t *te_typeexpr,
+func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, t *te_typeexpr,
                                 out *cac_typeexpr) np {
   switch t {
     case &TeName(a te_name): {
@@ -554,7 +554,7 @@ func fake_eval_arraytype_count(x *ast_expr, count_out *u32) np {
   }
 }
 
-func help_check_and_compute_fields(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls, a *shray[te_vardecl],
+func help_check_and_compute_fields(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, a *shray[te_vardecl],
                                    computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) np {
   all_complete bool = true;
   all_computed array[te_vardecl];
@@ -575,7 +575,7 @@ func help_check_and_compute_fields(clq *clqueue, g *te_generics, scope *type_sco
   return NoFail;
 }
 
-func check_and_compute_name_type(clq *clqueue, g *te_generics, parms *idy_repls, a *te_name,
+func check_and_compute_name_type(clq *clqueue, g te_generik_scope, parms *idy_repls, a *te_name,
                                  computed_out *cu_typeexpr) np {
   // Generic parameters have already been checked.  (I hope so.)
   if lookup_plain_generic(g, parms, a->value, computed_out) {
@@ -591,7 +591,7 @@ func check_and_compute_name_type(clq *clqueue, g *te_generics, parms *idy_repls,
   return NoFail;
 }
 
-func check_and_compute_typeexpr_shray(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls,
+func check_and_compute_typeexpr_shray(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls,
                                       t *shray[te_typeexpr], computed_out *shray[te_typeexpr],
                                       computed_complete_out *bool) np {
   complete bool = true;
@@ -609,7 +609,7 @@ func check_and_compute_typeexpr_shray(clq *clqueue, g *te_generics, scope *type_
   return NoFail;
 }
 
-func check_and_compute_app_type(clq *clqueue, g *te_generics, scope *type_scope, parms *idy_repls, a *te_typeapp,
+func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, a *te_typeapp,
                                 out *cac_typeexpr) np {
   params_complete bool;
   params shray[te_typeexpr];
@@ -708,33 +708,15 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_ty
 }
 
 // Returns an index into the HasGenerics array.
-func find_plain_generic(g *te_generics, name sym) opt[size] {
-  switch g {
-  case &TeNoGenerics:
-    return None;
-  case &TeHasGenerics(a shray[te_generik]):
-    return lookup_plain_name(&a, name);
-  case &TeVariadicGenerics(a te_variadic_generics):
-    // We can't see variadic generics because there's no "RHS type" of a fn.
-    ice(_u8("find_generic sees variadic generic."));
-    return fake();
-  }
+func find_plain_generic(g te_generik_scope, name sym) opt[size] {
+  return lookup_plain_name(&g.sh, name);
 }
 
-func find_ipse_generic(g *te_generics, name sym) opt[tup[size, *te_ipse_generik]] {
-  switch g {
-  case &TeNoGenerics:
-    return None;
-  case &TeHasGenerics(a shray[te_generik]):
-    return lookup_ipse_name(&a, name);
-  case &TeVariadicGenerics(a te_variadic_generics):
-    // We can't see variadic generics because there's no "RHS type" of a fn.
-    ice(_u8("find_generic sees variadic generic."));
-    return fake();
-  }
+func find_ipse_generic(g te_generik_scope, name sym) opt[tup[size, *te_ipse_generik]] {
+  return lookup_ipse_name(&g.sh, name);
 }
 
-func lookup_plain_generic(g *te_generics, parms *idy_repls, name sym, out *cu_typeexpr) bool {
+func lookup_plain_generic(g te_generik_scope, parms *idy_repls, name sym, out *cu_typeexpr) bool {
   if case Has(ix size) = find_plain_generic(g, name) {
     *out = *ref(&parms->tys, ix);
     return true;
@@ -1216,7 +1198,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           rhs_fields array[te_vardecl];
           rhs_fields_complete bool;
           if case Unprinted(pm) = help_check_and_compute_fields(
-              clq, &ent->generics, ref_scope(&inst->parms), &inst->parms.repls, &crs.drs.fields,
+              clq, flatten(&ent->generics), ref_scope(&inst->parms), &inst->parms.repls, &crs.drs.fields,
               &rhs_fields, &rhs_fields_complete) {
             inst->info = FailedComputation;
             return Unprinted(pm);
@@ -1240,7 +1222,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           rhs_fields array[te_vardecl];
           rhs_fields_complete bool;
 
-          if case Unprinted(pm) = help_check_and_compute_fields(clq, &ent->generics, inst_scope, &inst->parms.repls,
+          if case Unprinted(pm) = help_check_and_compute_fields(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
                                                                 &drs.fields, &rhs_fields, &rhs_fields_complete) {
             inst->info = FailedComputation;
             return Unprinted(pm);
@@ -1266,7 +1248,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
           rhs_constructors array[te_vardecl];
           rhs_constructors_complete bool;
 
-          if case Unprinted(pm) = help_check_and_compute_fields(clq, &ent->generics, inst_scope, &inst->parms.repls,
+          if case Unprinted(pm) = help_check_and_compute_fields(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
                                                                 &drs.constructors, &rhs_constructors,
                                                                 &rhs_constructors_complete) {
             inst->info = FailedComputation;
