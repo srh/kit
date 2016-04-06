@@ -497,8 +497,8 @@ func check_and_compute_typeexpr(clq *clqueue, g *te_generics, scope *type_scope,
     }
 
     case &TeIpse(a te_ipse):
-      if case Has(ix size) = find_ipse_generic(g, a.name) {
-        *out = {true, parms->tys[ix].x};
+      if case Has(ixtup tup[size, _]) = find_ipse_generic(g, a.name) {
+        *out = {true, parms->tys[ixtup.car].x};
         return NoFail;
       } else {
         if !ipse_in_scope(scope, a.name) {
@@ -721,7 +721,7 @@ func find_plain_generic(g *te_generics, name sym) opt[size] {
   }
 }
 
-func find_ipse_generic(g *te_generics, name sym) opt[size] {
+func find_ipse_generic(g *te_generics, name sym) opt[tup[size, *te_ipse_generik]] {
   switch g {
   case &TeNoGenerics:
     return None;
@@ -1778,14 +1778,14 @@ func lookup_plain_name(arr *shray[te_generik], x sym) opt[size] {
   return None;
 }
 
-func lookup_ipse_name(arr *shray[te_generik], x sym) opt[size] {
+func lookup_ipse_name(arr *shray[te_generik], x sym) opt[tup[size, *te_ipse_generik]] {
   n size = count(arr);
   for i size = 0; i < n; i = i + 1 {
     switch &arr[i] {
     case &TePlainGeneric(b sym): { }
     case &TeIpseGeneric(b te_ipse_generik):
       if b.name == x {
-        return Has(i);
+        return Has({i, &b});
       }
     }
   }

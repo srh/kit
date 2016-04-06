@@ -138,13 +138,13 @@ func unify_under_generics(scope *type_scope, unif_parms *array[te_typeexpr], pt 
     case &TeIpse(a te_ipse):
       // NOTE: I mimicked the TeName case, and haven't fully thought out how that would
       // affect this function's callers, so treat this code with skepticism.
-      if case Has(ix size) = lookup_ipse_name(names, a.name) {
+      if case Has(ixtup tup[size, *te_ipse_generik]) = lookup_ipse_name(names, a.name) {
         // SCOPE(): We don't actually use the generik oftype at all!
         unified te_typeexpr;
-        if !unify_types(scope, &unif_parms[ix], pt, emissions_append, &unified) {
+        if !unify_types(scope, &unif_parms[ixtup.car], pt, emissions_append, &unified) {
           return false;
         }
-        unif_parms[ix] = unified;
+        unif_parms[ixtup.car] = unified;
         *unified_out = TeIpse({a.name});
         return true;
       } else {
