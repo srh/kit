@@ -66,8 +66,8 @@ struct defscope {
   accessible array[access_entry_id];
   // Generics and their _complete_ replacements.
   generics *te_generics;
-  deflevel_parms_scope *type_scope;
   repls *idy_repls;
+  deflevel_parms_scope *type_scope;
   def_informal_name sym;
 }
 
@@ -217,7 +217,7 @@ func es_note_var_destroyer(es *framescope, vn var_number) np {
 
 func check_def_expr(clq *clqueue, accessible array[access_entry_id], g *te_generics, parms *idy_genparms,
                     x *ast_expr_consume, pt *te_typeexpr, def_informal_name sym, frame_info_out *frame_info) np {
-  ds defscope = {clq->cs, clq->im, clq, accessible, g, ref_scope(parms), &parms->repls, def_informal_name};
+  ds defscope = {clq->cs, clq->im, clq, accessible, g, &parms->repls, ref_scope(parms), def_informal_name};
   es framescope = mk(&ds, ref_scope(parms), None);
   #check_expr_consume(&es, x, pt);
   // SCOPE: This is such a ghetto hack.
