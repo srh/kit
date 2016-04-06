@@ -20,7 +20,7 @@ enum unify_emission {
 // reconstruct the correct values later.)
 //
 // _appends_ emissions onto emissions_append.
-func unify_under_generics(scope *type_scope, unif_parms *array[te_typeexpr], pt *te_typeexpr,
+func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt *te_typeexpr,
                           names *shray[te_generik], t *te_typeexpr,
                           emissions_append *array[unify_emission],
                           unified_out *te_typeexpr) bool {
@@ -206,7 +206,7 @@ func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) boo
 
 func unify_types(scope *type_scope, pta *te_typeexpr, ptb *te_typeexpr, emissions_append *array[unify_emission], out *te_typeexpr) bool {
   names shray[te_generik];
-  unif_parms array[te_typeexpr];
+  unif_parms shray[te_typeexpr];
   return unify_under_generics(scope, &unif_parms, pta, &names, ptb, emissions_append, out);
 }
 
@@ -244,16 +244,17 @@ func type_matches(scope *type_scope, parms *shray[te_typeexpr], pt *te_typeexpr,
   // We need to retain all new information we gain about the value of the generic param
   // typeexprs as we compare the whole type, in order to make sure we don't match
   // conflicting information about a generic parameter.
-  unif_parms array[te_typeexpr] = mk_copy(parms);
+  unif_parms_tmp array[te_typeexpr] = mk_copy(parms);
+  // unif_parms has a fixed size, we pre-freeze it -- it's not immutable until unify_under_generics returns.
+  unif_parms shray[te_typeexpr] = freeze(&unif_parms_tmp);
   // Since t is complete, unified is irrelevant and must be identical to t.
   unified te_typeexpr;
   emissions array[unify_emission];
   if !unify_under_generics(scope, &unif_parms, pt, names, t, &emissions, &unified) {
     return TypeDoesNotMatch;
   }
-  frozen_unif_parms shray[te_typeexpr] = freeze(&unif_parms);
-  if !all_complete_computed(&frozen_unif_parms).complete {
+  if !all_complete_computed(&unif_parms).complete {
     return TypeMatchesAmbiguously;
   }
-  return TypeMatchesPrecisely({frozen_unif_parms, freeze(&emissions)});
+  return TypeMatchesPrecisely({unif_parms, freeze(&emissions)});
 }
