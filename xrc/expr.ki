@@ -726,7 +726,7 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
     switch &rhs_info->lval {
     case &IsLvalYes(desc lval_description):
       lval = IsLvalYes({add_cell(es, {LocationVirtual, success_case_cu, success_case_props}), DeadMe,
-            enum_field_ipse(desc.ipse)});
+            enum_field_ipse(es, desc.ipse, success_case_cu)});
     case &IsLvalNo(desc rval_description):
       lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, success_case_cu, success_case_props})});
     }
@@ -861,7 +861,7 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   switch cf_res {
     case InheritsLval(off check_field_offset_and_index): {
       // We deref, so it's always an lval.
-      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe, field_ipse(ipse)});
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe, field_ipse(es, ipse, fieldtype)});
       annotate(&a->info, DerefFieldName(@[ast_field_info]{off.offset, off.index}));
     }
     case ConstantField(value u32): {
@@ -874,17 +874,14 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   return NoFail;
 }
 
-// Right now fields have the same ipse as what they're part of -- they're part of the
-// same object!  So, having equal ipses does not mean you're the same object.
-func field_ipse(outer_ipse te_typeexpr) te_typeexpr {
-  // SCOPE(): This is bad, has wrong oftype.
-  return outer_ipse;
+// Not sure we use field_ipse properly(?) for rvalue fields?  Deref+indexing fields?
+func field_ipse(es *framescope, outer_ipse te_typeexpr, inner_cu cu_typeexpr) te_typeexpr {
+  return misc_ipse(es, inner_cu);
 }
 
-// This is halfway B.S. the same way that field_ipse is.
-func enum_field_ipse(outer_ipse te_typeexpr) te_typeexpr {
-  // SCOPE(): This is bad, has wrong oftype.
-  return outer_ipse;
+// This ipse's validity and presence is really conditional on a tag value, so... uh, beware?
+func enum_field_ipse(es *framescope, outer_ipse te_typeexpr, inner_cu cu_typeexpr) te_typeexpr {
+  return misc_ipse(es, inner_cu);
 }
 
 // Varnames aren't supposed to shadow, so... we have user-friendly ipse names.  (Note
@@ -926,7 +923,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
       switch &info->lval {
         case &IsLvalYes(desc lval_description): {
           lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe,
-                            field_ipse(desc.ipse)});
+                            field_ipse(es, desc.ipse, fieldtype)});
         }
         case &IsLvalNo(desc rval_description): {
           lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, fieldtype, props})});
@@ -2027,7 +2024,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       switch &lhs_info->lval {
         case &IsLvalYes(desc lval_description): {
           lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
-                            DeadMe, field_ipse(desc.ipse)});
+                            DeadMe, field_ipse(es, desc.ipse, ~ *result_type)});
         }
         case &IsLvalNo(desc rval_description): {
           lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *result_type, result_props})});
