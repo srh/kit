@@ -247,7 +247,7 @@ func type_matches(scope *type_scope, parms *shray[te_typeexpr], pt *te_typeexpr,
   unif_parms_tmp array[te_typeexpr] = mk_copy(parms);
   // unif_parms has a fixed size, we pre-freeze it -- it's not immutable until unify_under_generics returns.
   unif_parms shray[te_typeexpr] = freeze(&unif_parms_tmp);
-  // Since t is complete, unified is irrelevant and must be identical to t.
+  // Since t is complete, unified is irrelevant and must be identical to t.  Might become untrue if ipses unify into a fresh ipse value.
   unified te_typeexpr;
   emissions array[unify_emission];
   if !unify_under_generics(scope, &unif_parms, pt, names, t, &emissions, &unified) {
@@ -256,5 +256,29 @@ func type_matches(scope *type_scope, parms *shray[te_typeexpr], pt *te_typeexpr,
   if !all_complete_computed(&unif_parms).complete {
     return TypeMatchesAmbiguously;
   }
+  if !verify_matches_oftypes(scope, &unif_parms, names, &emissions) {
+    // SCOPE(): Probably should just kill the type checking -- matches-but-invalid.
+    return TypeDoesNotMatch;
+  }
   return TypeMatchesPrecisely({unif_parms, freeze(&emissions)});
+}
+
+func verify_matches_oftypes(scope *type_scope, unif_parms *shray[te_typeexpr], names *shray[te_generik], emissions_append *array[unify_emission]) bool {
+  n size = count(names);
+  check(n == count(unif_parms));
+  for i size = 0; i < n; i++ {
+    if case &TeIpseGeneric(tig te_ipse_generik) = &names[i] {
+      if case &TeIpse(ti te_ipse) = &unif_parms[i] {
+        ui_oftype cu_typeexpr = scope_lookup(scope, ti.name);
+        // As in type_matches, since oftypes are complete, unified is irrelevant and must be identical to t.
+        unified te_typeexpr;
+        if !unify_under_generics(scope, unif_parms, &ui_oftype.x, names, &tig.oftype, emissions_append, &unified) {
+          return false;
+        }
+      } else {
+        ice(_u8("verify_matches_oftypes sees non-ipse unif_parm"));
+      }
+    }
+  }
+  return true;
 }
