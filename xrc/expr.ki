@@ -877,11 +877,13 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
 // Right now fields have the same ipse as what they're part of -- they're part of the
 // same object!  So, having equal ipses does not mean you're the same object.
 func field_ipse(outer_ipse te_typeexpr) te_typeexpr {
+  // SCOPE(): This is bad, has wrong oftype.
   return outer_ipse;
 }
 
 // This is halfway B.S. the same way that field_ipse is.
 func enum_field_ipse(outer_ipse te_typeexpr) te_typeexpr {
+  // SCOPE(): This is bad, has wrong oftype.
   return outer_ipse;
 }
 
