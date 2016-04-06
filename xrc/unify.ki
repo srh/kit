@@ -252,9 +252,8 @@ func type_matches(scope *type_scope, parms *shray[te_typeexpr], pt *te_typeexpr,
     return TypeDoesNotMatch;
   }
   frozen_unif_parms shray[te_typeexpr] = freeze(&unif_parms);
-  if all_complete_computed(&frozen_unif_parms).complete {
-    return TypeMatchesPrecisely({frozen_unif_parms, freeze(&emissions)});
-  } else {
+  if !all_complete_computed(&frozen_unif_parms).complete {
     return TypeMatchesAmbiguously;
   }
+  return TypeMatchesPrecisely({frozen_unif_parms, freeze(&emissions)});
 }
