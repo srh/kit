@@ -647,14 +647,6 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
 }
 
 func arity_matches(a *te_generics, params opt[*shray[te_typeexpr]]) bool {
-  return help_arity_matches(a, params);
-}
-
-func arity_matches(a *te_generics, params opt[*shray[cu_typeexpr]]) bool {
-  return help_arity_matches(a, params);
-}
-
-func[T] help_arity_matches(a *te_generics, params opt[*shray[T]]) bool {
   // SCOPE(): Um.  Arity is no longer a number -- we have to match ipses, their oftypes have to match, everything has to unify.
   switch arity(a) {
     case NoParamsArity: {
@@ -682,7 +674,7 @@ func ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typ
 
 func match_deftype(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]],
                    out *deftype_entry_id) np {
-  // SCOPE(): See arity_matches or help_arity_matches -- we never look at the generik oftype.
+  // SCOPE(): See arity_matches -- we never look at the generik oftype.
   if case Has(arr *array[deftype_entry_id]) = lookup_ref(&cs->deftypes_by_name, &name) {
     n size = count(arr);
     match opt[deftype_entry_id] = None;
