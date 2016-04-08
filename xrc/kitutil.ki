@@ -142,6 +142,34 @@ func[T, U] MERR(cs *checkstate, m ast_meta, x T, y U) np {
   return MERR(cs, m, consup(x, y));
 }
 
+func[R, T, U, V, W, X, Y, Z, A] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z, t A) cr[R] {
+  return MERR(cs, m, consup(x, y, z, p, q, r, s, t));
+}
+
+func[R, T, U, V, W, X, Y, Z] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z) cr[R] {
+  return MERR(cs, m, consup(x, y, z, p, q, r, s));
+}
+
+func[R, T, U, V, W, X, Y] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y) cr[R] {
+  return MERR(cs, m, consup(x, y, z, p, q, r));
+}
+
+func[R, T, U, V, W, X] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X) cr[R] {
+  return MERR(cs, m, consup(x, y, z, p, q));
+}
+
+func[R, T, U, V, W] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W) cr[R] {
+  return MERR(cs, m, consup(x, y, z, p));
+}
+
+func[R, T, U, V] MERR(cs *checkstate, m ast_meta, x T, y U, z V) cr[R] {
+  return MERR(cs, m, consup(x, y, z));
+}
+
+func[R, T, U] MERR(cs *checkstate, m ast_meta, x T, y U) cr[R] {
+  return MERR(cs, m, consup(x, y));
+}
+
 // Hopefully msg ends in \n, like strings created by err_string.
 func ERR_append(pm err_printed, msg array[u8]) np {
   // We ignore pm.printed_meta.  (It's like ERR.
@@ -182,6 +210,10 @@ func[T] merr_string(cs *checkstate, m ast_meta, x T) array[u8] {
 }
 
 func[T] MERR(cs *checkstate, m ast_meta, x T) np {
+  return Unprinted({true, merr_string(cs, m, x)});
+}
+
+func[R, T] MERR(cs *checkstate, m ast_meta, x T) cr[R] {
   return Unprinted({true, merr_string(cs, m, x)});
 }
 

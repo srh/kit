@@ -582,12 +582,11 @@ func check_and_compute_name_type(clq *clqueue, g te_generik_scope, scope *type_s
     return NoFail;
   }
 
-  id deftype_entry_id;
-  #match_deftype(clq->cs, fake_ast_meta(), a->value, scope, None, &id);
+  md matched_deftype = #match_deftype(clq->cs, fake_ast_meta(), a->value, scope, None);
 
   np idy_genparms = blank_idyparms();
-  inst_id deftype_inst_id = enqueue_deftype_inst(clq, id, &np);
-  *computed_out = ~ @[te_typeexpr]TeName({a->value, Has({id, inst_id})});
+  inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &np);
+  *computed_out = ~ @[te_typeexpr]TeName({a->value, Has({md.ent_id, inst_id})});
   return NoFail;
 }
 
@@ -617,8 +616,7 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
 
   switch &a->typefunc {
     case &TePureName(value sym): {
-      id deftype_entry_id;
-      #match_deftype(clq->cs, fake_ast_meta(), value, scope, Has(&params), &id);
+      md matched_deftype = #match_deftype(clq->cs, fake_ast_meta(), value, scope, Has(&params));
 
       if params_complete {
         // TODO: This is quite duplicated with check_and_compute_parms.  With the changes
@@ -632,8 +630,8 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
           push(&canonical, ~canonicalized);
         }
         hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
-        inst_id deftype_inst_id = enqueue_deftype_inst(clq, id, &hp);
-        *out = {true, TeApp({TePureName(value), params, Has({{id, inst_id}, freeze(&ipse_names)})})};
+        inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &hp);
+        *out = {true, TeApp({TePureName(value), params, Has({{md.ent_id, inst_id}, freeze(&ipse_names)})})};
       } else {
         *out = {false, TeApp({TePureName(value), params, None})};
       }
@@ -669,12 +667,15 @@ func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typee
   return false;
 }
 
-func ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]]) np {
+func[T] ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]]) cr[T] {
   return MERR(cs, m, _u8("No match for type with name '"), name, _u8("' and maybe some params"));
 }
 
-func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, params opt[*shray[te_typeexpr]],
-                   out *deftype_entry_id) np {
+struct matched_deftype {
+  ent_id deftype_entry_id;
+}
+
+func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, params opt[*shray[te_typeexpr]]) cr[matched_deftype] {
   // SCOPE(): See arity_matches -- we never look at the generik oftype.
   if case Has(arr *array[deftype_entry_id]) = lookup_ref(&cs->deftypes_by_name, &name) {
     n size = count(arr);
@@ -690,8 +691,7 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, para
       }
     }
     if case Has(id) = match {
-      *out = id;
-      return NoFail;
+      return NoFail({id});
     } else {
       return ERR_no_match(cs, m, name, params);
     }
@@ -1520,27 +1520,29 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
       ent->ent_id = BeganComputing;
       switch ent->arity {
         case AccessArityNone: {
-          id deftype_entry_id;
           global_scope type_scope = mk_global();
-          if case Unprinted(pm) = match_deftype(cs, fake_ast_meta(), ent->name, &global_scope, None, &id) {
+          switch match_deftype(cs, fake_ast_meta(), ent->name, &global_scope, None) {
+          case Unprinted(pm):
             ent->ent_id = FailedComputation;
             return Unprinted(pm);
+          case NoFail(md matched_deftype):
+            *out = md.ent_id;
+            ent->ent_id = Computed(md.ent_id);
+            return NoFail;
           }
-          *out = id;
-          ent->ent_id = Computed(id);
-          return NoFail;
         }
         case AccessArityFinite(n u32): {
           global_scope type_scope = mk_global();
           params shray[te_typeexpr] = repeat(~n, TeUnknown);
-          id deftype_entry_id;
-          if case Unprinted(pm) = match_deftype(cs, fake_ast_meta(), ent->name, &global_scope, Has(&params), &id) {
+          switch match_deftype(cs, fake_ast_meta(), ent->name, &global_scope, Has(&params)) {
+          case Unprinted(pm):
             ent->ent_id = FailedComputation;
             return Unprinted(pm);
+          case NoFail(md matched_deftype):
+            *out = md.ent_id;
+            ent->ent_id = Computed(md.ent_id);
+            return NoFail;
           }
-          *out = id;
-          ent->ent_id = Computed(id);
-          return NoFail;
         }
       }
     }
