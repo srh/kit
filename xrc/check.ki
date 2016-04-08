@@ -648,18 +648,22 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
 
 func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typeexpr]]) bool {
   // SCOPE(): Um.  Arity is no longer a number -- we have to match ipses, their oftypes have to match, everything has to unify.
-  switch arity(a) {
-  case NoParamsArity:
+  // SCOPE(): We should have a "correct number of parameters but fails" result.
+
+  switch a {
+  case &TeNoGenerics:
     if case None = params {
       return true;
     }
-  case FiniteArity(n u32):
+  case &TeHasGenerics(sh shray[te_generik]):
+    // SCOPE(): No.
     if case Has(p) = params {
-      return n == @[u32]~count(p);
+      return count(p) == count(&sh);
     }
-  case VariadicArity(ar variadic_arity):
+  case &TeVariadicGenerics(vg te_variadic_generics):
+    // SCOPE(): No.
     if case Has(p) = params {
-      return ar.before + ar.after <= @[u32]~count(p);
+      return count(&vg.before) + count(&vg.after) <= count(p);
     }
   }
   return false;

@@ -1,4 +1,3 @@
-import arity;
 import box;
 import deferred;
 import expr;
