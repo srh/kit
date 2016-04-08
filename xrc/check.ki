@@ -1518,32 +1518,26 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
   switch ent->ent_id {
     case NotComputed: {
       ent->ent_id = BeganComputing;
+
+      global_scope type_scope = mk_global();
+      param_shray shray[te_typeexpr];
+      params opt[*shray[te_typeexpr]];
       switch ent->arity {
-        case AccessArityNone: {
-          global_scope type_scope = mk_global();
-          switch match_deftype(cs, fake_ast_meta(), ent->name, &global_scope, None) {
-          case Unprinted(pm):
-            ent->ent_id = FailedComputation;
-            return Unprinted(pm);
-          case NoFail(md matched_deftype):
-            *out = md.ent_id;
-            ent->ent_id = Computed(md.ent_id);
-            return NoFail;
-          }
-        }
-        case AccessArityFinite(n u32): {
-          global_scope type_scope = mk_global();
-          params shray[te_typeexpr] = repeat(~n, TeUnknown);
-          switch match_deftype(cs, fake_ast_meta(), ent->name, &global_scope, Has(&params)) {
-          case Unprinted(pm):
-            ent->ent_id = FailedComputation;
-            return Unprinted(pm);
-          case NoFail(md matched_deftype):
-            *out = md.ent_id;
-            ent->ent_id = Computed(md.ent_id);
-            return NoFail;
-          }
-        }
+      case AccessArityNone:
+        params = None;
+      case AccessArityFinite(n u32):
+        param_shray = repeat(~n, TeUnknown);
+        params = Has(&param_shray);
+      }
+
+      switch match_deftype(cs, fake_ast_meta(), ent->name, &global_scope, params) {
+      case Unprinted(pm):
+        ent->ent_id = FailedComputation;
+        return Unprinted(pm);
+      case NoFail(md matched_deftype):
+        *out = md.ent_id;
+        ent->ent_id = Computed(md.ent_id);
+        return NoFail;
       }
     }
     case BeganComputing: {
