@@ -1515,38 +1515,34 @@ func generiks_same_human_name(a *ast_generik, b *ast_generik) bool {
 func get_accessible_deftype(cs *checkstate, aid access_entry_id) cr[deftype_entry_id] {
   ent *access_entry = ref_access_entry(cs, aid);
   switch ent->ent_id {
-    case NotComputed: {
-      ent->ent_id = BeganComputing;
+  case NotComputed:
+    ent->ent_id = BeganComputing;
 
-      global_scope type_scope = mk_global();
-      param_shray shray[te_typeexpr];
-      params opt[*shray[te_typeexpr]];
-      switch ent->arity {
-      case AccessArityNone:
-        params = None;
-      case AccessArityFinite(n u32):
-        param_shray = repeat(~n, TeUnknown);
-        params = Has(&param_shray);
-      }
+    global_scope type_scope = mk_global();
+    param_shray shray[te_typeexpr];
+    params opt[*shray[te_typeexpr]];
+    switch ent->arity {
+    case AccessArityNone:
+      params = None;
+    case AccessArityFinite(n u32):
+      param_shray = repeat(~n, TeUnknown);
+      params = Has(&param_shray);
+    }
 
-      switch match_deftype(cs, fake_ast_meta(), ent->name, &global_scope, params) {
-      case Unprinted(pm):
-        ent->ent_id = FailedComputation;
-        return Unprinted(pm);
-      case NoFail(md matched_deftype):
-        ent->ent_id = Computed(md.ent_id);
-        return NoFail(md.ent_id);
-      }
+    switch match_deftype(cs, fake_ast_meta(), ent->name, &global_scope, params) {
+    case Unprinted(pm):
+      ent->ent_id = FailedComputation;
+      return Unprinted(pm);
+    case NoFail(md matched_deftype):
+      ent->ent_id = Computed(md.ent_id);
+      return NoFail(md.ent_id);
     }
-    case BeganComputing: {
-      return ERR(_u8("Recursively computing access block reference"));
-    }
-    case FailedComputation: {
-      return ERR(_u8("Repeated get_accessible_deftype error"));
-    }
-    case Computed(x deftype_entry_id): {
-      return NoFail(x);
-    }
+  case BeganComputing:
+    return ERR(_u8("Recursively computing access block reference"));
+  case FailedComputation:
+    return ERR(_u8("Repeated get_accessible_deftype error"));
+  case Computed(x deftype_entry_id):
+    return NoFail(x);
   }
 }
 
