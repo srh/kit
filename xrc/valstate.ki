@@ -243,7 +243,8 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
     #vs_support_activate(vs, a.retcell);
 
     switch a.semantic {
-    case NoSemantic: { }
+    case NoSemantic:
+      void;
     case MoveSemantic(bs gr_apply_bi_semantic):
       #vs_support_copy_properties(vs, bs.dest, bs.src);
       #vs_support_activate(vs, bs.dest);
@@ -385,12 +386,14 @@ func vs_support_copy_properties(vs *vt_state, dest cell_num, src cell_num) np {
       if d == src {
         #vs_support_add(vs, {PointerFrom(dest), supp->supportee});
       }
-    case &FieldOf(d cell_num): {
+    case &FieldOf(d cell_num):
       // For what it's worth, the support from a field to its struct owner is _not_
       // emitted support.  So it's not an exception that it doesn't get copied.
-    }
-    case &DescopingElement(d cell_num): { }
-    case &LostTrack(v void): { }
+      void;
+    case &DescopingElement(d cell_num):
+      void;
+    case &LostTrack(v void):
+      void;
     }
     // supp is inv
   }
@@ -449,7 +452,8 @@ func vs_support_virtualdead(vs *vt_state, c cell_num) np {
 
 func vs_support_active_op(vs *vt_state, op gr_active_op) np {
   switch op {
-  case Nothing: { }
+  case Nothing:
+    void;
   case Activate(c cell_num):
     #vs_support_activate(vs, c);
   case Deactivate(c cell_num):
@@ -466,7 +470,8 @@ func vs_checksum_xop(vs *vs_checksum, op *gr_xop) void {
     case TwoExtraOps(ops gr_active_xop):
       vs_checksum_active_op(vs, ops.op1);
       vs_checksum_active_op(vs, ops.op2);
-    case StandardApply: { }
+    case StandardApply:
+      void;
     }
     nparams i32 = ~count(&a.params);
     // funcell deactivates, params deactivate, return cell activates
@@ -478,8 +483,10 @@ func vs_checksum_xop(vs *vs_checksum, op *gr_xop) void {
     // Same as GrApply except without the funcell.
     vs->active_count += -nparams + 1;
     vs->live_count += -nparams;
-  case &GrMemCopy(a gr_memcopy): { }
-  case &GrWriteConst(a gr_writeconst): { }
+  case &GrMemCopy(a gr_memcopy):
+    void;
+  case &GrWriteConst(a gr_writeconst):
+    void;
   case &GrAddressof(a gr_addressof):
     vs->active_count++;
   case &GrDeref(a gr_deref):
@@ -488,7 +495,8 @@ func vs_checksum_xop(vs *vs_checksum, op *gr_xop) void {
     vs->live_count++;
   case &GrLive(a gr_live):
     vs->live_count++;
-  case &GrAssertLive(a gr_assert_live): { }
+  case &GrAssertLive(a gr_assert_live):
+    void;
   case &GrDead(a gr_dead):
     vs->live_count--;
   case &GrVirtualDead(a gr_virtual_dead):
@@ -505,7 +513,8 @@ func vs_checksum_xop(vs *vs_checksum, op *gr_xop) void {
 
 func vs_checksum_active_op(vs *vs_checksum, op gr_active_op) void {
   switch op {
-  case Nothing: { }
+  case Nothing:
+    void;
   case Activate(c cell_num):
     vs->active_count++;
   case Deactivate(c cell_num):

@@ -100,7 +100,8 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
           body_text_offset u32 = *un(&ref_fn_body(cs, fnid)->body_text_offset);
           name string = lookup(cs->im, ent->def_name);
           switch cs->plat.opsys {
-          case Linux32: { }
+          case Linux32:
+            void;
           case Win32:
             name = _s("_") + name;
           case Osx32:

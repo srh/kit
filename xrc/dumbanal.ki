@@ -48,7 +48,8 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
         case TwoExtraOps(ops gr_active_xop):
           gr_track_active_op(ctr, ops.op1);
           gr_track_active_op(ctr, ops.op2);
-        case StandardApply: { }
+        case StandardApply:
+          void;
         }
         gr_deactivate(ctr, a.funcell);
         for i size = 0; i < nparams; i = i + 1 {
@@ -197,7 +198,8 @@ func combine_branch_mut(new_live *celltrack, onto *genexpr_result, case_mut gene
       *onto = Terminal;
       *end_ctr = *new_live;
     }
-  case NonTerminal: { }
+  case NonTerminal:
+    void;
   }
 }
 

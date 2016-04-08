@@ -325,12 +325,10 @@ func parse_def_generics_and_name(p *ps, is_export ast_isexport, is_var ast_isvar
     *generics_out = NoGenerics;
   case IsNotExport:
     switch is_var {
-      case IsVar: {
-        *generics_out = NoGenerics;
-      }
-      case IsNotVar: {
-        #parse_generics_if_present(p, generics_out);
-      }
+    case IsVar:
+      *generics_out = NoGenerics;
+    case IsNotVar:
+      #parse_generics_if_present(p, generics_out);
     }
   }
   #parse_ident(p, name_out);
@@ -492,16 +490,14 @@ func parse_bracebody(p *ps, out *ast_bracebody) parse_result {
 
 func try_underscore_if_allowed(p *ps, ab allow_blanks, out *ast_typeexpr) try_parse_result {
   switch ab {
-    case AllowBlanksYes: {
-      if +try_skip_keyw(p, Underscore) {
-        *out = Unknown({});
-        return Success;
-      }
-      return Fail;
+  case AllowBlanksYes:
+    if +try_skip_keyw(p, Underscore) {
+      *out = Unknown({});
+      return Success;
     }
-    case AllowBlanksNo: {
-      return Fail;
-    }
+    return Fail;
+  case AllowBlanksNo:
+    return Fail;
   }
 }
 
@@ -550,7 +546,8 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_ipses, out *ast_typ
     case Success:
       *out = Ipse(ipse);
       return Success;
-    case Quickfail: { }
+    case Quickfail:
+      void;
     case Error:
       return Error;
     }
@@ -560,7 +557,8 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_ipses, out *ast_typ
   if ! +try_underscore_if_allowed(p, ab, &lhs) {
     name ast_ident;
     switch triparse_ident(p, &name) {
-    case Success: { }
+    case Success:
+      void;
     case Quickfail:
       return Quickfail;
     case Error:
@@ -590,17 +588,17 @@ func parse_rest_of_union(p *ps, out *ast_typeexpr) parse_result {
 
 func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) parse_result {
   switch ab {
-    case AllowBlanksYes: {
-      if +try_skip_keyw(p, Underscore) {
-        param box[ast_typeexpr];
-        #try_skip_token(p, @[tokval]Grouper(RBracket));
-        #help_parse_typeexpr(p, ab, AllowIpsesNo, oo(&param));
+  case AllowBlanksYes:
+    if +try_skip_keyw(p, Underscore) {
+      param box[ast_typeexpr];
+      #try_skip_token(p, @[tokval]Grouper(RBracket));
+      #help_parse_typeexpr(p, ab, AllowIpsesNo, oo(&param));
 
-        *out = Arraytype({None, param});
-        return Success;
-      }
+      *out = Arraytype({None, param});
+      return Success;
     }
-    default: { }
+  default:
+    void;
   }
 
   count box[ast_expr];
@@ -713,28 +711,23 @@ func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) parse_result {
   #parse_ident(p, &name);
 
   switch ab {
-    case AllowBlanksYes: {
-      type ast_typeexpr;
-      switch help_triparse_typeexpr(p, ab, AllowIpsesNo, &type) {
-        case Success: {
-          *out = {name, type};
-          return Success;
-        }
-        case Quickfail: {
-          *out = {name, Unknown({})};
-          return Success;
-        }
-        case Error: {
-          return Fail;
-        }
-      }
-    }
-    case AllowBlanksNo: {
-      type ast_typeexpr;
-      #help_parse_typeexpr(p, ab, AllowIpsesNo, &type);
+  case AllowBlanksYes:
+    type ast_typeexpr;
+    switch help_triparse_typeexpr(p, ab, AllowIpsesNo, &type) {
+    case Success:
       *out = {name, type};
       return Success;
+    case Quickfail:
+      *out = {name, Unknown({})};
+      return Success;
+    case Error:
+      return Fail;
     }
+  case AllowBlanksNo:
+    type ast_typeexpr;
+    #help_parse_typeexpr(p, ab, AllowIpsesNo, &type);
+    *out = {name, type};
+    return Success;
   }
 }
 
@@ -1531,30 +1524,31 @@ func parse_switch_case(p *ps, out *ast_switch_case) parse_result {
   #parse_case_pattern(p, &pattern);
   #try_skip_oper(p, ':');
   switch triparse_bracebody(p, &body) {
-    case Success: { }
-    case Quickfail:
-      statements array[ast_statement];
-      done bool = false;
-      casekeyw tokval = Keyw(Case);
-      defaultkeyw tokval = Keyw(Default);
-      rbrace tokval = Grouper(RBrace);
-      while !done {
-        if equal(&peek(p)->val, &casekeyw) || equal(&peek(p)->val, &defaultkeyw) || equal(&peek(p)->val, &rbrace) {
-          // We disallow empty non-braced switch cases -- they look too much like
-          // fallthrough cases.
-          if count(&statements) == 0 {
-            return Fail;
-          }
-          body = {NotComputed, move(&statements)};
-          done = true;
-        } else {
-          st ast_statement;
-          #parse_statement(p, &st);
-          pushref(&statements, &st);
+  case Success:
+    void;
+  case Quickfail:
+    statements array[ast_statement];
+    done bool = false;
+    casekeyw tokval = Keyw(Case);
+    defaultkeyw tokval = Keyw(Default);
+    rbrace tokval = Grouper(RBrace);
+    while !done {
+      if equal(&peek(p)->val, &casekeyw) || equal(&peek(p)->val, &defaultkeyw) || equal(&peek(p)->val, &rbrace) {
+        // We disallow empty non-braced switch cases -- they look too much like
+        // fallthrough cases.
+        if count(&statements) == 0 {
+          return Fail;
         }
+        body = {NotComputed, move(&statements)};
+        done = true;
+      } else {
+        st ast_statement;
+        #parse_statement(p, &st);
+        pushref(&statements, &st);
       }
-    case Error:
-      return Fail;
+    }
+  case Error:
+    return Fail;
   }
   *out = {pattern, move(&body)};
   return Success;
@@ -1607,7 +1601,8 @@ enum triparse_result {
 func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_assignment, out *ast_statement_enum) parse_result {
   name ast_ident;
   switch triparse_ident(p, &name) {
-  case Success: { }
+  case Success:
+    void;
   case Error:
     return Fail;
   case Quickfail:

@@ -213,7 +213,8 @@ func st_divmod(x bigint, y bigint, op *primitive_numeric_op, div_out *bigint, mo
     return ERR(_u8("Static eval: divide by zero"));
   }
   switch op->op_numtraits.repr {
-  case Unsigned: { }
+  case Unsigned:
+    void;
   case SignedTwos:
     if y == -bigu(1) && x == op->op_numtraits.minval {
       return ERR(_u8("Static eval: divide minval by -1"));
@@ -265,8 +266,8 @@ func st_num_rangechecked_output(clq *clqueue, env *st_env, retvalref st_obj_ref,
     }
     // Make sure we know to handle some weird reprs later when we have them.
     switch op_numtraits->repr {
-    case Unsigned: { }
-    case SignedTwos: { }
+    case Unsigned: void;
+    case SignedTwos: void;
     }
     addand bigint = incr(op_numtraits->maxval - op_numtraits->minval);
     num = ((num - op_numtraits->minval) % addand) + op_numtraits->minval;

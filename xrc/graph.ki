@@ -207,7 +207,8 @@ func addx(gr *frame_graph, ctr *celltrack, op gr_xop) gr_num {
     case TwoExtraOps(ops gr_active_xop):
       gr_track_active_op(ctr, ops.op1);
       gr_track_active_op(ctr, ops.op2);
-    case StandardApply: { }
+    case StandardApply:
+      void;
     }
     gr_deactivate(ctr, a.funcell);
     for i size = 0; i < nparams; i = i + 1 {
@@ -301,7 +302,8 @@ func incr_indegree_for_adding_qop(gr *frame_graph, op *gr_qop) void {
     incr_indegree(gr, a.second);
   case &GrJmp(a gr_jmp):
     incr_indegree(gr, a.next);
-  case &GrQNop: { }
+  case &GrQNop:
+    void;
   }
 }
 
@@ -1401,8 +1403,10 @@ func gr_expr_after_discard_before(gs gr_statep, x *ast_expr, aft *ast_expr_after
   switch aft {
   case &DiscardTemporary(da destroy_action):
     add(bu, @[gr_xop]GrLive({whole_cell(x)}));
-  case &DiscardVirtualDead(c cell_num): { }
-  case &DiscardNothing: { }
+  case &DiscardVirtualDead(c cell_num):
+    void;
+  case &DiscardNothing:
+    void;
   }
 }
 
@@ -1416,7 +1420,8 @@ func gr_expr_after_discard(gs gr_statep, x *ast_expr, aft *ast_expr_after_discar
     add(bu, gn);
   case &DiscardVirtualDead(c cell_num):
     add(bu, @[gr_xop]GrVirtualDead({c}));
-  case &DiscardNothing: { }
+  case &DiscardNothing:
+    void;
   }
 }
 
@@ -1773,7 +1778,8 @@ func gr_deactivate(ctr *celltrack, c cell_num) void {
 
 func gr_track_active_op(ctr *celltrack, op gr_active_op) void {
   switch op {
-  case Nothing: { }
+  case Nothing:
+    void;
   case Activate(c cell_num):
     gr_activate(ctr, c);
   case Deactivate(c cell_num):
@@ -1955,15 +1961,18 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
 
   #gr_expr(gs, oo(&a->lhs), bu);
   switch un(&a->info) {
-  case &StaticSelfAssignment: { }
+  case &StaticSelfAssignment:
+    void;
   case &SimpleMoveAssignment(smi ast_simple_move_assignment_info):
     // rhs is an rvalue.
     add(bu, @[gr_xop]GrLive({whole_cell(oo(&a->rhs))}));
   case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info):
     // rhs is an rvalue.
     add(bu, @[gr_xop]GrLive({whole_cell(oo(&a->rhs))}));
-  case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): { }
-  case &ConditionalAssignment(ci ast_conditional_assignment_info): { }
+  case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info):
+    void;
+  case &ConditionalAssignment(ci ast_conditional_assignment_info):
+    void;
   }
 
   #gr_expr(gs, oo(&a->rhs), bu);
@@ -2162,7 +2171,8 @@ func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) v
   // Generally for rvalues we write constant values here -- we can activate *after* we've
   // written a constant value.  No atomic activation necessary.
   switch un(&a->name_info) {
-  case &LocalResolve(li local_info): { }
+  case &LocalResolve(li local_info):
+    void;
   case &GlobalResolve(gi global_info):
     add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstDef({gi.ent, gi.inst})}));
     add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
@@ -2189,11 +2199,11 @@ func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) v
 
 func ellval_desc(x *is_lval) *lval_description {
   switch x {
-    case &IsLvalYes(desc lval_description): { return &desc; }
-    case &IsLvalNo(desc rval_description): {
-      ice(_u8("lvalue_value_cell expects lvalue"));
-      return fake();
-    }
+  case &IsLvalYes(desc lval_description):
+    return &desc;
+  case &IsLvalNo(desc rval_description):
+    ice(_u8("lvalue_value_cell expects lvalue"));
+    return fake();
   }
 }
 
@@ -2215,16 +2225,14 @@ func rval_cell(x *ast_expr) cell_num {
 
 func rval_cell(x *is_lval) cell_num {
   switch x {
-    case &IsLvalNo(desc rval_description): {
-      if desc.whole_num != desc.partial_num {
-        ice(_u8("rval_cell on non-whole"));
-      }
-      return desc.whole_num;
+  case &IsLvalNo(desc rval_description):
+    if desc.whole_num != desc.partial_num {
+      ice(_u8("rval_cell on non-whole"));
     }
-    case &IsLvalYes(desc lval_description): {
-      ice(_u8("rval_cell sees lvalue"));
-      return fake();
-    }
+    return desc.whole_num;
+  case &IsLvalYes(desc lval_description):
+    ice(_u8("rval_cell sees lvalue"));
+    return fake();
   }
 }
 
@@ -2273,18 +2281,22 @@ func gr_maybe_virtualdead(gs gr_statep, c cell_num) opt[gr_num] {
 func gr_consume_actions_before(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) void {
   add(bu, @[gr_xop]GrAssertLive({result_cell(aft)}));
   switch &aft->actions {
-  case &ConsumeByInPlace: { }
+  case &ConsumeByInPlace:
+    void;
   case &ConsumeByCopyDestroy(cd copy_destroy_action):
     // It's an rvalue, we make the whole cell live before evaling.
     add(bu, @[gr_xop]GrLive({whole_cell(expr)}));
-  case &ConsumeByCopy(cc copy_consume): { }
-  case &ConsumeByMove(m move_action): { }
+  case &ConsumeByCopy(cc copy_consume):
+    void;
+  case &ConsumeByMove(m move_action):
+    void;
   }
 }
 
 func gr_consume_actions(gs gr_statep, expr *ast_expr, aft *ast_expr_after_consume, bu *sq_builder) void {
   switch &aft->actions {
-  case &ConsumeByInPlace: { }
+  case &ConsumeByInPlace:
+    void;
   case &ConsumeByCopyDestroy(cd copy_destroy_action):
     dep gr_num = gr_copy_action(gs, &cd.copy, BiCopy);
     add(bu, dep);
@@ -2741,7 +2753,7 @@ func gr_magic_enum_info(clq *clqueue, scope *type_scope, wc which_ctor, mei *mag
                         gr_out *frame_graph, gn_out *gr_num,
                         return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   cs *checkstate = clq->cs;
-  init_padding bool = false;
+  init_padding bool;
   switch wc {
   case CtorInit:
     ice(_u8("Magic CtorInit on enum type"));
@@ -2749,7 +2761,8 @@ func gr_magic_enum_info(clq *clqueue, scope *type_scope, wc which_ctor, mei *mag
     init_padding = true;
   case CtorMove:
     init_padding = true;
-  case CtorDestroy: { /* don't init padding. */ }
+  case CtorDestroy:
+    init_padding = false;
   }
   gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_info")), Computed(*scope));
   ctr celltrack = mk_celltrack();
@@ -2885,7 +2898,8 @@ func gr_magic_enum_info(clq *clqueue, scope *type_scope, wc which_ctor, mei *mag
       add(&sub_bu, @[gr_xop]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.x)}));
     case CtorMove:
       add(&sub_bu, @[gr_xop]GrWriteConst({get(&tagcells, 0), ConstInt(~ tagval.x)}));
-    case CtorDestroy: { }
+    case CtorDestroy:
+      void;
     }
 
     prepadding_ogn opt[gr_num]
@@ -3216,7 +3230,8 @@ func gr_bi_ctor(gs gr_statep, destnum cell_num, srcnum cell_num, cd *ctor_desc,
       add(&bu, @[gr_xop]GrActiveXop({Activate(destnum), Nothing}));
     case BiDeactivateSrcButMove:
       add(&bu, @[gr_xop]GrActiveXop({Deactivate(srcnum), Nothing}));
-    case BiNothingButCopy: { }
+    case BiNothingButCopy:
+      void;
     }
   case &FunCtor(ip instpair):
     gn gr_num = gr_bi_fun(gs, ip, destnum, srcnum, statechange);

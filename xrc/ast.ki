@@ -762,18 +762,17 @@ struct ast_expr {
 
 func annotate_info(a *ast_expr, info ast_expr_info) void {
   switch &a->info {
-    case &CompleteCheck(t ast_expr_complete_info): {
-      ice(_u8("expr already completely annotated"));
+  case &CompleteCheck(t ast_expr_complete_info):
+    ice(_u8("expr already completely annotated"));
+  case &IncompleteCheck:
+    switch &info {
+    case &CompleteCheck(t ast_expr_complete_info):
+      void;
+    default:
+      ice(_u8("expr already incompletely annotated"));
     }
-    case &IncompleteCheck: {
-      switch &info {
-        case &CompleteCheck(t ast_expr_complete_info): { /* Do nothing. */ }
-        default: {
-          ice(_u8("expr already incompletely annotated"));
-        }
-      }
-    }
-    case &NoInfo: { }
+  case &NoInfo:
+    void;
   }
 
   a->info = info;

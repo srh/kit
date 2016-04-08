@@ -291,8 +291,10 @@ func ds_lookup_constructor(ds *defscope, scope *type_scope, name sym, gp *genpar
   switch tri_decompose_typeapp(pt, primitive_function_puretype(ds->cs), &arg_type, &return_type) {
   case BadPuretype:
     switch pt {
-    case &TeName(te te_name): { }
-    case &TeApp(te te_typeapp): { }
+    case &TeName(te te_name):
+      void;
+    case &TeApp(te te_typeapp):
+      void;
     case &TeUnknown:
       return NoFail(AmbigMatchConstructor);
     default:
@@ -306,7 +308,8 @@ func ds_lookup_constructor(ds *defscope, scope *type_scope, name sym, gp *genpar
     switch structural_enumspec(ds, pt, &et) {
     case Error(pm):
       return Unprinted(pm);
-    case Success: { }
+    case Success:
+      void;
     case NotAccessible:
       return NoFail(NoMatchConstructor);
     }
@@ -333,7 +336,8 @@ func ds_lookup_constructor(ds *defscope, scope *type_scope, name sym, gp *genpar
     switch structural_enumspec(ds, &cac_return_type.te, &et) {
     case Error(pm):
       return Unprinted(pm);
-    case Success: { }
+    case Success:
+      void;
     case NotAccessible:
       return NoFail(NoMatchConstructor);
     }
@@ -371,7 +375,8 @@ func lookup_or_make_enum_constructor_def(ds *defscope, scope *type_scope, et *en
     res match_def_res;
     #match_def(ds->cs, defname, scope, &nogp, ctor_type, &res);
     switch &res {
-    case &NoMatch: { } // Do nothing.
+    case &NoMatch:
+      void;
     case &MultiMatch:
       ice(_u8("magic_enum_ctor lookup sees MultiMatch"));
     case &OneMatch(m ent_and_parms):
@@ -1360,7 +1365,8 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
     switch structural_structspec(es->ds, pt, &b) {
     case Error(pm):
       return Unprinted(pm);
-    case Success: { }
+    case Success:
+      void;
     case NotAccessible:
       return MERR(es->cs, a->meta, _u8("Strinit for inaccessible or non-structural type, "), pretty(es->im, pt));
     }
@@ -1478,12 +1484,10 @@ func help_check_lambda_body(ds *defscope, scope *type_scope, return_type *cu_typ
 
 func numeric_literal_value(a *ast_numeric_literal) bigint {
   switch a {
-    case &HexLiteral(b ast_hex_literal): {
-      return convert_to_bigint(16, &b.digits);
-    }
-    case &DecLiteral(b ast_dec_literal): {
-      return convert_to_bigint(10, &b.digits);
-    }
+  case &HexLiteral(b ast_hex_literal):
+    return convert_to_bigint(16, &b.digits);
+  case &DecLiteral(b ast_dec_literal):
+    return convert_to_bigint(10, &b.digits);
   }
 }
 

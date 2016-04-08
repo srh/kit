@@ -351,7 +351,8 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
   switch structural_enumspec(es->ds, switchable_type, &et) {
   case Error(pm):
     return Unprinted(pm);
-  case Success: { }
+  case Success:
+    void;
   case NotAccessible:
     return ERR(_u8("Inaccessible rhs hit or non-enum type in swartch"));
   }

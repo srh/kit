@@ -1152,8 +1152,10 @@ func inst_type(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id)
   switch &ent->generics {
   case &TeNoGenerics:
     return ~@[te_typeexpr]TeName({ent->name, Has({ent_id, inst_id})});
-  case &TeHasGenerics(a shray[te_generik]): { }
-  case &TeVariadicGenerics(a te_variadic_generics): { }
+  case &TeHasGenerics(a shray[te_generik]):
+    void;
+  case &TeVariadicGenerics(a te_variadic_generics):
+    void;
   }
   cu_params *shray[cu_typeexpr] = &inst->parms.repls.tys;
   te_params array[te_typeexpr];
@@ -1749,7 +1751,8 @@ func lookup_plain_name(arr *shray[te_generik], x sym) opt[size] {
       if b == x {
         return Has(i);
       }
-    case &TeIpseGeneric(b te_ipse_generik): { }
+    case &TeIpseGeneric(b te_ipse_generik):
+      void;
     }
   }
   return None;
@@ -1759,7 +1762,8 @@ func lookup_ipse_name(arr *shray[te_generik], x sym) opt[tup[size, *te_ipse_gene
   n size = count(arr);
   for i size = 0; i < n; i = i + 1 {
     switch &arr[i] {
-    case &TePlainGeneric(b sym): { }
+    case &TePlainGeneric(b sym):
+      void;
     case &TeIpseGeneric(b te_ipse_generik):
       if b.name == x {
         return Has({i, &b});

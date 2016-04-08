@@ -7,7 +7,7 @@ struct treestate {
 }
 
 func mk_treestate() treestate {
-  return { };
+  return {};
 }
 
 func ts_xop(ts *treestate, op *gr_xop) np {

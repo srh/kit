@@ -132,7 +132,8 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
             *disp = HasConstValue(a.value);
           case &HasConstValue(gc gr_const):
             *disp = NotConst;
-          case &NotConst: { }
+          case &NotConst:
+            void;
           }
         }
       case &GrAddressof(a gr_addressof):
@@ -148,13 +149,15 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
         mark_cell_not_const(bas, a.partof);
         mark_cell_value_used(bas, a.name);
         mark_cell_value_used(bas, a.partof);
-       default: { }
+      default:
+        void;
       }
     case &QOp(qn gr_qnode):
       switch &qn.op {
       case &GrBranch(a gr_branch):
         mark_cell_value_used(bas, a.src);
-      default: { }
+      default:
+        void;
       }
     }
   }

@@ -535,8 +535,10 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
 
 
       // TODO: We could track active/inactive cells at eval-time too. (It's a useful assertion.)
-      case &GrActiveXop(a gr_active_xop): { }
-      case &GrManyActiveXop(a gr_many_active_xop): { }
+      case &GrActiveXop(a gr_active_xop):
+        void;
+      case &GrManyActiveXop(a gr_many_active_xop):
+        void;
       }
 
     case &QOp(qn gr_qnode):
@@ -574,7 +576,8 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
       case &GrJmp(a gr_jmp):
         push(&stack, a.next.x);
 
-      case &GrQNop: { }
+      case &GrQNop:
+        void;
       }
     }
   }

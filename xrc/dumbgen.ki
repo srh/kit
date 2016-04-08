@@ -141,7 +141,9 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
     if !celltrack_is_empty(&ctr) {
       ice(_u8("fn_body leaves cells alive or active, saw "), to_u8str(cs->im, ctr));
     }
-  case &NonTerminal: { /* nothing to assert */ }
+  case &NonTerminal:
+    // nothing to assert
+    void;
   }
 
   #dumbly_layout_frame_cells(g, &h);
@@ -344,18 +346,23 @@ func duck_conflicting_cells(h *frame, c cell_num, bumpline *i32, offsets *array[
   for i size = 0; i < nconflicting; i = i + 1 {
     d cell_num = get(&c_disp->conflicting, i);
     switch ref(offsets, d.x) {
-    case &Nope: { }
+    case &Nope:
+      void;
     case &Has(loc cell_loc):
       switch &loc {
       case &DirectLoc(x i32):
         bline = min(bline, x);
       case &IndirectLoc(x i32):
         bline = min(bline, x);
-      case &ConstFuncellLoc(fnid fn_body_id): { }
-      case &ConstIntCellLoc(b bigint): { }
-      case &UnusedLoc: { }
+      case &ConstFuncellLoc(fnid fn_body_id):
+        void;
+      case &ConstIntCellLoc(b bigint):
+        void;
+      case &UnusedLoc:
+        void;
       }
-    case &StaticSubcell(p2 tup[cell_num, u32]): { }
+    case &StaticSubcell(p2 tup[cell_num, u32]):
+      void;
     }
   }
   *bumpline = bline;
@@ -448,9 +455,9 @@ func is_const_primop_int_cell(h *frame, c cell_num) opt[bigint] {
           case &ConstInt(b bigint):
             return Has(b);
           // TODO: For some (all) of these other cases, we could produce a const st_value.
-          case &ConstDef(ip instpair): { }
-          case &ConstFnBody(fnid fn_body_id): { }
-          case &ConstBytes(b shray[u8]): { }
+          case &ConstDef(ip instpair): void;
+          case &ConstFnBody(fnid fn_body_id): void;
+          case &ConstBytes(b shray[u8]): void;
           }
         }
       }
@@ -767,8 +774,8 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         case &GrWriteConst(a gr_writeconst):
           dest_loc cell_loc = get_loc(h, a.dest);
           switch &dest_loc {
-          case &ConstFuncellLoc(id fn_body_id): { }
-          case &ConstIntCellLoc(b bigint): { }
+          case &ConstFuncellLoc(id fn_body_id): void;
+          case &ConstIntCellLoc(b bigint): void;
           default:
             dest_ci *cell_info = ref_cell(h->gr, a.dest);
             value st_value;
@@ -785,22 +792,21 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           x86_store32(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX);
         case &GrSubcell(a gr_subcell):
           switch get_loc(h, a.name) {
-          case DirectLoc(off i32): { }
+          case DirectLoc(off i32):
+            void;
           case IndirectLoc(off i32):
             x86_load_cell_address(f, h, X86_EAX, a.partof);
             x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
             x86_store32(f, X86_EBP, off, X86_EAX);
           }
-        case &GrLive(a gr_live): { }
-          // Do nothing.  (This graph node is used for static eval, book keeping, etc.)
-        case &GrAssertLive(a gr_assert_live): { }
-          // Do nothing.
-        case &GrDead(a gr_dead): { }
-          // Do nothing.  (Likewise.)
-        case &GrVirtualDead(a gr_virtual_dead): { }
-          // Do nothing.  (Likewise.)
-        case &GrActiveXop(a gr_active_xop): { }
-        case &GrManyActiveXop(a gr_many_active_xop): { }
+
+        // These cases do nothing here -- they're for static eval, book-keeping, etc.
+        case &GrLive(a gr_live): void;
+        case &GrAssertLive(a gr_assert_live): void;
+        case &GrDead(a gr_dead): void;
+        case &GrVirtualDead(a gr_virtual_dead): void;
+        case &GrActiveXop(a gr_active_xop): void;
+        case &GrManyActiveXop(a gr_many_active_xop): void;
         }
 
       case &QOp(qn gr_qnode):

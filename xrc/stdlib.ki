@@ -196,13 +196,13 @@ func[T] unHas(p opt[T]) T {
 
 func[T] `==`(x opt[T], y opt[T]) bool {
   switch &x {
-    case &None: {
-      if case &None(u) = &y { return true; }
+  case &None:
+    if case &None(u) = &y {
+      return true;
     }
-    case &Has(a T): {
-      if case &Has(b T) = &y {
-        return a == b;
-      }
+  case &Has(a T):
+    if case &Has(b T) = &y {
+      return a == b;
     }
   }
   return false;
