@@ -269,6 +269,8 @@ enum type_matches_res {
 
 struct unif_parms {
   tys shray[te_typeexpr];
+  // They _start out_ dirty -- verify_matches_oftypes de-dirties some.
+  // (The reason is, "dirty" means "consider smashing its oftype with a generic oftype" right now.  This could change later.)
   dirty shray[bool];
 }
 
@@ -300,12 +302,12 @@ func type_matches(scope *type_scope, parms *shray[te_typeexpr], pt *te_typeexpr,
   if !unify_under_generics(scope, &up, pt, names, t, &info, &emissions, &unified) {
     return TypeDoesNotMatch;
   }
-  if !all_complete_computed(&up.tys).complete {
-    return TypeMatchesAmbiguously;
-  }
   if !verify_matches_oftypes(scope, &up, names, &emissions) {
     // SCOPE(): Probably should just kill the type checking -- matches-but-invalid.
     return TypeDoesNotMatch;
+  }
+  if !all_complete_computed(&up.tys).complete {
+    return TypeMatchesAmbiguously;
   }
   return TypeMatchesPrecisely({up.tys, freeze(&emissions)});
 }
@@ -313,19 +315,30 @@ func type_matches(scope *type_scope, parms *shray[te_typeexpr], pt *te_typeexpr,
 func verify_matches_oftypes(scope *type_scope, up *unif_parms, names *shray[te_generik], emissions_app *array[unify_emission]) bool {
   n size = count(names);
   check(n == count(&up->tys));
-  for i size = 0; i < n; i++ {
-    if case &TeIpseGeneric(tig te_ipse_generik) = &names[i] {
-      if case &TeIpse(ti te_ipse) = &up->tys[i] {
-        ui_oftype cu_typeexpr = scope_lookup(scope, ti.name);
-        // As in type_matches, since oftypes are complete, unified is irrelevant and must be identical to t.
-        info unify_information = mk_fresh_info();
-        unified te_typeexpr;
-        if !unify_under_generics(scope, up, &ui_oftype.x, names, &tig.oftype, &info, emissions_app, &unified) {
-          return false;
+  reloop bool = true;
+  while reloop {
+    reloop = false;
+    for i size = 0; i < n; i++ {
+      if case &TeIpseGeneric(tig te_ipse_generik) = &names[i] {
+        if up->dirty[i] {
+          up->dirty[i] = false;
+          switch &up->tys[i] {
+          case &TeIpse(ti te_ipse):
+            ui_oftype cu_typeexpr = scope_lookup(scope, ti.name);
+            // As in type_matches, since oftypes are complete, unified is irrelevant and must be identical to t.
+            info unify_information = mk_fresh_info();
+            unified te_typeexpr;
+            if !unify_under_generics(scope, up, &ui_oftype.x, names, &tig.oftype, &info, emissions_app, &unified) {
+              return false;
+            }
+            check(!info.updated);
+            reloop = true;
+          case &TeUnknown:
+            void;
+          default:
+            ice(_u8("verify_matches_oftypes sees non-ipse unif_parm"));
+          }
         }
-        check(!info.updated);
-      } else {
-        ice(_u8("verify_matches_oftypes sees non-ipse unif_parm"));
       }
     }
   }
