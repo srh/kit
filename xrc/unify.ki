@@ -30,7 +30,7 @@ func mk_fresh_info() unify_information {
 // reconstruct the correct values later.)
 //
 // _appends_ emissions onto emissions_app.
-func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt *te_typeexpr,
+func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
                           names *shray[te_generik], t *te_typeexpr,
                           info_app *unify_information,
                           emissions_app *array[unify_emission],
@@ -52,10 +52,10 @@ func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt 
     case &TeName(a te_name): {
       if case Has(ix size) = lookup_plain_name(names, a.value) {
         unified te_typeexpr;
-        if !unify_types(scope, &unif_parms[ix], pt, emissions_app, &unified) {
+        if !unify_types(scope, &up->tys[ix], pt, emissions_app, &unified) {
           return false;
         }
-        unif_parms[ix] = unified;
+        up->tys[ix] = unified;
         *unified_out = TeName({a.value, None});
         return true;
       } else {
@@ -89,7 +89,7 @@ func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt 
         reserve(&unified_params, n);
         for i size = 0; i < n; i = i + 1 {
           unified te_typeexpr;
-          if !unify_under_generics(scope, unif_parms, &pa_params[i], names, &a_params[i], info_app, emissions_app, &unified) {
+          if !unify_under_generics(scope, up, &pa_params[i], names, &a_params[i], info_app, emissions_app, &unified) {
             return false;
           }
           push(&unified_params, unified);
@@ -115,7 +115,7 @@ func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt 
             return false;
           }
           unified te_typeexpr;
-          if !unify_under_generics(scope, unif_parms, &pd->type, names, &d->type, info_app, emissions_app, &unified) {
+          if !unify_under_generics(scope, up, &pd->type, names, &d->type, info_app, emissions_app, &unified) {
             return false;
           }
           push(&unified_fields, {d->name, unified});
@@ -144,7 +144,7 @@ func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt 
           unified_count = pa.count;
         }
         unified_type te_typeexpr;
-        if !unify_under_generics(scope, unif_parms, oo(&pa.param), names, oo(&a.param), info_app, emissions_app, &unified_type) {
+        if !unify_under_generics(scope, up, oo(&pa.param), names, oo(&a.param), info_app, emissions_app, &unified_type) {
           return false;
         }
         *unified_out = TeArraytype({unified_count, emshp(unified_type)});
@@ -160,10 +160,10 @@ func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt 
       if case Has(ixtup tup[size, *te_ipse_generik]) = lookup_ipse_name(names, a.name) {
         // SCOPE(): We don't actually use the generik oftype at all!
         unified te_typeexpr;
-        if !unify_types(scope, &unif_parms[ixtup.car], pt, emissions_app, &unified) {
+        if !unify_types(scope, &up->tys[ixtup.car], pt, emissions_app, &unified) {
           return false;
         }
-        unif_parms[ixtup.car] = unified;
+        up->tys[ixtup.car] = unified;
         *unified_out = TeIpse({a.name});
         return true;
       } else {
@@ -234,8 +234,8 @@ func unify_types(scope *type_scope, pta *te_typeexpr, ptb *te_typeexpr, emission
 
 func unify_types(scope *type_scope, pta *te_typeexpr, ptb *te_typeexpr, info_app *unify_information, emissions_app *array[unify_emission], out *te_typeexpr) bool {
   names shray[te_generik];
-  unif_parms shray[te_typeexpr];
-  return unify_under_generics(scope, &unif_parms, pta, &names, ptb, info_app, emissions_app, out);
+  up unif_parms = mk_empty_unif_parms();
+  return unify_under_generics(scope, &up, pta, &names, ptb, info_app, emissions_app, out);
 }
 
 func unifies(complete *te_typeexpr, pt *te_typeexpr) bool {
@@ -263,6 +263,20 @@ enum type_matches_res {
   TypeMatchesPrecisely type_matches_precisely;
 }
 
+struct unif_parms {
+  tys shray[te_typeexpr];
+}
+
+// Makes a _copy_ of parms.
+func mk_unif_parms(parms *shray[te_typeexpr]) unif_parms {
+  tmp array[te_typeexpr] = mk_copy(parms);
+  return {freeze(&tmp)};
+}
+
+func mk_empty_unif_parms() unif_parms {
+  return {mk_shray()};
+}
+
 // t is complete, but it references the generic names in "names", whose corresponding
 // values in "parms" could be incomplete.  pt is the partial type of an expression we're
 // matching against this generic definition.  count(parms) == count(names).
@@ -272,37 +286,35 @@ func type_matches(scope *type_scope, parms *shray[te_typeexpr], pt *te_typeexpr,
   // We need to retain all new information we gain about the value of the generic param
   // typeexprs as we compare the whole type, in order to make sure we don't match
   // conflicting information about a generic parameter.
-  unif_parms_tmp array[te_typeexpr] = mk_copy(parms);
-  // unif_parms has a fixed size, we pre-freeze it -- it's not immutable until unify_under_generics returns.
-  unif_parms shray[te_typeexpr] = freeze(&unif_parms_tmp);
+  up unif_parms = mk_unif_parms(parms);
   // Since t is complete, unified is irrelevant and must be identical to t.  Might become untrue if ipses unify into a fresh ipse value.
   unified te_typeexpr;
   info unify_information = mk_fresh_info();
   emissions array[unify_emission];
-  if !unify_under_generics(scope, &unif_parms, pt, names, t, &info, &emissions, &unified) {
+  if !unify_under_generics(scope, &up, pt, names, t, &info, &emissions, &unified) {
     return TypeDoesNotMatch;
   }
-  if !all_complete_computed(&unif_parms).complete {
+  if !all_complete_computed(&up.tys).complete {
     return TypeMatchesAmbiguously;
   }
-  if !verify_matches_oftypes(scope, &unif_parms, names, &emissions) {
+  if !verify_matches_oftypes(scope, &up, names, &emissions) {
     // SCOPE(): Probably should just kill the type checking -- matches-but-invalid.
     return TypeDoesNotMatch;
   }
-  return TypeMatchesPrecisely({unif_parms, freeze(&emissions)});
+  return TypeMatchesPrecisely({up.tys, freeze(&emissions)});
 }
 
-func verify_matches_oftypes(scope *type_scope, unif_parms *shray[te_typeexpr], names *shray[te_generik], emissions_app *array[unify_emission]) bool {
+func verify_matches_oftypes(scope *type_scope, up *unif_parms, names *shray[te_generik], emissions_app *array[unify_emission]) bool {
   n size = count(names);
-  check(n == count(unif_parms));
+  check(n == count(&up->tys));
   for i size = 0; i < n; i++ {
     if case &TeIpseGeneric(tig te_ipse_generik) = &names[i] {
-      if case &TeIpse(ti te_ipse) = &unif_parms[i] {
+      if case &TeIpse(ti te_ipse) = &up->tys[i] {
         ui_oftype cu_typeexpr = scope_lookup(scope, ti.name);
         // As in type_matches, since oftypes are complete, unified is irrelevant and must be identical to t.
         info unify_information = mk_fresh_info();
         unified te_typeexpr;
-        if !unify_under_generics(scope, unif_parms, &ui_oftype.x, names, &tig.oftype, &info, emissions_app, &unified) {
+        if !unify_under_generics(scope, up, &ui_oftype.x, names, &tig.oftype, &info, emissions_app, &unified) {
           return false;
         }
         check(!info.updated);
