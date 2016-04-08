@@ -9,22 +9,22 @@ func canonicalized_pack(pack *te_instpack) te_instpack {
   return *pack;
 }
 
-func canonicalized_ipse_sym(im *identmap, s_scope *type_scope, s sym, ipse_names_append *array[sym], canonicalized_scope_append *type_scope) sym {
-  if case Has(ix size) = find(ipse_names_append, s) {
+func canonicalized_ipse_sym(im *identmap, s_scope *type_scope, s sym, ipse_names_app *array[sym], canonicalized_scope_app *type_scope) sym {
+  if case Has(ix size) = find(ipse_names_app, s) {
     return make_canonicalized_ipse_name(im, ix);
   } else {
-    n size = count(ipse_names_append);
-    push(ipse_names_append, s);
+    n size = count(ipse_names_app);
+    push(ipse_names_app, s);
     ret sym = make_canonicalized_ipse_name(im, n);
-    scope_add(canonicalized_scope_append, ret, scope_lookup(s_scope, s));
+    scope_add(canonicalized_scope_app, ret, scope_lookup(s_scope, s));
     return ret;
   }
 }
 
-func canonicalized_app_pack(im *identmap, pack_scope *type_scope, pack *te_app_pack, ipse_names_append *array[sym], canonicalized_scope_append *type_scope) te_app_pack {
+func canonicalized_app_pack(im *identmap, pack_scope *type_scope, pack *te_app_pack, ipse_names_app *array[sym], canonicalized_scope_app *type_scope) te_app_pack {
   build array[sym];
   foreach s sym in elems(&pack->ipse_mappings) {
-    push(&build, canonicalized_ipse_sym(im, pack_scope, s, ipse_names_append, canonicalized_scope_append));
+    push(&build, canonicalized_ipse_sym(im, pack_scope, s, ipse_names_app, canonicalized_scope_app));
   }
 
   return {pack->teip, freeze(&build)};
@@ -41,7 +41,7 @@ func make_canonicalized_ipse_name(im *identmap, ix size) sym {
   return intern(im, from_u8(&b));
 }
 
-func canonicalize_idy_ipses(im *identmap, t_scope *type_scope, t *te_typeexpr, out *te_typeexpr, ipse_names_append *array[sym], canonicalized_scope_append *type_scope) void {
+func canonicalize_idy_ipses(im *identmap, t_scope *type_scope, t *te_typeexpr, out *te_typeexpr, ipse_names_app *array[sym], canonicalized_scope_app *type_scope) void {
   switch t {
   case &TeName(a te_name):
     *out = TeName({a.value, Has!canonicalized_pack(unHas!&a.pack)});
@@ -50,32 +50,32 @@ func canonicalize_idy_ipses(im *identmap, t_scope *type_scope, t *te_typeexpr, o
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
       tmp te_typeexpr;
-      canonicalize_idy_ipses(im, t_scope, ref(&a.params, i), &tmp, ipse_names_append, canonicalized_scope_append);
+      canonicalize_idy_ipses(im, t_scope, ref(&a.params, i), &tmp, ipse_names_app, canonicalized_scope_app);
       push(&newparams, tmp);
     }
-    *out = TeApp({a.typefunc, freeze(&newparams), Has!canonicalized_app_pack(im, t_scope, unHas!&a.pack, ipse_names_append, canonicalized_scope_append)});
+    *out = TeApp({a.typefunc, freeze(&newparams), Has!canonicalized_app_pack(im, t_scope, unHas!&a.pack, ipse_names_app, canonicalized_scope_app)});
   case &TeUnion(a te_union):
     // Honestly, a union having ipses would be pretty weird.
-    *out = TeUnion({canonicalize_idy_vardecls(im, t_scope, &a.fields, ipse_names_append, canonicalized_scope_append)});
+    *out = TeUnion({canonicalize_idy_vardecls(im, t_scope, &a.fields, ipse_names_app, canonicalized_scope_app)});
   case &TeArraytype(a te_arraytype):
     count opt[u32] = canonicalize_arraytype_count(&a.count);
     param shp[te_typeexpr];
-    canonicalize_idy_ipses(im, t_scope, oo(&a.param), oo(&param), ipse_names_append, canonicalized_scope_append);
+    canonicalize_idy_ipses(im, t_scope, oo(&a.param), oo(&param), ipse_names_app, canonicalized_scope_app);
     *out = TeArraytype({count, param});
   case &TeIpse(a te_ipse):
-    *out = TeIpse({canonicalized_ipse_sym(im, t_scope, a.name, ipse_names_append, canonicalized_scope_append)});
+    *out = TeIpse({canonicalized_ipse_sym(im, t_scope, a.name, ipse_names_app, canonicalized_scope_app)});
   case &TeUnknown:
     ice(_u8("canonicalize_idy_ipses sees TeUnknown."));
   }
 }
 
-func canonicalize_idy_vardecls(im *identmap, t_scope *type_scope, a *shray[te_vardecl], ipse_names_append *array[sym], canonicalized_scope_append *type_scope) shray[te_vardecl] {
+func canonicalize_idy_vardecls(im *identmap, t_scope *type_scope, a *shray[te_vardecl], ipse_names_app *array[sym], canonicalized_scope_app *type_scope) shray[te_vardecl] {
   build array[te_vardecl];
   n size = count(a);
   for i size = 0; i < n; i = i + 1 {
     decl *te_vardecl = ref(a, i);
     tmp te_typeexpr;
-    canonicalize_idy_ipses(im, t_scope, &decl->type, &tmp, ipse_names_append, canonicalized_scope_append);
+    canonicalize_idy_ipses(im, t_scope, &decl->type, &tmp, ipse_names_app, canonicalized_scope_app);
     push(&build, {decl->name, tmp});
   }
   return freeze(&build);

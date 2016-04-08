@@ -887,10 +887,10 @@ func enum_field_ipse(es *framescope, outer_ipse te_typeexpr, inner_cu cu_typeexp
 // Varnames aren't supposed to shadow, so... we have user-friendly ipse names.  (Note
 // that vars could shadow generic ipse parameters, for now, so we add the $var_
 // prefix.)
-func varname_ipse(es *framescope, name sym, oftype cu_typeexpr, scope_append *type_scope) te_typeexpr {
+func varname_ipse(es *framescope, name sym, oftype cu_typeexpr, scope_app *type_scope) te_typeexpr {
   n sym = intern(es->im, _s("$var_") + lookup(es->im, name) + _s("_") + from_u8(to_u8str(es->ipse_gen_counter)));
   es->ipse_gen_counter++;
-  scope_add(scope_append, n, oftype);
+  scope_add(scope_app, n, oftype);
   return TeIpse({n});
 }
 

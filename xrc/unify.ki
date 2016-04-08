@@ -19,10 +19,10 @@ enum unify_emission {
 // parameter when we've halfway-processed the type -- the caller can and should
 // reconstruct the correct values later.)
 //
-// _appends_ emissions onto emissions_append.
+// _appends_ emissions onto emissions_app.
 func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt *te_typeexpr,
                           names *shray[te_generik], t *te_typeexpr,
-                          emissions_append *array[unify_emission],
+                          emissions_app *array[unify_emission],
                           unified_out *te_typeexpr) bool {
   if case &TeUnknown = pt {
     // It's worth pointing out:  This _is_ correct behavior if t is a generic parameter.
@@ -33,7 +33,7 @@ func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt 
     case &TeName(a te_name): {
       if case Has(ix size) = lookup_plain_name(names, a.value) {
         unified te_typeexpr;
-        if !unify_types(scope, &unif_parms[ix], pt, emissions_append, &unified) {
+        if !unify_types(scope, &unif_parms[ix], pt, emissions_app, &unified) {
           return false;
         }
         unif_parms[ix] = unified;
@@ -70,7 +70,7 @@ func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt 
         reserve(&unified_params, n);
         for i size = 0; i < n; i = i + 1 {
           unified te_typeexpr;
-          if !unify_under_generics(scope, unif_parms, &pa_params[i], names, &a_params[i], emissions_append, &unified) {
+          if !unify_under_generics(scope, unif_parms, &pa_params[i], names, &a_params[i], emissions_app, &unified) {
             return false;
           }
           push(&unified_params, unified);
@@ -96,7 +96,7 @@ func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt 
             return false;
           }
           unified te_typeexpr;
-          if !unify_under_generics(scope, unif_parms, &pd->type, names, &d->type, emissions_append, &unified) {
+          if !unify_under_generics(scope, unif_parms, &pd->type, names, &d->type, emissions_app, &unified) {
             return false;
           }
           push(&unified_fields, {d->name, unified});
@@ -125,7 +125,7 @@ func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt 
           unified_count = pa.count;
         }
         unified_type te_typeexpr;
-        if !unify_under_generics(scope, unif_parms, oo(&pa.param), names, oo(&a.param), emissions_append, &unified_type) {
+        if !unify_under_generics(scope, unif_parms, oo(&pa.param), names, oo(&a.param), emissions_app, &unified_type) {
           return false;
         }
         *unified_out = TeArraytype({unified_count, emshp(unified_type)});
@@ -141,7 +141,7 @@ func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt 
       if case Has(ixtup tup[size, *te_ipse_generik]) = lookup_ipse_name(names, a.name) {
         // SCOPE(): We don't actually use the generik oftype at all!
         unified te_typeexpr;
-        if !unify_types(scope, &unif_parms[ixtup.car], pt, emissions_append, &unified) {
+        if !unify_types(scope, &unif_parms[ixtup.car], pt, emissions_app, &unified) {
           return false;
         }
         unif_parms[ixtup.car] = unified;
@@ -157,11 +157,11 @@ func unify_under_generics(scope *type_scope, unif_parms *shray[te_typeexpr], pt 
 
             // unified_oftype is unnecessary, we're unifying complete types just to check equivalence.
             unified_oftype te_typeexpr;
-            if !unify_types(scope, &a_oftype.x, &pa_oftype.x, emissions_append, &unified_oftype) {
+            if !unify_types(scope, &a_oftype.x, &pa_oftype.x, emissions_app, &unified_oftype) {
               return false;
             }
 
-            push(emissions_append, @[unify_emission]SameIpse({a.name, pa.name}));
+            push(emissions_app, @[unify_emission]SameIpse({a.name, pa.name}));
           } else {
             // Just to assert the scope actually has the name.
             discard cu_typeexpr = scope_lookup(scope, a.name);
@@ -204,10 +204,10 @@ func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) boo
   }
 }
 
-func unify_types(scope *type_scope, pta *te_typeexpr, ptb *te_typeexpr, emissions_append *array[unify_emission], out *te_typeexpr) bool {
+func unify_types(scope *type_scope, pta *te_typeexpr, ptb *te_typeexpr, emissions_app *array[unify_emission], out *te_typeexpr) bool {
   names shray[te_generik];
   unif_parms shray[te_typeexpr];
-  return unify_under_generics(scope, &unif_parms, pta, &names, ptb, emissions_append, out);
+  return unify_under_generics(scope, &unif_parms, pta, &names, ptb, emissions_app, out);
 }
 
 func unifies(complete *te_typeexpr, pt *te_typeexpr) bool {
@@ -263,7 +263,7 @@ func type_matches(scope *type_scope, parms *shray[te_typeexpr], pt *te_typeexpr,
   return TypeMatchesPrecisely({unif_parms, freeze(&emissions)});
 }
 
-func verify_matches_oftypes(scope *type_scope, unif_parms *shray[te_typeexpr], names *shray[te_generik], emissions_append *array[unify_emission]) bool {
+func verify_matches_oftypes(scope *type_scope, unif_parms *shray[te_typeexpr], names *shray[te_generik], emissions_app *array[unify_emission]) bool {
   n size = count(names);
   check(n == count(unif_parms));
   for i size = 0; i < n; i++ {
@@ -272,7 +272,7 @@ func verify_matches_oftypes(scope *type_scope, unif_parms *shray[te_typeexpr], n
         ui_oftype cu_typeexpr = scope_lookup(scope, ti.name);
         // As in type_matches, since oftypes are complete, unified is irrelevant and must be identical to t.
         unified te_typeexpr;
-        if !unify_under_generics(scope, unif_parms, &ui_oftype.x, names, &tig.oftype, emissions_append, &unified) {
+        if !unify_under_generics(scope, unif_parms, &ui_oftype.x, names, &tig.oftype, emissions_app, &unified) {
           return false;
         }
       } else {
