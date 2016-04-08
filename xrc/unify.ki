@@ -319,9 +319,10 @@ func verify_matches_oftypes(scope *type_scope, up *unif_parms, names *shray[te_g
   while reloop {
     reloop = false;
     for i size = 0; i < n; i++ {
-      if case &TeIpseGeneric(tig te_ipse_generik) = &names[i] {
-        if up->dirty[i] {
-          up->dirty[i] = false;
+      if up->dirty[i] {
+        up->dirty[i] = false;
+        switch &names[i] {
+        case &TeIpseGeneric(tig te_ipse_generik):
           switch &up->tys[i] {
           case &TeIpse(ti te_ipse):
             ui_oftype cu_typeexpr = scope_lookup(scope, ti.name);
@@ -336,7 +337,13 @@ func verify_matches_oftypes(scope *type_scope, up *unif_parms, names *shray[te_g
           case &TeUnknown:
             void;
           default:
-            ice(_u8("verify_matches_oftypes sees non-ipse unif_parm"));
+            // (A) I _thought_ this was only reachable for match_deftype, but now I think user-supplied parms to match_def could also create this fail.
+            return false;
+          }
+        case &TePlainGeneric(s sym):
+          if case &TeIpse(ti te_ipse) = &up->tys[i] {
+            // See (A) ^^, likewise.
+            return false;
           }
         }
       }
