@@ -643,24 +643,43 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
   }
 }
 
-func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typeexpr]]) bool {
-  // SCOPE(): Um.  Arity is no longer a number -- we have to match ipses, their oftypes have to match, everything has to unify.
+func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typeexpr]], emissions_out *array[unify_emission], learned_params_out *opt[shray[te_typeexpr]]) bool {
   // SCOPE(): We should have a "correct number of parameters but fails" result.
 
   switch a {
   case &TeNoGenerics:
     if case None = params {
+      *emissions_out = mk_array();
+      *learned_params_out = None;
       return true;
     }
   case &TeHasGenerics(sh shray[te_generik]):
-    // SCOPE(): No.
-    if case Has(p) = params {
-      return count(p) == count(&sh);
+    if case Has(p *shray[te_typeexpr]) = params {
+      n size = count(p);
+      if n != count(&sh) {
+        return false;
+      }
+
+      up unif_parms = mk_unif_parms(p);
+      // EMISSIONS() SCOPE() Emit emissions.
+      // Also emit newly learned type information?
+      emissions array[unify_emission];
+      if !verify_matches_oftypes(scope, &up, &sh, &emissions) {
+        return false;
+      }
+      swap(emissions_out, &emissions);
+      *learned_params_out = Has(up.tys);
+      return true;
     }
   case &TeVariadicGenerics(vg te_variadic_generics):
     // SCOPE(): No.
     if case Has(p) = params {
-      return count(&vg.before) + count(&vg.after) <= count(p);
+      if count(&vg.before) + count(&vg.after) <= count(p) {
+        cp array[te_typeexpr] = mk_copy(p);
+        *emissions_out = mk_array();
+        *learned_params_out = Has(freeze(&cp));
+        return true;
+      }
     }
   }
   return false;
@@ -682,7 +701,11 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, para
     for i size = 0; i < n; i = i + 1 {
       id deftype_entry_id = arr[i];
       ent *deftype_entry = ref_deftype_entry(cs, id);
-      if arity_matches(scope, &ent->generics, params) {
+      // SCOPE(): Emit the learned params.
+      learned opt[shray[te_typeexpr]];
+      // EMISSIONS() SCOPE(): Emit emissions.
+      emissions array[unify_emission];
+      if arity_matches(scope, &ent->generics, params, &emissions, &learned) {
         if case Has(alt_id) = match {
           return ERR(_u8("Multiple deftypes named '"), lookup(cs->im, name), _u8("' match arity"));
         }
