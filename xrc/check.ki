@@ -42,8 +42,7 @@ func check_module(cs *checkstate, mod_name sym) np {
   mod *module = ref_module(cs, id);
 
   foreach aid access_entry_id in elems(&mod->access_blocks) {
-    dti deftype_entry_id;
-    #get_accessible_deftype(cs, aid, &dti);
+    dti deftype_entry_id = #get_accessible_deftype(cs, aid);
   }
 
   foreach eid def_entry_id in elems(&mod->defs) {
@@ -1513,7 +1512,7 @@ func generiks_same_human_name(a *ast_generik, b *ast_generik) bool {
   return generik_human_name(a)->value == generik_human_name(b)->value;
 }
 
-func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_entry_id) np {
+func get_accessible_deftype(cs *checkstate, aid access_entry_id) cr[deftype_entry_id] {
   ent *access_entry = ref_access_entry(cs, aid);
   switch ent->ent_id {
     case NotComputed: {
@@ -1535,9 +1534,8 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
         ent->ent_id = FailedComputation;
         return Unprinted(pm);
       case NoFail(md matched_deftype):
-        *out = md.ent_id;
         ent->ent_id = Computed(md.ent_id);
-        return NoFail;
+        return NoFail(md.ent_id);
       }
     }
     case BeganComputing: {
@@ -1547,8 +1545,7 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id, out *deftype_en
       return ERR(_u8("Repeated get_accessible_deftype error"));
     }
     case Computed(x deftype_entry_id): {
-      *out = x;
-      return NoFail;
+      return NoFail(x);
     }
   }
 }
