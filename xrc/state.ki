@@ -675,7 +675,8 @@ defclass move depth_rewinder {
   old_depth u32;
 }
 
-def template_instantiation_limit u32 = 50;
+// SCOPE(): Change this back to 50.
+def template_instantiation_limit u32 = 10;
 
 access depth_rewinder {
   func do_init(d *depth_rewinder) void {

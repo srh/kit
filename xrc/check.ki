@@ -582,6 +582,7 @@ func check_and_compute_name_type(clq *clqueue, g te_generik_scope, scope *type_s
   }
 
   md matched_deftype = #match_deftype(clq->cs, fake_ast_meta(), a->value, scope, None);
+  check(isNone(&md.learned_params));
 
   np idy_genparms = blank_idyparms();
   inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &np);
@@ -609,13 +610,19 @@ func check_and_compute_typeexpr_shray(clq *clqueue, g te_generik_scope, scope *t
 
 func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, a *te_typeapp,
                                 out *cac_typeexpr) np {
-  params_complete bool;
-  params shray[te_typeexpr];
-  #check_and_compute_typeexpr_shray(clq, g, scope, parms, &a->params, &params, &params_complete);
+  params_complete_discard bool;
+  params1 shray[te_typeexpr];
+  #check_and_compute_typeexpr_shray(clq, g, scope, parms, &a->params, &params1, &params_complete_discard);
 
   switch &a->typefunc {
     case &TePureName(value sym): {
-      md matched_deftype = #match_deftype(clq->cs, fake_ast_meta(), value, scope, Has(&params));
+      md matched_deftype = #match_deftype(clq->cs, fake_ast_meta(), value, scope, Has(&params1));
+
+      // TODO: We could make unify_under_generics retain computedness and prove that we don't have to re-cac the params -- just run all_complete_computed on them.
+      // TODO: Also have unify_under_generics look at instpacks?  Using their ipse_mappings too.
+      params_complete bool;
+      cac_params shray[te_typeexpr];
+      #check_and_compute_typeexpr_shray(clq, g, scope, parms, unHas(&md.learned_params), &cac_params, &params_complete);
 
       if params_complete {
         // TODO: This is quite duplicated with check_and_compute_parms.  With the changes
@@ -623,21 +630,21 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
         canonicalized_scope type_scope = mk_global();
         ipse_names array[sym];
         canonical array[cu_typeexpr];
-        foreach param *te_typeexpr in refs(&params) {
+        foreach param *te_typeexpr in refs(&cac_params) {
           canonicalized te_typeexpr;
           canonicalize_idy_ipses(clq->im, scope, param, &canonicalized, &ipse_names, &canonicalized_scope);
           push(&canonical, ~canonicalized);
         }
         hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
         inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &hp);
-        *out = {true, TeApp({TePureName(value), params, Has({{md.ent_id, inst_id}, freeze(&ipse_names)})})};
+        *out = {true, TeApp({TePureName(value), cac_params, Has({{md.ent_id, inst_id}, freeze(&ipse_names)})})};
       } else {
-        *out = {false, TeApp({TePureName(value), params, None})};
+        *out = {false, TeApp({TePureName(value), cac_params, None})};
       }
       return NoFail;
     }
     case &TePureUnknown: {
-      *out = {false, TeApp({TePureUnknown, params, None})};
+      *out = {false, TeApp({TePureUnknown, params1, None})};
       return NoFail;
     }
   }
@@ -691,13 +698,14 @@ func[T] ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_
 
 struct matched_deftype {
   ent_id deftype_entry_id;
+  learned_params opt[shray[te_typeexpr]];
 }
 
 func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, params opt[*shray[te_typeexpr]]) cr[matched_deftype] {
   // SCOPE(): See arity_matches -- we never look at the generik oftype.
   if case Has(arr *array[deftype_entry_id]) = lookup_ref(&cs->deftypes_by_name, &name) {
     n size = count(arr);
-    match opt[deftype_entry_id] = None;
+    match opt[matched_deftype] = None;
     for i size = 0; i < n; i = i + 1 {
       id deftype_entry_id = arr[i];
       ent *deftype_entry = ref_deftype_entry(cs, id);
@@ -706,14 +714,14 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, para
       // EMISSIONS() SCOPE(): Emit emissions.
       emissions array[unify_emission];
       if arity_matches(scope, &ent->generics, params, &emissions, &learned) {
-        if case Has(alt_id) = match {
+        if case &Has(md matched_deftype) = &match {
           return ERR(_u8("Multiple deftypes named '"), lookup(cs->im, name), _u8("' match arity"));
         }
-        match = Has(id);
+        match = Has({id, learned});
       }
     }
-    if case Has(id) = match {
-      return NoFail({id});
+    if case Has(md) = match {
+      return NoFail(md);
     } else {
       return ERR_no_match(cs, m, name, params);
     }
@@ -1557,6 +1565,7 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id) cr[deftype_entr
       ent->ent_id = FailedComputation;
       return Unprinted(pm);
     case NoFail(md matched_deftype):
+      // It's fine to ignore md.learned, we passed TeUnknown for all params.
       ent->ent_id = Computed(md.ent_id);
       return NoFail(md.ent_id);
     }
