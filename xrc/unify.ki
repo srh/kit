@@ -51,11 +51,13 @@ func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
   switch t {
     case &TeName(a te_name): {
       if case Has(ix size) = lookup_plain_name(names, a.value) {
+        info unify_information = mk_fresh_info();
         unified te_typeexpr;
-        if !unify_types(scope, &up->tys[ix], pt, emissions_app, &unified) {
+        if !unify_types(scope, &up->tys[ix], pt, &info, emissions_app, &unified) {
           return false;
         }
         up->tys[ix] = unified;
+        up->dirty[ix] |= info.updated;
         *unified_out = TeName({a.value, None});
         return true;
       } else {
@@ -159,11 +161,13 @@ func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
       // affect this function's callers, so treat this code with skepticism.
       if case Has(ixtup tup[size, *te_ipse_generik]) = lookup_ipse_name(names, a.name) {
         // SCOPE(): We don't actually use the generik oftype at all!
+        info unify_information;
         unified te_typeexpr;
-        if !unify_types(scope, &up->tys[ixtup.car], pt, emissions_app, &unified) {
+        if !unify_types(scope, &up->tys[ixtup.car], pt, &info, emissions_app, &unified) {
           return false;
         }
         up->tys[ixtup.car] = unified;
+        up->dirty[ixtup.car] |= info.updated;
         *unified_out = TeIpse({a.name});
         return true;
       } else {
@@ -265,16 +269,18 @@ enum type_matches_res {
 
 struct unif_parms {
   tys shray[te_typeexpr];
+  dirty shray[bool];
 }
 
 // Makes a _copy_ of parms.
 func mk_unif_parms(parms *shray[te_typeexpr]) unif_parms {
   tmp array[te_typeexpr] = mk_copy(parms);
-  return {freeze(&tmp)};
+  n size = count(&tmp);
+  return {freeze(&tmp), repeat(n, false)};
 }
 
 func mk_empty_unif_parms() unif_parms {
-  return {mk_shray()};
+  return {mk_shray(), mk_shray()};
 }
 
 // t is complete, but it references the generic names in "names", whose corresponding
