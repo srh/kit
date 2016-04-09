@@ -678,7 +678,6 @@ func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typee
       }
 
       up unif_parms = mk_unif_parms(p);
-      // EMISSIONS() SCOPE() Emit emissions.
       // Also emit newly learned type information?
       emissions array[unify_emission];
       if !verify_matches_oftypes(scope, &up, &sh, &emissions) {
