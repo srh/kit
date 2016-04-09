@@ -350,3 +350,12 @@ func verify_matches_oftypes(scope *type_scope, up *unif_parms, names *shray[te_g
   }
   return true;
 }
+
+func verify_all_plainar(p *shray[te_typeexpr]) bool {
+  foreach ty *te_typeexpr in refs(p) {
+    if case &TeIpse(ti te_ipse) = ty {
+      return false;
+    }
+  }
+  return true;
+}
