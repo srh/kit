@@ -732,7 +732,6 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, para
     for i size = 0; i < n; i = i + 1 {
       id deftype_entry_id = arr[i];
       ent *deftype_entry = ref_deftype_entry(cs, id);
-      // SCOPE(): Emit the learned params.
       learned opt[shray[te_typeexpr]];
       // EMISSIONS() SCOPE(): Emit emissions.
       emissions array[unify_emission];
