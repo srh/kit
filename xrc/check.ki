@@ -587,6 +587,7 @@ func check_and_compute_name_type(clq *clqueue, g te_generik_scope, scope *type_s
   }
 
   md matched_deftype = #match_deftype(clq->cs, fake_ast_meta(), a->value, scope, None);
+  // EMISSIONS() SCOPE(): handle emissions
   check(isNone(&md.learned_params));
 
   np idy_genparms = blank_idyparms();
@@ -626,6 +627,7 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
 
   switch &a->typefunc {
     case &TePureName(value sym): {
+      // EMISSIONS() SCOPE(): handle emissions
       md matched_deftype = #match_deftype(clq->cs, fake_ast_meta(), value, scope, Has(&params1));
 
       // TODO: We could make unify_under_generics retain computedness and prove that we don't have to re-cac the params -- just run all_complete_computed on them.
@@ -723,6 +725,7 @@ func[T] ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_
 struct matched_deftype {
   ent_id deftype_entry_id;
   learned_params opt[shray[te_typeexpr]];
+  emissions shray[unify_emission];
 }
 
 func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, params opt[*shray[te_typeexpr]]) cr[matched_deftype] {
@@ -733,14 +736,13 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, para
       id deftype_entry_id = arr[i];
       ent *deftype_entry = ref_deftype_entry(cs, id);
       learned opt[shray[te_typeexpr]];
-      // EMISSIONS() SCOPE(): Emit emissions.
       emissions array[unify_emission];
       switch arity_matches(scope, &ent->generics, params, &emissions, &learned) {
       case Success:
         if case &Has(md matched_deftype) = &match {
           return ERR(_u8("Multiple deftypes named '"), lookup(cs->im, name), _u8("' match arity"));
         }
-        match = Has({id, learned});
+        match = Has({id, learned, freeze(&emissions)});
       case NotThis:
         void;
       case NotAny:
@@ -1593,6 +1595,8 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id) cr[deftype_entr
       return Unprinted(pm);
     case NoFail(md matched_deftype):
       // It's fine to ignore md.learned, we passed TeUnknown for all params.
+      // Also that means there will be no emissions.
+      check(empty(&md.emissions));
       ent->ent_id = Computed(md.ent_id);
       return NoFail(md.ent_id);
     }
