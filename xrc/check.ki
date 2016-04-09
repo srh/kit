@@ -660,49 +660,60 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
   }
 }
 
-func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typeexpr]], emissions_out *array[unify_emission], learned_params_out *opt[shray[te_typeexpr]]) bool {
-  // SCOPE(): We should have a "correct number of parameters but fails" result.
+enum triresult {
+  Success void;
+  NotThis void;
+  NotAny void;
+}
 
+func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typeexpr]], emissions_out *array[unify_emission], learned_params_out *opt[shray[te_typeexpr]]) triresult {
   switch a {
   case &TeNoGenerics:
     if case None = params {
       *emissions_out = mk_array();
       *learned_params_out = None;
-      return true;
+      return Success;
+    } else {
+      return NotThis;
     }
   case &TeHasGenerics(sh shray[te_generik]):
     if case Has(p *shray[te_typeexpr]) = params {
       n size = count(p);
       if n != count(&sh) {
-        return false;
+        return NotThis;
       }
 
       up unif_parms = mk_unif_parms(p);
       // Also emit newly learned type information?
       emissions array[unify_emission];
       if !verify_matches_oftypes(scope, &up, &sh, &emissions) {
-        return false;
+        return NotAny;
       }
       swap(emissions_out, &emissions);
       *learned_params_out = Has(up.tys);
-      return true;
+      return Success;
+    } else {
+      return NotThis;
     }
   case &TeVariadicGenerics(vg te_variadic_generics):
     // Variadics don't support ipse generics yet.
     if case Has(p *shray[te_typeexpr]) = params {
       if count(&vg.before) + count(&vg.after) <= count(p) {
         if !verify_all_plainar(p) {
-          return false;
+          return NotAny;
         }
 
         cp array[te_typeexpr] = mk_copy(p);
         *emissions_out = mk_array();
         *learned_params_out = Has(freeze(&cp));
-        return true;
+        return Success;
+      } else {
+        return NotThis;
       }
+    } else {
+      return NotThis;
     }
   }
-  return false;
 }
 
 func[T] ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_typeexpr]]) cr[T] {
@@ -715,7 +726,6 @@ struct matched_deftype {
 }
 
 func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, params opt[*shray[te_typeexpr]]) cr[matched_deftype] {
-  // SCOPE(): See arity_matches -- we never look at the generik oftype.
   if case Has(arr *array[deftype_entry_id]) = lookup_ref(&cs->deftypes_by_name, &name) {
     n size = count(arr);
     match opt[matched_deftype] = None;
@@ -726,11 +736,16 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, para
       learned opt[shray[te_typeexpr]];
       // EMISSIONS() SCOPE(): Emit emissions.
       emissions array[unify_emission];
-      if arity_matches(scope, &ent->generics, params, &emissions, &learned) {
+      switch arity_matches(scope, &ent->generics, params, &emissions, &learned) {
+      case Success:
         if case &Has(md matched_deftype) = &match {
           return ERR(_u8("Multiple deftypes named '"), lookup(cs->im, name), _u8("' match arity"));
         }
         match = Has({id, learned});
+      case NotThis:
+        void;
+      case NotAny:
+        return ERR(_u8("A deftype named '"), lookup(cs->im, name), _u8("' is too close, no match"));
       }
     }
     if case Has(md) = match {
