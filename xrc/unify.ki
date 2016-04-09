@@ -302,7 +302,7 @@ func type_matches(scope *type_scope, parms *shray[te_typeexpr], pt *te_typeexpr,
     return TypeDoesNotMatch;
   }
   if !verify_matches_oftypes(scope, &up, names, &emissions) {
-    // SCOPE(): Probably should just kill the type checking -- matches-but-invalid.
+    // This does not kill match_def completely.  The reason is, it's oftypes getting smashed with other concrete types that would cause verify_matches_oftypes to fail.
     return TypeDoesNotMatch;
   }
   if !all_complete_computed(&up.tys).complete {
