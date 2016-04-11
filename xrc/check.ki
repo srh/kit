@@ -587,8 +587,9 @@ func check_and_compute_name_type(clq *clqueue, g te_generik_scope, scope *type_s
   }
 
   md matched_deftype = #match_deftype(clq->cs, fake_ast_meta(), a->value, scope, None);
-  // EMISSIONS() SCOPE(): handle emissions
   check(isNone(&md.learned_params));
+  // There should be no emissions, because this is a name type, no ipses involved.
+  check(empty(&md.emissions));
 
   np idy_genparms = blank_idyparms();
   inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &np);
