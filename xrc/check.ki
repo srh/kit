@@ -591,7 +591,8 @@ func check_and_compute_name_type(clq *clqueue, g te_generik_scope, scope *type_s
   check(empty(&md.emissions));
 
   np idy_genparms = blank_idyparms();
-  inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &np);
+  inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &np,
+                                                 &md.emissions /* which is empty */);
   *computed_out = ~ @[te_typeexpr]TeName({a->value, Has({md.ent_id, inst_id})});
   return NoFail;
 }
@@ -648,7 +649,7 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
           push(&canonical, ~canonicalize_idy_ipses(&ctx, param));
         }
         hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
-        inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &hp);
+        inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &hp, &md.emissions);
         *out = {true, TeApp({TePureName(value), cac_params, Has({{md.ent_id, inst_id}, freeze(&ipse_names), md.emissions})})};
       } else {
         *out = {false, TeApp({TePureName(value), cac_params, None})};
@@ -802,9 +803,9 @@ func subsequent_depth(cs *checkstate, parms *idy_repls) u32 {
   }
 }
 
-func enqueue_deftype_inst(clq *clqueue, id deftype_entry_id, parms *idy_genparms) deftype_inst_id {
+func enqueue_deftype_inst(clq *clqueue, id deftype_entry_id, parms *idy_genparms, emittance *shray[unify_emission]) deftype_inst_id {
   cs *checkstate = clq->cs;
-  res type_id_and_created = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
+  res type_id_and_created = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms, emittance);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDeftypeEntry({id, res.id, cs->instantiation_depth}));
   }
@@ -816,15 +817,15 @@ struct type_id_and_created {
   created bool;
 }
 
-func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *idy_genparms) type_id_and_created {
+func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *idy_genparms, emittance *shray[unify_emission]) type_id_and_created {
   if case Has(id deftype_inst_id) = lookup(&ent->insts, parms) {
     return {id, false};
   }
   inst deftype_inst;
   if case &Has(info deftype_inst_info) = &ent->default_info {
-    inst = {*parms, Computed(info)};
+    inst = {*parms, *emittance, Computed(info)};
   } else {
-    inst = {*parms, NotComputed};
+    inst = {*parms, *emittance, NotComputed};
   }
   id deftype_inst_id = add_deftype_inst(cs, inst);
   check_insert(&ent->insts, parms, id);
@@ -1341,6 +1342,11 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
   }
 }
 
+// Just to give the creation of empty emittances a name.
+func mk_empty_emittance() shray[unify_emission] {
+  return mk_shray();
+}
+
 func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) np {
   ent *deftype_entry = ref_deftype_entry(cs, id);
   if case &Has(np deftype_nonprim) = &ent->nonprim {
@@ -1349,8 +1355,9 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) np {
     switch &np.tl->generics {
       case &NoGenerics: {
         parms idy_genparms = blank_idyparms();
+        emittance shray[unify_emission] = mk_empty_emittance();
         clq clqueue = mk(cs);
-        discard_id deftype_inst_id = enqueue_deftype_inst(&clq, id, &parms);
+        discard_id deftype_inst_id = enqueue_deftype_inst(&clq, id, &parms, &emittance);
         return finish_checking(cs, &clq);
       }
       case &HasGenerics(ig): {

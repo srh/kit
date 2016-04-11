@@ -321,6 +321,8 @@ struct deftype_inst_info {
 
 struct deftype_inst {
   parms idy_genparms;
+  // Maybe this should/could be part of idy_genparms -- i think we just recompute the same value each time in match_def.  This specifies the emissions that the values of parms implicitly generates.  For example, if we have generics ['a T, T], if parms is ['$0, foo['$2]] and the oftype of '$0 is foo['$1] in scope for some reason... then we have the emission '$1 = '$2.
+  emittance shray[unify_emission];
   info nbfc[deftype_inst_info];
 }
 
