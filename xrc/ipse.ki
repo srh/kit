@@ -29,18 +29,21 @@ func canonicalized_unify_emission(ctx *canonicalizing_ctx, u *unify_emission) un
   }
 }
 
+func canonicalized_emittance(ctx *canonicalizing_ctx, us *shray[unify_emission]) shray[unify_emission] {
+  emittance_bu array[unify_emission];
+  foreach u *unify_emission in refs(us) {
+    push(&emittance_bu, canonicalized_unify_emission(ctx, u));
+  }
+  return freeze(&emittance_bu);
+}
+
 func canonicalized_app_pack(ctx *canonicalizing_ctx, pack *te_app_pack) te_app_pack {
   ipse_mappings_bu array[sym];
   foreach s sym in elems(&pack->ipse_mappings) {
     push(&ipse_mappings_bu, canonicalized_ipse_sym(ctx, s));
   }
 
-  emissions_bu array[unify_emission];
-  foreach u *unify_emission in refs(&pack->emittance) {
-    push(&emissions_bu, canonicalized_unify_emission(ctx, u));
-  }
-
-  return {pack->teip, freeze(&ipse_mappings_bu), freeze(&emissions_bu)};
+  return {pack->teip, freeze(&ipse_mappings_bu), canonicalized_emittance(ctx, &pack->emittance)};
 }
 
 func canonicalize_arraytype_count(a *opt[u32]) opt[u32] {
