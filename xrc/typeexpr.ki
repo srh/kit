@@ -18,7 +18,7 @@ struct cac_typeexpr {
 // replaced consistently.
 enum te_typeexpr {
   TeName te_name;
-  TeApp te_typeapp;
+  TeApp te_app;
   TeUnion te_union;
   TeArraytype te_arraytype;
   TeIpse te_ipse;
@@ -47,7 +47,7 @@ struct te_app_pack {
   ipse_mappings shray[sym];
 }
 
-struct te_typeapp {
+struct te_app {
   typefunc te_puretype;
   params shray[te_typeexpr];
   // Only supplied if the type is complete, the lookup actually happened.
@@ -116,8 +116,8 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
         ice(_u8("idy_typeexpr_equal on a non-pack-having name typeexpr"));
       }
     }
-    case &TeApp(ax te_typeapp): {
-      if case &TeApp(bx te_typeapp) = b {
+    case &TeApp(ax te_app): {
+      if case &TeApp(bx te_app) = b {
         if case &Has(p te_app_pack) = &ax.pack {
           if case &Has(q te_app_pack) = &bx.pack {
             return p.teip.inst_id.x == q.teip.inst_id.x && help_idy_typeexpr_ipse_mappings_equal(&p.ipse_mappings, &q.ipse_mappings);
@@ -218,7 +218,7 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
     case &TeName(b te_name): {
       wrap_u8str(help, r, _u8("TeName"), &b);
     }
-    case &TeApp(b te_typeapp): {
+    case &TeApp(b te_app): {
       wrap_u8str(help, r, _u8("TeApp"), &b);
     }
     case &TeUnion(b te_union): {
@@ -241,7 +241,7 @@ func[H] build_u8str(help H, r *array[u8], a *te_name) void {
   append(r, _u8("}"));
 }
 
-func[H] build_u8str(help H, r *array[u8], a *te_typeapp) void {
+func[H] build_u8str(help H, r *array[u8], a *te_app) void {
   append(r, _u8("{typefunc:"));
   build_u8str(help, r, &a->typefunc);
   append(r, _u8(",params:"));
@@ -300,7 +300,7 @@ func help_compute_hash(a *te_typeexpr) osize {
       return ~p.inst_id.x;
     }
     ice(_u8("help_compute_hash on non-pack-having name typeexpr"));
-  case &TeApp(ax te_typeapp):
+  case &TeApp(ax te_app):
     if case &Has(p te_app_pack) = &ax.pack {
       return (@[osize]~p.teip.inst_id.x * 0x3001) ^ help_compute_hash(&p.ipse_mappings);
     }
@@ -349,7 +349,7 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
   switch a {
   case &TeName(b te_name):
     build_u8str(im, r, &b.value);
-  case &TeApp(b te_typeapp):
+  case &TeApp(b te_app):
     switch b.typefunc {
     case TePureName(s sym):
       build_u8str(im, r, &s);

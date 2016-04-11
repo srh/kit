@@ -74,9 +74,9 @@ func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
       }
     }
 
-    case &TeApp(a te_typeapp): {
+    case &TeApp(a te_app): {
       // Generics can't be type constructors (yet).
-      if case &TeApp(pa te_typeapp) = pt {
+      if case &TeApp(pa te_app) = pt {
         unified_typefunc te_puretype;
         if !unify_puretypes(&a.typefunc, &pa.typefunc, &unified_typefunc) {
           return false;

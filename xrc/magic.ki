@@ -260,7 +260,7 @@ func check_magic_ctor(clq *clqueue, g te_generik_scope, scope *type_scope, parms
         ice(_u8("check_magic_ctor packless name type"));
       }
     }
-    case &TeApp(a te_typeapp): {
+    case &TeApp(a te_app): {
       if case &Has(p te_app_pack) = &a.pack {
         info magic_ctor_info;
         #check_pack_ctor(clq, scope, &cac.te, &cac_props, &p.teip, &p.ipse_mappings, wc, &info);

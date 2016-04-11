@@ -293,7 +293,7 @@ func ds_lookup_constructor(ds *defscope, scope *type_scope, name sym, gp *genpar
     switch pt {
     case &TeName(te te_name):
       void;
-    case &TeApp(te te_typeapp):
+    case &TeApp(te te_app):
       void;
     case &TeUnknown:
       return NoFail(AmbigMatchConstructor);
@@ -1542,7 +1542,7 @@ func decompose_ref_or_ptr(t *cu_typeexpr, es *framescope, ipse_out *te_typeexpr,
 
 func decompose_typeapp(t *te_typeexpr, expected_puretype te_puretype, params_out **shray[te_typeexpr]) bool {
   // This could be implemented in terms of unify_under_generics, you know.
-  if case &TeApp(app te_typeapp) = t {
+  if case &TeApp(app te_app) = t {
     unified te_puretype;
     if !unify_puretypes(&app.typefunc, &expected_puretype, &unified) {
       return false;
@@ -1646,7 +1646,7 @@ func structural_structspec(ds *defscope, t *te_typeexpr, st_out *structspec) str
   case &TeName(a te_name):
     ipse_mappings shray[sym];  // empty
     return help_structural_structspec(ds, unHas(&a.pack), &ipse_mappings, st_out);
-  case &TeApp(a te_typeapp):
+  case &TeApp(a te_app):
     hp *te_app_pack = unHas(&a.pack);
     return help_structural_structspec(ds, &hp->teip, &hp->ipse_mappings, st_out);
   default:
@@ -1660,7 +1660,7 @@ func structural_enumspec(ds *defscope, t *te_typeexpr, et_out *enumspec) structu
   case &TeName(a te_name):
     ipse_mappings shray[sym]; // empty
     return help_structural_enumspec(ds, unHas(&a.pack), &ipse_mappings, et_out);
-  case &TeApp(a te_typeapp):
+  case &TeApp(a te_app):
     hp *te_app_pack = unHas(&a.pack);
     return help_structural_enumspec(ds, &hp->teip, &hp->ipse_mappings, et_out);
   default:
@@ -1808,7 +1808,7 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
       ipse_mappings shray[sym];  // empty
       return lookup_name_field(es, unHas(&a.pack), &ipse_mappings, fieldname, fieldtype_out, res_out);
     }
-    case &TeApp(a te_typeapp): {
+    case &TeApp(a te_app): {
       hp *te_app_pack = unHas(&a.pack);
       return lookup_name_field(es, &hp->teip, &hp->ipse_mappings, fieldname, fieldtype_out, res_out);
     }

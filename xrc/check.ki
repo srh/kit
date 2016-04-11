@@ -475,7 +475,7 @@ func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_sc
       *out = {true, computed.x};
       return NoFail;
     }
-    case &TeApp(a te_typeapp): {
+    case &TeApp(a te_app): {
       #check_and_compute_app_type(clq, g, scope, parms, &a, out);
       return NoFail;
     }
@@ -614,7 +614,7 @@ func check_and_compute_typeexpr_shray(clq *clqueue, g te_generik_scope, scope *t
   return NoFail;
 }
 
-func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, a *te_typeapp,
+func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, a *te_app,
                                 out *cac_typeexpr) np {
   if isHas(&a->pack) {
     *out = {true, TeApp(*a)};
@@ -1039,7 +1039,7 @@ func compute_complete_type_properties(clq *clqueue, scope *type_scope, t *te_typ
         return fake();
       }
     }
-    case &TeApp(a te_typeapp): {
+    case &TeApp(a te_app): {
       if case &Has(pack te_app_pack) = &a.pack {
         return compute_pack_properties(clq, &pack.teip, out);
       } else {
@@ -1761,7 +1761,7 @@ func all_complete_computed(decls *shray[te_vardecl]) complete_computed {
 func is_complete_computed(t *te_typeexpr) complete_computed {
   switch t {
     case &TeName(a te_name): { return {true, isHas(&a.pack)}; }
-    case &TeApp(a te_typeapp): {
+    case &TeApp(a te_app): {
       if case &TePureUnknown = &a.typefunc {
         return {false, false};
       }

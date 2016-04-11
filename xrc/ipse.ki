@@ -52,7 +52,7 @@ func canonicalize_idy_ipses(ctx *canonicalizing_ctx, t *te_typeexpr) te_typeexpr
   switch t {
   case &TeName(a te_name):
     return TeName({a.value, Has!canonicalized_pack(unHas!&a.pack)});
-  case &TeApp(a te_typeapp):
+  case &TeApp(a te_app):
     newparams array[te_typeexpr];
     nparams size = count(&a.params);
     for i size = 0; i < nparams; i = i + 1 {
@@ -129,7 +129,7 @@ func map_ipses(im *identmap, ipse_mappings *shray[sym], t *te_typeexpr) te_typee
   switch t {
   case &TeName(a te_name):
     return *t;
-  case &TeApp(a te_typeapp):
+  case &TeApp(a te_app):
     newparams array[te_typeexpr];
     foreach param *te_typeexpr in refs(&a.params) {
       push(&newparams, map_ipses(im, ipse_mappings, param));
