@@ -629,7 +629,6 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
 
   switch &a->typefunc {
     case &TePureName(value sym): {
-      // EMISSIONS() SCOPE(): handle emissions
       md matched_deftype = #match_deftype(clq->cs, fake_ast_meta(), value, scope, Has(&params1));
 
       // TODO: We could make unify_under_generics retain computedness and prove that we don't have to re-cac the params -- just run all_complete_computed on them.
@@ -649,6 +648,7 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
           push(&canonical, ~canonicalize_idy_ipses(&ctx, param));
         }
         hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
+        // EMISSIONS() SCOPE(): is this all the emissions?  Like, what about the second time we check_and_compute?
         inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &hp, &md.emissions);
         *out = {true, TeApp({TePureName(value), cac_params, Has({{md.ent_id, inst_id}, freeze(&ipse_names), md.emissions})})};
       } else {
