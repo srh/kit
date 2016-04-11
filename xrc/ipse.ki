@@ -21,13 +21,26 @@ func canonicalized_ipse_sym(ctx *canonicalizing_ctx, s sym) sym {
   }
 }
 
+func canonicalized_unify_emission(ctx *canonicalizing_ctx, u *unify_emission) unify_emission {
+  switch u {
+  case &SameIpse(a unify_same_ipse):
+    return SameIpse({canonicalized_ipse_sym(ctx, a.name1),
+                     canonicalized_ipse_sym(ctx, a.name2)});
+  }
+}
+
 func canonicalized_app_pack(ctx *canonicalizing_ctx, pack *te_app_pack) te_app_pack {
-  build array[sym];
+  ipse_mappings_bu array[sym];
   foreach s sym in elems(&pack->ipse_mappings) {
-    push(&build, canonicalized_ipse_sym(ctx, s));
+    push(&ipse_mappings_bu, canonicalized_ipse_sym(ctx, s));
   }
 
-  return {pack->teip, freeze(&build)};
+  emissions_bu array[unify_emission];
+  foreach u *unify_emission in refs(&pack->emittance) {
+    push(&emissions_bu, canonicalized_unify_emission(ctx, u));
+  }
+
+  return {pack->teip, freeze(&ipse_mappings_bu), freeze(&emissions_bu)};
 }
 
 func canonicalize_arraytype_count(a *opt[u32]) opt[u32] {
@@ -105,13 +118,26 @@ func map_vardecl_ipses(im *identmap, ipse_mappings *shray[sym], inn *shray[te_va
   return freeze(&bu);
 }
 
+func map_ipses_to_unify_emission(im *identmap, ipse_mappings *shray[sym], u *unify_emission) unify_emission {
+  switch u {
+  case &SameIpse(a unify_same_ipse):
+    return SameIpse({map_ipse_sym(im, ipse_mappings, a.name1),
+                     map_ipse_sym(im, ipse_mappings, a.name2)});
+  }
+}
+
 func map_ipses_to_app_pack(im *identmap, ipse_mappings *shray[sym], pack *te_app_pack) te_app_pack {
-  build array[sym];
+  ipse_mappings_bu array[sym];
   foreach s sym in elems(&pack->ipse_mappings) {
-    push(&build, map_ipse_sym(im, ipse_mappings, s));
+    push(&ipse_mappings_bu, map_ipse_sym(im, ipse_mappings, s));
   }
 
-  return {pack->teip, freeze(&build)};
+  emittance_bu array[unify_emission];
+  foreach u *unify_emission in refs(&pack->emittance) {
+    push(&emittance_bu, map_ipses_to_unify_emission(im, ipse_mappings, u));
+  }
+
+  return {pack->teip, freeze(&ipse_mappings_bu), freeze(&emittance_bu)};
 }
 
 func map_ipse_sym(im *identmap, ipse_mappings *shray[sym], s sym) sym {
