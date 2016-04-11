@@ -89,11 +89,6 @@ func canonicalize_idy_ipses(ctx *canonicalizing_ctx, t *te_typeexpr) te_typeexpr
   }
 }
 
-func canonicalize_idy_ipses(im *identmap, t_scope *type_scope, t *te_typeexpr, out *te_typeexpr, ipse_names_app *array[sym], canonicalized_scope_app *type_scope) void {
-  ctx canonicalizing_ctx = {im, t_scope, ipse_names_app, canonicalized_scope_app};
-  *out = canonicalize_idy_ipses(&ctx, t);
-}
-
 func canonicalize_idy_vardecls(ctx *canonicalizing_ctx, a *shray[te_vardecl]) shray[te_vardecl] {
   build array[te_vardecl];
   n size = count(a);

@@ -1150,8 +1150,8 @@ func make_comparecells(es *framescope, dest cell_num) instpair {
   if case Has(ent def_entry_id) = es->cs->prims.ptr_eq {
     canonicalized_scope type_scope = mk_global();
     ipse_names array[sym];
-    canonical te_typeexpr;
-    canonicalize_idy_ipses(es->im, &es->tscope, &ref_cell(es, dest)->type.x, &canonical, &ipse_names, &canonicalized_scope);
+    ctx canonicalizing_ctx = {es->im, &es->tscope, &ipse_names, &canonicalized_scope};
+    canonical te_typeexpr = canonicalize_idy_ipses(&ctx, &ref_cell(es, dest)->type.x);
     parms idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {mk_shray(~canonical)}};
     inst_id def_inst_id = enqueue_def_inst(es->clq, ent, &parms);
     return {ent, inst_id};

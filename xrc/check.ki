@@ -444,13 +444,12 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_s
 
       canonicalized_scope type_scope = mk_global();
       ipse_names array[sym];
+      ctx canonicalizing_ctx = {clq->im, t_scope, &ipse_names, &canonicalized_scope};
       cu_params array[cu_typeexpr];
       n size = count(&params);
       reserve(&cu_params, n);
       for i size = 0; i < n; i = i + 1 {
-        canonicalized te_typeexpr;
-        canonicalize_idy_ipses(clq->im, t_scope, &params[i], &canonicalized, &ipse_names, &canonicalized_scope);
-        push(&cu_params, ~canonicalized);
+        push(&cu_params, ~canonicalize_idy_ipses(&ctx, &params[i]));
       }
       *out = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&cu_params)}};
       return NoFail;
@@ -643,11 +642,10 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
         // we're making we should definitely dedup this code.
         canonicalized_scope type_scope = mk_global();
         ipse_names array[sym];
+        ctx canonicalizing_ctx = {clq->im, scope, &ipse_names, &canonicalized_scope};
         canonical array[cu_typeexpr];
         foreach param *te_typeexpr in refs(&cac_params) {
-          canonicalized te_typeexpr;
-          canonicalize_idy_ipses(clq->im, scope, param, &canonicalized, &ipse_names, &canonicalized_scope);
-          push(&canonical, ~canonicalized);
+          push(&canonical, ~canonicalize_idy_ipses(&ctx, param));
         }
         hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
         inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &hp);
