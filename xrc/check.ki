@@ -468,49 +468,45 @@ func nogeneric_check_and_compute_typeexpr(clq *clqueue, scope *type_scope, t *te
 func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, t *te_typeexpr,
                                 out *cac_typeexpr) np {
   switch t {
-    case &TeName(a te_name): {
-      computed cu_typeexpr;
-      #check_and_compute_name_type(clq, g, scope, parms, &a, &computed);
-      *out = {true, computed.x};
-      return NoFail;
-    }
-    case &TeApp(a te_app): {
-      #check_and_compute_app_type(clq, g, scope, parms, &a, out);
-      return NoFail;
-    }
+  case &TeName(a te_name):
+    computed cu_typeexpr;
+    #check_and_compute_name_type(clq, g, scope, parms, &a, &computed);
+    *out = {true, computed.x};
+    return NoFail;
 
-    case &TeUnion(a te_union): {
-      computed_fields_complete bool;
-      computed_fields array[te_vardecl];
-      #help_check_and_compute_fields(clq, g, scope, parms, &a.fields, &computed_fields, &computed_fields_complete);
-      *out = {computed_fields_complete, TeUnion({freeze(&computed_fields)})};
-      return NoFail;
-    }
+  case &TeApp(a te_app):
+    #check_and_compute_app_type(clq, g, scope, parms, &a, out);
+    return NoFail;
 
-    case &TeArraytype(a te_arraytype): {
-      param cac_typeexpr;
-      #check_and_compute_typeexpr(clq, g, scope, parms, oo(&a.param), &param);
-      *out = {param.complete && isHas(&a.count), TeArraytype({a.count, emshp(param.te)})};
-      return NoFail;
-    }
+  case &TeUnion(a te_union):
+    computed_fields_complete bool;
+    computed_fields array[te_vardecl];
+    #help_check_and_compute_fields(clq, g, scope, parms, &a.fields, &computed_fields, &computed_fields_complete);
+    *out = {computed_fields_complete, TeUnion({freeze(&computed_fields)})};
+    return NoFail;
 
-    case &TeIpse(a te_ipse):
-      if case Has(ixtup tup[size, _]) = find_ipse_generic(g, a.name) {
-        *out = {true, parms->tys[ixtup.car].x};
-        return NoFail;
+  case &TeArraytype(a te_arraytype):
+    param cac_typeexpr;
+    #check_and_compute_typeexpr(clq, g, scope, parms, oo(&a.param), &param);
+    *out = {param.complete && isHas(&a.count), TeArraytype({a.count, emshp(param.te)})};
+    return NoFail;
+
+  case &TeIpse(a te_ipse):
+    if case Has(ixtup tup[size, _]) = find_ipse_generic(g, a.name) {
+      *out = {true, parms->tys[ixtup.car].x};
+      return NoFail;
+    } else {
+      if !ipse_in_scope(scope, a.name) {
+        return ERR(_u8("Ipse '"), lookup(clq->im, a.name), _u8(" not in scope"));
       } else {
-        if !ipse_in_scope(scope, a.name) {
-          return ERR(_u8("Ipse '"), lookup(clq->im, a.name), _u8(" not in scope"));
-        } else {
-          *out = {true, TeIpse({a.name})};
-          return NoFail;
-        }
+        *out = {true, TeIpse({a.name})};
+        return NoFail;
       }
-
-    case &TeUnknown: {
-      *out = {false, TeUnknown};
-      return NoFail;
     }
+
+  case &TeUnknown:
+    *out = {false, TeUnknown};
+    return NoFail;
   }
 }
 
