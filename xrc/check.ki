@@ -318,12 +318,14 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
 
       inst_scope *type_scope = ref_scope(&inst->parms);
 
+      // EMISSIONS() Handle this somehow?
+      emissions array[unify_emission];
       // Important: We check the typeexpr first.  If that typeexpr cyclically refers to
       // this def, we fail.  If there is no typeexpr, we need to compute it from the rhs
       // (and that also needs to not depend cyclically on this def's own typeexpr).
       computed cac_typeexpr;
       if case Unprinted(pm) = check_and_compute_typeexpr(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
-                                                         ent_typeexpr, &computed) {
+                                                         ent_typeexpr, &emissions, &computed) {
         inst->typrop = FailedComputation;
         return Unprinted(pm);
       }
@@ -461,13 +463,19 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_s
   }
 }
 
+func nogeneric_check_and_compute_typeexpr(clq *clqueue, scope *type_scope, t *te_typeexpr, emissions_app *array[unify_emission], out *cac_typeexpr) np {
+  ng te_generik_scope = empty_generik_scope();
+  np idy_repls = blank_idyrepls();
+  return check_and_compute_typeexpr(clq, ng, scope, &np, t, emissions_app, out);
+}
+
 func nogeneric_check_and_compute_typeexpr(clq *clqueue, scope *type_scope, t *te_typeexpr, out *cac_typeexpr) np {
   ng te_generik_scope = empty_generik_scope();
   np idy_repls = blank_idyrepls();
   return check_and_compute_typeexpr(clq, ng, scope, &np, t, out);
 }
 
-
+// EMISSIONS() remove callers of this.
 func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, t *te_typeexpr,
                                 out *cac_typeexpr) np {
   emissions array[unify_emission];
@@ -498,10 +506,9 @@ func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_sc
     *out = {computed_fields_complete, TeUnion({freeze(&computed_fields)})};
     return NoFail;
 
-  // EMISSIONS() not handled below
   case &TeArraytype(a te_arraytype):
     param cac_typeexpr;
-    #check_and_compute_typeexpr(clq, g, scope, parms, oo(&a.param), &param);
+    #check_and_compute_typeexpr(clq, g, scope, parms, oo(&a.param), emissions_app, &param);
     *out = {param.complete && isHas(&a.count), TeArraytype({a.count, emshp(param.te)})};
     return NoFail;
 
