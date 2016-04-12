@@ -1252,13 +1252,14 @@ func inst_type(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id)
   for i size = 0; i < n; i = i + 1 {
     push(&te_params, ref(cu_params, i)->x);
   }
+  // TODO: These ipse mappings (shrays of [$'0 ..< $'n]) could be pre-constructed and cached.
   // The type returned is scoped to the deftype inst's idy_genparms type_scope, so these ipse mappings are correct.
   ipse_mappings array[sym];
   nmappings size = inst->parms.num_ipse_types_used;
   for i size = 0; i < nmappings; i++ {
     push(&ipse_mappings, make_canonicalized_ipse_name(cs->im, i));
   }
-  return ~@[te_typeexpr]TeApp({TePureName(ent->name), freeze(&te_params), Has({{ent_id, inst_id}, freeze(&ipse_mappings), mk_shray@[unify_emission]() /* EMISSIONS() SCOPE(): What?  No emittance? */})});
+  return ~@[te_typeexpr]TeApp({TePureName(ent->name), freeze(&te_params), Has({{ent_id, inst_id}, freeze(&ipse_mappings), inst->emittance})});
 }
 
 func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id deftype_inst_id) np {
