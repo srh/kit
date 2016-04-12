@@ -407,9 +407,11 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t_scope *type_scope, 
   case &HasParms(ps shray[te_typeexpr]):
     nogeneric_g te_generik_scope = empty_generik_scope();
     nogeneric_parms idy_repls = blank_idyrepls();
+    // EMISSIONS(): Use this somehow.
+    emissions array[unify_emission];
     params_complete bool;
     params shray[te_typeexpr];
-    #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, &params, &params_complete);
+    #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, &emissions, &params, &params_complete);
 
     if !params_complete {
       ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
@@ -434,9 +436,11 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_s
     case &HasParms(ps shray[te_typeexpr]): {
       nogeneric_g te_generik_scope = empty_generik_scope();
       nogeneric_parms idy_repls = blank_idyrepls();
+      // EMISSIONS(): Pardon me, use this value.  (Canonicalize them and output them?)
+      emissions array[unify_emission];
       params_complete bool;
       params shray[te_typeexpr];
-      #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, &params, &params_complete);
+      #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, &emissions, &params, &params_complete);
 
       if !params_complete {
         ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
@@ -463,10 +467,19 @@ func nogeneric_check_and_compute_typeexpr(clq *clqueue, scope *type_scope, t *te
   return check_and_compute_typeexpr(clq, ng, scope, &np, t, out);
 }
 
+
+func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, t *te_typeexpr,
+                                out *cac_typeexpr) np {
+  emissions array[unify_emission];
+  return check_and_compute_typeexpr(clq, g, scope, parms, t, &emissions, out);
+}
+
 // NOTE: Generics replacement should really be a separate phase.  (Why?)  (Performance is
 // one counter-argument -- we'd create an extra intermediate te_typeexpr.)
 func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, t *te_typeexpr,
+                                emissions_app *array[unify_emission],
                                 out *cac_typeexpr) np {
+  // EMISSIONS() n^2 array concatenation, make some better data structure for this function's emissions
   switch t {
   case &TeName(a te_name):
     computed cu_typeexpr;
@@ -475,16 +488,17 @@ func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_sc
     return NoFail;
 
   case &TeApp(a te_app):
-    #check_and_compute_app_type(clq, g, scope, parms, &a, out);
+    #check_and_compute_app_type(clq, g, scope, parms, &a, emissions_app, out);
     return NoFail;
 
   case &TeUnion(a te_union):
     computed_fields_complete bool;
     computed_fields array[te_vardecl];
-    #help_check_and_compute_fields(clq, g, scope, parms, &a.fields, &computed_fields, &computed_fields_complete);
+    #help_check_and_compute_fields(clq, g, scope, parms, &a.fields, emissions_app, &computed_fields, &computed_fields_complete);
     *out = {computed_fields_complete, TeUnion({freeze(&computed_fields)})};
     return NoFail;
 
+  // EMISSIONS() not handled below
   case &TeArraytype(a te_arraytype):
     param cac_typeexpr;
     #check_and_compute_typeexpr(clq, g, scope, parms, oo(&a.param), &param);
@@ -549,7 +563,9 @@ func fake_eval_arraytype_count(x *ast_expr, count_out *u32) np {
 }
 
 func help_check_and_compute_fields(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, a *shray[te_vardecl],
-                                   computed_fields_out *array[te_vardecl], computed_fields_complete_out *bool) np {
+                                   emissions_app *array[unify_emission],
+                                   computed_fields_out *array[te_vardecl],
+                                   computed_fields_complete_out *bool) np {
   all_complete bool = true;
   all_computed array[te_vardecl];
   foreach i size in upto(count(a)) {
@@ -560,7 +576,7 @@ func help_check_and_compute_fields(clq *clqueue, g te_generik_scope, scope *type
       }
     }
     computed cac_typeexpr;
-    #check_and_compute_typeexpr(clq, g, scope, parms, &decl->type, &computed);
+    #check_and_compute_typeexpr(clq, g, scope, parms, &decl->type, emissions_app, &computed);
     all_complete = all_complete & computed.complete;
     push(&all_computed, {decl->name, computed.te});
   }
@@ -594,7 +610,9 @@ func check_and_compute_name_type(clq *clqueue, g te_generik_scope, scope *type_s
 }
 
 func check_and_compute_typeexpr_shray(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls,
-                                      t *shray[te_typeexpr], computed_out *shray[te_typeexpr],
+                                      t *shray[te_typeexpr],
+                                      emissions_app *array[unify_emission],
+                                      computed_out *shray[te_typeexpr],
                                       computed_complete_out *bool) np {
   complete bool = true;
   computed array[te_typeexpr];
@@ -602,7 +620,7 @@ func check_and_compute_typeexpr_shray(clq *clqueue, g te_generik_scope, scope *t
   reserve(&computed, n);
   for i size = 0; i < n; i = i + 1 {
     c cac_typeexpr;
-    #check_and_compute_typeexpr(clq, g, scope, parms, ref(t, i), &c);
+    #check_and_compute_typeexpr(clq, g, scope, parms, ref(t, i), emissions_app, &c);
     push(&computed, c.te);
     complete = complete & c.complete;
   }
@@ -612,16 +630,19 @@ func check_and_compute_typeexpr_shray(clq *clqueue, g te_generik_scope, scope *t
 }
 
 func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, a *te_app,
+                                emissions_app *array[unify_emission],
                                 out *cac_typeexpr) np {
-  if isHas(&a->pack) {
+  if case &Has(pack te_app_pack) = &a->pack {
     // SCOPE(): The pack should have short-circuiting emissions to emit.
     *out = {true, TeApp(*a)};
+    append(emissions_app, &pack.emittance);
     return NoFail;
   }
 
+  emissions1 array[unify_emission];
   params_complete_discard bool;
   params1 shray[te_typeexpr];
-  #check_and_compute_typeexpr_shray(clq, g, scope, parms, &a->params, &params1, &params_complete_discard);
+  #check_and_compute_typeexpr_shray(clq, g, scope, parms, &a->params, &emissions1, &params1, &params_complete_discard);
 
   switch &a->typefunc {
     case &TePureName(value sym): {
@@ -629,9 +650,10 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
 
       // TODO: We could make unify_under_generics retain computedness and prove that we don't have to re-cac the params -- just run all_complete_computed on them.
       // TODO: Also have unify_under_generics look at instpacks?  Using their ipse_mappings too.
+      emissions2 array[unify_emission] = mk_copy(&md.emissions);
       params_complete bool;
       cac_params shray[te_typeexpr];
-      #check_and_compute_typeexpr_shray(clq, g, scope, parms, unHas(&md.learned_params), &cac_params, &params_complete);
+      #check_and_compute_typeexpr_shray(clq, g, scope, parms, unHas(&md.learned_params), &emissions2, &cac_params, &params_complete);
 
       if params_complete {
         // TODO: This is quite duplicated with check_and_compute_parms.  With the changes
@@ -644,16 +666,19 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
           push(&canonical, ~canonicalize_idy_ipses(&ctx, param));
         }
         hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
-        // EMISSIONS() SCOPE(): is this all the emissions?  Like, what about the second time we check_and_compute?
-        inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &hp, &md.emissions);
-        *out = {true, TeApp({TePureName(value), cac_params, Has({{md.ent_id, inst_id}, freeze(&ipse_names), md.emissions})})};
+        emissions2_sh shray[_] = freeze(&emissions2);
+        append(emissions_app, &emissions2_sh);
+        inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &hp, &emissions2_sh);
+        *out = {true, TeApp({TePureName(value), cac_params, Has({{md.ent_id, inst_id}, freeze(&ipse_names), emissions2_sh})})};
       } else {
         *out = {false, TeApp({TePureName(value), cac_params, None})};
+        append(emissions_app, &md.emissions);
       }
       return NoFail;
     }
     case &TePureUnknown: {
       *out = {false, TeApp({TePureUnknown, params1, None})};
+      append(emissions_app, &emissions1);
       return NoFail;
     }
   }
@@ -1246,10 +1271,12 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
 
         switch ent_rhs {
         case &ClassexprRhsSpec(crs classexpr_rhs_spec):
+          rhs_emissions array[unify_emission];
           rhs_fields array[te_vardecl];
           rhs_fields_complete bool;
           if case Unprinted(pm) = help_check_and_compute_fields(
               clq, flatten(&ent->generics), ref_scope(&inst->parms), &inst->parms.repls, &crs.drs.fields,
+              &rhs_emissions,
               &rhs_fields, &rhs_fields_complete) {
             inst->info = FailedComputation;
             return Unprinted(pm);
@@ -1270,11 +1297,16 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
         case &DefstructRhsSpec(drs structspec):
           inst_scope *type_scope = ref_scope(&inst->parms);
 
+          // EMISSIONS(): Use this.
+          rhs_emissions array[unify_emission];
           rhs_fields array[te_vardecl];
           rhs_fields_complete bool;
 
           if case Unprinted(pm) = help_check_and_compute_fields(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
-                                                                &drs.fields, &rhs_fields, &rhs_fields_complete) {
+                                                                &drs.fields,
+                                                                &rhs_emissions,
+                                                                &rhs_fields,
+                                                                &rhs_fields_complete) {
             inst->info = FailedComputation;
             return Unprinted(pm);
           }
@@ -1296,11 +1328,15 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
         case &DefenumRhsSpec(drs enumspec):
           inst_scope *type_scope = ref_scope(&inst->parms);
 
+          // EMISSIONS(): Use this.
+          rhs_emissions array[unify_emission];
           rhs_constructors array[te_vardecl];
           rhs_constructors_complete bool;
 
           if case Unprinted(pm) = help_check_and_compute_fields(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
-                                                                &drs.constructors, &rhs_constructors,
+                                                                &drs.constructors,
+                                                                &rhs_emissions,
+                                                                &rhs_constructors,
                                                                 &rhs_constructors_complete) {
             inst->info = FailedComputation;
             return Unprinted(pm);
