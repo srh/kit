@@ -318,7 +318,7 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
 
       inst_scope *type_scope = ref_scope(&inst->parms);
 
-      // EMISSIONS() Handle this somehow?
+      // EMISSIONS(): Handle this somehow?
       emissions array[unify_emission];
       // Important: We check the typeexpr first.  If that typeexpr cyclically refers to
       // this def, we fail.  If there is no typeexpr, we need to compute it from the rhs
@@ -475,7 +475,7 @@ func nogeneric_check_and_compute_typeexpr(clq *clqueue, scope *type_scope, t *te
   return check_and_compute_typeexpr(clq, ng, scope, &np, t, out);
 }
 
-// EMISSIONS() remove callers of this.
+// EMISSIONS(): remove callers of this.
 func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, t *te_typeexpr,
                                 out *cac_typeexpr) np {
   emissions array[unify_emission];
@@ -487,7 +487,7 @@ func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_sc
 func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, t *te_typeexpr,
                                 emissions_app *array[unify_emission],
                                 out *cac_typeexpr) np {
-  // EMISSIONS() n^2 array concatenation, make some better data structure for this function's emissions
+  // EMISSIONS(): n^2 array concatenation, make some better data structure for this function's emissions
   switch t {
   case &TeName(a te_name):
     computed cu_typeexpr;
@@ -1279,6 +1279,7 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
 
         switch ent_rhs {
         case &ClassexprRhsSpec(crs classexpr_rhs_spec):
+          // EMISSIONS(): Use this.
           rhs_emissions array[unify_emission];
           rhs_fields array[te_vardecl];
           rhs_fields_complete bool;
