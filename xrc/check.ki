@@ -431,35 +431,33 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t_scope *type_scope, 
 // parms have already had generics replaced.  They should also be complete.
 func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_scope, t *genparms, out *idy_genparms) np {
   switch t {
-    case &NoParms: {
-      *out = blank_idyparms();
-      return NoFail;
-    }
-    case &HasParms(ps shray[te_typeexpr]): {
-      nogeneric_g te_generik_scope = empty_generik_scope();
-      nogeneric_parms idy_repls = blank_idyrepls();
-      // EMISSIONS(): Pardon me, use this value.  (Canonicalize them and output them?)
-      emissions array[unify_emission];
-      params_complete bool;
-      params shray[te_typeexpr];
-      #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, &emissions, &params, &params_complete);
+  case &NoParms:
+    *out = blank_idyparms();
+    return NoFail;
+  case &HasParms(ps shray[te_typeexpr]):
+    nogeneric_g te_generik_scope = empty_generik_scope();
+    nogeneric_parms idy_repls = blank_idyrepls();
+    // EMISSIONS(): Pardon me, use this value.  (Canonicalize them and output them?)
+    emissions array[unify_emission];
+    params_complete bool;
+    params shray[te_typeexpr];
+    #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, &emissions, &params, &params_complete);
 
-      if !params_complete {
-        ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
-      }
-
-      canonicalized_scope type_scope = mk_global();
-      ipse_names array[sym];
-      ctx canonicalizing_ctx = {clq->im, t_scope, &ipse_names, &canonicalized_scope};
-      cu_params array[cu_typeexpr];
-      n size = count(&params);
-      reserve(&cu_params, n);
-      for i size = 0; i < n; i = i + 1 {
-        push(&cu_params, ~canonicalize_idy_ipses(&ctx, &params[i]));
-      }
-      *out = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&cu_params)}};
-      return NoFail;
+    if !params_complete {
+      ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
     }
+
+    canonicalized_scope type_scope = mk_global();
+    ipse_names array[sym];
+    ctx canonicalizing_ctx = {clq->im, t_scope, &ipse_names, &canonicalized_scope};
+    cu_params array[cu_typeexpr];
+    n size = count(&params);
+    reserve(&cu_params, n);
+    for i size = 0; i < n; i = i + 1 {
+      push(&cu_params, ~canonicalize_idy_ipses(&ctx, &params[i]));
+    }
+    *out = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&cu_params)}};
+    return NoFail;
   }
 }
 
