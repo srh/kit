@@ -6,7 +6,7 @@
 
 #include "databuf.h"
 #include "identmap.h"
-#include "objfile/objfile.h"
+#include "objfile_objfile.h"
 #include "util.h"
 
 enum objfile_relocation_type {

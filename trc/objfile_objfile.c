@@ -1,4 +1,4 @@
-#include "objfile/objfile.h"
+#include "objfile_objfile.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -7,8 +7,8 @@
 #include "arith.h"
 #include "build.h"
 #include "databuf.h"
-#include "objfile/structs.h"
-#include "objfile/win.h"
+#include "objfile_structs.h"
+#include "objfile_win.h"
 #include "slice.h"
 #include "util.h"
 

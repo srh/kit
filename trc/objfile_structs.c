@@ -1,4 +1,4 @@
-#include "objfile/structs.h"
+#include "objfile_structs.h"
 
 #include "util.h"
 

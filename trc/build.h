@@ -2,7 +2,7 @@
 #define KIT_BUILD_H_
 
 #include "typecheck.h"
-#include "objfile/objfile.h"
+#include "objfile_objfile.h"
 
 /* TODO: Move platform funcs elsewhere, make objfile.c not include build.h */
 int platform_prefix_underscore(enum target_platform platform);

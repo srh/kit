@@ -1,11 +1,11 @@
-#include "objfile/win.h"
+#include "objfile_win.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
 #include "arith.h"
-#include "objfile/structs.h"
+#include "objfile_structs.h"
 #include "util.h"
 
 #define IMAGE_FILE_MACHINE_I386 0x14c

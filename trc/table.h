@@ -4,7 +4,7 @@
 #include "ast.h"
 #include "arity.h"
 #include "primitive.h"
-#include "objfile/objfile.h"
+#include "objfile_objfile.h"
 
 struct checkstate;
 

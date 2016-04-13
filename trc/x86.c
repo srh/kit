@@ -7,7 +7,7 @@
 #include "slice.h"
 #include "table.h"
 #include "typecheck.h"
-#include "objfile/objfile.h"
+#include "objfile_objfile.h"
 
 
 void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,

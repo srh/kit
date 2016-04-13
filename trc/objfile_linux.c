@@ -1,4 +1,4 @@
-#include "objfile/linux.h"
+#include "objfile_linux.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -6,7 +6,7 @@
 
 #include "arith.h"
 #include "databuf.h"
-#include "objfile/structs.h"
+#include "objfile_structs.h"
 #include "util.h"
 
 enum { kEI_NIDENT = 16 };

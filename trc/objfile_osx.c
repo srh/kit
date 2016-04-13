@@ -1,4 +1,4 @@
-#include "objfile/osx.h"
+#include "objfile_osx.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -6,7 +6,7 @@
 
 #include "arith.h"
 #include "databuf.h"
-#include "objfile/structs.h"
+#include "objfile_structs.h"
 #include "util.h"
 
 /* Beware: The endianness of these fields can depend on the endianness
