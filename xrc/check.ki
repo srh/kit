@@ -19,19 +19,17 @@ func finish_checking(cs *checkstate, clq *clqueue) np {
   check(cs->instantiation_depth == 0);
   while case Has(entry clqueue_entry) = popval(&clq->entries) {
     switch &entry {
-      case &ClqDeftypeEntry(e clqueue_deftype_entry): {
-        rw depth_rewinder;
-        #set_instantiation_depth(cs, e.instantiation_depth, &rw);
-        #ensure_deftype_inst_checked(clq, e.ent_id, e.inst_id);
-      }
-      case &ClqDefEntry(e clqueue_def_entry): {
-        rw depth_rewinder;
-        #set_instantiation_depth(cs, e.instantiation_depth, &rw);
-        // NOTE: It would be nice if checking/graphing, and evaling, were done in separate
-        // phases as much as possible.
-        val_discard *st_value;
-        #ensure_def_inst_evaled(clq, e.ent_id, e.inst_id, &val_discard);
-      }
+    case &ClqDeftypeEntry(e clqueue_deftype_entry):
+      rw depth_rewinder;
+      #set_instantiation_depth(cs, e.instantiation_depth, &rw);
+      #ensure_deftype_inst_checked(clq, e.ent_id, e.inst_id);
+    case &ClqDefEntry(e clqueue_def_entry):
+      rw depth_rewinder;
+      #set_instantiation_depth(cs, e.instantiation_depth, &rw);
+      // NOTE: It would be nice if checking/graphing, and evaling, were done in separate
+      // phases as much as possible.
+      val_discard *st_value;
+      #ensure_def_inst_evaled(clq, e.ent_id, e.inst_id, &val_discard);
     }
   }
   return NoFail;
