@@ -1275,12 +1275,12 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     case &OneGlobalMatch(egm es_global_match): {
       ent *def_entry = ref_def_entry(es->cs, egm.ent_id);
 
-      // EMISSIONS(): Do something.
       emissions array[unify_emission];
       // This parallels or plagairizes ensure_def_inst_type_computed.
       // TODO: Dedup anything?
       matched_parms idy_repls;
       #check_and_compute_parms_no_canonicalize(es->clq, &es->tscope, &egm.parms, &emissions, &matched_parms);
+      // ^ this is kind of weird -- we've done a global match, so we could just canonicalize the def inst parms/emittance or somethnig?  No?
 
       ent_typeexpr *te_typeexpr;
       #def_converted_typeexpr(ent, &ent_typeexpr);
@@ -1293,7 +1293,8 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       props type_properties;
       #compute_type_properties(es->clq, &es->tscope, &cu_computed, &props);
 
-      annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id, {egm.emissions}}));
+      append(&emissions, &egm.emissions);
+      annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id, {freeze(&emissions)}}));
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, cu_computed, props})),
                                         cu_computed, props)));
       return NoFail;
