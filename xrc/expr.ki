@@ -2128,7 +2128,7 @@ func decompose_indexable(clq *clqueue, scope *type_scope, typ *te_typeexpr,
   case &OneMatch(m ent_and_parms):
     inst_id def_inst_id;
     #make_inst(clq, m.ent, scope, &m.parms, &inst_id);
-    ty *cu_typrop;
+    ty *def_inst_typeinfo;
     #ensure_def_inst_type_computed(clq->cs, clq, ref_def_entry(clq->cs, m.ent), inst_id, &ty);
     arr_ptr_type *te_typeexpr;
     key_type *te_typeexpr;

@@ -300,23 +300,22 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms, emitta
 
 // Outputs a stable pointer.
 func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
-                                   inst_id def_inst_id, out **cu_typrop) np {
+                                   inst_id def_inst_id, out **def_inst_typeinfo) np {
   inst *def_inst = ref_inst(cs, inst_id);
-  switch &inst->typrop {
+  switch &inst->typeinfo {
     case &NotComputed: {
       rw depth_rewinder;
       #set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms.repls), &rw);
-      inst->typrop = BeganComputing;
+      inst->typeinfo = BeganComputing;
 
       ent_typeexpr *te_typeexpr;
       if case Unprinted(pm) = def_converted_typeexpr(ent, &ent_typeexpr) {
-        inst->typrop = FailedComputation;
+        inst->typeinfo = FailedComputation;
         return Unprinted(pm);
       }
 
       inst_scope *type_scope = ref_scope(&inst->parms);
 
-      // EMISSIONS(): Handle this somehow?
       emissions array[unify_emission];
       // Important: We check the typeexpr first.  If that typeexpr cyclically refers to
       // this def, we fail.  If there is no typeexpr, we need to compute it from the rhs
@@ -324,23 +323,23 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       computed cac_typeexpr;
       if case Unprinted(pm) = check_and_compute_typeexpr(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
                                                          ent_typeexpr, &emissions, &computed) {
-        inst->typrop = FailedComputation;
+        inst->typeinfo = FailedComputation;
         return Unprinted(pm);
       }
       check(computed.complete);
       props type_properties;
       cu_computed cu_typeexpr = ~computed.te;
       if case Unprinted(pm) = compute_type_properties(clq, inst_scope, &cu_computed, &props) {
-        inst->typrop = FailedComputation;
+        inst->typeinfo = FailedComputation;
         return Unprinted(pm);
       }
       if !is_defwise_trivial(&props) {
-        inst->typrop = FailedComputation;
+        inst->typeinfo = FailedComputation;
         return ERR(_u8("def (instantiation) has non-trivial type"));
       }
 
-      inst->typrop = Computed({cu_computed, props});
-      *out = un(&inst->typrop);
+      inst->typeinfo = Computed({cu_computed, props, freeze(&emissions)});
+      *out = un(&inst->typeinfo);
       return NoFail;
     }
     case &BeganComputing: {
@@ -349,7 +348,7 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
     case &FailedComputation: {
       return ERR(_u8("revisiting def's type after failure for "), lookup(cs->im, ent->def_name));
     }
-    case &Computed(typr cu_typrop): {
+    case &Computed(typr def_inst_typeinfo): {
       *out = &typr;
       return NoFail;
     }
@@ -358,8 +357,8 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
 
 func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, inst_id def_inst_id) np {
   ent *def_entry = ref_def_entry(cs, ent_id);
-  typrop *cu_typrop;
-  #ensure_def_inst_type_computed(cs, clq, ent, inst_id, &typrop);
+  typeinfo *def_inst_typeinfo;
+  #ensure_def_inst_type_computed(cs, clq, ent, inst_id, &typeinfo);
   inst *def_inst = ref_inst(cs, inst_id);
   switch inst->rhs_status {
     case DidNotCheckRhs: {
@@ -376,7 +375,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
         case &InstRhsExpr(rhs def_inst_rhs_expr): {
           info frame_info;
           #check_def_expr(clq, ent->accessible, flatten(&ent->generics), &inst->parms, &rhs.ec,
-                          &typrop->cu.x, ent->def_name, &info);
+                          &typeinfo->cu.x, ent->def_name, &info);
           annotate(&rhs.frame_info, move(&info));
         }
         case &InstRhsNonMagic(nonmag def_non_magic): {

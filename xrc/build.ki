@@ -88,7 +88,7 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
       idyparms idy_genparms = blank_idyparms();
       if case Has(inst_id def_inst_id) = lookup_sole_value(&ent->insts, &idyparms) {
         inst *def_inst = ref_inst(cs, inst_id);
-        if !is_fn_type(cs, &un(&inst->typrop)->cu.x) {
+        if !is_fn_type(cs, &un(&inst->typeinfo)->cu.x) {
           return ERR(_u8("Cannot codegen export symbols for non-fn def (can only export functions)"));
         }
         if case &Computed(val st_value) = &inst->evaled_value {

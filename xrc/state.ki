@@ -593,6 +593,14 @@ struct frame_regraphed {
   cell cell_num;
 }
 
+struct def_inst_typeinfo {
+  cu cu_typeexpr;
+  props type_properties;
+  // Don't forget to combine this with parms_emittance?  SIGH!  Fuck this planet.
+  // EMISSIONS: Actually use this somehow...
+  emittance shray[unify_emission];
+}
+
 struct def_inst {
   parms idy_genparms;
   // Emissions that are emitted just by the parms having the types that they have.
@@ -603,7 +611,7 @@ struct def_inst {
   // The concrete type (with generics replaced) once we've computed it and checked it.
   // And its properties.  TODO: Many needless uses of "un," also some of the users of this
   // could stand to take one cu_typrop parameter instead of its fields separately.
-  typrop nbfc[cu_typrop];
+  typeinfo nbfc[def_inst_typeinfo];
   rhs_status def_inst_rhs_status;
   graph nbfc[frame_regraphed];
   evaled_value nbfc[st_value];

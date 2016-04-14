@@ -3329,23 +3329,23 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
 
   ent *def_entry = ref_def_entry(clq->cs, ent_id);
   inst *def_inst = ref_inst(clq->cs, inst_id);
-  inst_typrop_scope *type_scope = ref_scope(&inst->parms);
-  inst_typrop *cu_typrop = un(&inst->typrop);
+  inst_typeinfo_scope *type_scope = ref_scope(&inst->parms);
+  inst_typeinfo *def_inst_typeinfo = un(&inst->typeinfo);
   switch &inst->graph {
     case &NotComputed: {
       inst->graph = BeganComputing;
       switch &inst->rhs {
         case &InstRhsPrim(op primitive_op): {
-          id fn_body_id = #add_prim_fn_body(clq, ent->def_name, inst_typrop_scope, &inst_typrop->cu, op);
-          frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typrop_scope, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
+          id fn_body_id = #add_prim_fn_body(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, op);
+          frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
           inst->graph = Computed(move(&frg));
           return NoFail;
         }
         case &InstRhsExtern: {
           id fn_body_id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
-          // inst_typrop_scope'll be the global anyway, so we do that explicitly.
+          // inst_typeinfo_scope'll be the global anyway, so we do that explicitly.
           scope type_scope = mk_global();
-          frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &scope, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
+          frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
           inst->graph = Computed(move(&frg));
           return NoFail;
         }
@@ -3380,12 +3380,12 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
           switch &nonmag {
           case &NonMagicCtor(wnmc which_non_magic_ctor):
             info *non_magic_ctor_info = un(&wnmc.nmc.info);
-            frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typrop_scope, &inst_typrop->cu, &inst_typrop->props, ConstDef(info->ip));
+            frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstDef(info->ip));
             inst->graph = Computed(move(&frg));
             return NoFail;
           case &NonMagicProp(nmp non_magic_prop):
             info u32 = *un(&nmp.info);
-            frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typrop_scope, &inst_typrop->cu, &inst_typrop->props, @[gr_const]ConstInt(~info));
+            frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, @[gr_const]ConstInt(~info));
             inst->graph = Computed(move(&frg));
             return NoFail;
           }
@@ -3399,12 +3399,12 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
             return_cell cell_num;
             arg_cells array[cell_num];
             inline should_inline;
-            #gr_magic(clq, inst_typrop_scope, &mag, &body_gr, &body_gn, &return_cell, &arg_cells, &inline);
+            #gr_magic(clq, inst_typeinfo_scope, &mag, &body_gr, &body_gn, &return_cell, &arg_cells, &inline);
             #vt_graph(clq, &body_gr, body_gn);
             id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells, inline, NotComputed})});
           }
 
-          frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typrop_scope, &inst_typrop->cu, &inst_typrop->props, ConstFnBody(id));
+          frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
           inst->graph = Computed(move(&frg));
           return NoFail;
         }
