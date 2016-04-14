@@ -257,9 +257,9 @@ func deftype_converted_rhs(np *deftype_nonprim, out **deftype_rhs_spec) np {
   }
 }
 
-func enqueue_def_inst(clq *clqueue, id def_entry_id, parms *idy_genparms) def_inst_id {
+func enqueue_def_inst(clq *clqueue, id def_entry_id, parms *idy_genparms, emittance *shray[unify_emission]) def_inst_id {
   cs *checkstate = clq->cs;
-  res id_and_created = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
+  res id_and_created = ensure_def_inst(cs, ref_def_entry(cs, id), parms, emittance);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDefEntry({id, res.id, cs->instantiation_depth}));
   }
@@ -272,7 +272,7 @@ struct id_and_created {
 }
 
 // rhs is "None" for extern defs and primitive defs.
-func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms) id_and_created {
+func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms, emittance *shray[unify_emission]) id_and_created {
   if case Has(id def_inst_id) = lookup(&ent->insts, parms) {
     return {id, false};
   }
@@ -295,7 +295,7 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms) id_and
     case &DefnMagic(mag def_magic):
       rhs = InstRhsMagic(mag);
   }
-  id def_inst_id = add_inst(cs, mk(*parms, rhs));
+  id def_inst_id = add_inst(cs, mk(*parms, *emittance, rhs));
   check_insert(&ent->insts, parms, id);
   return {id, true};
 }
@@ -812,8 +812,9 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) np {
   switch &ent->generics {
     case &TeNoGenerics: {
       parms idy_genparms = blank_idyparms();
+      parms_emittance shray[unify_emission] = mk_empty_emittance();
       clq clqueue = mk(cs);
-      discard_inst_id def_inst_id = enqueue_def_inst(&clq, id, &parms);
+      discard_inst_id def_inst_id = enqueue_def_inst(&clq, id, &parms, &parms_emittance);
       return finish_checking(cs, &clq);
     }
     case &TeHasGenerics(ig): {
@@ -1186,10 +1187,9 @@ func make_magic_inst(clq *clqueue, magic_name sym, arity size, scope *type_scope
 
 func make_inst(clq *clqueue, ent def_entry_id, parms_scope *type_scope, parms *genparms, inst_out *def_inst_id) np {
   idy_parms idy_genparms;
-  // EMISSIONS(): Use emittance.
   emittance shray[unify_emission];
   #check_and_compute_parms_with_canonicalization(clq, parms_scope, parms, &idy_parms, &emittance);
-  inst_id def_inst_id = enqueue_def_inst(clq, ent, &idy_parms);
+  inst_id def_inst_id = enqueue_def_inst(clq, ent, &idy_parms, &emittance);
   *inst_out = inst_id;
   return NoFail;
 }

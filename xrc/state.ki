@@ -595,6 +595,8 @@ struct frame_regraphed {
 
 struct def_inst {
   parms idy_genparms;
+  // Emissions that are emitted just by the parms having the types that they have.
+  parms_emittance shray[unify_emission];
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics
   // replaced.  This is None if we have an extern def or primitive def.
   rhs def_inst_rhs;
@@ -607,8 +609,8 @@ struct def_inst {
   evaled_value nbfc[st_value];
 }
 
-func mk(parms idy_genparms, rhs def_inst_rhs) def_inst {
-  return {parms, rhs, NotComputed, DidNotCheckRhs, NotComputed, NotComputed};
+func mk(parms idy_genparms, parms_emittance shray[unify_emission], rhs def_inst_rhs) def_inst {
+  return {parms, parms_emittance, rhs, NotComputed, DidNotCheckRhs, NotComputed, NotComputed};
 }
 
 struct def_nonprim {
