@@ -398,7 +398,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
 }
 
 // parms have already had generics replaced.  They should also be complete.
-func check_and_compute_parms_no_canonicalize(clq *clqueue, t_scope *type_scope, t *genparms, out *idy_repls) np {
+func check_and_compute_parms_no_canonicalize(clq *clqueue, t_scope *type_scope, t *genparms, emissions_app *array[unify_emission], out *idy_repls) np {
   switch t {
   case &NoParms:
     *out = blank_idyrepls();
@@ -406,11 +406,9 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t_scope *type_scope, 
   case &HasParms(ps shray[te_typeexpr]):
     nogeneric_g te_generik_scope = empty_generik_scope();
     nogeneric_parms idy_repls = blank_idyrepls();
-    // EMISSIONS(): Use this somehow.
-    emissions array[unify_emission];
     params_complete bool;
     params shray[te_typeexpr];
-    #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, &emissions, &params, &params_complete);
+    #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, emissions_app, &params, &params_complete);
 
     if !params_complete {
       ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
