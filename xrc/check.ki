@@ -429,10 +429,12 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t_scope *type_scope, 
 }
 
 // parms have already had generics replaced.  They should also be complete.
-func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_scope, t *genparms, out *idy_genparms) np {
+// Emits canonicalized emittance.
+func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_scope, t *genparms, out *idy_genparms, emittance_out *shray[unify_emission]) np {
   switch t {
   case &NoParms:
     *out = blank_idyparms();
+    *emittance_out = mk_empty_emittance();
     return NoFail;
   case &HasParms(ps shray[te_typeexpr]):
     nogeneric_g te_generik_scope = empty_generik_scope();
@@ -457,6 +459,8 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_s
       push(&cu_params, ~canonicalize_idy_ipses(&ctx, &params[i]));
     }
     *out = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&cu_params)}};
+    frozen_emittance shray[unify_emission] = freeze(&emissions);
+    *emittance_out = canonicalized_emittance(&ctx, &frozen_emittance);
     return NoFail;
   }
 }
@@ -1182,7 +1186,9 @@ func make_magic_inst(clq *clqueue, magic_name sym, arity size, scope *type_scope
 
 func make_inst(clq *clqueue, ent def_entry_id, parms_scope *type_scope, parms *genparms, inst_out *def_inst_id) np {
   idy_parms idy_genparms;
-  #check_and_compute_parms_with_canonicalization(clq, parms_scope, parms, &idy_parms);
+  // EMISSIONS(): Use emittance.
+  emittance shray[unify_emission];
+  #check_and_compute_parms_with_canonicalization(clq, parms_scope, parms, &idy_parms, &emittance);
   inst_id def_inst_id = enqueue_def_inst(clq, ent, &idy_parms);
   *inst_out = inst_id;
   return NoFail;
