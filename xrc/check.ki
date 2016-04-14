@@ -434,7 +434,6 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_s
   case &HasParms(ps shray[te_typeexpr]):
     nogeneric_g te_generik_scope = empty_generik_scope();
     nogeneric_parms idy_repls = blank_idyrepls();
-    // EMISSIONS(): Pardon me, use this value.  (Canonicalize them and output them?)
     emissions array[unify_emission];
     params_complete bool;
     params shray[te_typeexpr];
