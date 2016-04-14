@@ -810,19 +810,17 @@ func lookup_plain_generic(g te_generik_scope, parms *idy_repls, name sym, out *c
 func ensure_def_checked(cs *checkstate, id def_entry_id) np {
   ent *def_entry = ref_def_entry(cs, id);
   switch &ent->generics {
-    case &TeNoGenerics: {
-      parms idy_genparms = blank_idyparms();
-      parms_emittance shray[unify_emission] = mk_empty_emittance();
-      clq clqueue = mk(cs);
-      discard_inst_id def_inst_id = enqueue_def_inst(&clq, id, &parms, &parms_emittance);
-      return finish_checking(cs, &clq);
-    }
-    case &TeHasGenerics(ig): {
-      discard *te_typeexpr;
-      #def_converted_typeexpr(ent, &discard);
-      // We declare success -- we check non-generic defs.
-      return NoFail;
-    }
+  case &TeNoGenerics:
+    parms idy_genparms = blank_idyparms();
+    parms_emittance shray[unify_emission] = mk_empty_emittance();
+    clq clqueue = mk(cs);
+    discard_inst_id def_inst_id = enqueue_def_inst(&clq, id, &parms, &parms_emittance);
+    return finish_checking(cs, &clq);
+  case &TeHasGenerics(ig):
+    discard *te_typeexpr;
+    #def_converted_typeexpr(ent, &discard);
+    // We declare success -- we check non-generic defs.
+    return NoFail;
   }
 }
 
