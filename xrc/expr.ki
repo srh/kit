@@ -329,8 +329,9 @@ func ds_lookup_constructor(ds *defscope, scope *type_scope, name sym, gp *genpar
   case BadArity:
     return NoFail(NoMatchConstructor);
   case Success:
+    emissions array[unify_emission];
     cac_return_type cac_typeexpr;
-    #nogeneric_check_and_compute_typeexpr(ds->clq, scope, return_type, &cac_return_type);
+    #nogeneric_check_and_compute_typeexpr(ds->clq, scope, return_type, &emissions, &cac_return_type);
     if !cac_return_type.complete {
       return NoFail(AmbigMatchConstructor);
     }
@@ -350,13 +351,12 @@ func ds_lookup_constructor(ds *defscope, scope *type_scope, name sym, gp *genpar
     }
     // rhs_type is complete.
     unified te_typeexpr;
-    emissions array[unify_emission];
     if !unify_types(scope, arg_type, rhs_type, &emissions, &unified) {
       return NoFail(NoMatchConstructor);
     }
     ctor_type te_typeexpr = fn_type(ds->cs, *rhs_type, cac_return_type.te);
     cac_ctor_type cac_typeexpr;
-    #nogeneric_check_and_compute_typeexpr(ds->clq, scope, &ctor_type, &cac_ctor_type);
+    #nogeneric_check_and_compute_typeexpr(ds->clq, scope, &ctor_type, &emissions, &cac_ctor_type);
     check(cac_ctor_type.complete);
 
     ip instpair = #lookup_or_make_enum_constructor_def(ds, scope, &et, &cac_return_type.te, &cac_ctor_type.te, decl_index);
