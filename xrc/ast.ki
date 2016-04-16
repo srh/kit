@@ -449,13 +449,13 @@ struct ast_deref_field {
 }
 
 // This could just have an instpair.
-struct global_info {
+struct ast_global_info {
   ent def_entry_id;
   inst def_inst_id;
   emissions emissions_info;
 }
 
-struct local_info {
+struct ast_local_info {
   varnum var_number;
   emissions emissions_info;
 }
@@ -477,8 +477,8 @@ struct enum_voidconstructed_info {
 }
 
 enum ast_name_expr_info {
-  LocalResolve local_info;
-  GlobalResolve global_info;
+  LocalResolve ast_local_info;
+  GlobalResolve ast_global_info;
   EnumConstructor enum_constructor_info;
   EnumVoidConstructed enum_voidconstructed_info;
 }

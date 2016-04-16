@@ -2171,9 +2171,9 @@ func gr_name_expr(gs gr_statep, x *ast_expr, a *ast_name_expr, bu *sq_builder) v
   // Generally for rvalues we write constant values here -- we can activate *after* we've
   // written a constant value.  No atomic activation necessary.
   switch un(&a->name_info) {
-  case &LocalResolve(li local_info):
+  case &LocalResolve(li ast_local_info):
     void;
-  case &GlobalResolve(gi global_info):
+  case &GlobalResolve(gi ast_global_info):
     add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstDef({gi.ent, gi.inst})}));
     add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
   case &EnumConstructor(ei enum_constructor_info):
