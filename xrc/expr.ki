@@ -842,6 +842,7 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_exp
   }
   #check_expr_ai(es, ai, oo(&a->expr), &unified_computed.te);
   annotate_info(x, oo(&a->expr)->info);
+  // EMISSIONS(): This is no-go, we'd re-annotate the emissions if there's an IncompleteCheck.
   annotate(&a->emissions, {freeze(&emissions)});
   return NoFail;
 }
