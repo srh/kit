@@ -735,10 +735,6 @@ struct ast_expr_complete_info {
   emissions opt[emissions_info];
 }
 
-func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties) ast_expr_complete_info {
-  return {lval, cu, cu_props, None};
-}
-
 func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties, emissions emissions_info) ast_expr_complete_info {
   return {lval, cu, cu_props, Has(emissions)};
 }

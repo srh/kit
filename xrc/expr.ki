@@ -529,7 +529,7 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
       ice(_u8("help_check_simple_literal passed type with bad properties: "), pm.msg);
     }
 
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~c.te, props})), ~c.te, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~c.te, props})), ~c.te, props, {freeze(&emissions)})));
   } else {
     annotate_info(x, @[ast_expr_info]IncompleteCheck);
   }
@@ -1526,7 +1526,7 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   check(is_complete_computed(pt).computed);
   props type_properties;
   #compute_complete_type_properties(es->clq, &es->tscope, pt, &props);
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props, {mk_empty_emittance()})));
   return NoFail;
 }
 
