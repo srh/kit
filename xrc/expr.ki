@@ -555,6 +555,17 @@ func check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_type
   return NoFail;
 }
 
+func copy_info(x *ast_expr_info, emissions emissions_info) ast_expr_info {
+  switch x {
+  case &NoInfo:
+    return NoInfo;
+  case &IncompleteCheck:
+    return IncompleteCheck;
+  case &CompleteCheck(i ast_expr_complete_info):
+    return CompleteCheck({i.lval, i.cu, i.cu_props, Has(emissions)});
+  }
+}
+
 func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) np {
   switch &x->u {
     case &NameExpr(a ast_name_expr):
@@ -562,7 +573,7 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
 
     case &ParenExpr(a ast_paren_expr):
       #check_expr_ai(es, ai, oo(&a.expr), pt);
-      annotate_info(x, oo(&a.expr)->info);
+      annotate_info(x, copy_info(&oo(&a.expr)->info, {mk_empty_emittance()}));
       return NoFail;
 
     case &NumericLiteral(a ast_numeric_literal):
@@ -841,9 +852,8 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_exp
     }
   }
   #check_expr_ai(es, ai, oo(&a->expr), &unified_computed.te);
-  annotate_info(x, oo(&a->expr)->info);
-  // EMISSIONS(): This is no-go, we'd re-annotate the emissions if there's an IncompleteCheck.
-  annotate(&a->emissions, {freeze(&emissions)});
+  // Obviously (it's obvious to me) sometimes these computed emissions get discarded, but then they'll get recomputed.
+  annotate_info(x, copy_info(&oo(&a->expr)->info, {freeze(&emissions)}));
   return NoFail;
 }
 
