@@ -945,8 +945,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
       lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
     }
   }
-  annotate(&a->emissions, {emissions});
-  annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
+  annotate_info(x, CompleteCheck(mk(lval, fieldtype, props, {emissions})));
   return NoFail;
 }
 

@@ -420,7 +420,6 @@ enum ast_local_field_info {
 
 struct ast_local_field {
   info nc[ast_local_field_info];
-  emissions nc[emissions_info];
   lhs box[ast_expr];
   fieldname ast_fieldname;
 }
