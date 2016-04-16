@@ -969,8 +969,7 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
     #compute_complete_type_properties(es->clq, &es->tscope, param, &props);
     annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}),
                                                            DeadMe, ipse}),
-                                      ~ *param, props)));
-    annotate(&a->emissions, {freeze(&emissions)});
+                                      ~ *param, props, {freeze(&emissions)})));
     return NoFail;
   }
   return ERR(_u8("Trying to deref a non-pointer, non-reference."));
