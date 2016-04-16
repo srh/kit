@@ -384,8 +384,8 @@ func lookup_or_make_enum_constructor_def(ds *defscope, scope *type_scope, et *en
     case &OneMatch(m ent_and_parms):
       // EMISSIONS: We've already established the emissions when creating the ctor_type?  No?  So we ignore m.emissions?
       inst_id def_inst_id;
-      if !from_np(make_inst(ds->clq, m.ent, scope, &m.parms, &inst_id)) {
-        ice(_u8("lookup_or_make_enum_constructor_def make_inst failed after match"));
+      if case Unprinted(pm) = make_inst(ds->clq, m.ent, scope, &m.parms, &inst_id) {
+        ice(_u8("lookup_or_make_enum_constructor_def make_inst failed after match: "), pm.msg);
       }
       return NoFail({m.ent, inst_id});
     }
@@ -422,8 +422,8 @@ func lookup_or_make_enum_constructor_def(ds *defscope, scope *type_scope, et *en
   ent def_entry_id = add_def_primitive(ds->cs, defname, TeNoGenerics, *ctor_type,
                                        @[def_definition]DefnMagic(MagicEnumConstruct(mec)));
   inst_id def_inst_id;
-  if !from_np(make_inst(ds->clq, ent, scope, &nogp, &inst_id)) {
-    ice(_u8("lookup_or_make_enum_constructor_def make_inst failed on fresh def"));
+  if case Unprinted(pm) = make_inst(ds->clq, ent, scope, &nogp, &inst_id) {
+    ice(_u8("lookup_or_make_enum_constructor_def make_inst failed on fresh def: "), pm.msg);
   }
 
   return NoFail({ent, inst_id});
@@ -520,13 +520,13 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
     check(empty(&emissions));
 
     c cac_typeexpr;
-    if !from_np(nogeneric_check_and_compute_typeexpr(es->clq, &es->tscope, &unified, &c)) {
-      ice(_u8("help_check_simple_literal passed bad type"));
+    if case Unprinted(pm) = nogeneric_check_and_compute_typeexpr(es->clq, &es->tscope, &unified, &c) {
+      ice(_u8("help_check_simple_literal passed bad type: "), pm.msg);
     }
     check(c.complete);
     props type_properties;
-    if !from_np(compute_complete_type_properties(es->clq, &es->tscope, &c.te, &props)) {
-      ice(_u8("help_check_simple_literal passed type with bad properties"));
+    if case Unprinted(pm) = compute_complete_type_properties(es->clq, &es->tscope, &c.te, &props) {
+      ice(_u8("help_check_simple_literal passed type with bad properties: "), pm.msg);
     }
 
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~c.te, props})), ~c.te, props)));
@@ -837,8 +837,8 @@ func check_expr_typed_expr(es *framescope, ai allow_incomplete, a *ast_typed_exp
   if computed.complete {
     unified_computed = computed;
   } else {
-    if !from_np(nogeneric_check_and_compute_typeexpr(es->clq, &es->tscope, &unified, &unified_computed)) {
-      return ERR(_u8("TypedExpr encounters un-computable unified type."));
+    if case Unprinted(pm) = nogeneric_check_and_compute_typeexpr(es->clq, &es->tscope, &unified, &unified_computed) {
+      return ERR(_u8("TypedExpr encounters un-computable unified type: "), pm.msg);
     }
   }
   #check_expr_ai(es, ai, oo(&a->expr), &unified_computed.te);
@@ -1977,8 +1977,8 @@ func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
 
 func compute_prim_with_scope(clq *clqueue, scope *type_scope, t te_typeexpr) cu_typeexpr {
   cac cac_typeexpr;
-  if !from_np(nogeneric_check_and_compute_typeexpr(clq, scope, &t, &cac)) {
-    ice(_u8("compute_prim encounters uncomputable type"));
+  if case Unprinted(pm) = nogeneric_check_and_compute_typeexpr(clq, scope, &t, &cac) {
+    ice(_u8("compute_prim encounters uncomputable type: "), pm.msg);
   }
   check(cac.complete);
   return ~cac.te;
@@ -1997,8 +1997,8 @@ func compute_prim(clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type
 
 func compute_prim_with_scope(clq *clqueue, scope *type_scope, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
   type cu_typeexpr = compute_prim(clq, t);
-  if !from_np(compute_type_properties(clq, scope, &type, props_out)) {
-    ice(_u8("compute_prim fails to compute type properties"));
+  if case Unprinted(pm) = compute_type_properties(clq, scope, &type, props_out) {
+    ice(_u8("compute_prim fails to compute type properties: "), pm.msg);
   }
   *out = type;
 }

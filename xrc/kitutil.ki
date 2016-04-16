@@ -3,6 +3,7 @@ import state;
 
 // A "printed" error happened.  (More like, "to be printed.")
 struct err_printed {
+  // True if location info is part of msg.
   printed_meta bool;
   msg array[u8];
 }
@@ -12,18 +13,8 @@ struct err_printed {
 enum np {
   // No failure happened.
   #NoFail void;
-  // We had a failure, and an error message was printed.  True if location info was printed.
+  // We had a failure...
   Unprinted err_printed;
-}
-
-// Callers of this are OK with discarding Unprinted info (presumably).
-func from_np(x np) bool {
-  switch x {
-  case NoFail: return true;
-  case Unprinted(pm err_printed):
-    dump_err_printed(pm);
-    return false;
-  }
 }
 
 // cr = check result.

@@ -1171,8 +1171,8 @@ func make_magic_inst(clq *clqueue, magic_name sym, arity size, scope *type_scope
   // It is templatized on one type parameter (type).
   parms genparms = HasParms(mk_shray(*type));
   inst_id def_inst_id;
-  if !from_np(make_inst(clq, ent_id, scope, &parms, &inst_id)) {
-    ice(_u8("make_inst (from make_magic_inst) seeing error... what?"));
+  if case Unprinted(pm) = make_inst(clq, ent_id, scope, &parms, &inst_id) {
+    ice(_u8("make_inst (from make_magic_inst) seeing error... what?: "), pm.msg);
   }
   return {ent_id, inst_id};
 }
