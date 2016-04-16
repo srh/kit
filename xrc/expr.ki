@@ -827,7 +827,7 @@ func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt 
   reannotate_static_to_virtual(es, result_cell(oo(&a->then_clause)));
   reannotate_static_to_virtual(es, result_cell(oo(&a->else_clause)));
   conj *cell_info = ref_cell(es, conjoined);
-  annotate_info(x, @[ast_expr_info]CompleteCheck({IsLvalNo({conjoined, conjoined}), conj->type, conj->props, None}));
+  annotate_info(x, @[ast_expr_info]CompleteCheck({IsLvalNo({conjoined, conjoined}), conj->type, conj->props, Has({mk_empty_emittance()})}));
   return NoFail;
 }
 
@@ -1033,7 +1033,8 @@ func check_expr_assignment(es *framescope, a *ast_assignment, pt *te_typeexpr, x
   case &IsLvalYes(desc lval_description):
     #check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), &lhs_info->cu.x);
     #annotate_disposal_for_assignment(es, desc.num, oo(&a->rhs), a);
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, void_typrop.cu, void_typrop.props})), void_typrop.cu, void_typrop.props)));
+    // I don't know if we really (in the long run) have empty emittance.  Like, the assignee and assignment value can't have certain relationships?
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, void_typrop.cu, void_typrop.props})), void_typrop.cu, void_typrop.props, {mk_empty_emittance()})));
     return NoFail;
   }
 }
@@ -1326,11 +1327,12 @@ func check_expr_string_literal(es *framescope, a *ast_string_literal, pt *te_typ
   if !unifies(&type.x, pt) {
     return ERR(_u8("string literal in bad place"));
   }
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, type, props})), type, props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, type, props})), type, props, {mk_empty_emittance()})));
   return NoFail;
 }
 
 func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt *te_typeexpr, x *ast_expr) np {
+  // I haven't thought about why emittance is empty in this function.  I guess because we expect the partial type to be complete.
   if !is_complete(pt) {
     if ai == AllowIncompleteYes {
       // NOTE: We could have more specific info, like number of fields and their incomplete types.
@@ -1370,7 +1372,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       p_i *ast_strinit_param = ref(&a->exprs, ~i);
       annotate(&p_i->info, {i * param_props.flat_size});
     }
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props, {mk_empty_emittance()})));
     return NoFail;
   } else {
     b structspec;
@@ -1408,7 +1410,7 @@ func check_expr_strinit(es *framescope, ai allow_incomplete, a *ast_strinit, pt 
       p_i *ast_strinit_param = &a->exprs[i];
       annotate(&p_i->info, {offsets[i]});
     }
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props)));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *pt, props})), ~ *pt, props, {mk_empty_emittance()})));
     return NoFail;
   }
 }
@@ -1896,7 +1898,7 @@ func check_expr_logical_conjunction(es *framescope, a *ast_logical_conjunction, 
   }
   #check_expr_consume(es, oo(&a->lhs), &ty.cu.x);
   #check_expr_consume(es, oo(&a->rhs), &ty.cu.x);
-  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ty.cu, ty.props})), ty.cu, ty.props)));
+  annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ty.cu, ty.props})), ty.cu, ty.props, {mk_empty_emittance()})));
   return NoFail;
 }
 
@@ -1930,8 +1932,9 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(&oo(&a->fun)->expr)->x);
   props type_properties;
   #compute_complete_type_properties(es->clq, &es->tscope, return_type, &props);
+  // EMISSIONS: This is nuts, how could this emittance be empty?  Oh, because it's in the name lookup on the function expression?  Okay.
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *return_type, props})),
-                                    ~ *return_type, props)));
+                                    ~ *return_type, props, {mk_empty_emittance()})));
   return NoFail;
 }
 
@@ -2091,7 +2094,8 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     }
   }
 
-  annotate_info(x, CompleteCheck(mk(lval, ~ *result_type, result_props)));
+  // We happen to emit our emissions... more specifically.  I'm not sure how you should feel about this.
+  annotate_info(x, CompleteCheck(mk(lval, ~ *result_type, result_props, {mk_empty_emittance()})));
   return NoFail;
 }
 
