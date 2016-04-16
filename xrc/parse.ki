@@ -200,7 +200,7 @@ func parse_rest_of_func(p *ps, is_export ast_isexport, is_inline ast_isinline, o
   end(p, lambda_expr_meta);
 
   *out = Def({is_export, IsNotVar, generics, name, None,
-              consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({NotComputed, is_inline, move(&params), return_type, {NotComputed, move(&body)}})))});
+              consume(mk(lambda_expr_meta, @[ast_expr_enum]Lambda({is_inline, move(&params), return_type, {NotComputed, move(&body)}})))});
   return Success;
 }
 
@@ -1213,7 +1213,7 @@ func parse_rest_of_lambda(p *ps, lambda_expr_meta ast_meta, out *ast_expr) parse
   body ast_bracebody;
   #parse_lambdaspec(p, &args, &return_type, &body);
   end(p, lambda_expr_meta);
-  *out = mk(lambda_expr_meta, @[ast_expr_enum]Lambda({NotComputed, IsNotInline, move(&args), return_type, {NotComputed, move(&body)}}));
+  *out = mk(lambda_expr_meta, @[ast_expr_enum]Lambda({IsNotInline, move(&args), return_type, {NotComputed, move(&body)}}));
   return Success;
 }
 

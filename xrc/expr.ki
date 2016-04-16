@@ -1438,8 +1438,7 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   props type_properties;
   #compute_complete_type_properties(es->clq, lambda_scope, &computed.te, &props);
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~computed.te, props})),
-                                    ~computed.te, props)));
-  annotate(&a->emissions, {freeze(&emissions)});
+                                    ~computed.te, props, {freeze(&emissions)})));
   return NoFail;
 }
 

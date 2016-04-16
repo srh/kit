@@ -394,7 +394,6 @@ enum ast_isinline {
 }
 
 struct ast_lambda {
-  emissions nc[emissions_info];
   // TODO: We put is_inline here mainly for convenience of implementation (in
   // gr_lambda_expr), it is unprincipled in the long run (I think?).
   is_inline ast_isinline;
