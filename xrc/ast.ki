@@ -439,7 +439,6 @@ enum ast_deref_field_info {
 
 struct ast_deref_field {
   info nc[ast_deref_field_info];
-  emissions nc[emissions_info];
   ptr_discard ast_later_discard_info;
   lhs box[ast_expr_consume];
   fieldname ast_fieldname;

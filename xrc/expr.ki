@@ -875,8 +875,7 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
       annotate(&a->info, DerefArrayLength(value));
     }
   }
-  annotate(&a->emissions, {emissions});
-  annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
+  annotate_info(x, CompleteCheck(mk(lval, fieldtype, props, {emissions})));
   return NoFail;
 }
 
