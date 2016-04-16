@@ -1257,11 +1257,11 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
     }
 
     case &OneEnumConstructorMatch(ci constructor_info): {
-      annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip, {ci.emissions}}));
+      annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip}));
       props type_properties;
       #compute_type_properties(es->clq, &es->tscope, &ci.type, &props);
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ci.type, props})),
-                                        ci.type, props)));
+                                        ci.type, props, {ci.emissions})));
       return NoFail;
     }
     case &EnumVoidConstructedMatch(vci voidconstructed_info): {
@@ -1269,7 +1269,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       props type_properties;
       #compute_type_properties(es->clq, &es->tscope, &vci.constructed_type, &props);
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.constructed_type, props})),
-                                        vci.constructed_type, props)));
+                                        vci.constructed_type, props, {mk_empty_emittance()})));
       return NoFail;
     }
     case &OneGlobalMatch(egm es_global_match): {
@@ -1294,17 +1294,17 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
       #compute_type_properties(es->clq, &es->tscope, &cu_computed, &props);
 
       append(&emissions, &egm.emissions);
-      annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id, {freeze(&emissions)}}));
+      annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id}));
       annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, cu_computed, props})),
-                                        cu_computed, props)));
+                                        cu_computed, props, {freeze(&emissions)})));
       return NoFail;
     }
 
     case &OneLocalMatch(elm es_local_match): {
-      annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({elm.varnum, {elm.emissions}}));
+      annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({elm.varnum}));
       vi *var_info = ref_var(es, elm.varnum);
       annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe, vi->ipse.x}),
-                                        vi->type, vi->props)));
+                                        vi->type, vi->props, {elm.emissions})));
       return NoFail;
     }
   }
