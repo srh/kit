@@ -742,10 +742,13 @@ struct ast_expr_complete_info {
   lval is_lval;
   cu cu_typeexpr;
   cu_props type_properties;
+  // A general place to dump emissions for an expr node.  Idk.
+  // EMISSIONS(): Make this not be opt -- everything should dump emissions_info.
+  emissions opt[emissions_info];
 }
 
 func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties) ast_expr_complete_info {
-  return {lval, cu, cu_props};
+  return {lval, cu, cu_props, None};
 }
 
 enum ast_expr_info {

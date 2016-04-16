@@ -817,7 +817,7 @@ func check_expr_ternary(es *framescope, ai allow_incomplete, a *ast_ternary, pt 
   reannotate_static_to_virtual(es, result_cell(oo(&a->then_clause)));
   reannotate_static_to_virtual(es, result_cell(oo(&a->else_clause)));
   conj *cell_info = ref_cell(es, conjoined);
-  annotate_info(x, @[ast_expr_info]CompleteCheck({IsLvalNo({conjoined, conjoined}), conj->type, conj->props}));
+  annotate_info(x, @[ast_expr_info]CompleteCheck({IsLvalNo({conjoined, conjoined}), conj->type, conj->props, None}));
   return NoFail;
 }
 
