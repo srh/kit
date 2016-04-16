@@ -127,12 +127,10 @@ struct ast_assignment {
 }
 
 struct ast_addressof {
-  emissions nc[emissions_info];
   rhs box[ast_expr];
 }
 
 struct ast_refof {
-  emissions nc[emissions_info];
   rhs box[ast_expr];
 }
 
@@ -577,8 +575,6 @@ struct ast_quickreturn_info {
   // maintain identical constructor ordering, thus, get(&constructor_mapping, i) returns
   // i.
   constructor_mapping array[size];
-
-  emissions emissions_info;
 }
 
 struct ast_quickreturn {
@@ -749,6 +745,10 @@ struct ast_expr_complete_info {
 
 func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties) ast_expr_complete_info {
   return {lval, cu, cu_props, None};
+}
+
+func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties, emissions emissions_info) ast_expr_complete_info {
+  return {lval, cu, cu_props, Has(emissions)};
 }
 
 enum ast_expr_info {

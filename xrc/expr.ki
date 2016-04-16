@@ -738,14 +738,14 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
       lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, success_case_cu, success_case_props})});
     }
 
-    annotate_info(x, CompleteCheck(mk(lval, success_case_cu, success_case_props)));
+    annotate_info(x, CompleteCheck(mk(lval, success_case_cu, success_case_props, {freeze(&emissions)})));
 
     constructors_props array[type_properties];
     #compute_complete_vardecl_properties(es->clq, &es->tscope, &et.constructors, &constructors_props);
 
     tag_cell cell_num = add_virtual_tag_cell(es, &et);
     return_tag_cell cell_num = add_virtual_tag_cell(es, &et);
-    annotate(&a->info, {tag_cell, et, move(&constructors_props), return_tag_cell, return_et, constructor_mapping, {freeze(&emissions)}});
+    annotate(&a->info, {tag_cell, et, move(&constructors_props), return_tag_cell, return_et, constructor_mapping});
 
     return NoFail;
   } else {
@@ -797,8 +797,7 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
     ref_props type_properties;
     #compute_complete_type_properties(es->clq, &es->tscope, &ref_computed.te, &ref_props);
     annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ref_computed.te, ref_props})),
-                                      ~ref_computed.te, ref_props)));
-    annotate(&a->emissions, {freeze(&emissions)});
+                                      ~ref_computed.te, ref_props, {freeze(&emissions)})));
     return NoFail;
   }
 }
@@ -1005,8 +1004,7 @@ func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *
   ptr_props type_properties;
   #compute_complete_type_properties(es->clq, &es->tscope, &ptr_computed.te, &ptr_props);
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ptr_computed.te, ptr_props})),
-                                    ~ptr_computed.te, ptr_props)));
-  annotate(&a->emissions, {freeze(&emissions)});
+                                    ~ptr_computed.te, ptr_props, {freeze(&emissions)})));
   return NoFail;
 }
 
