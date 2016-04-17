@@ -1007,7 +1007,7 @@ func check_expr_addressof(es *framescope, a *ast_addressof, pt *te_typeexpr, x *
 
   ptr_type te_typeexpr = ptr_type(es->cs, rhs_info->cu.x);
   ptr_computed cac_typeexpr;
-  #nogeneric_check_and_compute_typeexpr(es->clq, &es->tscope, &ptr_type, &ptr_computed);
+  #nogeneric_check_and_compute_typeexpr(es->clq, &es->tscope, &ptr_type, &emissions, &ptr_computed);
   check(ptr_computed.complete);
   ptr_props type_properties;
   #compute_complete_type_properties(es->clq, &es->tscope, &ptr_computed.te, &ptr_props);
