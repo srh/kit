@@ -546,24 +546,23 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   note_initter bool;
   cell cell_num;
   switch &a->rhs {
-    case &HasExpr(x box[ast_expr_consume]): {
-      #check_expr_consume(&bs->es, oo(&x), &computed.te);
-      info *ast_expr_complete_info = expr_complete_info(&oo(&x)->expr);
-      complete_type = &info->cu;
-      note_initter = false;
-      cell = result_cell(oo(&x));
+  case &HasExpr(x box[ast_expr_consume]):
+    #check_expr_consume(&bs->es, oo(&x), &computed.te);
+    info *ast_expr_complete_info = expr_complete_info(&oo(&x)->expr);
+    complete_type = &info->cu;
+    note_initter = false;
+    cell = result_cell(oo(&x));
+
+  case &AutoInit(x opt[init_action]):
+    if !computed.complete {
+      return ERR(_u8("Variable declaration with no rhs, incomplete type"));
     }
-    case &AutoInit(x opt[init_action]): {
-      if !computed.complete {
-        return ERR(_u8("Variable declaration with no rhs, incomplete type"));
-      }
-      cu_computed = ~computed.te;
-      complete_type = &cu_computed;
-      cu_props type_properties;
-      #compute_type_properties(bs->clq, &bs->es.tscope, complete_type, &cu_props);
-      note_initter = true;
-      cell = add_cell(&bs->es, {LocationStatic, *complete_type, cu_props});
-    }
+    cu_computed = ~computed.te;
+    complete_type = &cu_computed;
+    cu_props type_properties;
+    #compute_type_properties(bs->clq, &bs->es.tscope, complete_type, &cu_props);
+    note_initter = true;
+    cell = add_cell(&bs->es, {LocationStatic, *complete_type, cu_props});
   }
 
   vn var_number;
@@ -575,14 +574,12 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   if note_initter {
     #es_note_var_initter(&bs->es, vn);
     switch &a->rhs {
-      case &HasExpr(x box[ast_expr_consume]): {
-        ice(_u8("note_initter true, on HasExpr, locally impossible"));
-      }
-      case &AutoInit(x opt[init_action]): {
-        init ctor_desc = #get_init_ctor(&bs->es, complete_type);
-        ia init_action = +{init, cell};
-        x = Has(ia);
-      }
+    case &HasExpr(x box[ast_expr_consume]):
+      ice(_u8("note_initter true, on HasExpr, locally impossible"));
+    case &AutoInit(x opt[init_action]):
+      init ctor_desc = #get_init_ctor(&bs->es, complete_type);
+      ia init_action = +{init, cell};
+      x = Has(ia);
     }
   }
   return NoFail;
