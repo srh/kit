@@ -150,6 +150,8 @@ int platform_prefix_underscore(enum target_platform platform) {
     return 1;
   case TARGET_PLATFORM_LINUX_32BIT:
     return 0;
+  case TARGET_PLATFORM_LINUX_64BIT:
+    TODO_IMPLEMENT;
   case TARGET_PLATFORM_OSX_32BIT:
     return 1;
   default:
@@ -668,6 +670,8 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
     *return_type_size_out = return_type_attrs.size;
     return !return_type_attrs.is_primitive;
   } break;
+  case TARGET_PLATFORM_LINUX_64BIT:
+    TODO_IMPLEMENT;
   default:
     UNREACHABLE();
   }
@@ -831,6 +835,8 @@ void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
     objfile_section_note_diff32(objfile_text(f), symbol_table_index,
                                 subtracted_offset, adjusted_offset);
   } break;
+  case TARGET_PLATFORM_LINUX_64BIT:
+    TODO_IMPLEMENT;
   default:
     UNREACHABLE();
   }
@@ -1444,6 +1450,8 @@ int platform_ret4_hrp(struct checkstate *cs) {
   case TARGET_PLATFORM_LINUX_32BIT: /* fallthrough */
   case TARGET_PLATFORM_OSX_32BIT:
     return 1;
+  case TARGET_PLATFORM_LINUX_64BIT:
+    TODO_IMPLEMENT;
   default:
     UNREACHABLE();
   }
@@ -3539,6 +3547,8 @@ int platform_can_return_in_eaxedx(struct checkstate *cs) {
     return 1;
   case TARGET_PLATFORM_LINUX_32BIT:
     return 0;
+  case TARGET_PLATFORM_LINUX_64BIT:
+    TODO_IMPLEMENT;
   default:
     UNREACHABLE();
   }
@@ -5152,6 +5162,8 @@ const char *platform_objfile_suffix(enum target_platform platform) {
   case TARGET_PLATFORM_LINUX_32BIT: /* fallthrough */
   case TARGET_PLATFORM_OSX_32BIT:
     return ".o";
+  case TARGET_PLATFORM_LINUX_64BIT:
+    TODO_IMPLEMENT;
   default:
     UNREACHABLE();
   }
@@ -5201,6 +5213,8 @@ int build_module(struct identmap *im,
   case TARGET_PLATFORM_OSX_32BIT:
     osx32_flatten(cs.im, objfile, &databuf);
     break;
+  case TARGET_PLATFORM_LINUX_64BIT:
+    TODO_IMPLEMENT;
   default:
     UNREACHABLE();
   }

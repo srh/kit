@@ -44,6 +44,8 @@ int main(int argc, char **argv) {
       test = 1;
     } else if (0 == strcmp(argv[i], "--linux")) {
       platform = TARGET_PLATFORM_LINUX_32BIT;
+    } else if (0 == strcmp(argv[i], "--linux64")) {
+      platform = TARGET_PLATFORM_LINUX_64BIT;
     } else if (0 == strcmp(argv[i], "--osx")) {
       platform = TARGET_PLATFORM_OSX_32BIT;
     } else {
