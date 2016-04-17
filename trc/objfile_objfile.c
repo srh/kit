@@ -266,3 +266,7 @@ uint32_t strtab_add(struct databuf *d, const void *buf, size_t count) {
   databuf_append(d, "\0", 1);
   return ret;
 }
+
+uint32_t strtab_append_c_str(struct databuf *d, const char *s) {
+  return strtab_add(d, s, strlen(s));
+}

@@ -127,10 +127,6 @@ enum {
   kR_386_PC32 = 2,
 };
 
-uint32_t strtab_append_c_str(struct databuf *d, const char *s) {
-  return strtab_add(d, s, strlen(s));
-}
-
 void push_symbol(struct identmap *im, struct objfile_symbol_record *symbol,
                  struct databuf *symbols, struct databuf *strings) {
   /* TODO: (Also in s2:) This and the for loop below is just a copy/paste job. */

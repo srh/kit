@@ -90,5 +90,6 @@ void append_zeros(struct databuf *d, size_t count);
 
 /* TODO: This should return a value in a wrapper struct? */
 uint32_t strtab_add(struct databuf *d, const void *buf, size_t count);
+uint32_t strtab_append_c_str(struct databuf *d, const char *s);
 
 #endif /* KIT_OBJFILE_OBJFILE_H_ */
