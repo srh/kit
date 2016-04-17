@@ -127,8 +127,8 @@ enum {
   kR_386_PC32 = 2,
 };
 
-void push_symbol(struct identmap *im, struct objfile_symbol_record *symbol,
-                 struct databuf *symbols, struct databuf *strings) {
+void linux32_push_symbol(struct identmap *im, struct objfile_symbol_record *symbol,
+                         struct databuf *symbols, struct databuf *strings) {
   /* TODO: (Also in s2:) This and the for loop below is just a copy/paste job. */
   struct elf32_Symtab_Entry ent;
   ident_value name = symbol->name;
@@ -201,7 +201,7 @@ void linux32_write_symbols_and_strings(struct identmap *im, struct objfile *f,
   struct objfile_symbol_record *symbol_table = f->symbol_table;
   for (size_t i = 0, e = f->symbol_table_count; i < e; i++) {
     if (symbol_table[i].is_static) {
-      push_symbol(im, &symbol_table[i], symbols, strings);
+      linux32_push_symbol(im, &symbol_table[i], symbols, strings);
       sti_map[i] = symbols_count;
       symbols_count = uint32_add(symbols_count, 1);
     }
@@ -211,7 +211,7 @@ void linux32_write_symbols_and_strings(struct identmap *im, struct objfile *f,
 
   for (size_t i = 0, e = f->symbol_table_count; i < e; i++) {
     if (!symbol_table[i].is_static) {
-      push_symbol(im, &symbol_table[i], symbols, strings);
+      linux32_push_symbol(im, &symbol_table[i], symbols, strings);
       sti_map[i] = symbols_count;
       symbols_count = uint32_add(symbols_count, 1);
     }
