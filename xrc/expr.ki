@@ -799,7 +799,7 @@ func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr
 
     ref_type te_typeexpr = mk_ref_type(es->cs, unified_ipse, rhs_info->cu.x);
     ref_computed cac_typeexpr;
-    #nogeneric_check_and_compute_typeexpr(es->clq, &es->tscope, &ref_type, &ref_computed);
+    #nogeneric_check_and_compute_typeexpr(es->clq, &es->tscope, &ref_type, &emissions, &ref_computed);
     // (TODO: Make lval desc.ipse be a te_ipse, so it can't be incomplete?)
     if !ref_computed.complete {
       return ERR(_u8("ICE?  lval desc.ipse must have been incomplete (after complete type-check)."));
