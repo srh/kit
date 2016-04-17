@@ -139,7 +139,6 @@ func convert_typeexpr(a *ast_typeexpr) cr[te_typeexpr] {
     *oo(&param) = #convert_typeexpr(oo(&b.param));
     return NoFail!@[te_typeexpr]TeArraytype({count, param});
   case &Ipse(b ast_ipse):
-    // SCOPE(): This proves that it's possible for ipses not to be "in scope".  We need to handle that failure case gracefully.
     return NoFail!@[te_typeexpr]TeIpse({b.name.value});
   case &Unknown(b ast_unknown):
     return NoFail!@[te_typeexpr]TeUnknown;
