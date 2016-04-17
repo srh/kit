@@ -516,11 +516,11 @@ func help_check_simple_literal(es *framescope, pt *te_typeexpr, type te_typeexpr
     return ERR(errmsg_name, _u8(" literal in bad place"));
   }
   if is_complete(&unified) {
-    // The type passed in by the caller is one of bool, void, `*`[_], which won't create emissions in unify_types.
+    // The type passed in by the caller is one of bool, void, `*`[_], which won't create emissions in unify_types.  But we could append to emissions when we cac below.
     check(empty(&emissions));
 
     c cac_typeexpr;
-    if case Unprinted(pm) = nogeneric_check_and_compute_typeexpr(es->clq, &es->tscope, &unified, &c) {
+    if case Unprinted(pm) = nogeneric_check_and_compute_typeexpr(es->clq, &es->tscope, &unified, &emissions, &c) {
       ice(_u8("help_check_simple_literal passed bad type: "), pm.msg);
     }
     check(c.complete);
