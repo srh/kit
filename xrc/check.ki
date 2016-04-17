@@ -465,19 +465,6 @@ func nogeneric_check_and_compute_typeexpr(clq *clqueue, scope *type_scope, t *te
   return check_and_compute_typeexpr(clq, ng, scope, &np, t, emissions_app, out);
 }
 
-func nogeneric_check_and_compute_typeexpr(clq *clqueue, scope *type_scope, t *te_typeexpr, out *cac_typeexpr) np {
-  ng te_generik_scope = empty_generik_scope();
-  np idy_repls = blank_idyrepls();
-  return check_and_compute_typeexpr(clq, ng, scope, &np, t, out);
-}
-
-// EMISSIONS(): remove callers of this.
-func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, t *te_typeexpr,
-                                out *cac_typeexpr) np {
-  emissions array[unify_emission];
-  return check_and_compute_typeexpr(clq, g, scope, parms, t, &emissions, out);
-}
-
 // NOTE: Generics replacement should really be a separate phase.  (Why?)  (Performance is
 // one counter-argument -- we'd create an extra intermediate te_typeexpr.)
 func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, t *te_typeexpr,
