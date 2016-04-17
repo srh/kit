@@ -482,7 +482,6 @@ func ipse_in_scope(scope *type_scope, name sym) bool {
 //
 // Also, the oftypes exist in some type scope.  For now, that would be the type scope that they're part of.  (Could that be bad?  I mean it feels icky if oftypes could cyclicly reference one another's ipses, maybe that could come up explicitly what with cyclic datatypes and such.  But anyway they could just casually be acyclic, while implementationally referencing the whole type_scope.)
 
-// TODO(): See "SCOPE()"
 // TODO: See "SCOPE"
 
 
