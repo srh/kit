@@ -656,7 +656,7 @@ func success_enum_case_info(ds *defscope, cu *cu_typeexpr, success_case_ix_out *
   }
 }
 
-func structurally_convertible_in_non_success(ds *defscope, rhs_success_ix size, rhs_constructors *shray[te_vardecl],
+func structurally_convertible_in_non_success(rhs_success_ix size, rhs_constructors *shray[te_vardecl],
                                              return_success_ix size, return_et *enumspec, out *bool,
                                              constructor_mapping_out *array[size]) np {
   // For now we're going to be uber-restrictive and require exactly the same constructor
@@ -729,7 +729,7 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
 
     is_structurally_convertible bool;
     constructor_mapping array[size];
-    #structurally_convertible_in_non_success(es->ds, success_case_ix, &et.constructors,
+    #structurally_convertible_in_non_success(success_case_ix, &et.constructors,
                                              return_success_case_ix, &return_et, &is_structurally_convertible,
                                              &constructor_mapping);
     if !is_structurally_convertible {
