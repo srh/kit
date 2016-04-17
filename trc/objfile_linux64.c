@@ -9,12 +9,10 @@
 #include "objfile_structs.h"
 #include "util.h"
 
-/* TODO(): This actually implements elf32 -- make it implement elf64.  (Duh.) */
-
 enum { kEI_NIDENT = 16 };
 
 PACK_PUSH
-struct elf32_Header {
+struct elf64_Header {
   uint8_t e_ident[kEI_NIDENT];
   /* Type: Relocatable, executable, etc. */
   struct le_u16 e_type;
@@ -23,11 +21,11 @@ struct elf32_Header {
   /* Version, should be "EV_CURRENT". */
   struct le_u32 e_version;
   /* Entry point (for executables). */
-  struct le_u32 e_entry;
+  struct le_u64 e_entry;
   /* Program header offset, zero for .o files. */
-  struct le_u32 e_phoff;
+  struct le_u64 e_phoff;
   /* Section header offset. */
-  struct le_u32 e_shoff;
+  struct le_u64 e_shoff;
   /* Flags, none defined. (Zero.) */
   struct le_u32 e_flags;
   /* Size of this elf header. */
@@ -47,6 +45,8 @@ struct elf32_Header {
   struct le_u16 e_shstrndx;
 } PACK_ATTRIBUTE;
 PACK_POP
+
+/* TODO(): Make elf64-compliant everything below. */
 
 PACK_PUSH
 struct elf32_Section_Header {
@@ -308,7 +308,7 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   CHECK(d);
   databuf_init(d);
 
-  const uint32_t section_header_offset = sizeof(struct elf32_Header);
+  const uint32_t section_header_offset = sizeof(struct elf64_Header);
   const uint16_t kNumSectionHeaders = 10;
   const uint32_t end_of_section_headers
     = uint32_add(section_header_offset,
@@ -388,7 +388,7 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
                           &text_end);
 
   {
-    struct elf32_Header h;
+    struct elf64_Header h;
     h.e_ident[0] = 0x7f;
     h.e_ident[1] = 'E';
     h.e_ident[2] = 'L';
@@ -404,9 +404,9 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     h.e_type = to_le_u16(kET_REL);
     h.e_machine = to_le_u16(kEM_386);
     h.e_version = to_le_u32(kEV_CURRENT);
-    h.e_entry = to_le_u32(0);
-    h.e_phoff = to_le_u32(0);
-    h.e_shoff = to_le_u32(section_header_offset);
+    h.e_entry = to_le_u64(0);
+    h.e_phoff = to_le_u64(0);
+    h.e_shoff = to_le_u64(section_header_offset);
     h.e_flags = to_le_u32(0);
     h.e_ehsize = to_le_u16(sizeof(h));
     h.e_phentsize = to_le_u16(0);
