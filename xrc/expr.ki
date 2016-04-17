@@ -1425,12 +1425,12 @@ func check_expr_lambda(es *framescope, a *ast_lambda, pt *te_typeexpr, x *ast_ex
   lambda_scope *type_scope = es->ds->deflevel_parms_scope;
 
   // TODO: I see some duplicated logic with the TypedExpr case.
+  emissions array[unify_emission];
   computed cac_typeexpr;
-  #check_and_compute_typeexpr(es->clq, es->ds->generics, lambda_scope, es->ds->repls, &converted, &computed);
+  #check_and_compute_typeexpr(es->clq, es->ds->generics, lambda_scope, es->ds->repls, &converted, &emissions, &computed);
   // Lambda exprs can't have partial types (yet!).
   check(computed.complete);
   unified te_typeexpr;
-  emissions array[unify_emission];
   if !unify_types(lambda_scope, pt, &computed.te, &emissions, &unified) {
     return ERR(_u8("Lambda is incompatible with contextual type."));
   }
