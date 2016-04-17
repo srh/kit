@@ -2,7 +2,7 @@
 *.o
 *.exe
 a.out
-out
+s1
 *.dSYM/
 s2
 /urc/s2b
