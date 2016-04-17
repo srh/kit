@@ -1981,14 +1981,13 @@ func compute_size(clq *clqueue) cu_typeexpr { return compute_prim(clq, primitive
 
 func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
   global_scope type_scope = mk_global();
-  return compute_prim_with_scope(clq, &global_scope, t);
+  emissions array[unify_emission];
+  return compute_prim_with_scope(clq, &global_scope, t, &emissions);
 }
 
-func compute_prim_with_scope(clq *clqueue, scope *type_scope, t te_typeexpr) cu_typeexpr {
-  // EMISSIONS(): Do something with these emissions?
-  emissions array[unify_emission];
+func compute_prim_with_scope(clq *clqueue, scope *type_scope, t te_typeexpr, emissions_app *array[unify_emission]) cu_typeexpr {
   cac cac_typeexpr;
-  if case Unprinted(pm) = nogeneric_check_and_compute_typeexpr(clq, scope, &t, &emissions, &cac) {
+  if case Unprinted(pm) = nogeneric_check_and_compute_typeexpr(clq, scope, &t, emissions_app, &cac) {
     ice(_u8("compute_prim encounters uncomputable type: "), pm.msg);
   }
   check(cac.complete);
@@ -2003,11 +2002,12 @@ func compute_prim(clq *clqueue, t te_typeexpr) cu_typrop {
 
 func compute_prim(clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
   global_scope type_scope = mk_global();
-  compute_prim_with_scope(clq, &global_scope, t, out, props_out);
+  emissions array[unify_emission];
+  compute_prim_with_scope(clq, &global_scope, t, &emissions, out, props_out);
 }
 
-func compute_prim_with_scope(clq *clqueue, scope *type_scope, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
-  type cu_typeexpr = compute_prim_with_scope(clq, scope, t);
+func compute_prim_with_scope(clq *clqueue, scope *type_scope, t te_typeexpr, emissions_app *array[unify_emission], out *cu_typeexpr, props_out *type_properties) void {
+  type cu_typeexpr = compute_prim_with_scope(clq, scope, t, emissions_app);
   if case Unprinted(pm) = compute_type_properties(clq, scope, &type, props_out) {
     ice(_u8("compute_prim fails to compute type properties: "), pm.msg);
   }
