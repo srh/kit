@@ -622,7 +622,6 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
                                 emissions_app *array[unify_emission],
                                 out *cac_typeexpr) np {
   if case &Has(pack te_app_pack) = &a->pack {
-    // SCOPE(): The pack should have short-circuiting emissions to emit.
     *out = {true, TeApp(*a)};
     append(emissions_app, &pack.emittance);
     return NoFail;
