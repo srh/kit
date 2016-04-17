@@ -185,6 +185,7 @@ struct ast_bracebody {
 
 struct ast_var_info {
   vn var_number;
+  emissions emissions_info;
 }
 
 enum ast_var_rhs {

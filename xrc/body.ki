@@ -538,8 +538,9 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   // TODO: Cache converted... or something.
   converted te_typeexpr = #convert_typeexpr(&a->decl.type);
 
+  emissions array[unify_emission];
   computed cac_typeexpr;
-  #check_and_compute_typeexpr(bs->clq, bs->ds->generics, &bs->es.tscope, bs->ds->repls, &converted, &computed);
+  #check_and_compute_typeexpr(bs->clq, bs->ds->generics, &bs->es.tscope, bs->ds->repls, &converted, &emissions, &computed);
   cu_computed cu_typeexpr;
 
   complete_type *cu_typeexpr;
@@ -569,7 +570,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   #es_push_var(&bs->es, vp, cell, Has(&a->decl.name),
                ~varname_ipse(&bs->es, a->decl.name.value, *complete_type, &bs->es.tscope),
                complete_type, VarSelfContained, &vn);
-  annotate(&a->info, {vn});
+  annotate(&a->info, {vn, {freeze(&emissions)}});
   #es_note_var_destroyer(&bs->es, vn);
   if note_initter {
     #es_note_var_initter(&bs->es, vn);
