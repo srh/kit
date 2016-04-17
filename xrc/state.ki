@@ -510,8 +510,9 @@ func ref_scope(parms *idy_genparms) *type_scope {
 }
 
 func hash_compute_hash(x *idy_genparms) osize {
+  // We don't hash x->scope.  (a) it's OK to under-traverse a hash function, (b) idy_genparms equality logic would involve dynamically looking up the oftype, not comparing the actual scopes, (c) it's provably unnecessary, I think, to compare oftypes.
+
   accum osize = hash_compute_hash(&x->num_ipse_types_used);
-  accum = (accum * 33) ^ idy_scopes_hash(oo(&x->scope));
   n size = count(&x->repls.tys);
   p * ^[0]cu_typeexpr = data(&x->repls.tys);
   for i size = 0; i < n; i = i + 1 {
@@ -520,18 +521,10 @@ func hash_compute_hash(x *idy_genparms) osize {
   return accum;
 }
 
+// Only to be used for idy_genparms values for the same def entry or deftype entry (i.e. genparms that are for the same te_generics).
 func hash_equal(x *idy_genparms, y *idy_genparms) bool {
-  return x->num_ipse_types_used == y->num_ipse_types_used && idy_typeexpr_list_equal(&x->repls.tys, &y->repls.tys) && idy_scopes_equal(oo(&x->scope), oo(&y->scope));
-}
-
-func idy_scopes_hash(x *type_scope) osize {
-  // SCOPE(): Likewise with idy_scopes_equal.
-  return 0;
-}
-
-func idy_scopes_equal(x *type_scope, y *type_scope) bool {
-  // SCOPE(): Must we use the type scopes?  I think it's provably unnecessary, but we should compare ipse oftypes when we run into them.
-  return true;
+  // We don't directly compare scopes.  That would probably be correct, but another form of correct behavior would be to lookup oftypes of ipses when we see them in repls.tys.  However, it's provably true (I think) that oftypes will match, because these idy_genparms values must be for the same def entry or deftype entry.  It's also very annoying to match the oftypes -- you need to mark them and avoid retraversing them to avoid exponential behavior (I think oftypes have to be acyclic) or infinite behavior.
+  return x->num_ipse_types_used == y->num_ipse_types_used && idy_typeexpr_list_equal(&x->repls.tys, &y->repls.tys);
 }
 
 enum def_inst_type_status {
