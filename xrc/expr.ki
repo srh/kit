@@ -1984,8 +1984,10 @@ func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
 }
 
 func compute_prim_with_scope(clq *clqueue, scope *type_scope, t te_typeexpr) cu_typeexpr {
+  // EMISSIONS(): Do something with these emissions?
+  emissions array[unify_emission];
   cac cac_typeexpr;
-  if case Unprinted(pm) = nogeneric_check_and_compute_typeexpr(clq, scope, &t, &cac) {
+  if case Unprinted(pm) = nogeneric_check_and_compute_typeexpr(clq, scope, &t, &emissions, &cac) {
     ice(_u8("compute_prim encounters uncomputable type: "), pm.msg);
   }
   check(cac.complete);
