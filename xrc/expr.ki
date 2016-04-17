@@ -1914,8 +1914,10 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   a_param_incomplete bool;
   #check_funcall_params_firsttime(es, &a->params, &a_param_incomplete);
 
+  // This is so fruity, emissions should be redundant.  However, meh.
+  emissions array[unify_emission];
   func_pt te_typeexpr;
-  #make_fn_partial_type(es->clq, &es->tscope, pt, &a->params, &func_pt);
+  #make_fn_partial_type(es->clq, &es->tscope, pt, &a->params, &emissions, &func_pt);
   funec *ast_expr_consume = oo(&a->fun);
   #check_expr_ai(es, ai_incomplete(!a_param_incomplete && ai == AllowIncompleteYes), &funec->expr, &func_pt);
 
@@ -1932,9 +1934,8 @@ func check_expr_funcall(es *framescope, ai allow_incomplete, a *ast_funcall, pt 
   return_type *te_typeexpr = fn_return_type(es->cs, &expr_complete_type(&oo(&a->fun)->expr)->x);
   props type_properties;
   #compute_complete_type_properties(es->clq, &es->tscope, return_type, &props);
-  // EMISSIONS: This is nuts, how could this emittance be empty?  Oh, because it's in the name lookup on the function expression?  Okay.
   annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ *return_type, props})),
-                                    ~ *return_type, props, {mk_empty_emittance()})));
+                                    ~ *return_type, props, {freeze(&emissions)})));
   return NoFail;
 }
 
@@ -2218,7 +2219,7 @@ func expr_type_incomplete(a *ast_expr) bool {
 }
 
 func make_fn_partial_type(clq *clqueue, scope *type_scope, return_type *te_typeexpr, params *array[ast_expr_consume],
-                          out *te_typeexpr) np {
+                          emissions_app *array[unify_emission], out *te_typeexpr) np {
   type_params array[te_typeexpr];
   n size = count(params);
   reserve(&type_params, n + 1);
@@ -2228,7 +2229,7 @@ func make_fn_partial_type(clq *clqueue, scope *type_scope, return_type *te_typee
   push(&type_params, *return_type);
   fntype te_typeexpr = TeApp({primitive_function_puretype(clq->cs), freeze(&type_params), None});
   cac cac_typeexpr;
-  #nogeneric_check_and_compute_typeexpr(clq, scope, &fntype, &cac);
+  #nogeneric_check_and_compute_typeexpr(clq, scope, &fntype, emissions_app, &cac);
   *out = cac.te;
   return NoFail;
 }
