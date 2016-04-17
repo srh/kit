@@ -47,6 +47,31 @@ void ok_memcpy(void *dest, const void *src, size_t n) {
   memcpy(dest, src, n);
 }
 
+void write_le_u64(void *dest, uint64_t x) {
+  uint8_t *d = dest;
+  d[0] = x & 0xFF;
+  d[1] = (x >> 8) & 0xFF;
+  d[2] = (x >> 16) & 0xFF;
+  d[3] = (x >> 24) & 0xFF;
+  d[4] = (x >> 32) & 0xFF;
+  d[5] = (x >> 40) & 0xFF;
+  d[6] = (x >> 48) & 0xFF;
+  d[7] = (x >> 56);
+}
+
+uint64_t read_le_u64(const void *src) {
+  const uint8_t *s = src;
+  uint64_t ret = s[0];
+  ret += (((uint64_t)(s[1])) << 8);
+  ret += (((uint64_t)(s[2])) << 16);
+  ret += (((uint64_t)(s[3])) << 24);
+  ret += (((uint64_t)(s[4])) << 32);
+  ret += (((uint64_t)(s[5])) << 40);
+  ret += (((uint64_t)(s[6])) << 48);
+  ret += (((uint64_t)(s[7])) << 56);
+  return ret;
+}
+
 void write_le_u32(void *dest, uint32_t x) {
   uint8_t *d = dest;
   d[0] = x & 0xFF;
@@ -75,6 +100,47 @@ uint16_t read_le_u16(const void *src) {
   uint16_t ret = s[0];
   ret += (((uint32_t)(s[1])) << 8);
   return ret;
+}
+
+struct le_u64 to_le_u64(uint64_t x) {
+  struct le_u64 ret;
+  write_le_u64(ret.bytes, x);
+  return ret;
+}
+uint64_t from_le_u64(struct le_u64 x) {
+  return read_le_u64(x.bytes);
+}
+
+struct le_i64 to_le_i64(int64_t x) {
+  /* We convert to uint64_t, adding 2**64 to x if it's negative. */
+  uint64_t xu = x;
+  struct le_i64 ret;
+  write_le_u64(ret.bytes, xu);
+  return ret;
+}
+int64_t from_le_i64(struct le_i64 x) {
+  /* We can't just convert unsigned->signed, it's
+  implementation-defined. */
+  uint64_t xu = read_le_u64(x.bytes);
+  if (xu > INT64_MAX) {
+    /* We subtract 2**64 from the numerical value, by subtracting (1 +
+    INT64_MAX) once and (1 + INT64_MAX / 2) twice. */
+    uint64_t s = 1 + (uint64_t)INT64_MAX;
+    /* First, xu > INT64_MAX, so we can subtract without underflow. */
+    xu -= s;
+    /* Now 0 <= xu <= INT64_MAX, we can safely convert. */
+    int64_t xi = (int64_t)xu;
+
+    int64_t hs = 1 + INT64_MAX / 2;
+    /* Now, subtract (1 + INT64_MAX / 2) twice. */
+    xi -= hs;
+    xi -= hs;
+    return xi;
+  } else {
+    /* xu <= INT64_MAX, we can safely convert. */
+    int64_t xi = (int32_t)xu;
+    return xi;
+  }
 }
 
 struct le_u32 to_le_u32(uint32_t x) {

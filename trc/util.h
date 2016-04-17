@@ -71,6 +71,12 @@ void alloc_half_strcat(const void *lbuf, size_t lcount,
 undefined behavior. */
 void ok_memcpy(void *dest, const void *src, size_t n);
 
+/* Writes/reads a uint64_t in little-endian. */
+void write_le_u64(void *dest, uint64_t x);
+uint64_t read_le_u64(const void *src);
+
+#define write_le_i64(dest, x) write_le_u64((dest), (uint64_t)(x))
+
 /* Writes/reads a uint32_t in little-endian. */
 void write_le_u32(void *dest, uint32_t x);
 uint32_t read_le_u32(const void *src);
@@ -82,6 +88,20 @@ void write_le_u16(void *dest, uint16_t x);
 uint16_t read_le_u16(const void *src);
 
 #define write_le_i16(dest, x) write_le_u16((dest), (uint32_t)(x));
+
+struct le_u64 {
+  char bytes[8];
+};
+
+struct le_u64 to_le_u64(uint64_t x);
+uint64_t from_le_u64(struct le_u64 x);
+
+struct le_i64 {
+  char bytes[8];
+};
+
+struct le_i64 to_le_i64(int64_t x);
+int64_t from_le_i64(struct le_i64 x);
 
 struct le_u32 {
   char bytes[4];
