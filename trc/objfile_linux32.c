@@ -1,4 +1,4 @@
-#include "objfile_linux.h"
+#include "objfile_linux32.h"
 
 #include <stdint.h>
 #include <stdlib.h>

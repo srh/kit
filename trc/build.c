@@ -8,7 +8,7 @@
 #include "checkstate.h"
 #include "databuf.h"
 #include "io.h"
-#include "objfile_linux.h"
+#include "objfile_linux32.h"
 #include "objfile_objfile.h"
 #include "objfile_osx.h"
 #include "objfile_win.h"
