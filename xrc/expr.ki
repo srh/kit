@@ -2007,6 +2007,7 @@ func compute_prim(clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type
 }
 
 func compute_prim_with_scope(clq *clqueue, scope *type_scope, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
+  // SCOPE() EMISSIONS(): We should call compute_prim_with_scope here?
   type cu_typeexpr = compute_prim(clq, t);
   if case Unprinted(pm) = compute_type_properties(clq, scope, &type, props_out) {
     ice(_u8("compute_prim fails to compute type properties: "), pm.msg);
