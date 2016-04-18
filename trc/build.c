@@ -1215,7 +1215,7 @@ void replace_placeholder_stack_adjustment(struct objfile *f,
   char buf[4];
   write_le_i32(buf, stack_adjustment);
   objfile_section_overwrite_raw(objfile_text(f),
-                                location + 2,
+                                size_add(location, 2),
                                 buf,
                                 sizeof(buf));
 }

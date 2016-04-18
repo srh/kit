@@ -301,7 +301,7 @@ void linux32_append_relocations_and_mutate_section(
       [OBJFILE_RELOCATION_TYPE_DIFF32] = 0, /* garbage */
     };
     struct le_u32 addend_le = to_le_u32((uint32_t)rel_addends[relocs[i].type]);
-    databuf_overwrite(&s->raw, from_le_u32(rel.r_offset), &addend_le, sizeof(addend_le));
+    databuf_overwrite(&s->raw, uint32_to_size(from_le_u32(rel.r_offset)), &addend_le, sizeof(addend_le));
   }
 }
 
