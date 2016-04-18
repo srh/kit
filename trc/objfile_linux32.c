@@ -394,7 +394,7 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     h.e_ident[4] = kELFCLASS32;
     h.e_ident[5] = kELFDATA2LSB;
     h.e_ident[6] = kEV_CURRENT;
-    h.e_ident[7] = 0;  /* kELFOSABI_LINUX; */
+    h.e_ident[7] = 0;  /* kELFOSABI_LINUX; -- I think .o files just use 0. */
     h.e_ident[8] = 0;  /* EI_ABIVERSION (= 8): must use zero. */
     /* padding */
     memset(h.e_ident + 9, 0, kEI_NIDENT - 9);

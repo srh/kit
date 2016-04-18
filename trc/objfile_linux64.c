@@ -46,7 +46,7 @@ struct elf64_Header {
 } PACK_ATTRIBUTE;
 PACK_POP
 
-/* TODO(): Make elf64-compliant everything below. */
+/* TODO(): elf64 below this */
 
 PACK_PUSH
 struct elf32_Section_Header {
@@ -104,11 +104,13 @@ enum { kRel_Section_Alignment = 8 };
 
 enum {
   kELFCLASS32 = 1,
+  kELFCLASS64 = 2,
   kELFDATA2LSB = 1,
   kEV_CURRENT = 1,
   kELFOSABI_LINUX = 3,
   kET_REL = 1,
   kEM_386 = 3,
+  kEM_X86_64 = 62,
   kSHT_NULL = 0,
   kSHT_PROGBITS = 1,
   kSHT_SYMTAB = 2,
@@ -387,22 +389,23 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
                           &sh_rel_text, &sh_text,
                           &text_end);
 
+  /* TODO(): elf64 above this. */
   {
     struct elf64_Header h;
     h.e_ident[0] = 0x7f;
     h.e_ident[1] = 'E';
     h.e_ident[2] = 'L';
     h.e_ident[3] = 'F';
-    h.e_ident[4] = kELFCLASS32;
+    h.e_ident[4] = kELFCLASS64;
     h.e_ident[5] = kELFDATA2LSB;
     h.e_ident[6] = kEV_CURRENT;
-    h.e_ident[7] = 0;  /* kELFOSABI_LINUX; */
+    h.e_ident[7] = 0;  /* kELFOSABI_LINUX; -- I think .o files just use 0. */
     h.e_ident[8] = 0;  /* EI_ABIVERSION (= 8): must use zero. */
     /* padding */
     memset(h.e_ident + 9, 0, kEI_NIDENT - 9);
 
     h.e_type = to_le_u16(kET_REL);
-    h.e_machine = to_le_u16(kEM_386);
+    h.e_machine = to_le_u16(kEM_X86_64);
     h.e_version = to_le_u32(kEV_CURRENT);
     h.e_entry = to_le_u64(0);
     h.e_phoff = to_le_u64(0);
@@ -418,6 +421,7 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
 
     databuf_append(d, &h, sizeof(h));
   }
+  /* TODO(): elf64 below this. */
 
   {
     /* Null section header (for index 0). */
