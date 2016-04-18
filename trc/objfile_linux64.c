@@ -79,18 +79,18 @@ struct elf64_Section_Header {
 } PACK_ATTRIBUTE;
 PACK_POP
 
-/* TODO(): elf64 below this */
-
 PACK_PUSH
-struct elf32_Symtab_Entry {
+struct elf64_Symtab_Entry {
   struct le_u32 st_name;
-  struct le_u32 st_value;
-  struct le_u32 st_size;
   uint8_t st_info;
   uint8_t st_other;
   struct le_u16 st_shndx;
+  struct le_u64 st_value;
+  struct le_u64 st_size;
 } PACK_ATTRIBUTE;
 PACK_POP
+
+/* TODO(): elf64 below this */
 
 PACK_PUSH
 struct elf32_Rel {
@@ -131,10 +131,16 @@ enum {
   kR_386_PC32 = 2,
 };
 
+/* TODO(): elf64 above this */
+
+struct le_u64 up_to_le_u64(uint32_t x) {
+  return to_le_u64((uint64_t)x);
+}
+
 void linux64_push_symbol(struct identmap *im, struct objfile_symbol_record *symbol,
                          struct databuf *symbols, struct databuf *strings) {
   /* TODO: (Also in s2:) This and the for loop below is just a copy/paste job. */
-  struct elf32_Symtab_Entry ent;
+  struct elf64_Symtab_Entry ent;
   ident_value name = symbol->name;
   const void *name_buf;
   size_t name_count;
@@ -142,9 +148,10 @@ void linux64_push_symbol(struct identmap *im, struct objfile_symbol_record *symb
 
   uint32_t offset = strtab_add(strings, name_buf, name_count);
   ent.st_name = to_le_u32(offset);
-  ent.st_value = to_le_u32(symbol->value);
+  /* TODO(): Maybe symbol->value should be a 64-bit value -- what goes into the value? */
+  ent.st_value = up_to_le_u64(symbol->value);
   /* TODO: (Also in s2:) It's OK to just use zero for everything? */
-  ent.st_size = to_le_u32(0);
+  ent.st_size = to_le_u64(0);
   ent.st_info = (symbol->is_function == IS_FUNCTION_YES ?
                  kSTT_FUNC : kSTT_OBJECT) | ((symbol->is_static ?
                                               kSTB_LOCAL : kSTB_GLOBAL) << 4);
@@ -169,6 +176,7 @@ void linux64_push_symbol(struct identmap *im, struct objfile_symbol_record *symb
   databuf_append(symbols, &ent, sizeof(ent));
 }
 
+/* TODO(): elf64 below this */
 
 void linux64_write_symbols_and_strings(struct identmap *im, struct objfile *f,
                                        struct databuf **symbols_out,
@@ -189,18 +197,20 @@ void linux64_write_symbols_and_strings(struct identmap *im, struct objfile *f,
   they get reordered (and index zero cannot be used). */
   uint32_t *sti_map = malloc_mul(sizeof(*sti_map), f->symbol_table_count);
 
+  /* TODO(): elf64 above this */
   {
     /* Add index zero symbol entry. */
-    struct elf32_Symtab_Entry ent;
+    struct elf64_Symtab_Entry ent;
     ent.st_name = to_le_u32(0);
-    ent.st_value = to_le_u32(0);
-    ent.st_size = to_le_u32(0);
+    ent.st_value = to_le_u64(0);
+    ent.st_size = to_le_u64(0);
     ent.st_info = 0;
     ent.st_other = 0;
     ent.st_shndx = to_le_u16(kSHN_UNDEF);
     databuf_append(symbols, &ent, sizeof(ent));
     symbols_count = uint32_add(symbols_count, 1);
   }
+  /* TODO(): elf64 below this */
 
   struct objfile_symbol_record *symbol_table = f->symbol_table;
   for (size_t i = 0, e = f->symbol_table_count; i < e; i++) {
@@ -230,10 +240,6 @@ void linux64_write_symbols_and_strings(struct identmap *im, struct objfile *f,
 }
 
 enum { kSymTabSectionNumber = 3 };
-
-struct le_u64 up_to_le_u64(uint32_t x) {
-  return to_le_u64((uint64_t)x);
-}
 
 void linux64_section_headers(uint32_t prev_end_offset,
                              int sh_out_index,
@@ -488,7 +494,7 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     sh.sh_link = to_le_u32(2);
     sh.sh_info = to_le_u32(end_local_symbols);
     sh.sh_addralign = to_le_u64(0);
-    sh.sh_entsize = to_le_u64(sizeof(struct elf32_Symtab_Entry));
+    sh.sh_entsize = to_le_u64(sizeof(struct elf64_Symtab_Entry));
     databuf_append(d, &sh, sizeof(sh));
   }
 
