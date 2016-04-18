@@ -146,7 +146,6 @@ void linux64_push_symbol(struct identmap *im, struct objfile_symbol_record *symb
 
   uint32_t offset = strtab_add(strings, name_buf, name_count);
   ent.st_name = to_le_u32(offset);
-  /* TODO(): Maybe symbol->value should be a 64-bit value -- what goes into the value? */
   ent.st_value = up_to_le_u64(symbol->value);
   /* TODO: (Also in s2:) It's OK to just use zero for everything? */
   ent.st_size = to_le_u64(0);
@@ -284,11 +283,8 @@ void linux64_append_relocations_and_mutate_section(
   for (size_t i = 0, e = s->relocs_count; i < e; i++) {
     CHECK(relocs[i].type != OBJFILE_RELOCATION_TYPE_DIFF32);
     struct elf64_Rel rel;
-    /* TODO(): should virtual_address in objfile_relocation be 64-bit?
-    Probably not, but double-check. */
-    /* TODO(): We're going to have to re-figure-out these relocations.
-    We'll need 64-bit relocations, and we'll need to figure out
-    whether the -4 addend is right for us. */
+    /* TODO(): It is not confirmed that our current treatment of 32
+    and PC32 is correct, in 64-bit. */
     rel.r_offset = up_to_le_u64(relocs[i].virtual_address);
     uint32_t sti = relocs[i].symbol_table_index.value;
     CHECK(sti < sti_map_count);
