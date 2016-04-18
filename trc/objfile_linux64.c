@@ -244,7 +244,7 @@ void linux64_section_headers(uint32_t prev_end_offset,
   uint32_t rel_end = uint32_add(rel_offset, rel_size);
   uint32_t sh_alignment = s->max_requested_alignment;
   uint32_t sh_offset = uint32_ceil_aligned(rel_end, sh_alignment);
-  uint32_t sh_size = s->raw.count;
+  uint32_t sh_size = size_to_uint32(s->raw.count);
   uint32_t sh_end = uint32_add(sh_offset, sh_size);
 
   rel_out->sh_name = to_le_u32(sh_strtab_rel_index);
@@ -341,7 +341,7 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   strtab_append_c_str(&sh_strtab, "");
 
   const uint32_t sym_strtab_offset
-    = uint32_add(sh_strtab_offset, sh_strtab.count);
+    = uint32_add(sh_strtab_offset, size_to_uint32(sh_strtab.count));
 
   struct databuf *symbols;
   struct databuf *strings;
@@ -447,7 +447,7 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     sh.sh_flags = to_le_u32(0);
     sh.sh_addr = to_le_u32(0);
     sh.sh_offset = to_le_u32(sh_strtab_offset);
-    sh.sh_size = to_le_u32(sh_strtab.count);
+    sh.sh_size = to_le_u32(size_to_uint32(sh_strtab.count));
     sh.sh_link = to_le_u32(0);
     sh.sh_info = to_le_u32(0);
     sh.sh_addralign = to_le_u32(0);
