@@ -45,4 +45,6 @@ int try_uint32_to_uint8(uint32_t x, uint8_t *out);
 
 int32_t uint32_to_int32(uint32_t x);
 
+size_t uint64_to_size(uint64_t x);
+
 #endif /* KIT_ARITH_H_ */

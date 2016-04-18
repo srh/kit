@@ -264,3 +264,8 @@ int32_t uint32_to_int32(uint32_t x) {
   CHECK(success);
   return ret;
 }
+
+size_t uint64_to_size(uint64_t x) {
+  CHECK(x <= SIZE_MAX);
+  return x;
+}

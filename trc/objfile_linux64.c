@@ -90,14 +90,14 @@ struct elf64_Symtab_Entry {
 } PACK_ATTRIBUTE;
 PACK_POP
 
-/* TODO(): elf64 below this */
-
 PACK_PUSH
-struct elf32_Rel {
-  struct le_u32 r_offset;
-  struct le_u32 r_info;
+struct elf64_Rel {
+  struct le_u64 r_offset;
+  struct le_u64 r_info;
 } PACK_ATTRIBUTE;
 PACK_POP
+
+/* TODO(): elf64 below this */
 
 /* Seems like a good idea. */
 enum { kRel_Section_Alignment = 8 };
@@ -129,6 +129,8 @@ enum {
   kSHF_EXEC = 4,
   kR_386_32 = 1,
   kR_386_PC32 = 2,
+  kR_X86_64_32 = 10,
+  kR_X86_64_PC32 = 2,
 };
 
 /* TODO(): elf64 above this */
@@ -250,7 +252,7 @@ void linux64_section_headers(uint32_t prev_end_offset,
                              struct elf64_Section_Header *sh_out,
                              uint32_t *end_out) {
   uint32_t rel_offset = uint32_ceil_aligned(prev_end_offset, kRel_Section_Alignment);
-  uint32_t rel_size = uint32_mul(s->relocs_count, sizeof(struct elf32_Rel));
+  uint32_t rel_size = uint32_mul(s->relocs_count, sizeof(struct elf64_Rel));
   uint32_t rel_end = uint32_add(rel_offset, rel_size);
   uint32_t sh_alignment = s->max_requested_alignment;
   uint32_t sh_offset = uint32_ceil_aligned(rel_end, sh_alignment);
@@ -266,7 +268,7 @@ void linux64_section_headers(uint32_t prev_end_offset,
   rel_out->sh_link = to_le_u32(kSymTabSectionNumber);
   rel_out->sh_info = to_le_u32(sh_out_index);
   rel_out->sh_addralign = to_le_u64(0);
-  rel_out->sh_entsize = to_le_u64(sizeof(struct elf32_Rel));
+  rel_out->sh_entsize = to_le_u64(sizeof(struct elf64_Rel));
 
   sh_out->sh_name = to_le_u32(sh_strtab_index);
   sh_out->sh_type = to_le_u32(kSHT_PROGBITS);
@@ -289,20 +291,24 @@ void linux64_append_relocations_and_mutate_section(
   struct objfile_relocation *relocs = s->relocs;
   for (size_t i = 0, e = s->relocs_count; i < e; i++) {
     CHECK(relocs[i].type != OBJFILE_RELOCATION_TYPE_DIFF32);
-    struct elf32_Rel rel;
-    rel.r_offset = to_le_u32(relocs[i].virtual_address);
+    struct elf64_Rel rel;
+    /* TODO(): should virtual_address in objfile_relocation be 64-bit?
+    Probably not, but double-check. */
+    /* TODO(): We're going to have to re-figure-out these relocations.
+    We'll need 64-bit relocations, and we'll need to figure out
+    whether the -4 addend is right for us. */
+    rel.r_offset = up_to_le_u64(relocs[i].virtual_address);
     uint32_t sti = relocs[i].symbol_table_index.value;
     CHECK(sti < sti_map_count);
     uint32_t new_sti = sti_map[sti];
-    CHECK(new_sti <= (UINT32_MAX >> 8));
     static const uint32_t rel_types[] = {
-      [OBJFILE_RELOCATION_TYPE_DIR32] = kR_386_32,
-      [OBJFILE_RELOCATION_TYPE_REL32] = kR_386_PC32,
+      [OBJFILE_RELOCATION_TYPE_DIR32] = kR_X86_64_32,
+      [OBJFILE_RELOCATION_TYPE_REL32] = kR_X86_64_PC32,
       [OBJFILE_RELOCATION_TYPE_DIFF32] = 0, /* garbage */
     };
 
     uint32_t rel_type = rel_types[relocs[i].type];
-    rel.r_info = to_le_u32((new_sti << 8) | rel_type);
+    rel.r_info = to_le_u64((((uint64_t)new_sti) << 32) | (uint64_t)rel_type);
     databuf_append(d, &rel, sizeof(rel));
 
     static const int32_t rel_addends[] = {
@@ -311,7 +317,7 @@ void linux64_append_relocations_and_mutate_section(
       [OBJFILE_RELOCATION_TYPE_DIFF32] = 0, /* garbage */
     };
     struct le_u32 addend_le = to_le_u32((uint32_t)rel_addends[relocs[i].type]);
-    databuf_overwrite(&s->raw, from_le_u32(rel.r_offset), &addend_le, sizeof(addend_le));
+    databuf_overwrite(&s->raw, uint64_to_size(from_le_u64(rel.r_offset)), &addend_le, sizeof(addend_le));
   }
 }
 
