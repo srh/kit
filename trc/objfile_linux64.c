@@ -46,10 +46,8 @@ struct elf64_Header {
 } PACK_ATTRIBUTE;
 PACK_POP
 
-/* TODO(): elf64 below this */
-
 PACK_PUSH
-struct elf32_Section_Header {
+struct elf64_Section_Header {
   /* An index into the section header string table section. */
   struct le_u32 sh_name;
   /* SHT_PROGBITS for "information defined by the program", SHT_SYMTAB
@@ -61,25 +59,27 @@ struct elf32_Section_Header {
   execution.  SHF_ALLOC: This secton occupies memory during process
   execution.  SHF_EXECINSTR: This section contains executable machine
   instructions. */
-  struct le_u32 sh_flags;
+  struct le_u64 sh_flags;
   /* The address at which the section's first byte should reside?  So,
   zero for .o files? */
-  struct le_u32 sh_addr;
+  struct le_u64 sh_addr;
   /* File offset of the section. */
-  struct le_u32 sh_offset;
+  struct le_u64 sh_offset;
   /* Section's size in bytes. */
-  struct le_u32 sh_size;
+  struct le_u64 sh_size;
   /* A "section header table index link." */
   struct le_u32 sh_link;
   /* Extra info. */
   struct le_u32 sh_info;
   /* Section alignment constraint.  0 means the same as 1. */
-  struct le_u32 sh_addralign;
+  struct le_u64 sh_addralign;
   /* For sections that hold a table of fixed-size entries: The size in
   bytes for each entry. */
-  struct le_u32 sh_entsize;
+  struct le_u64 sh_entsize;
 } PACK_ATTRIBUTE;
 PACK_POP
+
+/* TODO(): elf64 below this */
 
 PACK_PUSH
 struct elf32_Symtab_Entry {
@@ -231,13 +231,17 @@ void linux64_write_symbols_and_strings(struct identmap *im, struct objfile *f,
 
 enum { kSymTabSectionNumber = 3 };
 
+struct le_u64 up_to_le_u64(uint32_t x) {
+  return to_le_u64((uint64_t)x);
+}
+
 void linux64_section_headers(uint32_t prev_end_offset,
                              int sh_out_index,
                              struct objfile_section *s,
                              uint32_t sh_strtab_rel_index, uint32_t sh_strtab_index,
                              uint32_t sh_flags,
-                             struct elf32_Section_Header *rel_out,
-                             struct elf32_Section_Header *sh_out,
+                             struct elf64_Section_Header *rel_out,
+                             struct elf64_Section_Header *sh_out,
                              uint32_t *end_out) {
   uint32_t rel_offset = uint32_ceil_aligned(prev_end_offset, kRel_Section_Alignment);
   uint32_t rel_size = uint32_mul(s->relocs_count, sizeof(struct elf32_Rel));
@@ -249,25 +253,25 @@ void linux64_section_headers(uint32_t prev_end_offset,
 
   rel_out->sh_name = to_le_u32(sh_strtab_rel_index);
   rel_out->sh_type = to_le_u32(kSHT_REL);
-  rel_out->sh_flags = to_le_u32(0);
-  rel_out->sh_addr = to_le_u32(0);
-  rel_out->sh_offset = to_le_u32(rel_offset);
-  rel_out->sh_size = to_le_u32(rel_size);
+  rel_out->sh_flags = to_le_u64(0);
+  rel_out->sh_addr = to_le_u64(0);
+  rel_out->sh_offset = up_to_le_u64(rel_offset);
+  rel_out->sh_size = up_to_le_u64(rel_size);
   rel_out->sh_link = to_le_u32(kSymTabSectionNumber);
   rel_out->sh_info = to_le_u32(sh_out_index);
-  rel_out->sh_addralign = to_le_u32(0);
-  rel_out->sh_entsize = to_le_u32(sizeof(struct elf32_Rel));
+  rel_out->sh_addralign = to_le_u64(0);
+  rel_out->sh_entsize = to_le_u64(sizeof(struct elf32_Rel));
 
   sh_out->sh_name = to_le_u32(sh_strtab_index);
   sh_out->sh_type = to_le_u32(kSHT_PROGBITS);
-  sh_out->sh_flags = to_le_u32(kSHF_ALLOC | sh_flags);
-  sh_out->sh_addr = to_le_u32(0);
-  sh_out->sh_offset = to_le_u32(sh_offset);
-  sh_out->sh_size = to_le_u32(sh_size);
+  sh_out->sh_flags = to_le_u64(kSHF_ALLOC | sh_flags);
+  sh_out->sh_addr = to_le_u64(0);
+  sh_out->sh_offset = up_to_le_u64(sh_offset);
+  sh_out->sh_size = up_to_le_u64(sh_size);
   sh_out->sh_link = to_le_u32(kSHN_UNDEF);
   sh_out->sh_info = to_le_u32(0);
-  sh_out->sh_addralign = to_le_u32(sh_alignment);
-  sh_out->sh_entsize = to_le_u32(0);
+  sh_out->sh_addralign = up_to_le_u64(sh_alignment);
+  sh_out->sh_entsize = to_le_u64(0);
 
   *end_out = sh_end;
 }
@@ -314,7 +318,7 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   const uint16_t kNumSectionHeaders = 10;
   const uint32_t end_of_section_headers
     = uint32_add(section_header_offset,
-                 kNumSectionHeaders * sizeof(struct elf32_Section_Header));
+                 kNumSectionHeaders * sizeof(struct elf64_Section_Header));
   const uint32_t sh_strtab_offset = end_of_section_headers;
 
   struct databuf sh_strtab;
@@ -362,8 +366,8 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
 
   const uint32_t symtab_end = uint32_add(symtab_offset, symtab_size);
 
-  struct elf32_Section_Header sh_rel_data;
-  struct elf32_Section_Header sh_data;
+  struct elf64_Section_Header sh_rel_data;
+  struct elf64_Section_Header sh_data;
   uint32_t data_end;
   linux64_section_headers(symtab_end, kLinux32DataSectionNumber, &f->data,
                           dot_rel_data_index, dot_data_index,
@@ -371,8 +375,8 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
                           &sh_rel_data, &sh_data,
                           &data_end);
 
-  struct elf32_Section_Header sh_rel_rodata;
-  struct elf32_Section_Header sh_rodata;
+  struct elf64_Section_Header sh_rel_rodata;
+  struct elf64_Section_Header sh_rodata;
   uint32_t rodata_end;
   linux64_section_headers(data_end, kLinux32RodataSectionNumber, &f->rdata,
                           dot_rel_rodata_index, dot_rodata_index,
@@ -380,8 +384,8 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
                           &sh_rel_rodata, &sh_rodata,
                           &rodata_end);
 
-  struct elf32_Section_Header sh_rel_text;
-  struct elf32_Section_Header sh_text;
+  struct elf64_Section_Header sh_rel_text;
+  struct elf64_Section_Header sh_text;
   uint32_t text_end;
   linux64_section_headers(rodata_end, kLinux32TextSectionNumber, &f->text,
                           dot_rel_text_index, dot_text_index,
@@ -414,80 +418,81 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     h.e_ehsize = to_le_u16(sizeof(h));
     h.e_phentsize = to_le_u16(0);
     h.e_phnum = to_le_u16(0);
-    h.e_shentsize = to_le_u16(sizeof(struct elf32_Section_Header));
+    h.e_shentsize = to_le_u16(sizeof(struct elf64_Section_Header));
     h.e_shnum = to_le_u16(kNumSectionHeaders);
     /* String table section header is at index 1. */
     h.e_shstrndx = to_le_u16(1);
 
     databuf_append(d, &h, sizeof(h));
   }
-  /* TODO(): elf64 below this. */
 
   {
     /* Null section header (for index 0). */
-    struct elf32_Section_Header sh;
+    struct elf64_Section_Header sh;
     sh.sh_name = to_le_u32(0);
     sh.sh_type = to_le_u32(kSHT_NULL);
-    sh.sh_flags = to_le_u32(0);
-    sh.sh_addr = to_le_u32(0);
-    sh.sh_offset = to_le_u32(0);
-    sh.sh_size = to_le_u32(0);
+    sh.sh_flags = to_le_u64(0);
+    sh.sh_addr = to_le_u64(0);
+    sh.sh_offset = to_le_u64(0);
+    sh.sh_size = to_le_u64(0);
     sh.sh_link = to_le_u32(0);
     sh.sh_info = to_le_u32(0);
-    sh.sh_addralign = to_le_u32(0);
-    sh.sh_entsize = to_le_u32(0);
+    sh.sh_addralign = to_le_u64(0);
+    sh.sh_entsize = to_le_u64(0);
     databuf_append(d, &sh, sizeof(sh));
   }
 
   {
     /* Strings table section header -- index 1. */
-    struct elf32_Section_Header sh;
+    struct elf64_Section_Header sh;
     sh.sh_name = to_le_u32(dot_shstrtab_index);
     sh.sh_type = to_le_u32(kSHT_STRTAB);
-    sh.sh_flags = to_le_u32(0);
-    sh.sh_addr = to_le_u32(0);
-    sh.sh_offset = to_le_u32(sh_strtab_offset);
-    sh.sh_size = to_le_u32(size_to_uint32(sh_strtab.count));
+    sh.sh_flags = to_le_u64(0);
+    sh.sh_addr = to_le_u64(0);
+    sh.sh_offset = up_to_le_u64(sh_strtab_offset);
+    sh.sh_size = up_to_le_u64(size_to_uint32(sh_strtab.count));
     sh.sh_link = to_le_u32(0);
     sh.sh_info = to_le_u32(0);
-    sh.sh_addralign = to_le_u32(0);
-    sh.sh_entsize = to_le_u32(0);
+    sh.sh_addralign = to_le_u64(0);
+    sh.sh_entsize = to_le_u64(0);
     databuf_append(d, &sh, sizeof(sh));
   }
 
   {
     /* Symbol table strings section header -- index 2. */
-    struct elf32_Section_Header sh;
+    struct elf64_Section_Header sh;
     sh.sh_name = to_le_u32(dot_strtab_index);
     sh.sh_type = to_le_u32(kSHT_STRTAB);
-    sh.sh_flags = to_le_u32(0);
-    sh.sh_addr = to_le_u32(0);
-    sh.sh_offset = to_le_u32(sym_strtab_offset);
-    sh.sh_size = to_le_u32(sym_strtab_size);
+    sh.sh_flags = to_le_u64(0);
+    sh.sh_addr = to_le_u64(0);
+    sh.sh_offset = up_to_le_u64(sym_strtab_offset);
+    sh.sh_size = up_to_le_u64(sym_strtab_size);
     sh.sh_link = to_le_u32(0);
     sh.sh_info = to_le_u32(0);
-    sh.sh_addralign = to_le_u32(0);
-    sh.sh_entsize = to_le_u32(0);
+    sh.sh_addralign = to_le_u64(0);
+    sh.sh_entsize = to_le_u64(0);
     databuf_append(d, &sh, sizeof(sh));
   }
 
   {
     STATIC_CHECK(kSymTabSectionNumber == 3);
     /* Symbol table section header -- index 3. */
-    struct elf32_Section_Header sh;
+    struct elf64_Section_Header sh;
     sh.sh_name = to_le_u32(dot_symtab_index);
     sh.sh_type = to_le_u32(kSHT_SYMTAB);
-    sh.sh_flags = to_le_u32(0);
-    sh.sh_addr = to_le_u32(0);
-    sh.sh_offset = to_le_u32(symtab_offset);
-    sh.sh_size = to_le_u32(symtab_size);
+    sh.sh_flags = to_le_u64(0);
+    sh.sh_addr = to_le_u64(0);
+    sh.sh_offset = up_to_le_u64(symtab_offset);
+    sh.sh_size = up_to_le_u64(symtab_size);
     /* The associated string table's section header index. */
     sh.sh_link = to_le_u32(2);
     sh.sh_info = to_le_u32(end_local_symbols);
-    sh.sh_addralign = to_le_u32(0);
-    sh.sh_entsize = to_le_u32(sizeof(struct elf32_Symtab_Entry));
+    sh.sh_addralign = to_le_u64(0);
+    sh.sh_entsize = to_le_u64(sizeof(struct elf32_Symtab_Entry));
     databuf_append(d, &sh, sizeof(sh));
   }
+
+  /* TODO(): elf64 below this (if there's anything to do) */
 
   STATIC_CHECK(kLinux32DataSectionNumber == 5);
   databuf_append(d, &sh_rel_data, sizeof(sh_rel_data));
@@ -519,27 +524,27 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   CHECK(d->count == symtab_end);
 
   append_zeros_to_align(d, kRel_Section_Alignment);
-  CHECK(d->count == from_le_u32(sh_rel_data.sh_offset));
+  CHECK(d->count == from_le_u64(sh_rel_data.sh_offset));
   linux64_append_relocations_and_mutate_section(
       sti_map, f->symbol_table_count, d, &f->data);
   append_zeros_to_align(d, f->data.max_requested_alignment);
-  CHECK(d->count == from_le_u32(sh_data.sh_offset));
+  CHECK(d->count == from_le_u64(sh_data.sh_offset));
   databuf_append(d, f->data.raw.buf, f->data.raw.count);
 
   append_zeros_to_align(d, kRel_Section_Alignment);
-  CHECK(d->count == from_le_u32(sh_rel_rodata.sh_offset));
+  CHECK(d->count == from_le_u64(sh_rel_rodata.sh_offset));
   linux64_append_relocations_and_mutate_section(
       sti_map, f->symbol_table_count, d, &f->rdata);
   append_zeros_to_align(d, f->rdata.max_requested_alignment);
-  CHECK(d->count == from_le_u32(sh_rodata.sh_offset));
+  CHECK(d->count == from_le_u64(sh_rodata.sh_offset));
   databuf_append(d, f->rdata.raw.buf, f->rdata.raw.count);
 
   append_zeros_to_align(d, kRel_Section_Alignment);
-  CHECK(d->count == from_le_u32(sh_rel_text.sh_offset));
+  CHECK(d->count == from_le_u64(sh_rel_text.sh_offset));
   linux64_append_relocations_and_mutate_section(
       sti_map, f->symbol_table_count, d, &f->text);
   append_zeros_to_align(d, f->text.max_requested_alignment);
-  CHECK(d->count == from_le_u32(sh_text.sh_offset));
+  CHECK(d->count == from_le_u64(sh_text.sh_offset));
   databuf_append(d, f->text.raw.buf, f->text.raw.count);
 
   *out = d;
