@@ -151,7 +151,7 @@ int platform_prefix_underscore(enum target_platform platform) {
   case TARGET_PLATFORM_LINUX_32BIT:
     return 0;
   case TARGET_PLATFORM_LINUX_64BIT:
-    TODO_IMPLEMENT;
+    return 0;
   case TARGET_PLATFORM_OSX_32BIT:
     return 1;
   default:
