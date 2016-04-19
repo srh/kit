@@ -5161,9 +5161,8 @@ const char *platform_objfile_suffix(enum target_platform platform) {
     return ".obj";
   case TARGET_PLATFORM_LINUX_32BIT: /* fallthrough */
   case TARGET_PLATFORM_OSX_32BIT:
-    return ".o";
   case TARGET_PLATFORM_LINUX_64BIT:
-    TODO_IMPLEMENT;
+    return ".o";
   default:
     UNREACHABLE();
   }
@@ -5214,7 +5213,8 @@ int build_module(struct identmap *im,
     osx32_flatten(cs.im, objfile, &databuf);
     break;
   case TARGET_PLATFORM_LINUX_64BIT:
-    TODO_IMPLEMENT;
+    linux64_flatten(cs.im, objfile, &databuf);
+    break;
   default:
     UNREACHABLE();
   }
