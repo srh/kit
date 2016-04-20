@@ -1,7 +1,5 @@
 import state;
 
-// DOTTED(): This file.
-
 // This file's a grab-bag for ipse type related stuff.  Probably most of it should be
 // moved to other files and this should go away.
 
@@ -85,6 +83,8 @@ func canonicalize_idy_ipses(ctx *canonicalizing_ctx, t *te_typeexpr) te_typeexpr
     return TeArraytype({count, emshp(canonicalize_idy_ipses(ctx, oo(&a.param)))});
   case &TeIpse(a te_ipse):
     return TeIpse({canonicalized_ipse_sym(ctx, a.name)});
+  case &TeDotted(a te_dotted):
+    return TeDotted({emshp!canonicalize_idy_ipses(ctx, oo(&a.lhs)), a.fieldname});
   case &TeUnknown:
     ice(_u8("canonicalize_idy_ipses sees TeUnknown."));
     return fake();
@@ -168,6 +168,8 @@ func map_ipses(im *identmap, ipse_mappings *shray[sym], t *te_typeexpr) te_typee
     return TeArraytype({count, emshp(map_ipses(im, ipse_mappings, oo(&a.param)))});
   case &TeIpse(a te_ipse):
     return TeIpse({map_ipse_sym(im, ipse_mappings, a.name)});
+  case &TeDotted(a te_dotted):
+    return TeDotted({emshp!map_ipses(im, ipse_mappings, oo(&a.lhs)), a.fieldname});
   case &TeUnknown:
     ice(_u8("map_ipses sees TeUnknown"));
     return fake();
