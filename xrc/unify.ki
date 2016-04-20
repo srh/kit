@@ -49,163 +49,158 @@ func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
     return true;
   }
   switch t {
-    case &TeName(a te_name): {
-      if case Has(ix size) = lookup_plain_name(names, a.value) {
-        info unify_information = mk_fresh_info();
-        unified te_typeexpr;
-        if !unify_types(scope, &up->tys[ix], pt, &info, emissions_app, &unified) {
+  case &TeName(a te_name):
+    if case Has(ix size) = lookup_plain_name(names, a.value) {
+      info unify_information = mk_fresh_info();
+      unified te_typeexpr;
+      if !unify_types(scope, &up->tys[ix], pt, &info, emissions_app, &unified) {
+        return false;
+      }
+      up->tys[ix] = unified;
+      up->dirty[ix] |= info.updated;
+      *unified_out = TeName({a.value, None});
+      return true;
+    } else {
+      if case &TeName(pa te_name) = pt {
+        // NOTE: Naturally, at some point scopage might be a factor.
+        if a.value != pa.value {
           return false;
         }
-        up->tys[ix] = unified;
-        up->dirty[ix] |= info.updated;
         *unified_out = TeName({a.value, None});
         return true;
       } else {
-        if case &TeName(pa te_name) = pt {
-          // NOTE: Naturally, at some point scopage might be a factor.
-          if a.value != pa.value {
-            return false;
-          }
-          *unified_out = TeName({a.value, None});
-          return true;
-        } else {
-          return false;
-        }
-      }
-    }
-
-    case &TeApp(a te_app): {
-      // Generics can't be type constructors (yet).
-      if case &TeApp(pa te_app) = pt {
-        unified_typefunc te_puretype;
-        if !unify_puretypes(&a.typefunc, &pa.typefunc, &unified_typefunc) {
-          return false;
-        }
-        a_params *shray[te_typeexpr] = &a.params;
-        pa_params *shray[te_typeexpr] = &pa.params;
-        n size = count(a_params);
-        if n != count(pa_params) {
-          return false;
-        }
-        unified_params array[te_typeexpr];
-        reserve(&unified_params, n);
-        for i size = 0; i < n; i = i + 1 {
-          unified te_typeexpr;
-          if !unify_under_generics(scope, up, &pa_params[i], names, &a_params[i], info_app, emissions_app, &unified) {
-            return false;
-          }
-          push(&unified_params, unified);
-        }
-        *unified_out = TeApp({unified_typefunc, freeze(&unified_params), None});
-        return true;
-      } else {
         return false;
       }
     }
 
-    case &TeUnion(a te_union): {
-      if case &TeUnion(pa te_union) = pt {
-        n size = count(&a.fields);
-        if n != count(&pa.fields) {
-          return false;
-        }
-        unified_fields array[te_vardecl];
-        for i size = 0; i < n; i = i + 1 {
-          pd *te_vardecl = &pa.fields[i];
-          d *te_vardecl = &a.fields[i];
-          if pd->name != d->name {
-            return false;
-          }
-          unified te_typeexpr;
-          if !unify_under_generics(scope, up, &pd->type, names, &d->type, info_app, emissions_app, &unified) {
-            return false;
-          }
-          push(&unified_fields, {d->name, unified});
-        }
-        *unified_out = TeUnion({freeze(&unified_fields)});
-        return true;
-      } else {
+  case &TeApp(a te_app):
+    // Generics can't be type constructors (yet).
+    if case &TeApp(pa te_app) = pt {
+      unified_typefunc te_puretype;
+      if !unify_puretypes(&a.typefunc, &pa.typefunc, &unified_typefunc) {
         return false;
       }
+      a_params *shray[te_typeexpr] = &a.params;
+      pa_params *shray[te_typeexpr] = &pa.params;
+      n size = count(a_params);
+      if n != count(pa_params) {
+        return false;
+      }
+      unified_params array[te_typeexpr];
+      reserve(&unified_params, n);
+      for i size = 0; i < n; i = i + 1 {
+        unified te_typeexpr;
+        if !unify_under_generics(scope, up, &pa_params[i], names, &a_params[i], info_app, emissions_app, &unified) {
+          return false;
+        }
+        push(&unified_params, unified);
+      }
+      *unified_out = TeApp({unified_typefunc, freeze(&unified_params), None});
+      return true;
+    } else {
+      return false;
     }
 
-    case &TeArraytype(a te_arraytype): {
-      if case &TeArraytype(pa te_arraytype) = pt {
-        unified_count opt[u32];
-        if case Has(ac u32) = a.count {
-          if case Has(pac u32) = pa.count {
-            if ac != pac {
-              return false;
-            } else {
-              unified_count = Has(ac);
-            }
+  case &TeUnion(a te_union):
+    if case &TeUnion(pa te_union) = pt {
+      n size = count(&a.fields);
+      if n != count(&pa.fields) {
+        return false;
+      }
+      unified_fields array[te_vardecl];
+      for i size = 0; i < n; i = i + 1 {
+        pd *te_vardecl = &pa.fields[i];
+        d *te_vardecl = &a.fields[i];
+        if pd->name != d->name {
+          return false;
+        }
+        unified te_typeexpr;
+        if !unify_under_generics(scope, up, &pd->type, names, &d->type, info_app, emissions_app, &unified) {
+          return false;
+        }
+        push(&unified_fields, {d->name, unified});
+      }
+      *unified_out = TeUnion({freeze(&unified_fields)});
+      return true;
+    } else {
+      return false;
+    }
+
+  case &TeArraytype(a te_arraytype):
+    if case &TeArraytype(pa te_arraytype) = pt {
+      unified_count opt[u32];
+      if case Has(ac u32) = a.count {
+        if case Has(pac u32) = pa.count {
+          if ac != pac {
+            return false;
           } else {
             unified_count = Has(ac);
           }
         } else {
-          unified_count = pa.count;
+          unified_count = Has(ac);
         }
-        unified_type te_typeexpr;
-        if !unify_under_generics(scope, up, oo(&pa.param), names, oo(&a.param), info_app, emissions_app, &unified_type) {
-          return false;
+      } else {
+        unified_count = pa.count;
+      }
+      unified_type te_typeexpr;
+      if !unify_under_generics(scope, up, oo(&pa.param), names, oo(&a.param), info_app, emissions_app, &unified_type) {
+        return false;
+      }
+      *unified_out = TeArraytype({unified_count, emshp(unified_type)});
+      return true;
+    } else {
+      return false;
+    }
+
+  case &TeIpse(a te_ipse):
+    // NOTE: I mimicked the TeName case, and haven't fully thought out how that would
+    // affect this function's callers, so treat this code with skepticism.
+    if case Has(ixtup tup[size, *te_ipse_generik]) = lookup_ipse_name(names, a.name) {
+      info unify_information;
+      unified te_typeexpr;
+      if !unify_types(scope, &up->tys[ixtup.car], pt, &info, emissions_app, &unified) {
+        return false;
+      }
+      up->tys[ixtup.car] = unified;
+      up->dirty[ixtup.car] |= info.updated;
+      *unified_out = TeIpse({a.name});
+      return true;
+    } else {
+      if case &TeIpse(pa te_ipse) = pt {
+        // NOTE: Beware scopage, as with TeName, when that becomes a factor.
+        if a.name != pa.name {
+          a_oftype cu_typeexpr = scope_lookup(scope, a.name);
+          pa_oftype cu_typeexpr = scope_lookup(scope, pa.name);
+          // If a.name isn't in "names", it cannot have an oftype that references "names".  So we can just use unify_types.  I mean generally a cu_typeexpr can't reference "names", so if they types share the same local scope, ditto, we already replaced its generics and cac'd the oftype.
+
+          info unify_information = mk_fresh_info();
+          unified_oftype_discard te_typeexpr;
+          if !unify_types(scope, &a_oftype.x, &pa_oftype.x, &info, emissions_app, &unified_oftype_discard) {
+            return false;
+          }
+          // we're unifying complete types just to check equivalence.
+          check(!info.updated);
+
+          push(emissions_app, @[unify_emission]SameIpse({a.name, pa.name}));
+        } else {
+          // Just to assert the scope actually has the name.
+          discard cu_typeexpr = scope_lookup(scope, a.name);
         }
-        *unified_out = TeArraytype({unified_count, emshp(unified_type)});
+        *unified_out = TeIpse({a.name});
         return true;
       } else {
         return false;
       }
     }
 
-    case &TeIpse(a te_ipse):
-      // NOTE: I mimicked the TeName case, and haven't fully thought out how that would
-      // affect this function's callers, so treat this code with skepticism.
-      if case Has(ixtup tup[size, *te_ipse_generik]) = lookup_ipse_name(names, a.name) {
-        info unify_information;
-        unified te_typeexpr;
-        if !unify_types(scope, &up->tys[ixtup.car], pt, &info, emissions_app, &unified) {
-          return false;
-        }
-        up->tys[ixtup.car] = unified;
-        up->dirty[ixtup.car] |= info.updated;
-        *unified_out = TeIpse({a.name});
-        return true;
-      } else {
-        if case &TeIpse(pa te_ipse) = pt {
-          // NOTE: Beware scopage, as with TeName, when that becomes a factor.
-          if a.name != pa.name {
-            a_oftype cu_typeexpr = scope_lookup(scope, a.name);
-            pa_oftype cu_typeexpr = scope_lookup(scope, pa.name);
-            // If a.name isn't in "names", it cannot have an oftype that references "names".  So we can just use unify_types.  I mean generally a cu_typeexpr can't reference "names", so if they types share the same local scope, ditto, we already replaced its generics and cac'd the oftype.
-
-            info unify_information = mk_fresh_info();
-            unified_oftype_discard te_typeexpr;
-            if !unify_types(scope, &a_oftype.x, &pa_oftype.x, &info, emissions_app, &unified_oftype_discard) {
-              return false;
-            }
-            // we're unifying complete types just to check equivalence.
-            check(!info.updated);
-
-            push(emissions_app, @[unify_emission]SameIpse({a.name, pa.name}));
-          } else {
-            // Just to assert the scope actually has the name.
-            discard cu_typeexpr = scope_lookup(scope, a.name);
-          }
-          *unified_out = TeIpse({a.name});
-          return true;
-        } else {
-          return false;
-        }
-      }
-
-    case &TeUnknown: {
-      // Right now, the only callers are type_matches and unify_types.  From type_matches,
-      // t is complete, and from unify_types, there are no generic names.
-      check(count(names) == 0);
-      *unified_out = *pt;
-      // We know pt is _not_ TeUnknown -- that's checked up top.
-      info_app->updated = true;
-      return true;
-    }
+  case &TeUnknown:
+    // Right now, the only callers are type_matches and unify_types.  From type_matches,
+    // t is complete, and from unify_types, there are no generic names.
+    check(count(names) == 0);
+    *unified_out = *pt;
+    // We know pt is _not_ TeUnknown -- that's checked up top.
+    info_app->updated = true;
+    return true;
   }
 }
 
