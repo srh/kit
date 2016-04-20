@@ -745,52 +745,49 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
   i_scope *type_scope = ref_scope(&ref_deftype_inst(clq->cs, inst_id)->parms);
   type cu_typeexpr = inst_type(cs, ent_id, inst_id);
   switch a {
-    case DefaultMoveCopyDestroy: {
-      props type_properties;
-      #compute_complete_struct_properties(clq, i_scope, st, &type, ComputeMove | ComputeCopy | ComputeDestroy, &props);
-      ptrtype te_typeexpr = ptr_type(cs, type.x);
-      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_initsym);
-      *out = {props.flat_size, props.flat_alignment,
-              init_behavior,
-              props.move_behavior, props.copy_behavior, props.destroy_behavior, props.is_scalar, props.is_pow2, props.exposed_types};
-      return NoFail;
-    }
-    case DefaultMove: {
-      props type_properties;
-      #compute_complete_struct_properties(clq, i_scope, st, &type, ComputeMove, &props);
-      ptrtype te_typeexpr = ptr_type(cs, type.x);
-      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_initsym);
-      copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype2, cs->im->cym.do_copysym);
-      destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_destroysym);
-      *out = {props.flat_size, props.flat_alignment,
-              init_behavior,
-              props.move_behavior,
-              copy_behavior,
-              destroy_behavior,
-              props.is_scalar, props.is_pow2, props.exposed_types};
-      return NoFail;
-    }
-    case NoDefaults: {
-      props type_properties;
-      #compute_complete_struct_properties(clq, i_scope, st, &type, ComputeNone, &props);
-      ptrtype te_typeexpr = ptr_type(cs, type.x);
-      fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-      fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-      init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_initsym);
-      move_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype2, cs->im->cym.do_movesym);
-      copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype2, cs->im->cym.do_copysym);
-      destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_destroysym);
-      props.is_scalar = IsScalarNo;
-      *out = {props.flat_size, props.flat_alignment,
-              init_behavior,
-              move_behavior,
-              copy_behavior,
-              destroy_behavior,
-              props.is_scalar, props.is_pow2, props.exposed_types};
-      return NoFail;
-    }
+  case DefaultMoveCopyDestroy:
+    props type_properties;
+    #compute_complete_struct_properties(clq, i_scope, st, &type, ComputeMove | ComputeCopy | ComputeDestroy, &props);
+    ptrtype te_typeexpr = ptr_type(cs, type.x);
+    fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+    init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_initsym);
+    *out = {props.flat_size, props.flat_alignment,
+            init_behavior,
+            props.move_behavior, props.copy_behavior, props.destroy_behavior, props.is_scalar, props.is_pow2, props.exposed_types};
+    return NoFail;
+  case DefaultMove:
+    props type_properties;
+    #compute_complete_struct_properties(clq, i_scope, st, &type, ComputeMove, &props);
+    ptrtype te_typeexpr = ptr_type(cs, type.x);
+    fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+    fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
+    init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_initsym);
+    copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype2, cs->im->cym.do_copysym);
+    destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_destroysym);
+    *out = {props.flat_size, props.flat_alignment,
+            init_behavior,
+            props.move_behavior,
+            copy_behavior,
+            destroy_behavior,
+            props.is_scalar, props.is_pow2, props.exposed_types};
+    return NoFail;
+  case NoDefaults:
+    props type_properties;
+    #compute_complete_struct_properties(clq, i_scope, st, &type, ComputeNone, &props);
+    ptrtype te_typeexpr = ptr_type(cs, type.x);
+    fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
+    fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
+    init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_initsym);
+    move_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype2, cs->im->cym.do_movesym);
+    copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype2, cs->im->cym.do_copysym);
+    destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_destroysym);
+    props.is_scalar = IsScalarNo;
+    *out = {props.flat_size, props.flat_alignment,
+            init_behavior,
+            move_behavior,
+            copy_behavior,
+            destroy_behavior,
+            props.is_scalar, props.is_pow2, props.exposed_types};
+    return NoFail;
   }
 }

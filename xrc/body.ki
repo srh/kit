@@ -190,133 +190,123 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
                           ee_out *entryexit) np {
   num statement_num = add_statement(bs);
   switch &s->u {
-    case &Expr(b ast_expr_discard): {
-      // This is a bit restrictive and anal, especially for a language designed to
-      // interact with C API's that might have "helpful" but ignorable return values.
-      pt te_typeexpr = primitive_void_type(bs->cs);
-      #check_discard_expr(&bs->es, &b, &pt);
-      *ee_out = {num, num};
-    }
+  case &Expr(b ast_expr_discard):
+    // This is a bit restrictive and anal, especially for a language designed to
+    // interact with C API's that might have "helpful" but ignorable return values.
+    pt te_typeexpr = primitive_void_type(bs->cs);
+    #check_discard_expr(&bs->es, &b, &pt);
+    *ee_out = {num, num};
 
-    case &Return(b ast_return_statement): {
-      exit_num statement_num;
-      #check_return_statement(bs, &b, &exit_num);
-      *ee_out = {num, exit_num};
-    }
+  case &Return(b ast_return_statement):
+    exit_num statement_num;
+    #check_return_statement(bs, &b, &exit_num);
+    *ee_out = {num, exit_num};
 
-    case &Var(b ast_var_statement): {
-      #check_var_statement(bs, vp, &b);
-      *ee_out = {num, num};
-    }
+  case &Var(b ast_var_statement):
+    #check_var_statement(bs, vp, &b);
+    *ee_out = {num, num};
 
-    case &IfThen(b ast_ifthen_statement): {
-      swartch_vp varpopper;
-      init_vp(&swartch_vp, &bs->es);
+  case &IfThen(b ast_ifthen_statement):
+    swartch_vp varpopper;
+    init_vp(&swartch_vp, &bs->es);
 
-      cond_vp varpopper;
-      init_vp(&cond_vp, &bs->es);
-      #check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard);
-      body_ee entryexit;
-      #check_body(bs, obp, &b.body, &body_ee);
-      tailnum statement_num = add_statement(bs);
-      connect_statements(bs, num, tailnum);
-      connect_statements(bs, num, body_ee.entry);
-      connect_statements(bs, body_ee.exit, tailnum);
-      *ee_out = {num, tailnum};
-    }
+    cond_vp varpopper;
+    init_vp(&cond_vp, &bs->es);
+    #check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard);
+    body_ee entryexit;
+    #check_body(bs, obp, &b.body, &body_ee);
+    tailnum statement_num = add_statement(bs);
+    connect_statements(bs, num, tailnum);
+    connect_statements(bs, num, body_ee.entry);
+    connect_statements(bs, body_ee.exit, tailnum);
+    *ee_out = {num, tailnum};
 
-    case &IfThenElse(b ast_ifthenelse_statement): {
-      swartch_vp varpopper;
-      init_vp(&swartch_vp, &bs->es);
+  case &IfThenElse(b ast_ifthenelse_statement):
+    swartch_vp varpopper;
+    init_vp(&swartch_vp, &bs->es);
 
-      cond_vp varpopper;
-      init_vp(&cond_vp, &bs->es);
-      #check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard);
-      then_ee entryexit;
-      #check_body(bs, obp, &b.thenbody, &then_ee);
-      descope_vars(&cond_vp);
-      else_ee entryexit;
-      #check_body(bs, obp, &b.elsebody, &else_ee);
-      tailnum statement_num = add_statement(bs);
-      connect_statements(bs, num, then_ee.entry);
-      connect_statements(bs, num, else_ee.entry);
-      connect_statements(bs, then_ee.exit, tailnum);
-      connect_statements(bs, else_ee.exit, tailnum);
-      *ee_out = {num, tailnum};
-    }
+    cond_vp varpopper;
+    init_vp(&cond_vp, &bs->es);
+    #check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard);
+    then_ee entryexit;
+    #check_body(bs, obp, &b.thenbody, &then_ee);
+    descope_vars(&cond_vp);
+    else_ee entryexit;
+    #check_body(bs, obp, &b.elsebody, &else_ee);
+    tailnum statement_num = add_statement(bs);
+    connect_statements(bs, num, then_ee.entry);
+    connect_statements(bs, num, else_ee.entry);
+    connect_statements(bs, then_ee.exit, tailnum);
+    connect_statements(bs, else_ee.exit, tailnum);
+    *ee_out = {num, tailnum};
 
-    case &While(b ast_while_statement): {
-      swartch_vp varpopper;
-      init_vp(&swartch_vp, &bs->es);
+  case &While(b ast_while_statement):
+    swartch_vp varpopper;
+    init_vp(&swartch_vp, &bs->es);
 
-      tailnum statement_num = add_statement(bs);
-      bp breakpack = {tailnum, vars_in_scope(&bs->es), num, vars_in_scope(&bs->es)};
-      cond_vp varpopper;
-      init_vp(&cond_vp, &bs->es);
-      #check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard);
-      body_ee entryexit;
-      #check_body(bs, Has(&bp), &b.body, &body_ee);
-      connect_statements(bs, num, body_ee.entry);
-      connect_statements(bs, body_ee.exit, num);
-      connect_statements(bs, num, tailnum);
-      *ee_out = {num, tailnum};
-    }
+    tailnum statement_num = add_statement(bs);
+    bp breakpack = {tailnum, vars_in_scope(&bs->es), num, vars_in_scope(&bs->es)};
+    cond_vp varpopper;
+    init_vp(&cond_vp, &bs->es);
+    #check_condition(&bs->es, &swartch_vp, &cond_vp, &b.condition, &b.condition_discard);
+    body_ee entryexit;
+    #check_body(bs, Has(&bp), &b.body, &body_ee);
+    connect_statements(bs, num, body_ee.entry);
+    connect_statements(bs, body_ee.exit, num);
+    connect_statements(bs, num, tailnum);
+    *ee_out = {num, tailnum};
 
-    case &For(b ast_for_statement): {
-      exitnum statement_num;
-      #check_for_statement(bs, vp, &b, num, &exitnum);
-      *ee_out = {num, exitnum};
-    }
+  case &For(b ast_for_statement):
+    exitnum statement_num;
+    #check_for_statement(bs, vp, &b, num, &exitnum);
+    *ee_out = {num, exitnum};
 
-    case &Block(b ast_block_statement):
-      body_ee entryexit;
-      #check_body(bs, obp, &b.body, &body_ee);
-      connect_statements(bs, num, body_ee.entry);
-      *ee_out = {num, body_ee.exit};
+  case &Block(b ast_block_statement):
+    body_ee entryexit;
+    #check_body(bs, obp, &b.body, &body_ee);
+    connect_statements(bs, num, body_ee.entry);
+    *ee_out = {num, body_ee.exit};
 
-    case &Switch(b ast_switch_statement): {
-      exitnum statement_num;
-      #check_switch_statement(bs, vp, obp, &b, num, &exitnum);
-      *ee_out = {num, exitnum};
-    }
+  case &Switch(b ast_switch_statement):
+    exitnum statement_num;
+    #check_switch_statement(bs, vp, obp, &b, num, &exitnum);
+    *ee_out = {num, exitnum};
 
-    case &Break(b ast_break_statement):
-      if case Has(bp *breakpack) = obp {
-        destructions array[var_destruction];
-        #compute_destruct(bs, vars_in_scope(&bs->es), &bp->break_in_scope, &destructions);
-        annotate(&b.info, {destructions});
-        connect_statements(bs, num, bp->break_target);
-        *ee_out = {num, add_statement(bs)};
-      } else {
-        return ERR(_u8("break statement in bad place."));
-      }
-
-    case &Continue(b ast_continue_statement):
-      if case Has(bp *breakpack) = obp {
-        destructions array[var_destruction];
-        #compute_destruct(bs, vars_in_scope(&bs->es), &bp->continue_in_scope, &destructions);
-        annotate(&b.info, {destructions});
-        connect_statements(bs, num, bp->continue_target);
-        *ee_out = {num, add_statement(bs)};
-      } else {
-        return ERR(_u8("continue statement in bad place."));
-      }
-
-    case &Label(b ast_label_statement): {
-      if case Has(ix size) = lookup_label(bs, b.name.value) {
-        return ERR(_u8("Duplicate label name."));
-      }
-
-      label_number label_num = ~count(&bs->labels);
-      push(&bs->labels, {num, &b, b.name.value, vars_in_scope(&bs->es), false});
-      annotate(&b.info, {label_number});
-      *ee_out = {num, num};
-    }
-
-    case &Goto(b ast_goto_statement): {
-      push(&bs->gotos, {num, &b, b.target.value, vars_in_scope(&bs->es)});
+  case &Break(b ast_break_statement):
+    if case Has(bp *breakpack) = obp {
+      destructions array[var_destruction];
+      #compute_destruct(bs, vars_in_scope(&bs->es), &bp->break_in_scope, &destructions);
+      annotate(&b.info, {destructions});
+      connect_statements(bs, num, bp->break_target);
       *ee_out = {num, add_statement(bs)};
+    } else {
+      return ERR(_u8("break statement in bad place."));
     }
+
+  case &Continue(b ast_continue_statement):
+    if case Has(bp *breakpack) = obp {
+      destructions array[var_destruction];
+      #compute_destruct(bs, vars_in_scope(&bs->es), &bp->continue_in_scope, &destructions);
+      annotate(&b.info, {destructions});
+      connect_statements(bs, num, bp->continue_target);
+      *ee_out = {num, add_statement(bs)};
+    } else {
+      return ERR(_u8("continue statement in bad place."));
+    }
+
+  case &Label(b ast_label_statement):
+    if case Has(ix size) = lookup_label(bs, b.name.value) {
+      return ERR(_u8("Duplicate label name."));
+    }
+
+    label_number label_num = ~count(&bs->labels);
+    push(&bs->labels, {num, &b, b.name.value, vars_in_scope(&bs->es), false});
+    annotate(&b.info, {label_number});
+    *ee_out = {num, num};
+
+  case &Goto(b ast_goto_statement):
+    push(&bs->gotos, {num, &b, b.target.value, vars_in_scope(&bs->es)});
+    *ee_out = {num, add_statement(bs)};
   }
   return NoFail;
 }
@@ -430,46 +420,44 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
     }
 
     switch &cas->pattern {
-      case &Case(patt ast_constructor_pattern): {
-        expected_type *te_typeexpr;
-        decl_index size;
-        #check_pattern(&bs->es, &chk, et, &patt, &expected_type, &decl_index);
-        // expected_type is complete, because check_pattern says so.
+    case &Case(patt ast_constructor_pattern):
+      expected_type *te_typeexpr;
+      decl_index size;
+      #check_pattern(&bs->es, &chk, et, &patt, &expected_type, &decl_index);
+      // expected_type is complete, because check_pattern says so.
 
-        tag_value enum_tag_value = mk_enum_tag_value(decl_index);
+      tag_value enum_tag_value = mk_enum_tag_value(decl_index);
 
-        case_vp varpopper;
-        init_vp(&case_vp, &bs->es);
-        ovn opt[var_number];
-        decl_emissions shray[unify_emission];
-        if case &Has(vd ast_vardecl) = &patt.decl {
-          cu_expected_type cu_typeexpr;
-          cell cell_num;
-          #check_pattern_var(&bs->es, &patt, expected_type, &vd, &cu_expected_type, &cell, &decl_emissions);
+      case_vp varpopper;
+      init_vp(&case_vp, &bs->es);
+      ovn opt[var_number];
+      decl_emissions shray[unify_emission];
+      if case &Has(vd ast_vardecl) = &patt.decl {
+        cu_expected_type cu_typeexpr;
+        cell cell_num;
+        #check_pattern_var(&bs->es, &patt, expected_type, &vd, &cu_expected_type, &cell, &decl_emissions);
 
-          vn var_number;
-          #es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~chk.switchable_type_ipse,
-                       &cu_expected_type, VarOverlay, &vn);
-          ovn = Has(vn);
-        } else {
-          if !type_is_void(bs->cs, expected_type) {
-            return ERR(_u8("decl-free case pattern used with non-void case"));
-          }
-          ovn = None;
+        vn var_number;
+        #es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~chk.switchable_type_ipse,
+                     &cu_expected_type, VarOverlay, &vn);
+        ovn = Has(vn);
+      } else {
+        if !type_is_void(bs->cs, expected_type) {
+          return ERR(_u8("decl-free case pattern used with non-void case"));
         }
-        annotate(&patt.cp_info, {{decl_emissions}, ovn, tag_value, enum_field_offset(bs->cs, et, tag_value)});
+        ovn = None;
+      }
+      annotate(&patt.cp_info, {{decl_emissions}, ovn, tag_value, enum_field_offset(bs->cs, et, tag_value)});
 
-        body_ee entryexit;
-        #check_body(bs, obp, &cas->body, &body_ee);
-        connect_statements(bs, num, body_ee.entry);
-        connect_statements(bs, body_ee.exit, exitnum);
-      }
-      case &Default: {
-        body_ee entryexit;
-        #check_body(bs, obp, &cas->body, &body_ee);
-        connect_statements(bs, num, body_ee.entry);
-        connect_statements(bs, body_ee.exit, exitnum);
-      }
+      body_ee entryexit;
+      #check_body(bs, obp, &cas->body, &body_ee);
+      connect_statements(bs, num, body_ee.entry);
+      connect_statements(bs, body_ee.exit, exitnum);
+    case &Default:
+      body_ee entryexit;
+      #check_body(bs, obp, &cas->body, &body_ee);
+      connect_statements(bs, num, body_ee.entry);
+      connect_statements(bs, body_ee.exit, exitnum);
     }
   }
   if ncases > count(&et->constructors) {
@@ -647,15 +635,13 @@ func lookup_label(bs *bodystate, label_name sym) opt[size] {
 
 func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
   switch a {
-    case &Case(ac ast_constructor_pattern): {
-      if case &Case(bc ast_constructor_pattern) = b {
-        return ac.constructor_name.value == bc.constructor_name.value;
-      }
+  case &Case(ac ast_constructor_pattern):
+    if case &Case(bc ast_constructor_pattern) = b {
+      return ac.constructor_name.value == bc.constructor_name.value;
     }
-    case &Default: {
-      if case &Default = b {
-        return true;
-      }
+  case &Default:
+    if case &Default = b {
+      return true;
     }
   }
   return false;
@@ -664,65 +650,63 @@ func duped_patterns(a *ast_case_pattern, b *ast_case_pattern) bool {
 func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, a *ast_condition,
                      cd *ast_condition_discard_info) np {
   switch a {
-    case &ExprCondition(b box[ast_expr_consume]): {
-      booltype cu_typeexpr = compute_bool(es->clq);
-      #check_consume_then_discard_expr(es, oo(&b), &booltype.x, &cd->later);
+  case &ExprCondition(b box[ast_expr_consume]):
+    booltype cu_typeexpr = compute_bool(es->clq);
+    #check_consume_then_discard_expr(es, oo(&b), &booltype.x, &cd->later);
 
-      // We need return statements in the "then" or "else" block to mark the boolean
-      // condition dead.  (It would be a smarter graph if we just marked it dead
-      // immediately after the branch, but... this way makes the code here handle all
-      // cases equivalently.)
+    // We need return statements in the "then" or "else" block to mark the boolean
+    // condition dead.  (It would be a smarter graph if we just marked it dead
+    // immediately after the branch, but... this way makes the code here handle all
+    // cases equivalently.)
+    swartch_vn var_number;
+    #es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_ipse(es, booltype), &booltype,
+                 VarSelfContained, &swartch_vn);
+    annotate(&cd->virtual_cell_dead, None);
+    return NoFail;
+  case &PatternCondition(b ast_pattern_assign):
+    chk swartch_checkobj;
+    #check_swartch(es, oo(&b.rhs), &cd->later, &chk);
+
+    // enum_type is complete, because check_swartch says so.
+
+    et *enumspec = &chk.enum_type;
+    if true {
       swartch_vn var_number;
-      #es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_ipse(es, booltype), &booltype,
-                   VarSelfContained, &swartch_vn);
+      #es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_ipse,
+                   chk.swartch_type, VarSelfContained, &swartch_vn);
+    }
+
+    expected_type *te_typeexpr;
+    decl_index size;
+    #check_pattern(es, &chk, et, &b.pattern, &expected_type, &decl_index);
+    // expected_type is complete, because check_pattern says so.
+
+    tag_cell cell_num = add_virtual_tag_cell(es, et);
+    annotate(&b.info, {{tag_cell, ~count(&et->constructors)}, mk_enum_tag_value(decl_index)});
+
+    ovn opt[var_number];
+    decl_emissions shray[unify_emission];
+    if case &Has(vd ast_vardecl) = &b.pattern.decl {
+      cu_expected_type cu_typeexpr;
+      cell cell_num;
+      #check_pattern_var(es, &b.pattern, expected_type, &vd, &cu_expected_type, &cell, &decl_emissions);
+
+      annotate(&cd->virtual_cell_dead, Has(cell));
+      vn var_number;
+      #es_push_var(es, cond_vp, cell, Has(&vd.name), ~chk.switchable_type_ipse,
+                   &cu_expected_type, VarOverlay, &vn);
+
+      ovn = Has(vn);
+    } else {
+      if !type_is_void(es->cs, expected_type) {
+        return ERR(_u8("decl-free case pattern used with non-void case"));
+      }
       annotate(&cd->virtual_cell_dead, None);
-      return NoFail;
+      ovn = None;
     }
-    case &PatternCondition(b ast_pattern_assign): {
-      chk swartch_checkobj;
-      #check_swartch(es, oo(&b.rhs), &cd->later, &chk);
-
-      // enum_type is complete, because check_swartch says so.
-
-      et *enumspec = &chk.enum_type;
-      if true {
-        swartch_vn var_number;
-        #es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_ipse,
-                     chk.swartch_type, VarSelfContained, &swartch_vn);
-      }
-
-      expected_type *te_typeexpr;
-      decl_index size;
-      #check_pattern(es, &chk, et, &b.pattern, &expected_type, &decl_index);
-      // expected_type is complete, because check_pattern says so.
-
-      tag_cell cell_num = add_virtual_tag_cell(es, et);
-      annotate(&b.info, {{tag_cell, ~count(&et->constructors)}, mk_enum_tag_value(decl_index)});
-
-      ovn opt[var_number];
-      decl_emissions shray[unify_emission];
-      if case &Has(vd ast_vardecl) = &b.pattern.decl {
-        cu_expected_type cu_typeexpr;
-        cell cell_num;
-        #check_pattern_var(es, &b.pattern, expected_type, &vd, &cu_expected_type, &cell, &decl_emissions);
-
-        annotate(&cd->virtual_cell_dead, Has(cell));
-        vn var_number;
-        #es_push_var(es, cond_vp, cell, Has(&vd.name), ~chk.switchable_type_ipse,
-                     &cu_expected_type, VarOverlay, &vn);
-
-        ovn = Has(vn);
-      } else {
-        if !type_is_void(es->cs, expected_type) {
-          return ERR(_u8("decl-free case pattern used with non-void case"));
-        }
-        annotate(&cd->virtual_cell_dead, None);
-        ovn = None;
-      }
-      tag_value enum_tag_value = mk_enum_tag_value(decl_index);
-      annotate(&b.pattern.cp_info, {{decl_emissions}, ovn, tag_value, enum_field_offset(es->cs, et, tag_value)});
-      return NoFail;
-    }
+    tag_value enum_tag_value = mk_enum_tag_value(decl_index);
+    annotate(&b.pattern.cp_info, {{decl_emissions}, ovn, tag_value, enum_field_offset(es->cs, et, tag_value)});
+    return NoFail;
   }
 }
 

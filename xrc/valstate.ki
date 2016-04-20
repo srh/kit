@@ -229,7 +229,7 @@ func vs_xop(c cgt, gn gr_num, xn *gr_xnode) np {
 
 func vs_support_xop(vs *vt_state, op *gr_xop) np {
   switch op {
-  case &GrApply(a gr_apply): {
+  case &GrApply(a gr_apply):
     // We don't know what we're doing yet so we just call these do-nothing functions.
     #vs_support_deactivate(vs, a.funcell);
     #vs_support_descope(vs, a.funcell);
@@ -258,14 +258,12 @@ func vs_support_xop(vs *vt_state, op *gr_xop) np {
       #vs_support_deactivate(vs, us.cell);
     }
     return NoFail;
-  }
-  case &GrPrimApply(a gr_prim_apply): {
+  case &GrPrimApply(a gr_prim_apply):
     foreach c cell_num in elems(&a.params) {
       #vs_support_descope(vs, c);
     }
     #vs_support_activate(vs, a.retcell);
     return NoFail;
-  }
   case &GrMemCopy(a gr_memcopy):
     #vs_support_copy_properties(vs, a.dest, a.src);
     return NoFail;

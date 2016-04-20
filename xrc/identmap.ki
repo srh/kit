@@ -41,9 +41,8 @@ access symmap[_] {
       return ~val;
     } else {
       switch lookup(&im->table, &s) {
-        case Has(value): {
-          return value;
-        }
+      case Has(value):
+        return value;
       }
     }
   }
