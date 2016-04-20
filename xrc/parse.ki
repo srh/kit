@@ -503,8 +503,10 @@ func try_underscore_if_allowed(p *ps, ab allow_blanks, out *ast_typeexpr) try_pa
 
 func help_parse_typeexpr(p *ps, ab allow_blanks, al allow_ipses, out *ast_typeexpr) parse_result {
   switch help_triparse_typeexpr(p, ab, al, out) {
-    case Success: { return Success; }
-    default: { return Fail; }
+  case Success:
+    return Success;
+  default:
+    return Fail;
   }
 }
 
@@ -793,25 +795,22 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
     } else if case Has(op_facts binop_facts) = binop_info(peek(p)->val) {
       op tok = *peek(p);
       switch compare_prec(prec_ctx, op_facts.op_prec.left) {
-        case Conflicts: {
-          return Fail;
-        }
-        case PullsLeft: {
-          *out = lhs;
-          return Success;
-        }
-        case PullsRight: {
-          oparr smallstr = oper_arr(op.val);
-          oper ast_ident = {startend(p), intern(p->im, to_str(&oparr))};
-          step(p);
-          rhs ast_expr;
-          #parse_expr(p, op_facts.op_prec.right, ab, IsNotStatementExpr, &rhs);
-          m ast_meta = copyend(p, lhs.meta);
-          // NOTE: This is fragile.  What if we had a statement, "x = y ! z;", where "!"
-          // is a lower-precedence operator than "="?  Right now no such operators exist
-          // (besides comma, which doesn't work in expressions) so we're okay.
-          #build_binop_expr(p, se, m, op_facts.user_assignment, oper, lhs, rhs, &lhs);
-        }
+      case Conflicts:
+        return Fail;
+      case PullsLeft:
+        *out = lhs;
+        return Success;
+      case PullsRight:
+        oparr smallstr = oper_arr(op.val);
+        oper ast_ident = {startend(p), intern(p->im, to_str(&oparr))};
+        step(p);
+        rhs ast_expr;
+        #parse_expr(p, op_facts.op_prec.right, ab, IsNotStatementExpr, &rhs);
+        m ast_meta = copyend(p, lhs.meta);
+        // NOTE: This is fragile.  What if we had a statement, "x = y ! z;", where "!"
+        // is a lower-precedence operator than "="?  Right now no such operators exist
+        // (besides comma, which doesn't work in expressions) so we're okay.
+        #build_binop_expr(p, se, m, op_facts.user_assignment, oper, lhs, rhs, &lhs);
       }
     } else {
       *out = lhs;
@@ -860,51 +859,51 @@ struct binop_facts {
 
 func binop_info(t tokval) opt[binop_facts] {
   switch t {
-    default: { return None; }
-    case Oper(x smallstr): {
-      if x.len == 1 {
-        c0 i32 = x.vals[0];
-        if c0 == '=' { return Has({{305, 305}, false}); }
-        if c0 == '+' || c0 == '-' { return Has({{504, 506}, false}); }
-        if c0 == '<' || c0 == '>' { return Has({{405, 405}, false}); }
-        if c0 == '*' { return Has({{604, 606}, false}); }
-        if c0 == '/' { return Has({{604, 605}, false}); }
-        if c0 == '%' { return Has({{605, 605}, false}); }
-        if c0 == '|' { return Has({{425, 425}, false}); }
-        if c0 == '^' { return Has({{435, 435}, false}); }
-        if c0 == '&' { return Has({{445, 445}, false}); }
-        return None;
+  default:
+    return None;
+  case Oper(x smallstr):
+    if x.len == 1 {
+      c0 i32 = x.vals[0];
+      if c0 == '=' { return Has({{305, 305}, false}); }
+      if c0 == '+' || c0 == '-' { return Has({{504, 506}, false}); }
+      if c0 == '<' || c0 == '>' { return Has({{405, 405}, false}); }
+      if c0 == '*' { return Has({{604, 606}, false}); }
+      if c0 == '/' { return Has({{604, 605}, false}); }
+      if c0 == '%' { return Has({{605, 605}, false}); }
+      if c0 == '|' { return Has({{425, 425}, false}); }
+      if c0 == '^' { return Has({{435, 435}, false}); }
+      if c0 == '&' { return Has({{445, 445}, false}); }
+      return None;
+    }
+    if x.len == 2 {
+      c0 i32 = x.vals[0];
+      c1 i32 = x.vals[1];
+      if c0 == '&' && c1 == '&' { return Has({{376, 374}, false}); }
+      if c0 == '|' && c1 == '|' { return Has({{356, 354}, false}); }
+      if (c0 == '<' && c1 == '<') || (c0 == '>' && c1 =='>') {
+        return Has({{415, 415}, false});
       }
-      if x.len == 2 {
-        c0 i32 = x.vals[0];
-        c1 i32 = x.vals[1];
-        if c0 == '&' && c1 == '&' { return Has({{376, 374}, false}); }
-        if c0 == '|' && c1 == '|' { return Has({{356, 354}, false}); }
-        if (c0 == '<' && c1 == '<') || (c0 == '>' && c1 =='>') {
-          return Has({{415, 415}, false});
-        }
-        if c1 == '=' && (c0 == '=' || c0 == '<' || c0 == '>' || c0 == '!') {
-          return Has({{405, 405}, false});
-        }
-        if c1 == '=' && (c0 == '%' || c0 == '&' || c0 == '*'
-                         || c0 == '-' || c0 == '+' || c0 == '|'
-                         || c0 == '/') {
-          return Has({{305, 305}, true});
-        }
-        return None;
+      if c1 == '=' && (c0 == '=' || c0 == '<' || c0 == '>' || c0 == '!') {
+        return Has({{405, 405}, false});
       }
-      if x.len == 3 {
-        c0 i32 = x.vals[0];
-        c1 i32 = x.vals[1];
-        c2 i32 = x.vals[2];
-        if c2 == '=' && ((c0 == '<' && c1 == '<')
-                         || (c0 == '>' && c1 == '>')) {
-          return Has({{305, 305}, true});
-        }
-        return None;
+      if c1 == '=' && (c0 == '%' || c0 == '&' || c0 == '*'
+                       || c0 == '-' || c0 == '+' || c0 == '|'
+                       || c0 == '/') {
+        return Has({{305, 305}, true});
       }
       return None;
     }
+    if x.len == 3 {
+      c0 i32 = x.vals[0];
+      c1 i32 = x.vals[1];
+      c2 i32 = x.vals[2];
+      if c2 == '=' && ((c0 == '<' && c1 == '<')
+                       || (c0 == '>' && c1 == '>')) {
+        return Has({{305, 305}, true});
+      }
+      return None;
+    }
+    return None;
   }
 }
 
@@ -947,8 +946,11 @@ func compare_prec(left i32, right i32) prec_cmp {
 
 func oper_arr(tv tokval) smallstr {
   switch tv {
-    case Oper(arr smallstr): { return arr; }
-    default: { check(false); return fake(); }
+  case Oper(arr smallstr):
+    return arr;
+  default:
+    check(false);
+    return fake();
   }
 }
 
@@ -999,17 +1001,17 @@ func build_binop_expr(p *ps, se statement_expr, m ast_meta, user_assignment bool
 
 func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) parse_result {
   switch peek(p)->val {
-    case Oper(operch smallstr): {
-      if is_at_sign(&operch) {
-        step(p);
-        args array[ast_typeexpr];
-        #try_skip_token(p, @[tokval]Grouper(LBracket));
-        #parse_rest_of_type_param_list(p, AllowBlanksNo, &args);
-        *out = mk(ident.meta, NameExpr(mk(ident, Has(move(&args)))));
-        return Success;
-      }
+  case Oper(operch smallstr):
+    if is_at_sign(&operch) {
+      step(p);
+      args array[ast_typeexpr];
+      #try_skip_token(p, @[tokval]Grouper(LBracket));
+      #parse_rest_of_type_param_list(p, AllowBlanksNo, &args);
+      *out = mk(ident.meta, NameExpr(mk(ident, Has(move(&args)))));
+      return Success;
     }
-    default: { }
+  default:
+    void;
   }
   *out = mk(ident.meta, NameExpr(mk(ident, None)));
   return Success;
@@ -1017,54 +1019,46 @@ func parse_finish_name_expr(p *ps, ident ast_ident, out *ast_expr) parse_result 
 
 func parse_atomic_expr_upon_keyw(p *ps, k keyw, out *ast_expr) parse_result {
   switch k {
-    case Func: {
-      m ast_meta = start(p);
-      step(p);
-      return parse_rest_of_lambda(p, m, out);
-    }
-    case True: {
-      m ast_meta = startend(p);
-      step(p);
-      *out = mk(m, @[ast_expr_enum]BoolLiteral({m, true}));
-      return Success;
-    }
-    case False: {
-      m ast_meta = startend(p);
-      step(p);
-      *out = mk(m, @[ast_expr_enum]BoolLiteral({m, false}));
-      return Success;
-    }
-    case Void: {
-      m ast_meta = startend(p);
-      step(p);
-      *out = mk(m, @[ast_expr_enum]VoidLiteral({m}));
-      return Success;
-    }
-    case Null: {
-      m ast_meta = startend(p);
-      step(p);
-      *out = mk(m, @[ast_expr_enum]NullLiteral({m}));
-      return Success;
-    }
-    default: {
-      return Fail;
-    }
+  case Func:
+    m ast_meta = start(p);
+    step(p);
+    return parse_rest_of_lambda(p, m, out);
+  case True:
+    m ast_meta = startend(p);
+    step(p);
+    *out = mk(m, @[ast_expr_enum]BoolLiteral({m, true}));
+    return Success;
+  case False:
+    m ast_meta = startend(p);
+    step(p);
+    *out = mk(m, @[ast_expr_enum]BoolLiteral({m, false}));
+    return Success;
+  case Void:
+    m ast_meta = startend(p);
+    step(p);
+    *out = mk(m, @[ast_expr_enum]VoidLiteral({m}));
+    return Success;
+  case Null:
+    m ast_meta = startend(p);
+    step(p);
+    *out = mk(m, @[ast_expr_enum]NullLiteral({m}));
+    return Success;
+  default:
+    return Fail;
   }
 }
 
 func parse_atomic_expr_upon_num(p *ps, n *numlit, out *ast_expr) parse_result {
   num_meta ast_meta = startend(p);
   switch n {
-    case &DecNum(arr shray[i8]): {
-      step(p);
-      *out = mk(num_meta, @[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]DecLiteral({num_meta, arr})));
-      return Success;
-    }
-    case &HexNum(arr shray[i8]): {
-      step(p);
-      *out = mk(num_meta, @[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]HexLiteral({num_meta, arr})));
-      return Success;
-    }
+  case &DecNum(arr shray[i8]):
+    step(p);
+    *out = mk(num_meta, @[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]DecLiteral({num_meta, arr})));
+    return Success;
+  case &HexNum(arr shray[i8]):
+    step(p);
+    *out = mk(num_meta, @[ast_expr_enum]NumericLiteral(@[ast_numeric_literal]HexLiteral({num_meta, arr})));
+    return Success;
   }
 }
 
@@ -1076,32 +1070,30 @@ enum allow_braces {
 func parse_atomic_expr_upon_grouper(p *ps, ab allow_braces, g grouper, out *ast_expr) parse_result {
   m ast_meta = start(p);
   switch g {
-    case LParen: {
-      step(p);
-      expr ast_expr;
-      #parse_expr(p, kSemicolonPrec, AllowBracesYes, IsNotStatementExpr, &expr);
-      #try_skip_token(p, @[tokval]Grouper(RParen));
-      end(p, m);
-      *out = mk(m, @[ast_expr_enum]ParenExpr({embox(expr)}));
-      return Success;
-    }
-    case LBrace: {
-      if case AllowBracesNo = ab {
-        return Fail;
-      }
-      step(p);
-      return parse_rest_of_strinit(p, m, out);
-    }
-    case DoubleQuote:
-      return parse_atomic_expr_upon_stringdelim(p, '\"', out);
-    case SingleQuote:
-      return parse_atomic_expr_upon_stringdelim(p, '\'', out);
-    case Backtick:
-      ident ast_ident;
-      #parse_backtick_ident(p, m, &ident);
-      return parse_finish_name_expr(p, ident, out);
-    default:
+  case LParen:
+    step(p);
+    expr ast_expr;
+    #parse_expr(p, kSemicolonPrec, AllowBracesYes, IsNotStatementExpr, &expr);
+    #try_skip_token(p, @[tokval]Grouper(RParen));
+    end(p, m);
+    *out = mk(m, @[ast_expr_enum]ParenExpr({embox(expr)}));
+    return Success;
+  case LBrace:
+    if case AllowBracesNo = ab {
       return Fail;
+    }
+    step(p);
+    return parse_rest_of_strinit(p, m, out);
+  case DoubleQuote:
+    return parse_atomic_expr_upon_stringdelim(p, '\"', out);
+  case SingleQuote:
+    return parse_atomic_expr_upon_stringdelim(p, '\'', out);
+  case Backtick:
+    ident ast_ident;
+    #parse_backtick_ident(p, m, &ident);
+    return parse_finish_name_expr(p, ident, out);
+  default:
+    return Fail;
   }
 }
 
@@ -1120,16 +1112,16 @@ func parse_atomic_expr_upon_oper(p *ps, ab allow_braces, operch *smallstr, out *
     return Success;
   } else {
     switch unop_info(operch) {
-      case None: { return Fail; }
-      case Has(rightprec i32): {
-        oper_meta ast_meta = startend(p);
-        step(p);
-        rhs ast_expr;
-        #parse_expr(p, rightprec, ab, IsNotStatementExpr, &rhs);
-        end(p, m);
-        *out = build_unop_expr(p->im, m, {oper_meta, intern(p->im, to_str(operch))}, rhs);
-        return Success;
-      }
+    case None:
+      return Fail;
+    case Has(rightprec i32):
+      oper_meta ast_meta = startend(p);
+      step(p);
+      rhs ast_expr;
+      #parse_expr(p, rightprec, ab, IsNotStatementExpr, &rhs);
+      end(p, m);
+      *out = build_unop_expr(p->im, m, {oper_meta, intern(p->im, to_str(operch))}, rhs);
+      return Success;
     }
   }
 }
@@ -1151,33 +1143,31 @@ func parse_atomic_expr_upon_stringdelim(p *ps, ch i32, out *ast_expr) parse_resu
 
 func parse_atomic_expr(p *ps, ab allow_braces, out *ast_expr) parse_result {
   switch peek(p)->val {
-    case Keyw(k keyw):
-      return parse_atomic_expr_upon_keyw(p, k, out);
-    case Num(n numlit):
-      return parse_atomic_expr_upon_num(p, &n, out);
-    case Grouper(g grouper):
-      return parse_atomic_expr_upon_grouper(p, ab, g, out);
-    case Ident(identch shray[i32]):
-      ident_meta ast_meta = startend(p);
-      step(p);
-      return parse_finish_name_expr(p, {ident_meta, intern(p->im, ~identch)}, out);
-    case ExclIdent(identch shray[i32]):
-      m ast_meta = start(p);
-      ident_meta ast_meta = startend(p);
-      step(p);
-      rhs ast_expr;
-      #parse_expr(p, kGeneralUnopRightPrec, ab, IsNotStatementExpr, &rhs);
-      end(p, m);
-      *out = build_unop_expr(p->im, m, {ident_meta, intern(p->im, ~identch)}, rhs);
-      return Success;
-    case Oper(operch smallstr):
-      return parse_atomic_expr_upon_oper(p, ab, &operch, out);
-    case Bad: {
-      return Fail;
-    }
-    case Eof: {
-      return Fail;
-    }
+  case Keyw(k keyw):
+    return parse_atomic_expr_upon_keyw(p, k, out);
+  case Num(n numlit):
+    return parse_atomic_expr_upon_num(p, &n, out);
+  case Grouper(g grouper):
+    return parse_atomic_expr_upon_grouper(p, ab, g, out);
+  case Ident(identch shray[i32]):
+    ident_meta ast_meta = startend(p);
+    step(p);
+    return parse_finish_name_expr(p, {ident_meta, intern(p->im, ~identch)}, out);
+  case ExclIdent(identch shray[i32]):
+    m ast_meta = start(p);
+    ident_meta ast_meta = startend(p);
+    step(p);
+    rhs ast_expr;
+    #parse_expr(p, kGeneralUnopRightPrec, ab, IsNotStatementExpr, &rhs);
+    end(p, m);
+    *out = build_unop_expr(p->im, m, {ident_meta, intern(p->im, ~identch)}, rhs);
+    return Success;
+  case Oper(operch smallstr):
+    return parse_atomic_expr_upon_oper(p, ab, &operch, out);
+  case Bad:
+    return Fail;
+  case Eof:
+    return Fail;
   }
 }
 
@@ -1263,50 +1253,43 @@ func parse_statement(p *ps, out *ast_statement) parse_result {
 
 func parse_statement_enum(p *ps, out *ast_statement_enum) parse_result {
   switch peek(p)->val {
-    case Keyw(k): {
-      switch k {
-        case Return: {
-          step(p);
-          return parse_rest_of_return_statement_enum(p, out);
-        }
-        case If: {
-          step(p);
-          return parse_rest_of_if_statement_enum(p, out);
-        }
-        case While: {
-          step(p);
-          return parse_rest_of_while_statement_enum(p, out);
-        }
-        case For: {
-          step(p);
-          return parse_rest_of_for_statement_enum(p, out);
-        }
-        case Foreach: {
-          step(p);
-          return parse_rest_of_foreach_statement_enum(p, out);
-        }
-        case Switch: {
-          step(p);
-          return parse_rest_of_switch_statement_enum(p, out);
-        }
-        case Break:
-          step(p);
-          return parse_rest_of_break_statement_enum(p, out);
-        case Continue:
-          step(p);
-          return parse_rest_of_continue_statement_enum(p, out);
-        case Label: {
-          step(p);
-          return parse_rest_of_label_statement_enum(p, out);
-        }
-        case Goto: {
-          step(p);
-          return parse_rest_of_goto_statement_enum(p, out);
-        }
-        default: { }
-      }
+  case Keyw(k):
+    switch k {
+    case Return:
+      step(p);
+      return parse_rest_of_return_statement_enum(p, out);
+    case If:
+      step(p);
+      return parse_rest_of_if_statement_enum(p, out);
+    case While:
+      step(p);
+      return parse_rest_of_while_statement_enum(p, out);
+    case For:
+      step(p);
+      return parse_rest_of_for_statement_enum(p, out);
+    case Foreach:
+      step(p);
+      return parse_rest_of_foreach_statement_enum(p, out);
+    case Switch:
+      step(p);
+      return parse_rest_of_switch_statement_enum(p, out);
+    case Break:
+      step(p);
+      return parse_rest_of_break_statement_enum(p, out);
+    case Continue:
+      step(p);
+      return parse_rest_of_continue_statement_enum(p, out);
+    case Label:
+      step(p);
+      return parse_rest_of_label_statement_enum(p, out);
+    case Goto:
+      step(p);
+      return parse_rest_of_goto_statement_enum(p, out);
+    default:
+      void;
     }
-    default: { }
+  default:
+    void;
   }
   return parse_naked_var_or_expr_statement_enum(p, AllowBracesYes, ForceAssignmentNo, out);
 }
@@ -1628,33 +1611,30 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
   } else {
     type ast_typeexpr;
     switch help_triparse_typeexpr(p, AllowBlanksYes, AllowIpsesNo, &type) {
-      case Quickfail: {
-        m ast_meta = copystart(p, name.meta);
-        lhs ast_expr = mk(name.meta, NameExpr(mk(name, None)));
-        whole_expr ast_expr;
-        #parse_after_atomic_expr(p, kSemicolonPrec, ab, IsStatementExpr, lhs, &whole_expr);
-        #try_skip_oper(p, ';');
-        *out = Expr(discard(move(&whole_expr)));
-        return Success;
-      }
-      case Error: {
-        return Fail;
-      }
-      case Success: {
-        decl = {name, type};
-      }
+    case Quickfail:
+      m ast_meta = copystart(p, name.meta);
+      lhs ast_expr = mk(name.meta, NameExpr(mk(name, None)));
+      whole_expr ast_expr;
+      #parse_after_atomic_expr(p, kSemicolonPrec, ab, IsStatementExpr, lhs, &whole_expr);
+      #try_skip_oper(p, ';');
+      *out = Expr(discard(move(&whole_expr)));
+      return Success;
+    case Error:
+      return Fail;
+    case Success:
+      decl = {name, type};
     }
   }
 
   semicolon tokval = mk_oper(';');
   if equal(&peek(p)->val, &semicolon) {
     switch fa {
-      case ForceAssignmentYes: { return Fail; }
-      case ForceAssignmentNo: {
-        step(p);
-        *out = Var({NotComputed, decl, AutoInit(None)});
-        return Success;
-      }
+    case ForceAssignmentYes:
+      return Fail;
+    case ForceAssignmentNo:
+      step(p);
+      *out = Var({NotComputed, decl, AutoInit(None)});
+      return Success;
     }
   }
 
@@ -1673,21 +1653,18 @@ func parse_rest_of_string_literal(p *ps, m ast_meta, out *ast_expr) parse_result
     done bool = false;
     while !done {
       switch peek(p)->val {
-        case Grouper(g grouper): {
-          if case DoubleQuote = g {
-            step(p);
-            done = true;
-          } else {
-            ice(_u8("String literal expected to end in double quote"));
-          }
+      case Grouper(g grouper):
+        if case DoubleQuote = g {
+          step(p);
+          done = true;
+        } else {
+          ice(_u8("String literal expected to end in double quote"));
         }
-        case StringChar(ch i32): {
-          push(&specs, {ch});
-          string_step(p, '\"');
-        }
-        default: {
-          return Fail;
-        }
+      case StringChar(ch i32):
+        push(&specs, {ch});
+        string_step(p, '\"');
+      default:
+        return Fail;
       }
     }
 
@@ -1707,28 +1684,24 @@ func parse_rest_of_string_literal(p *ps, m ast_meta, out *ast_expr) parse_result
 func parse_rest_of_char_literal(p *ps, m ast_meta, out *ast_expr) parse_result {
   value i32;
   switch peek(p)->val {
-    case StringChar(ch i32): {
-      value = ch;
-      string_step(p, '\'');
-    }
-    default: {
-      return Fail;
-    }
+  case StringChar(ch i32):
+    value = ch;
+    string_step(p, '\'');
+  default:
+    return Fail;
   }
   switch peek(p)->val {
-    case Grouper(g grouper): {
-      if case SingleQuote = g {
-        step(p);
-        end(p, m);
-        *out = mk(m, @[ast_expr_enum]CharLiteral({{value}}));
-        return Success;
-      } else {
-        return Fail;
-      }
-    }
-    default: {
+  case Grouper(g grouper):
+    if case SingleQuote = g {
+      step(p);
+      end(p, m);
+      *out = mk(m, @[ast_expr_enum]CharLiteral({{value}}));
+      return Success;
+    } else {
       return Fail;
     }
+  default:
+    return Fail;
   }
 }
 
