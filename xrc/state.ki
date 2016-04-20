@@ -279,6 +279,10 @@ func mk_exposed_type_name(only_part sym) exposed_type_name {
   return {mk_shray(only_part)};
 }
 
+func[H] build_u8str(help H, r *array[u8], x *exposed_type_name) void {
+  build_shray_u8str(help, r, &x->parts);
+}
+
 struct type_properties {
   flat_size u32;
   flat_alignment u32;
