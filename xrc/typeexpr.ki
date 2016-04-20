@@ -212,23 +212,18 @@ func[H] build_u8str(help H, r *array[u8], a *cu_typeexpr) void {
 
 func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
   switch a {
-    case &TeName(b te_name): {
-      wrap_u8str(help, r, _u8("TeName"), &b);
-    }
-    case &TeApp(b te_app): {
-      wrap_u8str(help, r, _u8("TeApp"), &b);
-    }
-    case &TeUnion(b te_union): {
-      wrap_u8str(help, r, _u8("TeUnion"), &b);
-    }
-    case &TeArraytype(b te_arraytype): {
-      wrap_u8str(help, r, _u8("TeArraytype"), &b);
-    }
-    case &TeIpse(b te_ipse):
-      wrap_u8str(help, r, _u8("TeIpse"), &b);
-    case &TeUnknown: {
-      append(r, _u8("TeUnknown"));
-    }
+  case &TeName(b te_name):
+    wrap_u8str(help, r, _u8("TeName"), &b);
+  case &TeApp(b te_app):
+    wrap_u8str(help, r, _u8("TeApp"), &b);
+  case &TeUnion(b te_union):
+    wrap_u8str(help, r, _u8("TeUnion"), &b);
+  case &TeArraytype(b te_arraytype):
+    wrap_u8str(help, r, _u8("TeArraytype"), &b);
+  case &TeIpse(b te_ipse):
+    wrap_u8str(help, r, _u8("TeIpse"), &b);
+  case &TeUnknown:
+    append(r, _u8("TeUnknown"));
   }
 }
 
@@ -274,14 +269,12 @@ func[H] build_u8str(help H, r *array[u8], a *te_vardecl) void {
 
 func[H] build_u8str(help H, r *array[u8], a *te_puretype) void {
   switch a {
-    case &TePureName(s sym): {
-      append(r, _u8("TePureName("));
-      build_u8str(help, r, &s);
-      push(r, ')');
-    }
-    case &TePureUnknown: {
-      append(r, _u8("TePureUnknown"));
-    }
+  case &TePureName(s sym):
+    append(r, _u8("TePureName("));
+    build_u8str(help, r, &s);
+    push(r, ')');
+  case &TePureUnknown:
+    append(r, _u8("TePureUnknown"));
   }
 }
 
