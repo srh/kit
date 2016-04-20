@@ -619,8 +619,10 @@ inline func wholeRval(num cell_num) is_lval {
 // Where the value of the expr is, _before_ after actions are run.
 func value_cell(x *is_lval) cell_num {
   switch x {
-    case &IsLvalYes(desc lval_description): { return desc.num; }
-    case &IsLvalNo(desc rval_description): { return desc.partial_num; }
+  case &IsLvalYes(desc lval_description):
+    return desc.num;
+  case &IsLvalNo(desc rval_description):
+    return desc.partial_num;
   }
 }
 

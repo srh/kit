@@ -331,49 +331,45 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
   }
 
   switch &inst->evaled_value {
-    case &NotComputed: {
-      inst->evaled_value = BeganComputing;
-      pool st_objpool = mk_objpool();
-      env st_env = mk_env(&pool, clq->cs->plat, count(&fg->gr.cells));
+  case &NotComputed:
+    inst->evaled_value = BeganComputing;
+    pool st_objpool = mk_objpool();
+    env st_env = mk_env(&pool, clq->cs->plat, count(&fg->gr.cells));
 
-      if case Unprinted(pm err_printed) = st_eval_frame_regraphed(clq, &env, fg) {
-        inst->evaled_value = FailedComputation;
-        return ERR_append(pm, err_string(_u8("(in evaling def "), defname, _u8(")")));
-      }
-      result st_obj_ref = cell_obj_ref(&env, fg->cell, "in st_eval_def");
-      value st_value;
-      if case Unprinted(pm err_printed) = obj_read(&env, result, &value) {
-        inst->evaled_value = FailedComputation;
-        return ERR_append(pm, err_string(_u8("(in result from evaling def "), defname, _u8(")")));
-      }
-      if count(&value.objrefs) != 0 {
-        inst->evaled_value = FailedComputation;
-        return ERR(_u8("def value (for "), defname, _u8(") has objrefs"));
-      }
-      if !is_fully_initialized(&env.plat, &value) {
-        inst->evaled_value = FailedComputation;
-        return ERR(_u8("def value (for "), defname, _u8(") is not fully initialized"));
-      }
-
-      inst->evaled_value = Computed(value);
-      if case &Computed(x st_value) = &inst->evaled_value {
-        *out = &x;
-      } else {
-        ice(_u8("locally impossible in st_eval_def"));
-      }
-      return NoFail;
-    }
-    case &BeganComputing: {
+    if case Unprinted(pm err_printed) = st_eval_frame_regraphed(clq, &env, fg) {
       inst->evaled_value = FailedComputation;
-      return ERR(_u8("recursively computing def inst's value"));
+      return ERR_append(pm, err_string(_u8("(in evaling def "), defname, _u8(")")));
     }
-    case &FailedComputation: {
-      return ERR(_u8("repeat error of st_eval_def"));
+    result st_obj_ref = cell_obj_ref(&env, fg->cell, "in st_eval_def");
+    value st_value;
+    if case Unprinted(pm err_printed) = obj_read(&env, result, &value) {
+      inst->evaled_value = FailedComputation;
+      return ERR_append(pm, err_string(_u8("(in result from evaling def "), defname, _u8(")")));
     }
-    case &Computed(x st_value): {
+    if count(&value.objrefs) != 0 {
+      inst->evaled_value = FailedComputation;
+      return ERR(_u8("def value (for "), defname, _u8(") has objrefs"));
+    }
+    if !is_fully_initialized(&env.plat, &value) {
+      inst->evaled_value = FailedComputation;
+      return ERR(_u8("def value (for "), defname, _u8(") is not fully initialized"));
+    }
+
+    inst->evaled_value = Computed(value);
+    if case &Computed(x st_value) = &inst->evaled_value {
       *out = &x;
-      return NoFail;
+    } else {
+      ice(_u8("locally impossible in st_eval_def"));
     }
+    return NoFail;
+  case &BeganComputing:
+    inst->evaled_value = FailedComputation;
+    return ERR(_u8("recursively computing def inst's value"));
+  case &FailedComputation:
+    return ERR(_u8("repeat error of st_eval_def"));
+  case &Computed(x st_value):
+    *out = &x;
+    return NoFail;
   }
 }
 

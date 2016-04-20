@@ -955,41 +955,39 @@ func gr_switch_statement(gs gr_statep, fb *fullbody_state, obg opt[breakgrack], 
     sc *ast_switch_case = ref(&a->cases, i);
 
     switch &sc->pattern {
-      case &Case(cp ast_constructor_pattern): {
-        cp_info *ast_cp_info = un(&cp.cp_info);
-        if case Has(vn var_number) = cp_info->ovn {
-          vi *var_info = ref(&fb->all_vars, vn.x);
+    case &Case(cp ast_constructor_pattern):
+      cp_info *ast_cp_info = un(&cp.cp_info);
+      if case Has(vn var_number) = cp_info->ovn {
+        vi *var_info = ref(&fb->all_vars, vn.x);
 
-          case_bu sq_builder = mk_builder(gs);
-          add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
-          offset gr_offset = OffsetConst({cp_info->field_offset, EnumConstructorField(unmk_enum_tag_value(cp_info->tag_value))});
-          if is_ptr {
-            add(&case_bu, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&a->swartch)), offset}));
-          } else {
-            add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), offset}));
-          }
-
-          #gr_bracebody(gs, fb, obg, &sc->body, &case_bu);
-          add(&case_bu, @[gr_xop]GrVirtualDead({vi->cell}));
-
-          gn sq_num = mut_connect(gs, &case_bu, &exit_target, JmpForward);
-          set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
+        case_bu sq_builder = mk_builder(gs);
+        add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
+        offset gr_offset = OffsetConst({cp_info->field_offset, EnumConstructorField(unmk_enum_tag_value(cp_info->tag_value))});
+        if is_ptr {
+          add(&case_bu, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&a->swartch)), offset}));
         } else {
-          case_bu sq_builder = mk_builder(gs);
-          add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
-          #gr_bracebody(gs, fb, obg, &sc->body, &case_bu);
-          gn sq_num = mut_connect(gs, &case_bu, &exit_target, JmpForward);
-          set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
+          add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&a->swartch)), offset}));
         }
-      }
-      case &Default: {
+
+        #gr_bracebody(gs, fb, obg, &sc->body, &case_bu);
+        add(&case_bu, @[gr_xop]GrVirtualDead({vi->cell}));
+
+        gn sq_num = mut_connect(gs, &case_bu, &exit_target, JmpForward);
+        set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
+      } else {
         case_bu sq_builder = mk_builder(gs);
         add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
         #gr_bracebody(gs, fb, obg, &sc->body, &case_bu);
-
-        gn var = mut_connect(gs, &case_bu, &exit_target, JmpForward);
-        set(&default_case, gn);
+        gn sq_num = mut_connect(gs, &case_bu, &exit_target, JmpForward);
+        set(ref(&cases, unmk_enum_tag_value(cp_info->tag_value)), gn);
       }
+    case &Default:
+      case_bu sq_builder = mk_builder(gs);
+      add(&case_bu, @[gr_xop]GrVirtualDead({info->tag_cell}));
+      #gr_bracebody(gs, fb, obg, &sc->body, &case_bu);
+
+      gn var = mut_connect(gs, &case_bu, &exit_target, JmpForward);
+      set(&default_case, gn);
     }
   }
 
@@ -1254,74 +1252,72 @@ func gr_expr_condition(gs gr_statep, a *ast_expr_consume, then_target gr_branch_
 func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_target gr_branch_target, else_target gr_branch_target,
                   thentrack_out *gr_savetrack, elsetrack_out *gr_savetrack, disposition gr_branch_disposition) cr[sq_num] {
   switch a {
-    case &ExprCondition(bec box[ast_expr_consume]): {
-      ret sq_num = #gr_expr_condition(gs, oo(&bec), then_target, else_target, disposition);
-      *thentrack_out = save_celltrack(gs.ctr);
-      *elsetrack_out = save_celltrack(gs.ctr);
-      return NoFail(ret);
+  case &ExprCondition(bec box[ast_expr_consume]):
+    ret sq_num = #gr_expr_condition(gs, oo(&bec), then_target, else_target, disposition);
+    *thentrack_out = save_celltrack(gs.ctr);
+    *elsetrack_out = save_celltrack(gs.ctr);
+    return NoFail(ret);
+
+  case &PatternCondition(pa ast_pattern_assign):
+    bef_bu sq_builder = mk_builder(gs);
+    #gr_live_and_expr_consume(gs, oo(&pa.rhs), &bef_bu);
+
+    info *ast_pattern_assign_info = un(&pa.info);
+
+    // TODO: Avoid the duplicate checks for addressof_constructor, only do one GrDeref.
+    if isHas(&pa.pattern.addressof_constructor) {
+      add(&bef_bu, @[gr_xop]GrDeref({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst({enum_tag_offset, EnumTagField})}));
+    } else {
+      add(&bef_bu, @[gr_xop]GrSubcell({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst({enum_tag_offset, EnumTagField})}));
     }
-
-    case &PatternCondition(pa ast_pattern_assign): {
-      bef_bu sq_builder = mk_builder(gs);
-      #gr_live_and_expr_consume(gs, oo(&pa.rhs), &bef_bu);
-
-      info *ast_pattern_assign_info = un(&pa.info);
-
-      // TODO: Avoid the duplicate checks for addressof_constructor, only do one GrDeref.
-      if isHas(&pa.pattern.addressof_constructor) {
-        add(&bef_bu, @[gr_xop]GrDeref({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst({enum_tag_offset, EnumTagField})}));
-      } else {
-        add(&bef_bu, @[gr_xop]GrSubcell({info->deconstruct.tag_cell, result_cell(oo(&pa.rhs)), OffsetConst({enum_tag_offset, EnumTagField})}));
-      }
-      postcond_save gr_savetrack = save_celltrack(gs.ctr);
-      saved_elsecase bool = false;
-      cases array[gr_branch_pair];
-      n size = info->deconstruct.num_enum_constructors;
-      reserve(&cases, n);
-      for i size = 0; i < n; i = i + 1 {
-        if i != 0 {
-          restore_celltrack(gs.ctr, &postcond_save);
-        }
-        tag enum_tag_value = mk_enum_tag_value(i);
-        if info->matching_tag_value.x == tag.x {
-          case_bu sq_builder = mk_builder(gs);
-          cp_info *ast_cp_info = un(&pa.pattern.cp_info);
-          add(&case_bu, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
-          if case Has(vn var_number) = cp_info->ovn {
-            vi *var_info = ref(&fb->all_vars, vn.x);
-            if isHas(&pa.pattern.addressof_constructor) {
-              add(&case_bu, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst({cp_info->field_offset, EnumConstructorField(i)})}));
-            } else {
-              add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst({cp_info->field_offset, EnumConstructorField(i)})}));
-            }
-          }
-          *thentrack_out = save_celltrack(gs.ctr);
-          thenseq sq_num = mut_connect_untracked(&case_bu, then_target.sn, JmpForward);
-          push(&cases, {@[gr_const]ConstInt(~tag.x), {thenseq, then_target.disposition}});
-        } else {
-          tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
-          elseseq sq_num = seqq(gs.gr, partof(gs), {tagdead, else_target.sn});
-          if !saved_elsecase {
-            *elsetrack_out = save_celltrack(gs.ctr);
-            saved_elsecase = true;
-          }
-          push(&cases, {@[gr_const]ConstInt(~tag.x), {elseseq, else_target.disposition}});
-        }
-      }
-      if !saved_elsecase {
-        // We need to output an elsecase savetrack even if it's never reachable, because
-        // this function's API doesn't have a way to tell the caller the elsecase is not
-        // reachable.
+    postcond_save gr_savetrack = save_celltrack(gs.ctr);
+    saved_elsecase bool = false;
+    cases array[gr_branch_pair];
+    n size = info->deconstruct.num_enum_constructors;
+    reserve(&cases, n);
+    for i size = 0; i < n; i = i + 1 {
+      if i != 0 {
         restore_celltrack(gs.ctr, &postcond_save);
-        tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
-        *elsetrack_out = save_celltrack(gs.ctr);
       }
-
-      br_point sq_num = addq(gs, @[gr_qop]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None, @[gr_branch_info]{disposition}}));
-      br sq_num = mut_connect_untracked(&bef_bu, br_point, JmpForward);
-
-      return NoFail(br);
+      tag enum_tag_value = mk_enum_tag_value(i);
+      if info->matching_tag_value.x == tag.x {
+        case_bu sq_builder = mk_builder(gs);
+        cp_info *ast_cp_info = un(&pa.pattern.cp_info);
+        add(&case_bu, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
+        if case Has(vn var_number) = cp_info->ovn {
+          vi *var_info = ref(&fb->all_vars, vn.x);
+          if isHas(&pa.pattern.addressof_constructor) {
+            add(&case_bu, @[gr_xop]GrDeref({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst({cp_info->field_offset, EnumConstructorField(i)})}));
+          } else {
+            add(&case_bu, @[gr_xop]GrSubcell({vi->cell, result_cell(oo(&pa.rhs)), OffsetConst({cp_info->field_offset, EnumConstructorField(i)})}));
+          }
+        }
+        *thentrack_out = save_celltrack(gs.ctr);
+        thenseq sq_num = mut_connect_untracked(&case_bu, then_target.sn, JmpForward);
+        push(&cases, {@[gr_const]ConstInt(~tag.x), {thenseq, then_target.disposition}});
+      } else {
+        tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
+        elseseq sq_num = seqq(gs.gr, partof(gs), {tagdead, else_target.sn});
+        if !saved_elsecase {
+          *elsetrack_out = save_celltrack(gs.ctr);
+          saved_elsecase = true;
+        }
+        push(&cases, {@[gr_const]ConstInt(~tag.x), {elseseq, else_target.disposition}});
+      }
     }
+    if !saved_elsecase {
+      // We need to output an elsecase savetrack even if it's never reachable, because
+      // this function's API doesn't have a way to tell the caller the elsecase is not
+      // reachable.
+      restore_celltrack(gs.ctr, &postcond_save);
+      tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
+      *elsetrack_out = save_celltrack(gs.ctr);
+    }
+
+    br_point sq_num = addq(gs, @[gr_qop]GrBranch({info->deconstruct.tag_cell, freeze(&cases), None, @[gr_branch_info]{disposition}}));
+    br sq_num = mut_connect_untracked(&bef_bu, br_point, JmpForward);
+
+    return NoFail(br);
   }
 }
 
@@ -1735,27 +1731,25 @@ func gr_local_field(gs gr_statep, x *ast_expr, a *ast_local_field, bu *sq_builde
   info *ast_local_field_info = un(&a->info);
 
   switch info {
-    case &ArrayLength(alinfo ast_arraylength_info): {
-      #gr_expr_and_discard(gs, oo(&a->lhs), &alinfo.after, bu);
+  case &ArrayLength(alinfo ast_arraylength_info):
+    #gr_expr_and_discard(gs, oo(&a->lhs), &alinfo.after, bu);
 
-      add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)}));
-      add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
-      return NoFail;
-    }
-    case &FieldName(sfi ast_field_info): {
-      #gr_expr(gs, oo(&a->lhs), bu);
+    add(bu, @[gr_xop]GrWriteConst({rval_cell(x), ConstInt(~alinfo.count)}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
+    return NoFail;
+  case &FieldName(sfi ast_field_info):
+    #gr_expr(gs, oo(&a->lhs), bu);
 
-      add(bu, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst({sfi.offset, StructField(sfi.index)})}));
-      switch &expr_complete_info(oo(&a->lhs))->lval {
-      case &IsLvalYes(desc lval_description):
-        if case DeadMe = desc.deadme {
-          add(bu, @[gr_xop]GrVirtualDead({desc.num}));
-        }
-      case &IsLvalNo(desc rval_description):
-        addo(bu, gr_maybe_virtualdead(gs, desc.partial_num));
+    add(bu, @[gr_xop]GrSubcell({value_cell(x), value_cell(oo(&a->lhs)), OffsetConst({sfi.offset, StructField(sfi.index)})}));
+    switch &expr_complete_info(oo(&a->lhs))->lval {
+    case &IsLvalYes(desc lval_description):
+      if case DeadMe = desc.deadme {
+        add(bu, @[gr_xop]GrVirtualDead({desc.num}));
       }
-      return NoFail;
+    case &IsLvalNo(desc rval_description):
+      addo(bu, gr_maybe_virtualdead(gs, desc.partial_num));
     }
+    return NoFail;
   }
 }
 
@@ -1981,94 +1975,89 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
   #gr_expr(gs, oo(&a->rhs), bu);
 
   switch un(&a->info) {
-    case &StaticSelfAssignment: {
-      // Do nothing.
+  case &StaticSelfAssignment:
+    void;
+  case &SimpleMoveAssignment(smi ast_simple_move_assignment_info):
+    // rhs is an rvalue.
+    dgn gr_num = gr_destroy_action(gs, &smi.target_destroy, DeadactAfterDestroyNo);
+    add(bu, dgn);
+    mgn gr_num = gr_move_action(gs, &smi.rhs_move, BiDeactivateSrcButMove);
+    add(bu, mgn);
+    // TODO: We could use whole_cell(oo(&a->rhs)) or something...
+    add(bu, @[gr_xop]GrDead({smi.rhs_move.x.src}));
+  case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info):
+    dgn gr_num = gr_destroy_action(gs, &scdi.target_destroy, DeadactAfterDestroyNo);
+    add(bu, dgn);
+    mgn1 gr_num = gr_copy_action(gs, &scdi.rhs_copy, BiNothingButCopy);
+    add(bu, mgn1);
+    addo(bu, gr_maybe_virtualdead(gs, scdi.rhs_copy.x.src));
+    drgn gr_num = gr_destroy_action(gs, &scdi.rhs_cleanup, DeadactAfterDestroyYes);
+    add(bu, drgn);
+  case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info):
+    dgn gr_num = gr_destroy_action(gs, &sci.target_destroy, DeadactAfterDestroyNo);
+    add(bu, dgn);
+    mgn gr_num = gr_copy_action(gs, &sci.rhs_copy, BiNothingButCopy);
+    add(bu, mgn);
+    if case DeadMe = sci.rhs_deadme {
+      addo(bu, gr_maybe_virtualdead(gs, sci.rhs_copy.x.src));
     }
-    case &SimpleMoveAssignment(smi ast_simple_move_assignment_info): {
-      // rhs is an rvalue.
-      dgn gr_num = gr_destroy_action(gs, &smi.target_destroy, DeadactAfterDestroyNo);
-      add(bu, dgn);
-      mgn gr_num = gr_move_action(gs, &smi.rhs_move, BiDeactivateSrcButMove);
-      add(bu, mgn);
-      // TODO: We could use whole_cell(oo(&a->rhs)) or something...
-      add(bu, @[gr_xop]GrDead({smi.rhs_move.x.src}));
-    }
-    case &SimpleCopyDestroyAssignment(scdi ast_simple_copydestroy_assignment_info): {
-      dgn gr_num = gr_destroy_action(gs, &scdi.target_destroy, DeadactAfterDestroyNo);
-      add(bu, dgn);
-      mgn1 gr_num = gr_copy_action(gs, &scdi.rhs_copy, BiNothingButCopy);
-      add(bu, mgn1);
-      addo(bu, gr_maybe_virtualdead(gs, scdi.rhs_copy.x.src));
-      drgn gr_num = gr_destroy_action(gs, &scdi.rhs_cleanup, DeadactAfterDestroyYes);
-      add(bu, drgn);
-    }
-    case &SimpleCopyAssignment(sci ast_simple_copy_assignment_info): {
-      dgn gr_num = gr_destroy_action(gs, &sci.target_destroy, DeadactAfterDestroyNo);
-      add(bu, dgn);
-      mgn gr_num = gr_copy_action(gs, &sci.rhs_copy, BiNothingButCopy);
-      add(bu, mgn);
-      if case DeadMe = sci.rhs_deadme {
-        addo(bu, gr_maybe_virtualdead(gs, sci.rhs_copy.x.src));
-      }
-    }
-    case &ConditionalAssignment(ci ast_conditional_assignment_info): {
-      destcell cell_num = value_cell(oo(&a->lhs));
-      valuetype *cu_typeexpr = &ref_cell(gs.gr, destcell)->type;
-      ptrtype cu_typrop = computed_ptr_type(gs, valuetype);
-      booltype cu_typrop = compute_bool(gs.clq);
-      fntype cu_typrop = gr_prim(gs, fn_type(gs.clq->cs, ptrtype.cu.x, ptrtype.cu.x, booltype.cu.x));
+  case &ConditionalAssignment(ci ast_conditional_assignment_info):
+    destcell cell_num = value_cell(oo(&a->lhs));
+    valuetype *cu_typeexpr = &ref_cell(gs.gr, destcell)->type;
+    ptrtype cu_typrop = computed_ptr_type(gs, valuetype);
+    booltype cu_typrop = compute_bool(gs.clq);
+    fntype cu_typrop = gr_prim(gs, fn_type(gs.clq->cs, ptrtype.cu.x, ptrtype.cu.x, booltype.cu.x));
 
-      funcell cell_num = add_cell(gs.gr, {LocationStatic, fntype.cu, fntype.props});
-      destptr cell_num = add_cell(gs.gr, {LocationStatic, ptrtype.cu, ptrtype.props});
-      srcptr cell_num = add_cell(gs.gr, {LocationStatic, ptrtype.cu, ptrtype.props});
-      cmp_result cell_num = add_cell(gs.gr, {LocationStatic, booltype.cu, booltype.props});
+    funcell cell_num = add_cell(gs.gr, {LocationStatic, fntype.cu, fntype.props});
+    destptr cell_num = add_cell(gs.gr, {LocationStatic, ptrtype.cu, ptrtype.props});
+    srcptr cell_num = add_cell(gs.gr, {LocationStatic, ptrtype.cu, ptrtype.props});
+    cmp_result cell_num = add_cell(gs.gr, {LocationStatic, booltype.cu, booltype.props});
 
-      add(bu, @[gr_xop]GrLive({cmp_result}));
-      add(bu, @[gr_xop]GrLive({funcell}));
-      add(bu, @[gr_xop]GrWriteConst({funcell, ConstDef(ci.comparecells)}));
-      add(bu, @[gr_xop]GrLive({destptr}));
-      add(bu, @[gr_xop]GrAddressof({destptr, destcell}));
-      add(bu, @[gr_xop]GrLive({srcptr}));
-      add(bu, @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
-      add(bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
-      add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result, StandardApply, NoSemantic}));
+    add(bu, @[gr_xop]GrLive({cmp_result}));
+    add(bu, @[gr_xop]GrLive({funcell}));
+    add(bu, @[gr_xop]GrWriteConst({funcell, ConstDef(ci.comparecells)}));
+    add(bu, @[gr_xop]GrLive({destptr}));
+    add(bu, @[gr_xop]GrAddressof({destptr, destcell}));
+    add(bu, @[gr_xop]GrLive({srcptr}));
+    add(bu, @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
+    add(bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
+    add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result, StandardApply, NoSemantic}));
 
-      postbranch_save gr_savetrack = save_celltrack(gs.ctr);
+    postbranch_save gr_savetrack = save_celltrack(gs.ctr);
 
-      condition_segment segmarker = begin_segment(bu);
+    condition_segment segmarker = begin_segment(bu);
 
-      exit_nopq tracked_target = mk_tracked(nopq(gs));
+    exit_nopq tracked_target = mk_tracked(nopq(gs));
 
-      just_dead_bu sq_builder = mk_builder(gs);
-      add(&just_dead_bu, @[gr_xop]GrActiveXop({Deactivate(cmp_result), Nothing}));
-      add(&just_dead_bu, @[gr_xop]GrDead({cmp_result}));
+    just_dead_bu sq_builder = mk_builder(gs);
+    add(&just_dead_bu, @[gr_xop]GrActiveXop({Deactivate(cmp_result), Nothing}));
+    add(&just_dead_bu, @[gr_xop]GrDead({cmp_result}));
 
-      just_dead_sn sq_num = mut_connect(gs, &just_dead_bu, &exit_nopq, JmpForward);
+    just_dead_sn sq_num = mut_connect(gs, &just_dead_bu, &exit_nopq, JmpForward);
 
-      restore_celltrack(gs.ctr, &postbranch_save);
+    restore_celltrack(gs.ctr, &postbranch_save);
 
-      do_assign_bu sq_builder = mk_builder(gs);
-      add(&do_assign_bu, @[gr_xop]GrActiveXop({Deactivate(cmp_result), Nothing}));
-      add(&do_assign_bu, @[gr_xop]GrDead({cmp_result}));
-      assign_destroy gr_num = gr_destroy_action(gs, &ci.conditional_destroy, DeadactAfterDestroyNo);
-      add(&do_assign_bu, assign_destroy);
-      assign_copy gr_num = gr_copy_action(gs, &ci.conditional_copy, BiNothingButCopy);
-      add(&do_assign_bu, assign_copy);
+    do_assign_bu sq_builder = mk_builder(gs);
+    add(&do_assign_bu, @[gr_xop]GrActiveXop({Deactivate(cmp_result), Nothing}));
+    add(&do_assign_bu, @[gr_xop]GrDead({cmp_result}));
+    assign_destroy gr_num = gr_destroy_action(gs, &ci.conditional_destroy, DeadactAfterDestroyNo);
+    add(&do_assign_bu, assign_destroy);
+    assign_copy gr_num = gr_copy_action(gs, &ci.conditional_copy, BiNothingButCopy);
+    add(&do_assign_bu, assign_copy);
 
-      do_assign_sn sq_num = mut_connect(gs, &do_assign_bu, &exit_nopq, JmpForward);
+    do_assign_sn sq_num = mut_connect(gs, &do_assign_bu, &exit_nopq, JmpForward);
 
-      cases shray[gr_branch_pair] = mk_shray({@[gr_const]ConstInt(bigu(0)), {do_assign_sn, ForwardTarget}}, {@[gr_const]ConstInt(bigu(1)), {just_dead_sn, ForwardTarget}});
+    cases shray[gr_branch_pair] = mk_shray({@[gr_const]ConstInt(bigu(0)), {do_assign_sn, ForwardTarget}}, {@[gr_const]ConstInt(bigu(1)), {just_dead_sn, ForwardTarget}});
 
-      br sq_num = addq(gs, @[gr_qop]GrBranch({cmp_result, cases, None, @[gr_branch_info]{ForwardBranch(exit_nopq.sn)}}));
+    br sq_num = addq(gs, @[gr_qop]GrBranch({cmp_result, cases, None, @[gr_branch_info]{ForwardBranch(exit_nopq.sn)}}));
 
-      // br is an expression node -- the cases attach to nopq's
-      append(bu, JmpForward, br, exit_nopq.sn);
+    // br is an expression node -- the cases attach to nopq's
+    append(bu, JmpForward, br, exit_nopq.sn);
 
-      end_segment(bu, condition_segment);
+    end_segment(bu, condition_segment);
 
-      if case DeadMe = ci.rhs_deadme {
-        addo(bu, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src));
-      }
+    if case DeadMe = ci.rhs_deadme {
+      addo(bu, gr_maybe_virtualdead(gs, ci.conditional_copy.x.src));
     }
   }
 
@@ -3335,94 +3324,85 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
   inst_typeinfo_scope *type_scope = ref_scope(&inst->parms);
   inst_typeinfo *def_inst_typeinfo = un(&inst->typeinfo);
   switch &inst->graph {
-    case &NotComputed: {
-      inst->graph = BeganComputing;
-      switch &inst->rhs {
-        case &InstRhsPrim(op primitive_op): {
-          id fn_body_id = #add_prim_fn_body(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, op);
-          frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
-          inst->graph = Computed(move(&frg));
-          return NoFail;
-        }
-        case &InstRhsExtern: {
-          id fn_body_id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
-          // inst_typeinfo_scope'll be the global anyway, so we do that explicitly.
-          scope type_scope = mk_global();
-          frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
-          inst->graph = Computed(move(&frg));
-          return NoFail;
-        }
-        case &InstRhsExpr(dire def_inst_rhs_expr): {
-          info *frame_info;
-          if case &Computed(finfo) = &dire.frame_info {
-            info = &finfo;
-          } else {
-            ice(_u8("ensure_def_inst_graphed missing 'dire' info"));
-          }
-          gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
-          ctr celltrack = mk_celltrack();
-          curseg gr_current_segment = {None};
-          gs gr_statep = {clq, &gr, &ctr, &curseg, None};
-          bu sq_builder = mk_builder(gs);
-          if case Unprinted(pm) = gr_live_and_expr_consume(gs, &dire.ec, &bu) {
-            inst->graph = FailedComputation;
-            return Unprinted(pm);
-          }
-          gn gr_num = done(&bu);
-
-          rcell cell_num = result_cell(&dire.ec);
-          gr_deactivate(&ctr, rcell);
-          gr_deaden(&ctr, rcell);
-          gr_check_empty(&ctr);
-
-          inst->graph = Computed(@[frame_regraphed]{move(&gr), gn, rcell});
-          return NoFail;
-        }
-
-        case &InstRhsNonMagic(nonmag def_non_magic): {
-          switch &nonmag {
-          case &NonMagicCtor(wnmc which_non_magic_ctor):
-            info *non_magic_ctor_info = un(&wnmc.nmc.info);
-            frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstDef(info->ip));
-            inst->graph = Computed(move(&frg));
-            return NoFail;
-          case &NonMagicProp(nmp non_magic_prop):
-            info u32 = *un(&nmp.info);
-            frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, @[gr_const]ConstInt(~info));
-            inst->graph = Computed(move(&frg));
-            return NoFail;
-          }
-        }
-
-        case &InstRhsMagic(mag def_magic): {
-          id fn_body_id;
-          if true {
-            body_gr frame_graph;
-            body_gn gr_num;
-            return_cell cell_num;
-            arg_cells array[cell_num];
-            inline should_inline;
-            #gr_magic(clq, inst_typeinfo_scope, &mag, &body_gr, &body_gn, &return_cell, &arg_cells, &inline);
-            #vt_graph(clq, &body_gr, body_gn);
-            id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells, inline, NotComputed})});
-          }
-
-          frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
-          inst->graph = Computed(move(&frg));
-          return NoFail;
-        }
+  case &NotComputed:
+    inst->graph = BeganComputing;
+    switch &inst->rhs {
+    case &InstRhsPrim(op primitive_op):
+      id fn_body_id = #add_prim_fn_body(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, op);
+      frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
+      inst->graph = Computed(move(&frg));
+      return NoFail;
+    case &InstRhsExtern:
+      id fn_body_id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
+      // inst_typeinfo_scope'll be the global anyway, so we do that explicitly.
+      scope type_scope = mk_global();
+      frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
+      inst->graph = Computed(move(&frg));
+      return NoFail;
+    case &InstRhsExpr(dire def_inst_rhs_expr):
+      info *frame_info;
+      if case &Computed(finfo) = &dire.frame_info {
+        info = &finfo;
+      } else {
+        ice(_u8("ensure_def_inst_graphed missing 'dire' info"));
       }
-    }
-    case &BeganComputing: {
-      ice(_u8("ensure_def_inst_graphed recursively computing"));
-      return fake();
-    }
-    case &FailedComputation: {
-      return ERR(_u8("ensure_def_inst_graphed fails again on same def"));
-    }
-    case &Computed(odr frame_regraphed): {
+      gr frame_graph = init_frame_graph_from_incomplete(&info->incomplete_graph);
+      ctr celltrack = mk_celltrack();
+      curseg gr_current_segment = {None};
+      gs gr_statep = {clq, &gr, &ctr, &curseg, None};
+      bu sq_builder = mk_builder(gs);
+      if case Unprinted(pm) = gr_live_and_expr_consume(gs, &dire.ec, &bu) {
+        inst->graph = FailedComputation;
+        return Unprinted(pm);
+      }
+      gn gr_num = done(&bu);
+
+      rcell cell_num = result_cell(&dire.ec);
+      gr_deactivate(&ctr, rcell);
+      gr_deaden(&ctr, rcell);
+      gr_check_empty(&ctr);
+
+      inst->graph = Computed(@[frame_regraphed]{move(&gr), gn, rcell});
+      return NoFail;
+
+    case &InstRhsNonMagic(nonmag def_non_magic):
+      switch &nonmag {
+      case &NonMagicCtor(wnmc which_non_magic_ctor):
+        info *non_magic_ctor_info = un(&wnmc.nmc.info);
+        frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstDef(info->ip));
+        inst->graph = Computed(move(&frg));
+        return NoFail;
+      case &NonMagicProp(nmp non_magic_prop):
+        info u32 = *un(&nmp.info);
+        frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, @[gr_const]ConstInt(~info));
+        inst->graph = Computed(move(&frg));
+        return NoFail;
+      }
+
+    case &InstRhsMagic(mag def_magic):
+      id fn_body_id;
+      if true {
+        body_gr frame_graph;
+        body_gn gr_num;
+        return_cell cell_num;
+        arg_cells array[cell_num];
+        inline should_inline;
+        #gr_magic(clq, inst_typeinfo_scope, &mag, &body_gr, &body_gn, &return_cell, &arg_cells, &inline);
+        #vt_graph(clq, &body_gr, body_gn);
+        id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells, inline, NotComputed})});
+      }
+
+      frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
+      inst->graph = Computed(move(&frg));
       return NoFail;
     }
+  case &BeganComputing:
+    ice(_u8("ensure_def_inst_graphed recursively computing"));
+    return fake();
+  case &FailedComputation:
+    return ERR(_u8("ensure_def_inst_graphed fails again on same def"));
+  case &Computed(odr frame_regraphed):
+    return NoFail;
   }
 }
 
