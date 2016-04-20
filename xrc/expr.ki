@@ -398,20 +398,16 @@ func lookup_or_make_enum_constructor_def(ds *defscope, scope *type_scope, et *en
 
   meco magic_enum_construct_op;
   switch &rhs_props.move_behavior {
-    case &DerivedMethodAbsent: {
-      copy_desc ctor_desc = #behavior_to_desc(&rhs_props.copy_behavior);
-      destroy_desc ctor_desc = #behavior_to_desc(&rhs_props.destroy_behavior);
-      meco = EnumConstructCopyDestroy({copy_desc, destroy_desc});
-    }
-    case &DerivedMethodExplicit(dme derived_method_explicit): {
-      meco = EnumConstructMove(FunCtor(dme.ip));
-    }
-    case &DerivedMethodNontrivial(ip instpair): {
-      meco = EnumConstructMove(FunCtor(ip));
-    }
-    case &DerivedMethodTrivial: {
-      meco = EnumConstructMove(TrivialCtor);
-    }
+  case &DerivedMethodAbsent:
+    copy_desc ctor_desc = #behavior_to_desc(&rhs_props.copy_behavior);
+    destroy_desc ctor_desc = #behavior_to_desc(&rhs_props.destroy_behavior);
+    meco = EnumConstructCopyDestroy({copy_desc, destroy_desc});
+  case &DerivedMethodExplicit(dme derived_method_explicit):
+    meco = EnumConstructMove(FunCtor(dme.ip));
+  case &DerivedMethodNontrivial(ip instpair):
+    meco = EnumConstructMove(FunCtor(ip));
+  case &DerivedMethodTrivial:
+    meco = EnumConstructMove(TrivialCtor);
   }
 
   return_type_props type_properties;
@@ -568,73 +564,73 @@ func copy_info(x *ast_expr_info, emissions emissions_info) ast_expr_info {
 
 func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te_typeexpr) np {
   switch &x->u {
-    case &NameExpr(a ast_name_expr):
-      return check_expr_name(es, ai, &a, pt, x);
+  case &NameExpr(a ast_name_expr):
+    return check_expr_name(es, ai, &a, pt, x);
 
-    case &ParenExpr(a ast_paren_expr):
-      #check_expr_ai(es, ai, oo(&a.expr), pt);
-      annotate_info(x, copy_info(&oo(&a.expr)->info, {mk_empty_emittance()}));
-      return NoFail;
+  case &ParenExpr(a ast_paren_expr):
+    #check_expr_ai(es, ai, oo(&a.expr), pt);
+    annotate_info(x, copy_info(&oo(&a.expr)->info, {mk_empty_emittance()}));
+    return NoFail;
 
-    case &NumericLiteral(a ast_numeric_literal):
-      return check_numeric_literal(es, ai, pt, numeric_literal_value(&a), x);
+  case &NumericLiteral(a ast_numeric_literal):
+    return check_numeric_literal(es, ai, pt, numeric_literal_value(&a), x);
 
-    case &BoolLiteral(a ast_bool_literal):
-      return help_check_simple_literal(es, pt, primitive_bool_type(es->cs), _u8("bool"), x);
+  case &BoolLiteral(a ast_bool_literal):
+    return help_check_simple_literal(es, pt, primitive_bool_type(es->cs), _u8("bool"), x);
 
-    case &VoidLiteral(a ast_void_literal):
-      return help_check_simple_literal(es, pt, primitive_void_type(es->cs), _u8("void"), x);
+  case &VoidLiteral(a ast_void_literal):
+    return help_check_simple_literal(es, pt, primitive_void_type(es->cs), _u8("void"), x);
 
-    case &NullLiteral(a ast_null_literal):
-      return help_check_simple_literal(es, pt, ptr_type(es->cs, TeUnknown), _u8("null"), x);
+  case &NullLiteral(a ast_null_literal):
+    return help_check_simple_literal(es, pt, ptr_type(es->cs, TeUnknown), _u8("null"), x);
 
-    case &CharLiteral(a ast_char_literal):
-      return check_numeric_literal(es, ai, pt, ~a.charspec.value, x);
+  case &CharLiteral(a ast_char_literal):
+    return check_numeric_literal(es, ai, pt, ~a.charspec.value, x);
 
-    case &StringLiteral(a ast_string_literal):
-      return check_expr_string_literal(es, &a, pt, x);
+  case &StringLiteral(a ast_string_literal):
+    return check_expr_string_literal(es, &a, pt, x);
 
-    case &Funcall(a ast_funcall):
-      return check_expr_funcall(es, ai, &a, pt, x);
+  case &Funcall(a ast_funcall):
+    return check_expr_funcall(es, ai, &a, pt, x);
 
-    case &LogicalConjunction(a ast_logical_conjunction):
-      return check_expr_logical_conjunction(es, &a, pt, x);
+  case &LogicalConjunction(a ast_logical_conjunction):
+    return check_expr_logical_conjunction(es, &a, pt, x);
 
-    case &Assignment(a ast_assignment):
-      return check_expr_assignment(es, &a, pt, x);
+  case &Assignment(a ast_assignment):
+    return check_expr_assignment(es, &a, pt, x);
 
-    case &RefOf(a ast_refof):
-      return check_expr_refof(es, &a, pt, x);
+  case &RefOf(a ast_refof):
+    return check_expr_refof(es, &a, pt, x);
 
-    case &AddressOf(a ast_addressof):
-      return check_expr_addressof(es, &a, pt, x);
+  case &AddressOf(a ast_addressof):
+    return check_expr_addressof(es, &a, pt, x);
 
-    case &Deref(a ast_deref):
-      return check_expr_deref(es, &a, pt, x);
+  case &Deref(a ast_deref):
+    return check_expr_deref(es, &a, pt, x);
 
-    case &IndexExpr(a ast_index_expr):
-      return check_expr_index(es, &a, pt, x);
+  case &IndexExpr(a ast_index_expr):
+    return check_expr_index(es, &a, pt, x);
 
-    case &Lambda(a ast_lambda):
-      return check_expr_lambda(es, &a, pt, x);
+  case &Lambda(a ast_lambda):
+    return check_expr_lambda(es, &a, pt, x);
 
-    case &LocalField(a ast_local_field):
-      return check_expr_local_field(es, &a, pt, x);
+  case &LocalField(a ast_local_field):
+    return check_expr_local_field(es, &a, pt, x);
 
-    case &DerefField(a ast_deref_field):
-      return check_expr_deref_field(es, &a, pt, x);
+  case &DerefField(a ast_deref_field):
+    return check_expr_deref_field(es, &a, pt, x);
 
-    case &TypedExpr(a ast_typed_expr):
-      return check_expr_typed_expr(es, ai, &a, pt, x);
+  case &TypedExpr(a ast_typed_expr):
+    return check_expr_typed_expr(es, ai, &a, pt, x);
 
-    case &Strinit(a ast_strinit):
-      return check_expr_strinit(es, ai, &a, pt, x);
+  case &Strinit(a ast_strinit):
+    return check_expr_strinit(es, ai, &a, pt, x);
 
-    case &Ternary(a ast_ternary):
-      return check_expr_ternary(es, ai, &a, pt, x);
+  case &Ternary(a ast_ternary):
+    return check_expr_ternary(es, ai, &a, pt, x);
 
-    case &QuickReturn(a ast_quickreturn):
-      return check_expr_quickreturn(es, ai, &a, pt, x);
+  case &QuickReturn(a ast_quickreturn):
+    return check_expr_quickreturn(es, ai, &a, pt, x);
   }
 }
 
@@ -876,15 +872,13 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   #compute_type_properties(es->clq, &es->tscope, &fieldtype, &props);
   lval is_lval;
   switch cf_res {
-    case InheritsLval(off check_field_offset_and_index): {
-      // We deref, so it's always an lval.
-      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe, field_ipse(es, ipse, fieldtype)});
-      annotate(&a->info, DerefFieldName(@[ast_field_info]{off.offset, off.index}));
-    }
-    case ConstantField(value u32): {
-      lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
-      annotate(&a->info, DerefArrayLength(value));
-    }
+  case InheritsLval(off check_field_offset_and_index):
+    // We deref, so it's always an lval.
+    lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe, field_ipse(es, ipse, fieldtype)});
+    annotate(&a->info, DerefFieldName(@[ast_field_info]{off.offset, off.index}));
+  case ConstantField(value u32):
+    lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
+    annotate(&a->info, DerefArrayLength(value));
   }
   annotate_info(x, CompleteCheck(mk(lval, fieldtype, props, {emissions})));
   return NoFail;
@@ -935,25 +929,21 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
   #compute_type_properties(es->clq, &es->tscope, &fieldtype, &props);
   lval is_lval;
   switch cf_res {
-    case InheritsLval(off check_field_offset_and_index): {
-      switch &info->lval {
-        case &IsLvalYes(desc lval_description): {
-          lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe,
-                            field_ipse(es, desc.ipse, fieldtype)});
-        }
-        case &IsLvalNo(desc rval_description): {
-          lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, fieldtype, props})});
-        }
-      }
-      // There's no disposal, it's a real field access.
-      annotate(&a->info, FieldName(@[ast_field_info]{off.offset, off.index}));
+  case InheritsLval(off check_field_offset_and_index):
+    switch &info->lval {
+    case &IsLvalYes(desc lval_description):
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe,
+                        field_ipse(es, desc.ipse, fieldtype)});
+    case &IsLvalNo(desc rval_description):
+      lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, fieldtype, props})});
     }
-    case ConstantField(value u32): {
-      after nc[ast_expr_after_discard] = NotComputed;
-      #annotate_disposal_for_discard(es, oo(&a->lhs), &after);
-      annotate(&a->info, @[ast_local_field_info]ArrayLength({*un(&after), value}));
-      lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
-    }
+    // There's no disposal, it's a real field access.
+    annotate(&a->info, FieldName(@[ast_field_info]{off.offset, off.index}));
+  case ConstantField(value u32):
+    after nc[ast_expr_after_discard] = NotComputed;
+    #annotate_disposal_for_discard(es, oo(&a->lhs), &after);
+    annotate(&a->info, @[ast_local_field_info]ArrayLength({*un(&after), value}));
+    lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
   }
   annotate_info(x, CompleteCheck(mk(lval, fieldtype, props, {emissions})));
   return NoFail;
@@ -1089,33 +1079,31 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
                                    after *nc[ast_expr_after_consume], moved_cell_ix_out *opt[size]) np {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
-    case &IsLvalNo(desc rval_description): {
-      if whole_temporary(&desc) {
-        annotate(after, mk_after(@[consume_actions]ConsumeByInPlace, desc.whole_num));
-      } else {
-        copy ctor_desc = #get_copy_ctor(es, &info->cu);
-        destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, desc.whole_num)->type);
-        dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
-        annotate(after,
-          mk_after(@[consume_actions]ConsumeByCopyDestroy({+{copy, dest, desc.partial_num},
-                                                           +{destroy, desc.whole_num}}),
-                   dest));
-      }
-      *moved_cell_ix_out = None;
-    }
-    case &IsLvalYes(desc lval_description): {
+  case &IsLvalNo(desc rval_description):
+    if whole_temporary(&desc) {
+      annotate(after, mk_after(@[consume_actions]ConsumeByInPlace, desc.whole_num));
+    } else {
+      copy ctor_desc = #get_copy_ctor(es, &info->cu);
+      destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, desc.whole_num)->type);
       dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
-      if case Has(ix size) = find(movable_cells, Has(desc.num)) {
-        move ctor_desc = #get_move_ctor(es, &info->cu);
-        annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]+{move, dest, desc.num}), dest));
-        *moved_cell_ix_out = Has(ix);
-      } else {
-        copy ctor_desc = #get_copy_ctor(es, &info->cu);
-        annotate(after, mk_after(@[consume_actions]ConsumeByCopy({@[copy_action]+{copy, dest, desc.num},
-                                                                  desc.deadme}),
-                                 dest));
-        *moved_cell_ix_out = None;
-      }
+      annotate(after,
+        mk_after(@[consume_actions]ConsumeByCopyDestroy({+{copy, dest, desc.partial_num},
+                                                         +{destroy, desc.whole_num}}),
+                 dest));
+    }
+    *moved_cell_ix_out = None;
+  case &IsLvalYes(desc lval_description):
+    dest cell_num = add_cell(es, {LocationStatic, info->cu, info->cu_props});
+    if case Has(ix size) = find(movable_cells, Has(desc.num)) {
+      move ctor_desc = #get_move_ctor(es, &info->cu);
+      annotate(after, mk_after(@[consume_actions]ConsumeByMove(@[move_action]+{move, dest, desc.num}), dest));
+      *moved_cell_ix_out = Has(ix);
+    } else {
+      copy ctor_desc = #get_copy_ctor(es, &info->cu);
+      annotate(after, mk_after(@[consume_actions]ConsumeByCopy({@[copy_action]+{copy, dest, desc.num},
+                                                                desc.deadme}),
+                               dest));
+      *moved_cell_ix_out = None;
     }
   }
   return NoFail;
@@ -1125,18 +1113,16 @@ func annotate_disposal_for_consume(es *framescope, a *ast_expr, movable_cells *s
 func annotate_disposal_for_discard(es *framescope, a *ast_expr, after *nc[ast_expr_after_discard]) np {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
-    case &IsLvalNo(desc rval_description): {
-      destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, desc.whole_num)->type);
-      annotate(after, mk_after_discard(@[destroy_action]+{destroy, desc.whole_num}));
-    }
-    case &IsLvalYes(desc lval_description): {
-      if case DeadMe = desc.deadme {
-        // This could ostensibly be Has(desc.num), but there's no reason to be
-        // inconsistent with the rvalue case.
-        annotate(after, mk_virtualdead_discard(desc.num));
-      } else {
-        annotate(after, mk_nothing_discard());
-      }
+  case &IsLvalNo(desc rval_description):
+    destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, desc.whole_num)->type);
+    annotate(after, mk_after_discard(@[destroy_action]+{destroy, desc.whole_num}));
+  case &IsLvalYes(desc lval_description):
+    if case DeadMe = desc.deadme {
+      // This could ostensibly be Has(desc.num), but there's no reason to be
+      // inconsistent with the rvalue case.
+      annotate(after, mk_virtualdead_discard(desc.num));
+    } else {
+      annotate(after, mk_nothing_discard());
     }
   }
   return NoFail;
@@ -1174,59 +1160,57 @@ func make_comparecells(es *framescope, dest cell_num) instpair {
 func annotate_disposal_for_assignment(es *framescope, dest cell_num, a *ast_expr, assignment *ast_assignment) np {
   info *ast_expr_complete_info = expr_complete_info(a);
   switch &info->lval {
-    case &IsLvalNo(desc rval_description): {
-      target_destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, dest)->type);
-      if whole_temporary(&desc) {
-        move ctor_desc = #get_move_ctor(es, &ref_cell(es, dest)->type);
-        annotate(&assignment->info,
-          @[ast_assignment_info]
-          SimpleMoveAssignment({@[destroy_action]+{target_destroy, dest},
-                                @[move_action]+{move, dest, desc.whole_num}}));
-      } else {
-        // TODO: This dups code with other makers of DisposeCopyAndDestroy.
-        copy ctor_desc = #get_copy_ctor(es, &ref_cell(es, dest)->type);
-        destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, desc.whole_num)->type);
+  case &IsLvalNo(desc rval_description):
+    target_destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, dest)->type);
+    if whole_temporary(&desc) {
+      move ctor_desc = #get_move_ctor(es, &ref_cell(es, dest)->type);
+      annotate(&assignment->info,
+        @[ast_assignment_info]
+        SimpleMoveAssignment({@[destroy_action]+{target_destroy, dest},
+                              @[move_action]+{move, dest, desc.whole_num}}));
+    } else {
+      // TODO: This dups code with other makers of DisposeCopyAndDestroy.
+      copy ctor_desc = #get_copy_ctor(es, &ref_cell(es, dest)->type);
+      destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, desc.whole_num)->type);
 
-        annotate(&assignment->info,
-          @[ast_assignment_info]
-          SimpleCopyDestroyAssignment({@[destroy_action]+{target_destroy, dest},
-                                       @[copy_action]+{copy, dest, desc.partial_num},
-                                       @[destroy_action]+{destroy, desc.whole_num}}));
-      }
+      annotate(&assignment->info,
+        @[ast_assignment_info]
+        SimpleCopyDestroyAssignment({@[destroy_action]+{target_destroy, dest},
+                                     @[copy_action]+{copy, dest, desc.partial_num},
+                                     @[destroy_action]+{destroy, desc.whole_num}}));
     }
-    case &IsLvalYes(desc lval_description): {
-      if dest == desc.num {
-        // Static self-assignment!
-        annotate(&assignment->info, StaticSelfAssignment);
-      } else {
-        target_destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, dest)->type);
-        copy ctor_desc = #get_copy_ctor(es, &ref_cell(es, dest)->type);
-        do_conditional bool;
-        switch &target_destroy {
+  case &IsLvalYes(desc lval_description):
+    if dest == desc.num {
+      // Static self-assignment!
+      annotate(&assignment->info, StaticSelfAssignment);
+    } else {
+      target_destroy ctor_desc = #get_destroy_ctor(es, &ref_cell(es, dest)->type);
+      copy ctor_desc = #get_copy_ctor(es, &ref_cell(es, dest)->type);
+      do_conditional bool;
+      switch &target_destroy {
+      case &TrivialCtor:
+        switch &copy {
         case &TrivialCtor:
-          switch &copy {
-          case &TrivialCtor:
-            do_conditional = false;
-          case &FunCtor(bfcd):
-            do_conditional = true;
-          }
-        case &FunCtor(ip instpair):
+          do_conditional = false;
+        case &FunCtor(bfcd):
           do_conditional = true;
         }
-        if do_conditional {
-          annotate(&assignment->info,
-            @[ast_assignment_info]
-            ConditionalAssignment({make_comparecells(es, dest),
-                                   @[destroy_action]+{target_destroy, dest},
-                                   @[copy_action]+{copy, dest, desc.num},
-                                   desc.deadme}));
-        } else {
-          annotate(&assignment->info,
-            @[ast_assignment_info]
-            SimpleCopyAssignment({@[destroy_action]+{target_destroy, dest},
-                                  @[copy_action]+{copy, dest, desc.num},
-                                  desc.deadme}));
-        }
+      case &FunCtor(ip instpair):
+        do_conditional = true;
+      }
+      if do_conditional {
+        annotate(&assignment->info,
+          @[ast_assignment_info]
+          ConditionalAssignment({make_comparecells(es, dest),
+                                 @[destroy_action]+{target_destroy, dest},
+                                 @[copy_action]+{copy, dest, desc.num},
+                                 desc.deadme}));
+      } else {
+        annotate(&assignment->info,
+          @[ast_assignment_info]
+          SimpleCopyAssignment({@[destroy_action]+{target_destroy, dest},
+                                @[copy_action]+{copy, dest, desc.num},
+                                desc.deadme}));
       }
     }
   }
@@ -1239,83 +1223,76 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
   match_res es_match_res;
   #es_lookup_name(es, a->ident.value, &parms, pt, &match_res);
   switch &match_res {
-    case &NoMatch: {
+  case &NoMatch:
+    return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value),
+                _u8("', maybe with parms, not found, matching type '"), pretty(es->im, pt), _u8("'"));
+
+  case &AmbigGlobalMatch:
+    if ai == AllowIncompleteYes {
+      // NOTE: We could annotate this more precisely in ambiguous-single-match cases.
+      annotate_info(x, @[ast_expr_info]IncompleteCheck);
+      return NoFail;
+    } else {
       return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value),
-                  _u8("', maybe with parms, not found, matching type '"), pretty(es->im, pt), _u8("'"));
+                  _u8("', maybe with parms, matches ambiguously over "), pretty(es->im, pt));
     }
-
-    case &AmbigGlobalMatch: {
-      if ai == AllowIncompleteYes {
-        // NOTE: We could annotate this more precisely in ambiguous-single-match cases.
-        annotate_info(x, @[ast_expr_info]IncompleteCheck);
-        return NoFail;
-      } else {
-        return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value),
-                    _u8("', maybe with parms, matches ambiguously over "), pretty(es->im, pt));
-      }
-    }
-    case &NoGlobalAmbigEnumConstructorMatch: {
-      if ai == AllowIncompleteYes {
-        annotate_info(x, @[ast_expr_info]IncompleteCheck);
-        return NoFail;
-      } else {
-        return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value),
-                    _u8("', maybe with parms, not found, but cannot rule out enum constructor, on type '"),
-                    pretty(es->im, pt));
-      }
-    }
-
-    case &OneEnumConstructorMatch(ci constructor_info): {
-      annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip}));
-      props type_properties;
-      #compute_type_properties(es->clq, &es->tscope, &ci.type, &props);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ci.type, props})),
-                                        ci.type, props, {ci.emissions})));
+  case &NoGlobalAmbigEnumConstructorMatch:
+    if ai == AllowIncompleteYes {
+      annotate_info(x, @[ast_expr_info]IncompleteCheck);
       return NoFail;
-    }
-    case &EnumVoidConstructedMatch(vci voidconstructed_info): {
-      annotate(&a->name_info, @[ast_name_expr_info]EnumVoidConstructed({vci.constructor_tag, vci.et}));
-      props type_properties;
-      #compute_type_properties(es->clq, &es->tscope, &vci.constructed_type, &props);
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.constructed_type, props})),
-                                        vci.constructed_type, props, {mk_empty_emittance()})));
-      return NoFail;
-    }
-    case &OneGlobalMatch(egm es_global_match): {
-      ent *def_entry = ref_def_entry(es->cs, egm.ent_id);
-
-      emissions array[unify_emission];
-      // This parallels or plagairizes ensure_def_inst_type_computed.
-      // TODO: Dedup anything?
-      matched_parms idy_repls;
-      #check_and_compute_parms_no_canonicalize(es->clq, &es->tscope, &egm.parms, &emissions, &matched_parms);
-      // ^ this is kind of weird -- we've done a global match, so we could just canonicalize the def inst parms/emittance or somethnig?  No?
-
-      ent_typeexpr *te_typeexpr;
-      #def_converted_typeexpr(ent, &ent_typeexpr);
-
-      computed cac_typeexpr;
-      #check_and_compute_typeexpr(es->clq, flatten(&ent->generics), &es->tscope, &matched_parms, ent_typeexpr, &emissions, &computed);
-
-      check(computed.complete);
-      cu_computed cu_typeexpr = ~computed.te;
-      props type_properties;
-      #compute_type_properties(es->clq, &es->tscope, &cu_computed, &props);
-
-      append(&emissions, &egm.emissions);
-      annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id}));
-      annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, cu_computed, props})),
-                                        cu_computed, props, {freeze(&emissions)})));
-      return NoFail;
+    } else {
+      return MERR(es->cs, a->ident.meta, _u8("Name lookup for '"), lookup(es->im, a->ident.value),
+                  _u8("', maybe with parms, not found, but cannot rule out enum constructor, on type '"),
+                  pretty(es->im, pt));
     }
 
-    case &OneLocalMatch(elm es_local_match): {
-      annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({elm.varnum}));
-      vi *var_info = ref_var(es, elm.varnum);
-      annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe, vi->ipse.x}),
-                                        vi->type, vi->props, {elm.emissions})));
-      return NoFail;
-    }
+  case &OneEnumConstructorMatch(ci constructor_info):
+    annotate(&a->name_info, @[ast_name_expr_info]EnumConstructor({ci.constructor_tag, ci.ip}));
+    props type_properties;
+    #compute_type_properties(es->clq, &es->tscope, &ci.type, &props);
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ci.type, props})),
+                                      ci.type, props, {ci.emissions})));
+    return NoFail;
+  case &EnumVoidConstructedMatch(vci voidconstructed_info):
+    annotate(&a->name_info, @[ast_name_expr_info]EnumVoidConstructed({vci.constructor_tag, vci.et}));
+    props type_properties;
+    #compute_type_properties(es->clq, &es->tscope, &vci.constructed_type, &props);
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, vci.constructed_type, props})),
+                                      vci.constructed_type, props, {mk_empty_emittance()})));
+    return NoFail;
+  case &OneGlobalMatch(egm es_global_match):
+    ent *def_entry = ref_def_entry(es->cs, egm.ent_id);
+
+    emissions array[unify_emission];
+    // This parallels or plagairizes ensure_def_inst_type_computed.
+    // TODO: Dedup anything?
+    matched_parms idy_repls;
+    #check_and_compute_parms_no_canonicalize(es->clq, &es->tscope, &egm.parms, &emissions, &matched_parms);
+    // ^ this is kind of weird -- we've done a global match, so we could just canonicalize the def inst parms/emittance or somethnig?  No?
+
+    ent_typeexpr *te_typeexpr;
+    #def_converted_typeexpr(ent, &ent_typeexpr);
+
+    computed cac_typeexpr;
+    #check_and_compute_typeexpr(es->clq, flatten(&ent->generics), &es->tscope, &matched_parms, ent_typeexpr, &emissions, &computed);
+
+    check(computed.complete);
+    cu_computed cu_typeexpr = ~computed.te;
+    props type_properties;
+    #compute_type_properties(es->clq, &es->tscope, &cu_computed, &props);
+
+    append(&emissions, &egm.emissions);
+    annotate(&a->name_info, @[ast_name_expr_info]GlobalResolve({egm.ent_id, egm.inst_id}));
+    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, cu_computed, props})),
+                                      cu_computed, props, {freeze(&emissions)})));
+    return NoFail;
+
+  case &OneLocalMatch(elm es_local_match):
+    annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({elm.varnum}));
+    vi *var_info = ref_var(es, elm.varnum);
+    annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe, vi->ipse.x}),
+                                      vi->type, vi->props, {elm.emissions})));
+    return NoFail;
   }
 }
 
@@ -1817,42 +1794,37 @@ func help_lookup_struct_field(es *framescope, st *structspec, fieldname *ast_ide
 func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident,
                             fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   switch &t->x {
-    case &TeName(a te_name): {
-      ipse_mappings shray[sym];  // empty
-      return lookup_name_field(es, unHas(&a.pack), &ipse_mappings, fieldname, fieldtype_out, res_out);
+  case &TeName(a te_name):
+    ipse_mappings shray[sym];  // empty
+    return lookup_name_field(es, unHas(&a.pack), &ipse_mappings, fieldname, fieldtype_out, res_out);
+  case &TeApp(a te_app):
+    hp *te_app_pack = unHas(&a.pack);
+    return lookup_name_field(es, &hp->teip, &hp->ipse_mappings, fieldname, fieldtype_out, res_out);
+  case &TeUnion(a te_union):
+    // The offset's what it would be for a struct.
+    offset_discard u32;
+    index size;
+    #lookup_field_from_list(es->clq, &es->tscope, &a.fields, fieldname->value, fieldtype_out, &offset_discard, &index);
+    // Offset's always 0 for a union.
+    *res_out = InheritsLval({0, index});
+    return NoFail;
+
+  case &TeArraytype(a te_arraytype):
+    if fieldname->value != es->im->cym.lengthsym {
+      return ERR(_u8("field lookup (not .length) on array type"));
     }
-    case &TeApp(a te_app): {
-      hp *te_app_pack = unHas(&a.pack);
-      return lookup_name_field(es, &hp->teip, &hp->ipse_mappings, fieldname, fieldtype_out, res_out);
+    *fieldtype_out = compute_size(es->clq);
+    if case Has(n u32) = a.count {
+      *res_out = ConstantField(n);
+    } else {
+      ice(_u8("Complete arraytype has incomplete count"));
     }
-    case &TeUnion(a te_union): {
-      // The offset's what it would be for a struct.
-      offset_discard u32;
-      index size;
-      #lookup_field_from_list(es->clq, &es->tscope, &a.fields, fieldname->value, fieldtype_out, &offset_discard, &index);
-      // Offset's always 0 for a union.
-      *res_out = InheritsLval({0, index});
-      return NoFail;
-    }
-    case &TeArraytype(a te_arraytype): {
-      if fieldname->value != es->im->cym.lengthsym {
-        return ERR(_u8("field lookup (not .length) on array type"));
-      }
-      *fieldtype_out = compute_size(es->clq);
-      if case Has(n u32) = a.count {
-        *res_out = ConstantField(n);
-      } else {
-        ice(_u8("Complete arraytype has incomplete count"));
-      }
-      return NoFail;
-    }
-    case &TeIpse(a te_ipse): {
-      return ERR(_u8("ICE: Looking up name field of... a ipse type?"));
-    }
-    case &TeUnknown: {
-      ice(_u8("lookup_field sees incomplete type"));
-      return fake();
-    }
+    return NoFail;
+  case &TeIpse(a te_ipse):
+    return ERR(_u8("ICE: Looking up name field of... a ipse type?"));
+  case &TeUnknown:
+    ice(_u8("lookup_field sees incomplete type"));
+    return fake();
   }
 }
 
@@ -2042,13 +2014,11 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     if !tech.deref {
       // TODO: This is totally duplicating field access logic.
       switch &lhs_info->lval {
-        case &IsLvalYes(desc lval_description): {
-          lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
-                            DeadMe, field_ipse(es, desc.ipse, ~ *result_type)});
-        }
-        case &IsLvalNo(desc rval_description): {
-          lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *result_type, result_props})});
-        }
+      case &IsLvalYes(desc lval_description):
+        lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
+                          DeadMe, field_ipse(es, desc.ipse, ~ *result_type)});
+      case &IsLvalNo(desc rval_description):
+        lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *result_type, result_props})});
       }
       // Nothing to dispose, it's a field access.
       annotate(&a->info, {None, ArrayIndexingInfo({rhs_later}), {freeze(&result_emissions)}});
