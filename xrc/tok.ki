@@ -296,14 +296,12 @@ func step(p *ps) void {
   for ;; {
     t tok = grab_tok(p);
     switch t.val {
-      case Comment: {
-        push(&p->comments, t.interval);
-      }
-      default: {
-        p->current = t;
-        p->prev_right = right;
-        return;
-      }
+    case Comment:
+      push(&p->comments, t.interval);
+    default:
+      p->current = t;
+      p->prev_right = right;
+      return;
     }
   }
 }
