@@ -147,110 +147,98 @@ func convert_typeexpr(a *ast_typeexpr) cr[te_typeexpr] {
 
 func def_converted_typeexpr(ent *def_entry, out **te_typeexpr) np {
   switch &ent->converted_typeexpr {
-    case &NotComputed: {
-      ent->converted_typeexpr = BeganComputing;
-      switch &ent->definition {
-        case &DefnPrim(op primitive_op): {
-          ice(_u8("def_entry for primitive has converted_typeexpr NotComputed."));
-          return fake();
-        }
-        case &DefnHasRhs(np def_nonprim): {
-          switch convert_typeexpr(&np.quick_typeexpr) {
-          case Unprinted(pm):
-            ent->converted_typeexpr = FailedComputation;
-            return Unprinted(pm);
-          case NoFail(converted te_typeexpr):
-            ent->converted_typeexpr = Computed(converted);
-          }
-          if case &Computed(te te_typeexpr) = &ent->converted_typeexpr {
-            *out = &te;
-          } else {
-            crash(_u8("impossible converted_typeexpr"));
-          }
-          return NoFail;
-        }
-        case &DefnNonMagic(mag def_non_magic): {
-          ice(_u8("def_entry for \"non_magic\" implementation has converted_typeexpr NotComputed."));
-          return fake();
-        }
-        case &DefnMagic(mag def_magic): {
-          ice(_u8("ICE: def_entry for magic implementation has converted_typeexpr NotComputed."));
-          return fake();
-        }
+  case &NotComputed:
+    ent->converted_typeexpr = BeganComputing;
+    switch &ent->definition {
+    case &DefnPrim(op primitive_op):
+      ice(_u8("def_entry for primitive has converted_typeexpr NotComputed."));
+      return fake();
+    case &DefnHasRhs(np def_nonprim):
+      switch convert_typeexpr(&np.quick_typeexpr) {
+      case Unprinted(pm):
+        ent->converted_typeexpr = FailedComputation;
+        return Unprinted(pm);
+      case NoFail(converted te_typeexpr):
+        ent->converted_typeexpr = Computed(converted);
       }
-    }
-    case &BeganComputing: {
-      return ERR(_u8("recursively computing def's typeexpr"));
-    }
-    case &FailedComputation: {
-      return ERR(_u8("repeat of error in def_converted_typeexpr"));
-    }
-    case &Computed(x te_typeexpr): {
-      *out = &x;
+      if case &Computed(te te_typeexpr) = &ent->converted_typeexpr {
+        *out = &te;
+      } else {
+        crash(_u8("impossible converted_typeexpr"));
+      }
       return NoFail;
+    case &DefnNonMagic(mag def_non_magic):
+      ice(_u8("def_entry for \"non_magic\" implementation has converted_typeexpr NotComputed."));
+      return fake();
+    case &DefnMagic(mag def_magic):
+      ice(_u8("ICE: def_entry for magic implementation has converted_typeexpr NotComputed."));
+      return fake();
     }
+  case &BeganComputing:
+    return ERR(_u8("recursively computing def's typeexpr"));
+  case &FailedComputation:
+    return ERR(_u8("repeat of error in def_converted_typeexpr"));
+  case &Computed(x te_typeexpr):
+    *out = &x;
+    return NoFail;
   }
 }
 
 func deftype_converted_rhs(np *deftype_nonprim, out **deftype_rhs_spec) np {
   switch &np->rhs {
-    case &NotComputed: {
-      np->rhs = BeganComputing;
-      switch &np->tl->rhs {
-      case &ClassexprRhs(a ast_classexpr_rhs):
-        switch convert_vardecl_list(&a.fields) {
-        case Unprinted(pm):
-          np->rhs = FailedComputation;
-          return Unprinted(pm);
-        case NoFail(fields shray[te_vardecl]):
-          np->rhs = Computed(@[deftype_rhs_spec]ClassexprRhsSpec({a.disposition, {fields}, bogus_exposers()}));
-        }
-        if case &Computed(b deftype_rhs_spec) = &np->rhs {
-          *out = &b;
-        } else {
-          crash(_u8("impossible rhs"));
-        }
-        return NoFail;
-      case &DefstructRhs(a ast_defstruct_rhs):
-        switch convert_vardecl_list(&a.fields) {
-        case Unprinted(pm):
-          np->rhs = FailedComputation;
-          return Unprinted(pm);
-        case NoFail(fields shray[te_vardecl]):
-          np->rhs = Computed(@[deftype_rhs_spec]DefstructRhsSpec({fields}));
-        }
-        if case &Computed(b deftype_rhs_spec) = &np->rhs {
-          *out = &b;
-        } else {
-          crash(_u8("impossible rhs"));
-        }
-        return NoFail;
-      case &DefenumRhs(a ast_defenum_rhs):
-        success_case_ix opt[size];
-        constructors array[te_vardecl];
-        if case Unprinted(pm) = convert_defenum_constructor_list(&a.constructors, &constructors, &success_case_ix) {
-          np->rhs = FailedComputation;
-          return Unprinted(pm);
-        }
-        np->rhs = Computed(@[deftype_rhs_spec]DefenumRhsSpec({freeze(&constructors), success_case_ix}));
-        if case &Computed(b deftype_rhs_spec) = &np->rhs {
-          *out = &b;
-        } else {
-          crash(_u8("impossible rhs"));
-        }
-        return NoFail;
+  case &NotComputed:
+    np->rhs = BeganComputing;
+    switch &np->tl->rhs {
+    case &ClassexprRhs(a ast_classexpr_rhs):
+      switch convert_vardecl_list(&a.fields) {
+      case Unprinted(pm):
+        np->rhs = FailedComputation;
+        return Unprinted(pm);
+      case NoFail(fields shray[te_vardecl]):
+        np->rhs = Computed(@[deftype_rhs_spec]ClassexprRhsSpec({a.disposition, {fields}, bogus_exposers()}));
       }
-    }
-    case &BeganComputing: {
-      return ERR(_u8("recursively computing deftype's rhs"));
-    }
-    case &FailedComputation: {
-      return ERR(_u8("repeat of error in deftype_converted_rhs"));
-    }
-    case &Computed(x deftype_rhs_spec): {
-      *out = &x;
+      if case &Computed(b deftype_rhs_spec) = &np->rhs {
+        *out = &b;
+      } else {
+        crash(_u8("impossible rhs"));
+      }
+      return NoFail;
+    case &DefstructRhs(a ast_defstruct_rhs):
+      switch convert_vardecl_list(&a.fields) {
+      case Unprinted(pm):
+        np->rhs = FailedComputation;
+        return Unprinted(pm);
+      case NoFail(fields shray[te_vardecl]):
+        np->rhs = Computed(@[deftype_rhs_spec]DefstructRhsSpec({fields}));
+      }
+      if case &Computed(b deftype_rhs_spec) = &np->rhs {
+        *out = &b;
+      } else {
+        crash(_u8("impossible rhs"));
+      }
+      return NoFail;
+    case &DefenumRhs(a ast_defenum_rhs):
+      success_case_ix opt[size];
+      constructors array[te_vardecl];
+      if case Unprinted(pm) = convert_defenum_constructor_list(&a.constructors, &constructors, &success_case_ix) {
+        np->rhs = FailedComputation;
+        return Unprinted(pm);
+      }
+      np->rhs = Computed(@[deftype_rhs_spec]DefenumRhsSpec({freeze(&constructors), success_case_ix}));
+      if case &Computed(b deftype_rhs_spec) = &np->rhs {
+        *out = &b;
+      } else {
+        crash(_u8("impossible rhs"));
+      }
       return NoFail;
     }
+  case &BeganComputing:
+    return ERR(_u8("recursively computing deftype's rhs"));
+  case &FailedComputation:
+    return ERR(_u8("repeat of error in deftype_converted_rhs"));
+  case &Computed(x deftype_rhs_spec):
+    *out = &x;
+    return NoFail;
   }
 }
 
@@ -275,22 +263,21 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms, emitta
   }
   rhs def_inst_rhs;
   switch &ent->definition {
-    case &DefnPrim(op primitive_op):
-      rhs = InstRhsPrim(op);
-    case &DefnHasRhs(np def_nonprim):
-      switch np.tl {
-        case &Def(a ast_def): {
-          rhs = InstRhsExpr({a.rhs, NotComputed});
-        }
-        case &ExternDef(a ast_extern_def): { rhs = InstRhsExtern; }
-        default: {
-          ice(_u8("def_entry has invalid toplevel\n"));
-        }
-      }
-    case &DefnNonMagic(nonmag def_non_magic):
-      rhs = InstRhsNonMagic(nonmag);
-    case &DefnMagic(mag def_magic):
-      rhs = InstRhsMagic(mag);
+  case &DefnPrim(op primitive_op):
+    rhs = InstRhsPrim(op);
+  case &DefnHasRhs(np def_nonprim):
+    switch np.tl {
+    case &Def(a ast_def):
+      rhs = InstRhsExpr({a.rhs, NotComputed});
+    case &ExternDef(a ast_extern_def):
+      rhs = InstRhsExtern;
+    default:
+      ice(_u8("def_entry has invalid toplevel\n"));
+    }
+  case &DefnNonMagic(nonmag def_non_magic):
+    rhs = InstRhsNonMagic(nonmag);
+  case &DefnMagic(mag def_magic):
+    rhs = InstRhsMagic(mag);
   }
   id def_inst_id = add_inst(cs, mk(*parms, *emittance, rhs));
   check_insert(&ent->insts, parms, id);
@@ -302,55 +289,51 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
                                    inst_id def_inst_id, out **def_inst_typeinfo) np {
   inst *def_inst = ref_inst(cs, inst_id);
   switch &inst->typeinfo {
-    case &NotComputed: {
-      rw depth_rewinder;
-      #set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms.repls), &rw);
-      inst->typeinfo = BeganComputing;
+  case &NotComputed:
+    rw depth_rewinder;
+    #set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms.repls), &rw);
+    inst->typeinfo = BeganComputing;
 
-      ent_typeexpr *te_typeexpr;
-      if case Unprinted(pm) = def_converted_typeexpr(ent, &ent_typeexpr) {
-        inst->typeinfo = FailedComputation;
-        return Unprinted(pm);
-      }
+    ent_typeexpr *te_typeexpr;
+    if case Unprinted(pm) = def_converted_typeexpr(ent, &ent_typeexpr) {
+      inst->typeinfo = FailedComputation;
+      return Unprinted(pm);
+    }
 
-      inst_scope *type_scope = ref_scope(&inst->parms);
+    inst_scope *type_scope = ref_scope(&inst->parms);
 
-      emissions array[unify_emission];
-      // Important: We check the typeexpr first.  If that typeexpr cyclically refers to
-      // this def, we fail.  If there is no typeexpr, we need to compute it from the rhs
-      // (and that also needs to not depend cyclically on this def's own typeexpr).
-      computed cac_typeexpr;
-      if case Unprinted(pm) = check_and_compute_typeexpr(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
-                                                         ent_typeexpr, &emissions, &computed) {
-        inst->typeinfo = FailedComputation;
-        return Unprinted(pm);
-      }
-      check(computed.complete);
-      props type_properties;
-      cu_computed cu_typeexpr = ~computed.te;
-      if case Unprinted(pm) = compute_type_properties(clq, inst_scope, &cu_computed, &props) {
-        inst->typeinfo = FailedComputation;
-        return Unprinted(pm);
-      }
-      if !is_defwise_trivial(&props) {
-        inst->typeinfo = FailedComputation;
-        return ERR(_u8("def (instantiation) has non-trivial type"));
-      }
+    emissions array[unify_emission];
+    // Important: We check the typeexpr first.  If that typeexpr cyclically refers to
+    // this def, we fail.  If there is no typeexpr, we need to compute it from the rhs
+    // (and that also needs to not depend cyclically on this def's own typeexpr).
+    computed cac_typeexpr;
+    if case Unprinted(pm) = check_and_compute_typeexpr(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
+                                                       ent_typeexpr, &emissions, &computed) {
+      inst->typeinfo = FailedComputation;
+      return Unprinted(pm);
+    }
+    check(computed.complete);
+    props type_properties;
+    cu_computed cu_typeexpr = ~computed.te;
+    if case Unprinted(pm) = compute_type_properties(clq, inst_scope, &cu_computed, &props) {
+      inst->typeinfo = FailedComputation;
+      return Unprinted(pm);
+    }
+    if !is_defwise_trivial(&props) {
+      inst->typeinfo = FailedComputation;
+      return ERR(_u8("def (instantiation) has non-trivial type"));
+    }
 
-      inst->typeinfo = Computed({cu_computed, props, freeze(&emissions)});
-      *out = un(&inst->typeinfo);
-      return NoFail;
-    }
-    case &BeganComputing: {
-      return ERR(_u8("computing def's type arouses cyclic dependency "), lookup(cs->im, ent->def_name));
-    }
-    case &FailedComputation: {
-      return ERR(_u8("revisiting def's type after failure for "), lookup(cs->im, ent->def_name));
-    }
-    case &Computed(typr def_inst_typeinfo): {
-      *out = &typr;
-      return NoFail;
-    }
+    inst->typeinfo = Computed({cu_computed, props, freeze(&emissions)});
+    *out = un(&inst->typeinfo);
+    return NoFail;
+  case &BeganComputing:
+    return ERR(_u8("computing def's type arouses cyclic dependency "), lookup(cs->im, ent->def_name));
+  case &FailedComputation:
+    return ERR(_u8("revisiting def's type after failure for "), lookup(cs->im, ent->def_name));
+  case &Computed(typr def_inst_typeinfo):
+    *out = &typr;
+    return NoFail;
   }
 }
 
@@ -360,39 +343,31 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
   #ensure_def_inst_type_computed(cs, clq, ent, inst_id, &typeinfo);
   inst *def_inst = ref_inst(cs, inst_id);
   switch inst->rhs_status {
-    case DidNotCheckRhs: {
-      rw depth_rewinder;
-      #set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms.repls), &rw);
-      inst->rhs_status = BeganCheckingRhs;
-      switch &inst->rhs {
-        case &InstRhsPrim(op primitive_op): {
-          // Do nothing.
-        }
-        case &InstRhsExtern: {
-          // Do nothing.
-        }
-        case &InstRhsExpr(rhs def_inst_rhs_expr): {
-          info frame_info;
-          #check_def_expr(clq, ent->accessible, flatten(&ent->generics), &inst->parms, &rhs.ec,
-                          &typeinfo->cu.x, ent->def_name, &info);
-          annotate(&rhs.frame_info, move(&info));
-        }
-        case &InstRhsNonMagic(nonmag def_non_magic): {
-          #check_non_magic(clq, flatten(&ent->generics), ref_scope(&inst->parms), &inst->parms.repls, &nonmag);
-        }
-        case &InstRhsMagic(mag def_magic): {
-          #check_magic(clq, flatten(&ent->generics), ref_scope(&inst->parms), &inst->parms.repls, &mag);
-        }
-      }
-      inst->rhs_status = FinishedCheckingRhs;
-      return NoFail;
+  case DidNotCheckRhs:
+    rw depth_rewinder;
+    #set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms.repls), &rw);
+    inst->rhs_status = BeganCheckingRhs;
+    switch &inst->rhs {
+    case &InstRhsPrim(op primitive_op):
+      void;
+    case &InstRhsExtern:
+      void;
+    case &InstRhsExpr(rhs def_inst_rhs_expr):
+      info frame_info;
+      #check_def_expr(clq, ent->accessible, flatten(&ent->generics), &inst->parms, &rhs.ec,
+                      &typeinfo->cu.x, ent->def_name, &info);
+      annotate(&rhs.frame_info, move(&info));
+    case &InstRhsNonMagic(nonmag def_non_magic):
+      #check_non_magic(clq, flatten(&ent->generics), ref_scope(&inst->parms), &inst->parms.repls, &nonmag);
+    case &InstRhsMagic(mag def_magic):
+      #check_magic(clq, flatten(&ent->generics), ref_scope(&inst->parms), &inst->parms.repls, &mag);
     }
-    case BeganCheckingRhs: {
-      return NoFail;
-    }
-    case FinishedCheckingRhs: {
-      return NoFail;
-    }
+    inst->rhs_status = FinishedCheckingRhs;
+    return NoFail;
+  case BeganCheckingRhs:
+    return NoFail;
+  case FinishedCheckingRhs:
+    return NoFail;
   }
 }
 
@@ -633,42 +608,40 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
   #check_and_compute_typeexpr_shray(clq, g, scope, parms, &a->params, &emissions1, &params1, &params_complete_discard);
 
   switch &a->typefunc {
-    case &TePureName(value sym): {
-      md matched_deftype = #match_deftype(clq->cs, fake_ast_meta(), value, scope, Has(&params1));
+  case &TePureName(value sym):
+    md matched_deftype = #match_deftype(clq->cs, fake_ast_meta(), value, scope, Has(&params1));
 
-      // TODO: We could make unify_under_generics retain computedness and prove that we don't have to re-cac the params -- just run all_complete_computed on them.
-      // TODO: Also have unify_under_generics look at instpacks?  Using their ipse_mappings too.
-      emissions2 array[unify_emission] = mk_copy(&md.emissions);
-      params_complete bool;
-      cac_params shray[te_typeexpr];
-      #check_and_compute_typeexpr_shray(clq, g, scope, parms, unHas(&md.learned_params), &emissions2, &cac_params, &params_complete);
+    // TODO: We could make unify_under_generics retain computedness and prove that we don't have to re-cac the params -- just run all_complete_computed on them.
+    // TODO: Also have unify_under_generics look at instpacks?  Using their ipse_mappings too.
+    emissions2 array[unify_emission] = mk_copy(&md.emissions);
+    params_complete bool;
+    cac_params shray[te_typeexpr];
+    #check_and_compute_typeexpr_shray(clq, g, scope, parms, unHas(&md.learned_params), &emissions2, &cac_params, &params_complete);
 
-      if params_complete {
-        // TODO: This is quite duplicated with check_and_compute_parms.  With the changes
-        // we're making we should definitely dedup this code.
-        canonicalized_scope type_scope = mk_global();
-        ipse_names array[sym];
-        ctx canonicalizing_ctx = {clq->im, scope, &ipse_names, &canonicalized_scope};
-        canonical array[cu_typeexpr];
-        foreach param *te_typeexpr in refs(&cac_params) {
-          push(&canonical, ~canonicalize_idy_ipses(&ctx, param));
-        }
-        hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
-        emissions2_sh shray[_] = freeze(&emissions2);
-        append(emissions_app, &emissions2_sh);
-        inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &hp, &emissions2_sh);
-        *out = {true, TeApp({TePureName(value), cac_params, Has({{md.ent_id, inst_id}, freeze(&ipse_names), emissions2_sh})})};
-      } else {
-        *out = {false, TeApp({TePureName(value), cac_params, None})};
-        append(emissions_app, &md.emissions);
+    if params_complete {
+      // TODO: This is quite duplicated with check_and_compute_parms.  With the changes
+      // we're making we should definitely dedup this code.
+      canonicalized_scope type_scope = mk_global();
+      ipse_names array[sym];
+      ctx canonicalizing_ctx = {clq->im, scope, &ipse_names, &canonicalized_scope};
+      canonical array[cu_typeexpr];
+      foreach param *te_typeexpr in refs(&cac_params) {
+        push(&canonical, ~canonicalize_idy_ipses(&ctx, param));
       }
-      return NoFail;
+      hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
+      emissions2_sh shray[_] = freeze(&emissions2);
+      append(emissions_app, &emissions2_sh);
+      inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &hp, &emissions2_sh);
+      *out = {true, TeApp({TePureName(value), cac_params, Has({{md.ent_id, inst_id}, freeze(&ipse_names), emissions2_sh})})};
+    } else {
+      *out = {false, TeApp({TePureName(value), cac_params, None})};
+      append(emissions_app, &md.emissions);
     }
-    case &TePureUnknown: {
-      *out = {false, TeApp({TePureUnknown, params1, None})};
-      append(emissions_app, &emissions1);
-      return NoFail;
-    }
+    return NoFail;
+  case &TePureUnknown:
+    *out = {false, TeApp({TePureUnknown, params1, None})};
+    append(emissions_app, &emissions1);
+    return NoFail;
   }
 }
 
@@ -1040,97 +1013,92 @@ func compute_complete_vardecl_properties(clq *clqueue, scope *type_scope, decls 
 func compute_complete_type_properties(clq *clqueue, scope *type_scope, t *te_typeexpr, out *type_properties) np {
   cs *checkstate = clq->cs;
   switch t {
-    case &TeName(a te_name): {
-      if case &Has(p te_instpack) = &a.pack {
-        return compute_pack_properties(clq, &p, out);
-      } else {
-        ice(_u8("compute_type_properties called on packless name type."));
-        return fake();
-      }
-    }
-    case &TeApp(a te_app): {
-      if case &Has(pack te_app_pack) = &a.pack {
-        return compute_pack_properties(clq, &pack.teip, out);
-      } else {
-        ice(_u8("compute_type_properties called on packless app type."));
-        return fake();
-      }
-    }
-
-    case &TeUnion(a te_union): {
-      max_size u32 = 0;
-      max_alignment u32 = 1;
-      is_pow2 pow2_turtles = IsPow2AllTheWayDown;
-      // TODO: Who knows how union exposed types are supposed to work.  We'll see.
-      exposed_types array[exposed_type_name];
-      n size = count(&a.fields);
-      for i size = 0; i < n; i = i + 1 {
-        props type_properties;
-        #compute_complete_type_properties(clq, scope, &ref(&a.fields, i)->type, &props);
-        max_size = max(max_size, props.flat_size);
-        max_alignment = max(max_alignment, props.flat_alignment);
-        is_pow2 = combine_pow2(is_pow2, props.is_pow2);
-        if !(isTrivial(props.init_behavior) && isTrivial(props.move_behavior) &&
-             isTrivial(props.copy_behavior) && isTrivial(props.destroy_behavior)) {
-          return ERR(_u8("union type has non-trivial field"));
-        }
-        foreach field_exposed *exposed_type_name in refs(&props.exposed_types) {
-          push(&exposed_types, subfield_exposed_type_name(a.fields[i].name,
-                                                          pluralize_enum_exposed(field_exposed)));
-        }
-      }
-      // Consider the case where you have a union of {uint32_t, uint32_t, uint32_t} and
-      // {uint64_t}.  We have alignment 8, thus we need size 16.
-      final_size u32 = ceil_aligned(max_size, max_alignment);
-      *out = {final_size, max_alignment, DerivedMethodTrivial,
-              DerivedMethodTrivial, DerivedMethodTrivial,
-              DerivedMethodTrivial, IsScalarNo, is_pow2,
-              freeze(&exposed_types)};
-      return NoFail;
-    }
-
-    case &TeArraytype(a te_arraytype): {
-      if case Has(c u32) = a.count {
-        props type_properties;
-        #compute_complete_type_properties(clq, scope, oo(&a.param), &props);
-
-        is_pow2 pow2_turtles;
-        if c == 0 || (c & (c - 1)) == 0 {
-          is_pow2 = props.is_pow2;
-        } else {
-          is_pow2 = HasNonPow2;
-        }
-
-        exposed_types array[exposed_type_name];
-        foreach etn *exposed_type_name in refs(&props.exposed_types) {
-          push(&exposed_types, pluralize_array_exposed(etn));
-        }
-
-        // We _should_ maintain alignment for a zero-element array because the pointer to
-        // such an array might hack in tag-bit logic.
-        *out = {props.flat_size * c, props.flat_alignment,
-                level_to_derived(clq, CtorInit, 1, scope, t, to_level(&props.init_behavior)),
-                level_to_derived(clq, CtorMove, 2, scope, t, to_level(&props.move_behavior)),
-                level_to_derived(clq, CtorCopy, 2, scope, t, to_level(&props.copy_behavior)),
-                level_to_derived(clq, CtorDestroy, 1, scope, t, to_level(&props.destroy_behavior)),
-                IsScalarNo,
-                is_pow2,
-                freeze(&exposed_types)};
-        return NoFail;
-      } else {
-        ice(_u8("compute_type_properties called on incomplete arraytype."));
-        return fake();
-      }
-    }
-
-    case &TeIpse(a te_ipse):
-      // Presumably this should be an ICE.
-      return ERR(_u8("ICE: compute_complete_type_properties on TeIpse"));
-
-    case &TeUnknown: {
-      ice(_u8("compute_type_properties called on incomplete type."));
+  case &TeName(a te_name):
+    if case &Has(p te_instpack) = &a.pack {
+      return compute_pack_properties(clq, &p, out);
+    } else {
+      ice(_u8("compute_type_properties called on packless name type."));
       return fake();
     }
+  case &TeApp(a te_app):
+    if case &Has(pack te_app_pack) = &a.pack {
+      return compute_pack_properties(clq, &pack.teip, out);
+    } else {
+      ice(_u8("compute_type_properties called on packless app type."));
+      return fake();
+    }
+
+  case &TeUnion(a te_union):
+    max_size u32 = 0;
+    max_alignment u32 = 1;
+    is_pow2 pow2_turtles = IsPow2AllTheWayDown;
+    // TODO: Who knows how union exposed types are supposed to work.  We'll see.
+    exposed_types array[exposed_type_name];
+    n size = count(&a.fields);
+    for i size = 0; i < n; i = i + 1 {
+      props type_properties;
+      #compute_complete_type_properties(clq, scope, &ref(&a.fields, i)->type, &props);
+      max_size = max(max_size, props.flat_size);
+      max_alignment = max(max_alignment, props.flat_alignment);
+      is_pow2 = combine_pow2(is_pow2, props.is_pow2);
+      if !(isTrivial(props.init_behavior) && isTrivial(props.move_behavior) &&
+           isTrivial(props.copy_behavior) && isTrivial(props.destroy_behavior)) {
+        return ERR(_u8("union type has non-trivial field"));
+      }
+      foreach field_exposed *exposed_type_name in refs(&props.exposed_types) {
+        push(&exposed_types, subfield_exposed_type_name(a.fields[i].name,
+                                                        pluralize_enum_exposed(field_exposed)));
+      }
+    }
+    // Consider the case where you have a union of {uint32_t, uint32_t, uint32_t} and
+    // {uint64_t}.  We have alignment 8, thus we need size 16.
+    final_size u32 = ceil_aligned(max_size, max_alignment);
+    *out = {final_size, max_alignment, DerivedMethodTrivial,
+            DerivedMethodTrivial, DerivedMethodTrivial,
+            DerivedMethodTrivial, IsScalarNo, is_pow2,
+            freeze(&exposed_types)};
+    return NoFail;
+
+  case &TeArraytype(a te_arraytype):
+    if case Has(c u32) = a.count {
+      props type_properties;
+      #compute_complete_type_properties(clq, scope, oo(&a.param), &props);
+
+      is_pow2 pow2_turtles;
+      if c == 0 || (c & (c - 1)) == 0 {
+        is_pow2 = props.is_pow2;
+      } else {
+        is_pow2 = HasNonPow2;
+      }
+
+      exposed_types array[exposed_type_name];
+      foreach etn *exposed_type_name in refs(&props.exposed_types) {
+        push(&exposed_types, pluralize_array_exposed(etn));
+      }
+
+      // We _should_ maintain alignment for a zero-element array because the pointer to
+      // such an array might hack in tag-bit logic.
+      *out = {props.flat_size * c, props.flat_alignment,
+              level_to_derived(clq, CtorInit, 1, scope, t, to_level(&props.init_behavior)),
+              level_to_derived(clq, CtorMove, 2, scope, t, to_level(&props.move_behavior)),
+              level_to_derived(clq, CtorCopy, 2, scope, t, to_level(&props.copy_behavior)),
+              level_to_derived(clq, CtorDestroy, 1, scope, t, to_level(&props.destroy_behavior)),
+              IsScalarNo,
+              is_pow2,
+              freeze(&exposed_types)};
+      return NoFail;
+    } else {
+      ice(_u8("compute_type_properties called on incomplete arraytype."));
+      return fake();
+    }
+
+  case &TeIpse(a te_ipse):
+    // Presumably this should be an ICE.
+    return ERR(_u8("ICE: compute_complete_type_properties on TeIpse"));
+
+  case &TeUnknown:
+    ice(_u8("compute_type_properties called on incomplete type."));
+    return fake();
   }
 }
 
@@ -1202,13 +1170,11 @@ func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) np {
     return NoFail;
   } else {
     switch &a->rhs.expr.u {
-      case &Lambda(b ast_lambda): {
-        *out = lambda_declared_type(im, &b);
-        return NoFail;
-      }
-      default: {
-        return ERR(_u8("Def does not have immediately conceivable typeexpr."));
-      }
+    case &Lambda(b ast_lambda):
+      *out = lambda_declared_type(im, &b);
+      return NoFail;
+    default:
+      return ERR(_u8("Def does not have immediately conceivable typeexpr."));
     }
   }
 }
@@ -1249,118 +1215,114 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
   inst *deftype_inst = ref_deftype_inst(cs, id);
 
   switch inst->info {
-    case NotComputed: {
-      rw depth_rewinder;
-      #set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms.repls), &rw);
-      inst->info = BeganComputing;
+  case NotComputed:
+    rw depth_rewinder;
+    #set_instantiation_depth(cs, subsequent_depth(cs, &inst->parms.repls), &rw);
+    inst->info = BeganComputing;
 
-      if case &Has(np deftype_nonprim) = &ent->nonprim {
-        ent_rhs *deftype_rhs_spec;
-        #deftype_converted_rhs(&np, &ent_rhs);
+    if case &Has(np deftype_nonprim) = &ent->nonprim {
+      ent_rhs *deftype_rhs_spec;
+      #deftype_converted_rhs(&np, &ent_rhs);
 
-        switch ent_rhs {
-        case &ClassexprRhsSpec(crs classexpr_rhs_spec):
-          // EMISSIONS(): Use this.
-          rhs_emissions array[unify_emission];
-          rhs_fields array[te_vardecl];
-          rhs_fields_complete bool;
-          if case Unprinted(pm) = help_check_and_compute_fields(
-              clq, flatten(&ent->generics), ref_scope(&inst->parms), &inst->parms.repls, &crs.drs.fields,
-              &rhs_emissions,
-              &rhs_fields, &rhs_fields_complete) {
-            inst->info = FailedComputation;
-            return Unprinted(pm);
-          }
-
-          check(rhs_fields_complete);
-
-          check(isBeganComputing(&inst->info));
-          st structspec = {freeze(&rhs_fields)};
-
-          class_props type_properties;
-          if case Unprinted(pm) = to_defclass_properties(clq, ent_id, id, crs.disposition, &st, &class_props) {
-            inst->info = FailedComputation;
-            return Unprinted(pm);
-          }
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo(st)), class_props});
-
-        case &DefstructRhsSpec(drs structspec):
-          inst_scope *type_scope = ref_scope(&inst->parms);
-
-          // EMISSIONS(): Use this.
-          rhs_emissions array[unify_emission];
-          rhs_fields array[te_vardecl];
-          rhs_fields_complete bool;
-
-          if case Unprinted(pm) = help_check_and_compute_fields(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
-                                                                &drs.fields,
-                                                                &rhs_emissions,
-                                                                &rhs_fields,
-                                                                &rhs_fields_complete) {
-            inst->info = FailedComputation;
-            return Unprinted(pm);
-          }
-          check(rhs_fields_complete);
-
-          check(isBeganComputing(&inst->info));
-          st structspec = {freeze(&rhs_fields)};
-
-          it cu_typeexpr = inst_type(cs, ent_id, id);
-          rhs_props type_properties;
-          if case Unprinted(pm) = compute_complete_struct_properties(clq, inst_scope, &st, &it, ComputeAll, &rhs_props) {
-            inst->info = FailedComputation;
-            return Unprinted(pm);
-          }
-          check(isBeganComputing(&inst->info));
-
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo(st)), rhs_props});
-
-        case &DefenumRhsSpec(drs enumspec):
-          inst_scope *type_scope = ref_scope(&inst->parms);
-
-          // EMISSIONS(): Use this.
-          rhs_emissions array[unify_emission];
-          rhs_constructors array[te_vardecl];
-          rhs_constructors_complete bool;
-
-          if case Unprinted(pm) = help_check_and_compute_fields(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
-                                                                &drs.constructors,
-                                                                &rhs_emissions,
-                                                                &rhs_constructors,
-                                                                &rhs_constructors_complete) {
-            inst->info = FailedComputation;
-            return Unprinted(pm);
-          }
-          check(rhs_constructors_complete);
-
-          check(isBeganComputing(&inst->info));
-          et enumspec = {freeze(&rhs_constructors), drs.success_case_ix};
-
-          it cu_typeexpr = inst_type(cs, ent_id, id);
-          rhs_props type_properties;
-          if case Unprinted(pm) = compute_complete_enum_properties(clq, inst_scope, &et, &it, &rhs_props) {
-            inst->info = FailedComputation;
-            return Unprinted(pm);
-          }
-          check(isBeganComputing(&inst->info));
-
-          inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsEnumInfo(et)), rhs_props});
-
+      switch ent_rhs {
+      case &ClassexprRhsSpec(crs classexpr_rhs_spec):
+        // EMISSIONS(): Use this.
+        rhs_emissions array[unify_emission];
+        rhs_fields array[te_vardecl];
+        rhs_fields_complete bool;
+        if case Unprinted(pm) = help_check_and_compute_fields(
+            clq, flatten(&ent->generics), ref_scope(&inst->parms), &inst->parms.repls, &crs.drs.fields,
+            &rhs_emissions,
+            &rhs_fields, &rhs_fields_complete) {
+          inst->info = FailedComputation;
+          return Unprinted(pm);
         }
-      } else {
-        ice(_u8("ensure_deftype_inst_checked sees NonComputed inst on primitive type."));
+
+        check(rhs_fields_complete);
+
+        check(isBeganComputing(&inst->info));
+        st structspec = {freeze(&rhs_fields)};
+
+        class_props type_properties;
+        if case Unprinted(pm) = to_defclass_properties(clq, ent_id, id, crs.disposition, &st, &class_props) {
+          inst->info = FailedComputation;
+          return Unprinted(pm);
+        }
+        inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo(st)), class_props});
+
+      case &DefstructRhsSpec(drs structspec):
+        inst_scope *type_scope = ref_scope(&inst->parms);
+
+        // EMISSIONS(): Use this.
+        rhs_emissions array[unify_emission];
+        rhs_fields array[te_vardecl];
+        rhs_fields_complete bool;
+
+        if case Unprinted(pm) = help_check_and_compute_fields(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
+                                                              &drs.fields,
+                                                              &rhs_emissions,
+                                                              &rhs_fields,
+                                                              &rhs_fields_complete) {
+          inst->info = FailedComputation;
+          return Unprinted(pm);
+        }
+        check(rhs_fields_complete);
+
+        check(isBeganComputing(&inst->info));
+        st structspec = {freeze(&rhs_fields)};
+
+        it cu_typeexpr = inst_type(cs, ent_id, id);
+        rhs_props type_properties;
+        if case Unprinted(pm) = compute_complete_struct_properties(clq, inst_scope, &st, &it, ComputeAll, &rhs_props) {
+          inst->info = FailedComputation;
+          return Unprinted(pm);
+        }
+        check(isBeganComputing(&inst->info));
+
+        inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsStructInfo(st)), rhs_props});
+
+      case &DefenumRhsSpec(drs enumspec):
+        inst_scope *type_scope = ref_scope(&inst->parms);
+
+        // EMISSIONS(): Use this.
+        rhs_emissions array[unify_emission];
+        rhs_constructors array[te_vardecl];
+        rhs_constructors_complete bool;
+
+        if case Unprinted(pm) = help_check_and_compute_fields(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
+                                                              &drs.constructors,
+                                                              &rhs_emissions,
+                                                              &rhs_constructors,
+                                                              &rhs_constructors_complete) {
+          inst->info = FailedComputation;
+          return Unprinted(pm);
+        }
+        check(rhs_constructors_complete);
+
+        check(isBeganComputing(&inst->info));
+        et enumspec = {freeze(&rhs_constructors), drs.success_case_ix};
+
+        it cu_typeexpr = inst_type(cs, ent_id, id);
+        rhs_props type_properties;
+        if case Unprinted(pm) = compute_complete_enum_properties(clq, inst_scope, &et, &it, &rhs_props) {
+          inst->info = FailedComputation;
+          return Unprinted(pm);
+        }
+        check(isBeganComputing(&inst->info));
+
+        inst->info = Computed({Has(@[deftype_inst_rhs_info]RhsEnumInfo(et)), rhs_props});
+
       }
-      return NoFail;
+    } else {
+      ice(_u8("ensure_deftype_inst_checked sees NonComputed inst on primitive type."));
     }
-    case BeganComputing: {
-      return ERR(_u8("deftype for '"), lookup(cs->im, ent->name), _u8("' recursively checking"));
-    }
-    case FailedComputation: {
-      return ERR(_u8("deftype for '"), lookup(cs->im, ent->name), _u8("' already failed checking"));
-    }
-    case Computed(info deftype_inst_info): {
-      return NoFail;
-    }
+    return NoFail;
+  case BeganComputing:
+    return ERR(_u8("deftype for '"), lookup(cs->im, ent->name), _u8("' recursively checking"));
+  case FailedComputation:
+    return ERR(_u8("deftype for '"), lookup(cs->im, ent->name), _u8("' already failed checking"));
+  case Computed(info deftype_inst_info):
+    return NoFail;
   }
 }
 
@@ -1375,17 +1337,15 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) np {
     discard *deftype_rhs_spec;
     #deftype_converted_rhs(&np, &discard);
     switch &np.tl->generics {
-      case &NoGenerics: {
-        parms idy_genparms = blank_idyparms();
-        emittance shray[unify_emission] = mk_empty_emittance();
-        clq clqueue = mk(cs);
-        discard_id deftype_inst_id = enqueue_deftype_inst(&clq, id, &parms, &emittance);
-        return finish_checking(cs, &clq);
-      }
-      case &HasGenerics(ig): {
-        // We declare success -- we check non-generic defs.
-        return NoFail;
-      }
+    case &NoGenerics:
+      parms idy_genparms = blank_idyparms();
+      emittance shray[unify_emission] = mk_empty_emittance();
+      clq clqueue = mk(cs);
+      discard_id deftype_inst_id = enqueue_deftype_inst(&clq, id, &parms, &emittance);
+      return finish_checking(cs, &clq);
+    case &HasGenerics(ig):
+      // We declare success -- we check non-generic defs.
+      return NoFail;
     }
   } else {
     ice(_u8("ensure_deftype_checked on primitive type"));
@@ -1514,33 +1474,28 @@ func process_toplevels(cs *checkstate,
   for i size = 0; i < ntoplevels; i = i + 1 {
     toplevel *ast_toplevel = ref(toplevels, i);
     switch toplevel {
-      case &Import(a ast_import): {
-        id module_id = #process_module(cs, a.name.value);
-        // Do nothing!  We've processed the module successfully.
-      }
-      case &Def(a ast_def): {
-        quick_te ast_typeexpr;
-        #quick_typeexpr(cs->im, &a, &quick_te);
-        ent def_entry = mk(mod->module_name, a.name.value, access_scope,
-                           #convert_generics(cs, &a.generics), quick_te, toplevel);
-        add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
-      }
-      case &ExternDef(a ast_extern_def): {
-        ent def_entry = mk(mod->module_name, a.name.value, access_scope, TeNoGenerics, a.type, toplevel);
-        add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
-      }
-      case &TypeDef(a ast_type_def): {
-        id deftype_entry_id = add_deftype_entry(cs, mk(mod->module_name, a.name.value,
-                                                       access_scope, #convert_generics(cs, &a.generics), &a));
-        push(&mod->deftypes, id);
-      }
-      case &Access(a ast_access): {
-        access_id access_entry_id = add_access_entry(cs, mk(a.name.value, a.arity));
-        push(&mod->access_blocks, access_id);
-        push(&access_scope, access_id);
-        #process_toplevels(cs, access_scope, mod, &a.toplevels);
-        pop(&access_scope);
-      }
+    case &Import(a ast_import):
+      id module_id = #process_module(cs, a.name.value);
+      // Do nothing!  We've processed the module successfully.
+    case &Def(a ast_def):
+      quick_te ast_typeexpr;
+      #quick_typeexpr(cs->im, &a, &quick_te);
+      ent def_entry = mk(mod->module_name, a.name.value, access_scope,
+                         #convert_generics(cs, &a.generics), quick_te, toplevel);
+      add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
+    case &ExternDef(a ast_extern_def):
+      ent def_entry = mk(mod->module_name, a.name.value, access_scope, TeNoGenerics, a.type, toplevel);
+      add_def_entry(cs, mod->module_name, &mod->defs, emshp(ent));
+    case &TypeDef(a ast_type_def):
+      id deftype_entry_id = add_deftype_entry(cs, mk(mod->module_name, a.name.value,
+                                                     access_scope, #convert_generics(cs, &a.generics), &a));
+      push(&mod->deftypes, id);
+    case &Access(a ast_access):
+      access_id access_entry_id = add_access_entry(cs, mk(a.name.value, a.arity));
+      push(&mod->access_blocks, access_id);
+      push(&access_scope, access_id);
+      #process_toplevels(cs, access_scope, mod, &a.toplevels);
+      pop(&access_scope);
     }
   }
   return NoFail;
@@ -1548,22 +1503,20 @@ func process_toplevels(cs *checkstate,
 
 func check_generics_unique(cs *checkstate, a *ast_generics) np {
   switch a {
-    case &NoGenerics: {
-      return NoFail;
-    }
-    case &HasGenerics(b array[ast_generik]): {
-      n size = count(&b);
-      for i size = 0; i < n; i = i + 1 {
-        xi *ast_generik = &b[i];
-        for j size = 0; j < i; j = j + 1 {
-          yi *ast_generik = &b[j];
-          if generiks_same_human_name(xi, yi) {
-            return ERR(_u8("Generic params are self-shadowing."));
-          }
+  case &NoGenerics:
+    return NoFail;
+  case &HasGenerics(b array[ast_generik]):
+    n size = count(&b);
+    for i size = 0; i < n; i = i + 1 {
+      xi *ast_generik = &b[i];
+      for j size = 0; j < i; j = j + 1 {
+        yi *ast_generik = &b[j];
+        if generiks_same_human_name(xi, yi) {
+          return ERR(_u8("Generic params are self-shadowing."));
         }
       }
-      return NoFail;
     }
+    return NoFail;
   }
 }
 
@@ -1663,22 +1616,19 @@ func match_def(cs *checkstate, name sym, scope *type_scope, gp *genparms, pt *te
       #def_converted_typeexpr(ent, &ent_typeexpr);
       match_result entry_matches_res = entry_matches(cs, scope, gp, pt, &ent->generics, ent_typeexpr);
       switch match_result {
-        case EntryDoesNotMatch: {
-          // Do nothing.
-        }
-        case EntryMatchesAmbigously: {
-          // NOTE: We could see if we have _one_ ambiguously matching entry, and extract
-          // any type information that we learned, to help the next match attempt (see
-          // check_expr and its allow_ambiguous parameter).  (Maybe we should, but maybe
-          // we shouldn't to keep the type checking algorithm simple and describable.)
+      case EntryDoesNotMatch:
+        void;
+      case EntryMatchesAmbigously:
+        // NOTE: We could see if we have _one_ ambiguously matching entry, and extract
+        // any type information that we learned, to help the next match attempt (see
+        // check_expr and its allow_ambiguous parameter).  (Maybe we should, but maybe
+        // we shouldn't to keep the type checking algorithm simple and describable.)
 
-          // Certainly the error message (somewhere) could be improved.
-          *res_out = MultiMatch;
-          return NoFail;
-        }
-        case EntryMatchesPrecisely(emp entry_matches_precisely): {
-          push(&matches, {id, emp.parms, emp.emissions});
-        }
+        // Certainly the error message (somewhere) could be improved.
+        *res_out = MultiMatch;
+        return NoFail;
+      case EntryMatchesPrecisely(emp entry_matches_precisely):
+        push(&matches, {id, emp.parms, emp.emissions});
       }
     }
     num_matches size = count(&matches);
@@ -1729,34 +1679,28 @@ func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res
 func entry_matches(cs *checkstate, scope *type_scope, gp *genparms, pt *te_typeexpr,
                    generics *te_generics, typeexpr *te_typeexpr) entry_matches_res {
   switch generics {
-    case &TeNoGenerics: {
-      switch gp {
-        case &HasParms(parms shray[te_typeexpr]): {
-          return EntryDoesNotMatch;
-        }
-        case &NoParms: {
-          names shray[te_generik];
-          parms shray[te_typeexpr];
-          res var = type_matches(scope, &parms, pt, &names, typeexpr);
-          return from_type_matches_res(false, &res);
-        }
-      }
+  case &TeNoGenerics:
+    switch gp {
+    case &HasParms(parms shray[te_typeexpr]):
+      return EntryDoesNotMatch;
+    case &NoParms:
+      names shray[te_generik];
+      parms shray[te_typeexpr];
+      res var = type_matches(scope, &parms, pt, &names, typeexpr);
+      return from_type_matches_res(false, &res);
     }
-    case &TeHasGenerics(names shray[te_generik]): {
-      switch gp {
-        case &HasParms(parms shray[te_typeexpr]): {
-          if count(&parms) != count(&names) {
-            return EntryDoesNotMatch;
-          }
-          res var = type_matches(scope, &parms, pt, &names, typeexpr);
-          return from_type_matches_res(true, &res);
-        }
-        case &NoParms: {
-          parms shray[te_typeexpr] = repeat(count(&names), TeUnknown);
-          res var = type_matches(scope, &parms, pt, &names, typeexpr);
-          return from_type_matches_res(true, &res);
-        }
+  case &TeHasGenerics(names shray[te_generik]):
+    switch gp {
+    case &HasParms(parms shray[te_typeexpr]):
+      if count(&parms) != count(&names) {
+        return EntryDoesNotMatch;
       }
+      res var = type_matches(scope, &parms, pt, &names, typeexpr);
+      return from_type_matches_res(true, &res);
+    case &NoParms:
+      parms shray[te_typeexpr] = repeat(count(&names), TeUnknown);
+      res var = type_matches(scope, &parms, pt, &names, typeexpr);
+      return from_type_matches_res(true, &res);
     }
   }
 }
@@ -1789,29 +1733,29 @@ func all_complete_computed(decls *shray[te_vardecl]) complete_computed {
 
 func is_complete_computed(t *te_typeexpr) complete_computed {
   switch t {
-    case &TeName(a te_name): { return {true, isHas(&a.pack)}; }
-    case &TeApp(a te_app): {
-      if case &TePureUnknown = &a.typefunc {
-        return {false, false};
-      }
-      all complete_computed = all_complete_computed(&a.params);
-      return {all.complete, all.computed & isHas(&a.pack)};
-    }
-    case &TeUnion(a te_union): { return all_complete_computed(&a.fields); }
-    case &TeArraytype(a te_arraytype): {
-      if isHas(&a.count) {
-        return is_complete_computed(oo(&a.param));
-      } else {
-        return {false, false};
-      }
-    }
-    case &TeIpse(a te_ipse):
-      // Yes, I guess.
-      return {true, true};
-
-    case &TeUnknown: {
+  case &TeName(a te_name):
+    return {true, isHas(&a.pack)};
+  case &TeApp(a te_app):
+    if case &TePureUnknown = &a.typefunc {
       return {false, false};
     }
+    all complete_computed = all_complete_computed(&a.params);
+    return {all.complete, all.computed & isHas(&a.pack)};
+  case &TeUnion(a te_union):
+    return all_complete_computed(&a.fields);
+  case &TeArraytype(a te_arraytype):
+    if isHas(&a.count) {
+      return is_complete_computed(oo(&a.param));
+    } else {
+      return {false, false};
+    }
+
+  case &TeIpse(a te_ipse):
+    // Yes, I guess.
+    return {true, true};
+
+  case &TeUnknown:
+    return {false, false};
   }
 }
 

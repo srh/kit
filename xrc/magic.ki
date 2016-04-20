@@ -256,38 +256,33 @@ func check_magic_ctor(clq *clqueue, g te_generik_scope, scope *type_scope, parms
   #compute_complete_type_properties(clq, scope, &cac.te, &cac_props);
 
   switch &cac.te {
-    case &TeName(a te_name): {
-      if case &Has(p te_instpack) = &a.pack {
-        ipse_mappings shray[sym];  // empty
-        info magic_ctor_info;
-        #check_pack_ctor(clq, scope, &cac.te, &cac_props, &p, &ipse_mappings, wc, &info);
-        annotate(&mc->info, info);
-      } else {
-        ice(_u8("check_magic_ctor packless name type"));
-      }
+  case &TeName(a te_name):
+    if case &Has(p te_instpack) = &a.pack {
+      ipse_mappings shray[sym];  // empty
+      info magic_ctor_info;
+      #check_pack_ctor(clq, scope, &cac.te, &cac_props, &p, &ipse_mappings, wc, &info);
+      annotate(&mc->info, info);
+    } else {
+      ice(_u8("check_magic_ctor packless name type"));
     }
-    case &TeApp(a te_app): {
-      if case &Has(p te_app_pack) = &a.pack {
-        info magic_ctor_info;
-        #check_pack_ctor(clq, scope, &cac.te, &cac_props, &p.teip, &p.ipse_mappings, wc, &info);
-        annotate(&mc->info, info);
-      } else {
-        ice(_u8("check_magic_ctor packless app type"));
-      }
+  case &TeApp(a te_app):
+    if case &Has(p te_app_pack) = &a.pack {
+      info magic_ctor_info;
+      #check_pack_ctor(clq, scope, &cac.te, &cac_props, &p.teip, &p.ipse_mappings, wc, &info);
+      annotate(&mc->info, info);
+    } else {
+      ice(_u8("check_magic_ctor packless app type"));
     }
-    case &TeUnion(a te_union): {
-      ice(_u8("check_magic_ctor seeing TeUnion"));
-    }
-    case &TeArraytype(a te_arraytype): {
-      props type_properties;
-      #compute_complete_type_properties(clq, scope, oo(&a.param), &props);
-      annotate(&mc->info, @[magic_ctor_info]MagicArraytypeInfo({~cac.te, cac_props, props, instpair_from_behavior(select_behavior(wc, &props))}));
-    }
-    case &TeIpse(a te_ipse):
-      return ERR(_u8("ICE: check_magic_ctor seeing TeIpse."));
-    case &TeUnknown: {
-      ice(_u8("check_magic_ctor seeing TeUnknown"));
-    }
+  case &TeUnion(a te_union):
+    ice(_u8("check_magic_ctor seeing TeUnion"));
+  case &TeArraytype(a te_arraytype):
+    props type_properties;
+    #compute_complete_type_properties(clq, scope, oo(&a.param), &props);
+    annotate(&mc->info, @[magic_ctor_info]MagicArraytypeInfo({~cac.te, cac_props, props, instpair_from_behavior(select_behavior(wc, &props))}));
+  case &TeIpse(a te_ipse):
+    return ERR(_u8("ICE: check_magic_ctor seeing TeIpse."));
+  case &TeUnknown:
+    ice(_u8("check_magic_ctor seeing TeUnknown"));
   }
 
   return NoFail;
@@ -329,13 +324,15 @@ func instpair_from_behavior(b *derived_method_behavior) instpair {
 
 func instpair_or_trivial_from_behavior(b *derived_method_behavior) opt[instpair] {
   switch b {
-    case &DerivedMethodAbsent: {
-      ice(_u8("instpair_or_trivial_from_behavior sees absent"));
-      return fake();
-    }
-    case &DerivedMethodExplicit(dme derived_method_explicit): { return Has(dme.ip); }
-    case &DerivedMethodNontrivial(ip instpair): { return Has(ip); }
-    case &DerivedMethodTrivial: { return None; }
+  case &DerivedMethodAbsent:
+    ice(_u8("instpair_or_trivial_from_behavior sees absent"));
+    return fake();
+  case &DerivedMethodExplicit(dme derived_method_explicit):
+    return Has(dme.ip);
+  case &DerivedMethodNontrivial(ip instpair):
+    return Has(ip);
+  case &DerivedMethodTrivial:
+    return None;
   }
 }
 
@@ -372,10 +369,14 @@ func check_pack_ctor(clq *clqueue, scope *type_scope, complete_te *te_typeexpr, 
 
 func select_behavior(wc which_ctor, props *type_properties) *derived_method_behavior {
   switch wc {
-    case CtorInit: { return &props->init_behavior; }
-    case CtorCopy: { return &props->copy_behavior; }
-    case CtorMove: { return &props->move_behavior; }
-    case CtorDestroy: { return &props->destroy_behavior; }
+  case CtorInit:
+    return &props->init_behavior;
+  case CtorCopy:
+    return &props->copy_behavior;
+  case CtorMove:
+    return &props->move_behavior;
+  case CtorDestroy:
+    return &props->destroy_behavior;
   }
 }
 
