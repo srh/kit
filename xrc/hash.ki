@@ -71,39 +71,36 @@ access hash[_, _] {
     step size = 1;
     for ;; {
       switch ref(&h->arr, offset) {
-        case &HashEmpty: {
-          *ref(&h->arr, offset) = @[hash_entry[K, V]]HashValue({*key, *value});
-          h->user_count = h->user_count + 1;
-          h->cell_count = h->cell_count + 1;
-          if h->cell_count * 2 >= count(&h->arr) {
-            rebuild_(h, count(&h->arr) * 2);
-          }
-          return true;
+      case &HashEmpty:
+        *ref(&h->arr, offset) = @[hash_entry[K, V]]HashValue({*key, *value});
+        h->user_count = h->user_count + 1;
+        h->cell_count = h->cell_count + 1;
+        if h->cell_count * 2 >= count(&h->arr) {
+          rebuild_(h, count(&h->arr) * 2);
         }
-        case &HashValue(p tup[K, V]): {
-          if hash_equal(&p.car, key) {
-            return false;
-          }
+        return true;
+      case &HashValue(p tup[K, V]):
+        if hash_equal(&p.car, key) {
+          return false;
+        }
+        offset = (offset + step) & mask;
+        step = step + 1;
+      case &HashErased:
+        insertion_offset size = offset;
+        for ;; {
           offset = (offset + step) & mask;
           step = step + 1;
-        }
-        case &HashErased: {
-          insertion_offset size = offset;
-          for ;; {
-            offset = (offset + step) & mask;
-            step = step + 1;
-            switch ref(&h->arr, offset) {
-            case &HashEmpty:
-              *ref(&h->arr, insertion_offset) = @[hash_entry[K, V]]HashValue({*key, *value});
-              h->user_count = h->user_count + 1;
-              return true;
-            case &HashValue(p tup[K, V]):
-              if hash_equal(&p.car, key) {
-                return false;
-              }
-            case &HashErased:
-              void;
+          switch ref(&h->arr, offset) {
+          case &HashEmpty:
+            *ref(&h->arr, insertion_offset) = @[hash_entry[K, V]]HashValue({*key, *value});
+            h->user_count = h->user_count + 1;
+            return true;
+          case &HashValue(p tup[K, V]):
+            if hash_equal(&p.car, key) {
+              return false;
             }
+          case &HashErased:
+            void;
           }
         }
       }
@@ -325,17 +322,16 @@ func[K, V] member(h *hash[K, V], key *K) bool {
 // Returns an unstable reference -- use it right away.
 func[K, V] try_insert_lookup(h *hash[K, V], key *K, value V) *V {
   switch lookup_ref(h, key) {
+  case Has(p *V):
+    return p;
+  case None:
+    ign var = try_insert(h, key, value);
+    switch lookup_ref(h, key) {
     case Has(p *V):
       return p;
-    case None: {
-      ign var = try_insert(h, key, value);
-      switch lookup_ref(h, key) {
-      case Has(p *V):
-        return p;
-      case None:
-        crash();
-        return fake();
-      }
+    case None:
+      crash();
+      return fake();
     }
   }
 }
