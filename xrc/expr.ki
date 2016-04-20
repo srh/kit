@@ -3,6 +3,8 @@ import body;
 import check;
 import primitives;
 
+// DOTTED(): This file
+
 // Used with the variable name "es" -- its name used to be different.
 struct framescope {
   ds *defscope;

@@ -7,6 +7,8 @@ import shp;
 import typeexpr;
 import u8ast;
 
+// DOTTED(): This file
+
 struct magic_struct_info {
   cu_type cu_typeexpr;
   cu_props type_properties;

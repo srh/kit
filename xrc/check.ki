@@ -12,6 +12,8 @@ import state;
 import u8ast;
 import unify;
 
+// DOTTED(): This file
+
 // This code does some typechecking.  See state.ki for types that maintain typechecking state.
 
 

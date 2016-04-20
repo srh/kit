@@ -22,6 +22,7 @@ enum te_typeexpr {
   TeUnion te_union;
   TeArraytype te_arraytype;
   TeIpse te_ipse;
+  TeDotted te_dotted;
   TeUnknown void;
 }
 
@@ -69,6 +70,12 @@ struct te_arraytype {
 struct te_ipse {
   name sym;
 }
+
+struct te_dotted {
+  lhs shp[te_typeexpr];
+  fieldname exposed_type_name;
+}
+// TODO(): DOTTED()
 
 struct te_vardecl {
   name sym;

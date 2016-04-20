@@ -1,5 +1,7 @@
 import typeexpr;
 
+// DOTTED(): This file.
+
 struct unify_same_ipse {
   name1 sym;
   name2 sym;
