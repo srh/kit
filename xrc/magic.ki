@@ -7,8 +7,6 @@ import shp;
 import typeexpr;
 import u8ast;
 
-// DOTTED(): This file
-
 struct magic_struct_info {
   cu_type cu_typeexpr;
   cu_props type_properties;
@@ -283,6 +281,8 @@ func check_magic_ctor(clq *clqueue, g te_generik_scope, scope *type_scope, parms
     annotate(&mc->info, @[magic_ctor_info]MagicArraytypeInfo({~cac.te, cac_props, props, instpair_from_behavior(select_behavior(wc, &props))}));
   case &TeIpse(a te_ipse):
     return ERR(_u8("ICE: check_magic_ctor seeing TeIpse."));
+  case &TeDotted(a te_dotted):
+    return ERR(_u8("ICE: check_magic_ctor seeing TeDotted."));
   case &TeUnknown:
     ice(_u8("check_magic_ctor seeing TeUnknown"));
   }
