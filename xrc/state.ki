@@ -275,6 +275,10 @@ struct exposed_type_name {
   parts shray[sym];
 }
 
+func `==`(x exposed_type_name, y exposed_type_name) bool {
+  return shray_equal(&x.parts, &y.parts);
+}
+
 func mk_exposed_type_name(only_part sym) exposed_type_name {
   return {mk_shray(only_part)};
 }

@@ -12,8 +12,6 @@ import state;
 import u8ast;
 import unify;
 
-// DOTTED(): This file
-
 // This code does some typechecking.  See state.ki for types that maintain typechecking state.
 
 
@@ -483,6 +481,27 @@ func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_sc
         return NoFail;
       }
     }
+
+  case &TeDotted(a te_dotted):
+    lhs cac_typeexpr;
+    #check_and_compute_typeexpr(clq, g, scope, parms, oo(&a.lhs), emissions_app, &lhs);
+
+    if !lhs.complete {
+      return ERR(_u8("Dotted type has incomplete lhs"));
+    }
+
+    lhs_props type_properties;
+    #compute_complete_type_properties(clq, scope, &lhs.te, &lhs_props);
+
+    if !isHas(find(&lhs_props.exposed_types, a.fieldname)) {
+      return ERR(_u8("Cannot find dotted type dot-name."));
+    }
+
+    // Okay, we have the exposed type.  Now what?  We need exposed types to, if they're ipse types, to have an oftype.  We'll need to have plural exposed types be a thing, too.
+    // We'll need to output the "fresh" ipse type or plural type, with an emission.
+
+    // DOTTED(): Uh yeah.
+    return ERR(_u8("ICE: TeDotted check_and_compute not implemented."));
 
   case &TeUnknown:
     *out = {false, TeUnknown};
@@ -1095,8 +1114,10 @@ func compute_complete_type_properties(clq *clqueue, scope *type_scope, t *te_typ
     }
 
   case &TeIpse(a te_ipse):
-    // Presumably this should be an ICE.
     return ERR(_u8("ICE: compute_complete_type_properties on TeIpse"));
+
+  case &TeDotted(a te_dotted):
+    return ERR(_u8("ICE: compute_complete_type_properties on TeDotted"));
 
   case &TeUnknown:
     ice(_u8("compute_type_properties called on incomplete type."));
@@ -1755,6 +1776,10 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
   case &TeIpse(a te_ipse):
     // Yes, I guess.
     return {true, true};
+
+  case &TeDotted(a te_dotted):
+    ice(_u8("is_complete_computed DOTTED()"));
+    return fake();
 
   case &TeUnknown:
     return {false, false};
