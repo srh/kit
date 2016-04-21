@@ -500,7 +500,7 @@ func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_sc
     // Okay, we have the exposed type.  Now what?  We need exposed types to, if they're ipse types, to have an oftype.  We'll need to have plural exposed types be a thing, too.
     // We'll need to output the "fresh" ipse type or plural type, with an emission.
 
-    // DOTTED(): Uh yeah.
+    // DOTTED(): Finish implementing for check_and_compute.
     return ERR(_u8("ICE: TeDotted check_and_compute not implemented."));
 
   case &TeUnknown:
