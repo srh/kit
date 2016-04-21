@@ -1778,8 +1778,11 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
     return {true, true};
 
   case &TeDotted(a te_dotted):
-    ice(_u8("is_complete_computed DOTTED()"));
-    return fake();
+    // DOTTED(): What does it imply for a dotted type to be "complete"?  Can an incomplete dotted type have an invalid exposed type name?  Will callers of this function suffer?
+    lhs complete_computed = is_complete_computed(oo(&a.lhs));
+    // Note that we _don't_ check that a.fieldname is sensible even if lhs is computed.
+    // TODO: This is_complete_computed function is, in general, just kind of weird.
+    return {lhs.complete, false};
 
   case &TeUnknown:
     return {false, false};
