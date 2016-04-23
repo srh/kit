@@ -1,6 +1,6 @@
 import tok;
 
-// DOTTED(): Parse Dotted() ast_typeexpr.
+// DOTTED(): Parse AstDotted() ast_typeexpr.
 
 enum allow_blanks {
   AllowBlanksNo void;
@@ -494,7 +494,7 @@ func try_underscore_if_allowed(p *ps, ab allow_blanks, out *ast_typeexpr) try_pa
   switch ab {
   case AllowBlanksYes:
     if +try_skip_keyw(p, Underscore) {
-      *out = Unknown({});
+      *out = AstUnknown({});
       return Success;
     }
     return Fail;
@@ -524,7 +524,7 @@ inline func success_or_fail(res parse_result) triparse_result {
 func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_ipses, out *ast_typeexpr) triparse_result {
   voidmeta ast_meta;
   if case Has(m ast_meta) = try_parse_keyw(p, Void) {
-    *out = Name({m, p->im->cym.voidsym});
+    *out = AstName({m, p->im->cym.voidsym});
     return Success;
   }
   if +try_skip_keyw(p, Union) {
@@ -548,7 +548,7 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_ipses, out *ast_typ
     ipse ast_ipse;
     switch triparse_ipse(p, &ipse) {
     case Success:
-      *out = Ipse(ipse);
+      *out = AstIpse(ipse);
       return Success;
     case Quickfail:
       void;
@@ -568,7 +568,7 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_ipses, out *ast_typ
     case Error:
       return Error;
     }
-    lhs = Name(name);
+    lhs = AstName(name);
   }
   if ! +try_skip_token(p, @[tokval]Grouper(LBracket)) {
     *out = lhs;
@@ -579,14 +579,14 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_ipses, out *ast_typ
     return Error;
   }
   // NOTE: Allow arbitrarily many type applications?
-  *out = App({embox(lhs), move(&args)});
+  *out = AstApp({embox(lhs), move(&args)});
   return Success;
 }
 
 func parse_rest_of_union(p *ps, out *ast_typeexpr) parse_result {
   fields array[ast_vardecl];
   #parse_braced_fields(p, &fields);
-  *out = Union({move(&fields)});
+  *out = AstUnion({move(&fields)});
   return Success;
 }
 
@@ -598,7 +598,7 @@ func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) parse_re
       #try_skip_token(p, @[tokval]Grouper(RBracket));
       #help_parse_typeexpr(p, ab, AllowIpsesNo, oo(&param));
 
-      *out = Arraytype({None, param});
+      *out = AstArraytype({None, param});
       return Success;
     }
   default:
@@ -611,15 +611,15 @@ func parse_rest_of_arraytype(p *ps, ab allow_blanks, out *ast_typeexpr) parse_re
   #try_skip_token(p, @[tokval]Grouper(RBracket));
   #parse_typeexpr(p, oo(&param));
 
-  *out = Arraytype({Has(count), param});
+  *out = AstArraytype({Has(count), param});
   return Success;
 }
 
 func parse_rest_of_pointer(p *ps, ab allow_blanks, oper ast_ident, out *ast_typeexpr) parse_result {
   arg ast_typeexpr;
   #help_parse_typeexpr(p, ab, AllowIpsesNo, &arg);
-  *out = App({embox(Name(oper)),
-              mk_array(arg)});
+  *out = AstApp({embox(AstName(oper)),
+                 mk_array(arg)});
   return Success;
 }
 
@@ -628,7 +628,7 @@ func parse_rest_of_reference(p *ps, ab allow_blanks, oper ast_ident, out *ast_ty
   if case Success = triparse_ipse(p, &ipse_arg) {
     arg ast_typeexpr;
     #help_parse_typeexpr(p, ab, AllowIpsesNo, &arg);
-    *out = App({embox(Name(oper)), mk_array(Ipse(ipse_arg), arg)});
+    *out = AstApp({embox(AstName(oper)), mk_array(AstIpse(ipse_arg), arg)});
     return Success;
   } else {
     return Fail;
@@ -722,7 +722,7 @@ func parse_vardecl(p *ps, ab allow_blanks, out *ast_vardecl) parse_result {
       *out = {name, type};
       return Success;
     case Quickfail:
-      *out = {name, Unknown({})};
+      *out = {name, AstUnknown({})};
       return Success;
     case Error:
       return Fail;
@@ -791,7 +791,7 @@ func parse_after_atomic_expr(p *ps, prec_ctx i32, ab allow_braces, se statement_
       m ast_meta = copyend(p, lhs.meta);
       note_original(p, m, IncrDecr);
       // (NOTE: Is expanding out this funcall/typed/addressof expr the best software design choice?  I think so, we can add layover information saying this is an incr expr, later.  Likewise with user assignment ops.)
-      *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
+      *out = mk(m, @[ast_expr_enum]TypedExpr({AstName({m /* TODO */, p->im->cym.voidsym}),
          embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(oper_meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk({oper_meta, incrdecr_sym(p->im, is_incr)}, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))))})))}));
       return Success;
     } else if case Has(op_facts binop_facts) = binop_info(peek(p)->val) {
@@ -991,7 +991,7 @@ func build_binop_expr(p *ps, se statement_expr, m ast_meta, user_assignment bool
         return Fail;
       }
       note_original(p, m, UserAssignment);
-      *out = mk(m, @[ast_expr_enum]TypedExpr({Name({m /* TODO */, p->im->cym.voidsym}),
+      *out = mk(m, @[ast_expr_enum]TypedExpr({AstName({m /* TODO */, p->im->cym.voidsym}),
          embox(mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(@[ast_name_expr]mk(op, None))))), mk_array(consume(mk(m, @[ast_expr_enum]AddressOf({embox(lhs)}))), consume(move(&rhs)))})))}));
     } else {
       *out = mk(m, @[ast_expr_enum]Funcall({embox(consume(mk(op.meta, @[ast_expr_enum]NameExpr(mk(op, None))))),
@@ -1461,8 +1461,8 @@ func parse_rest_of_foreach_statement_enum(p *ps, out *ast_statement_enum) parse_
   iteree_var_name sym = gensym(p->im, _u8("iteree"));
   iter_var_name sym = gensym(p->im, _u8("iterator"));
 
-  iteree_var_st ast_var_statement = {NotComputed, @[ast_vardecl]{{m, iteree_var_name}, Unknown({})}, HasExpr(embox(consume(iteree)))};
-  iter_var_st ast_var_statement = {NotComputed, @[ast_vardecl]{{m, iter_var_name}, Unknown({})}, HasExpr(embox(consume(wrapapply(m, p->im->cym.do_iter_mk, iteree_var_name))))};
+  iteree_var_st ast_var_statement = {NotComputed, @[ast_vardecl]{{m, iteree_var_name}, AstUnknown({})}, HasExpr(embox(consume(iteree)))};
+  iter_var_st ast_var_statement = {NotComputed, @[ast_vardecl]{{m, iter_var_name}, AstUnknown({})}, HasExpr(embox(consume(wrapapply(m, p->im->cym.do_iter_mk, iteree_var_name))))};
   decl_var_st ast_var_statement = {NotComputed, decl, HasExpr(embox(consume(wrapapply(m, p->im->cym.do_iter_access, wrapaddressof(m, iter_var_name)))))};
 
   *out = Block({@[ast_bracebody]{
@@ -1601,7 +1601,7 @@ func parse_naked_var_or_expr_statement_enum(p *ps, ab allow_braces, fa force_ass
 
   decl ast_vardecl;
   if +try_skip_keyw(p, Var) {
-    decl = {name, Unknown({})};
+    decl = {name, AstUnknown({})};
   } else if +try_skip_oper(p, at_sign) {
     lhs ast_expr;
     #parse_finish_name_expr(p, name, &lhs);

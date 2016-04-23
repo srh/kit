@@ -58,9 +58,9 @@ func check_module(cs *checkstate, mod_name sym) np {
 
 func convert_typefunc(a *ast_typeexpr) cr[te_puretype] {
   switch a {
-  case &Name(b ast_ident):
+  case &AstName(b ast_ident):
     return NoFail!@[te_puretype]TePureName(b.value);
-  case &Unknown(b ast_unknown):
+  case &AstUnknown(b ast_unknown):
     return NoFail!@[te_puretype]TePureUnknown;
   default:
     return ERR(_u8("Fancy type expression '"), to_u8str(a), _u8("' in typefunc"));
@@ -116,17 +116,17 @@ func convert_vardecl(a *ast_vardecl) cr[te_vardecl] {
 // NOTE: This could probably lookup names, check arity, in a defscope, etc.
 func convert_typeexpr(a *ast_typeexpr) cr[te_typeexpr] {
   switch a {
-  case &Name(b ast_ident):
+  case &AstName(b ast_ident):
     return NoFail!@[te_typeexpr]TeName({b.value, None});
-  case &App(b ast_typeapp):
+  case &AstApp(b ast_typeapp):
     typefunc te_puretype = #convert_typefunc(oo(&b.typefunc));
     params shray[te_typeexpr] = #convert_typeexpr_list(&b.params);
     return NoFail!@[te_typeexpr]TeApp({typefunc, params, None});
-  case &Union(b ast_union):
+  case &AstUnion(b ast_union):
     fields shray[te_vardecl] = #convert_vardecl_list(&b.fields);
     return NoFail!@[te_typeexpr]TeUnion({fields});
 
-  case &Arraytype(b ast_arraytype):
+  case &AstArraytype(b ast_arraytype):
     count opt[u32];
     if case &Has(bo box[ast_expr]) = &b.count {
       num u32;
@@ -138,15 +138,15 @@ func convert_typeexpr(a *ast_typeexpr) cr[te_typeexpr] {
     param shp[te_typeexpr];
     *oo(&param) = #convert_typeexpr(oo(&b.param));
     return NoFail!@[te_typeexpr]TeArraytype({count, param});
-  case &Ipse(b ast_ipse):
+  case &AstIpse(b ast_ipse):
     return NoFail!@[te_typeexpr]TeIpse({b.name.value});
-  case &Dotted(b ast_dotted):
+  case &AstDotted(b ast_dotted):
     parts array[sym];
     foreach ident *ast_ident in refs(&b.fieldname) {
       push(&parts, ident->value);
     }
     return NoFail!@[te_typeexpr]TeDotted({emshp(#convert_typeexpr(oo(&b.lhs))), {freeze(&parts)}});
-  case &Unknown(b ast_unknown):
+  case &AstUnknown(b ast_unknown):
     return NoFail!@[te_typeexpr]TeUnknown;
   }
 }
@@ -1190,7 +1190,7 @@ func lambda_declared_type(im *identmap, a *ast_lambda) ast_typeexpr {
     push(&type_params, ref(&a->args, i)->type);
   }
   push(&type_params, a->return_type);
-  return App({embox(@[ast_typeexpr]Name({fake_ast_meta(), im->cym.fnsym})), type_params});
+  return AstApp({embox(@[ast_typeexpr]AstName({fake_ast_meta(), im->cym.fnsym})), type_params});
 }
 
 func quick_typeexpr(im *identmap, a *ast_def, out *ast_typeexpr) np {

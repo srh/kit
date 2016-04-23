@@ -169,13 +169,13 @@ struct ast_unknown {
 }
 
 enum ast_typeexpr {
-  Name ast_ident;
-  App ast_typeapp;
-  Union ast_union;
-  Arraytype ast_arraytype;
-  Ipse ast_ipse;
-  Dotted ast_dotted;
-  Unknown ast_unknown;
+  AstName ast_ident;
+  AstApp ast_typeapp;
+  AstUnion ast_union;
+  AstArraytype ast_arraytype;
+  AstIpse ast_ipse;
+  AstDotted ast_dotted;
+  AstUnknown ast_unknown;
 }
 
 struct ast_vardecl {
