@@ -545,10 +545,10 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_ipses, out *ast_typ
   }
 
   if case AllowIpsesYes = al {
-    ipse ast_ipse;
+    ipse ast_typeexpr;
     switch triparse_ipse(p, &ipse) {
     case Success:
-      *out = AstIpse(ipse);
+      *out = ipse;
       return Success;
     case Quickfail:
       void;
@@ -624,18 +624,18 @@ func parse_rest_of_pointer(p *ps, ab allow_blanks, oper ast_ident, out *ast_type
 }
 
 func parse_rest_of_reference(p *ps, ab allow_blanks, oper ast_ident, out *ast_typeexpr) parse_result {
-  ipse_arg ast_ipse;
+  ipse_arg ast_typeexpr;
   if case Success = triparse_ipse(p, &ipse_arg) {
     arg ast_typeexpr;
     #help_parse_typeexpr(p, ab, AllowIpsesNo, &arg);
-    *out = AstApp({embox(AstName(oper)), mk_array(AstIpse(ipse_arg), arg)});
+    *out = AstApp({embox(AstName(oper)), mk_array(ipse_arg, arg)});
     return Success;
   } else {
     return Fail;
   }
 }
 
-func triparse_ipse(p *ps, out *ast_ipse) triparse_result {
+func triparse_ipse(p *ps, out *ast_typeexpr) triparse_result {
   if ! +try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
     return Quickfail;
   }
@@ -643,7 +643,7 @@ func triparse_ipse(p *ps, out *ast_ipse) triparse_result {
   if case Fail = parse_ident(p, &name) {
     return Error;
   }
-  *out = {name};
+  *out = AstIpse({name});
   return Success;
 }
 
