@@ -140,6 +140,12 @@ func convert_typeexpr(a *ast_typeexpr) cr[te_typeexpr] {
     return NoFail!@[te_typeexpr]TeArraytype({count, param});
   case &Ipse(b ast_ipse):
     return NoFail!@[te_typeexpr]TeIpse({b.name.value});
+  case &Dotted(b ast_dotted):
+    parts array[sym];
+    foreach ident *ast_ident in refs(&b.fieldname) {
+      push(&parts, ident->value);
+    }
+    return NoFail!@[te_typeexpr]TeDotted({emshp(#convert_typeexpr(oo(&b.lhs))), {freeze(&parts)}});
   case &Unknown(b ast_unknown):
     return NoFail!@[te_typeexpr]TeUnknown;
   }

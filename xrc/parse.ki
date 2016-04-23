@@ -1,5 +1,7 @@
 import tok;
 
+// DOTTED(): Parse Dotted() ast_typeexpr.
+
 enum allow_blanks {
   AllowBlanksNo void;
   AllowBlanksYes void;

@@ -159,6 +159,12 @@ struct ast_ipse {
   name ast_ident;
 }
 
+struct ast_dotted {
+  lhs box[ast_typeexpr];
+  // Becomes an exposed_type_name.
+  fieldname array[ast_ident];
+}
+
 struct ast_unknown {
 }
 
@@ -168,6 +174,7 @@ enum ast_typeexpr {
   Union ast_union;
   Arraytype ast_arraytype;
   Ipse ast_ipse;
+  Dotted ast_dotted;
   Unknown ast_unknown;
 }
 
