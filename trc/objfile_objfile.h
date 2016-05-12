@@ -63,6 +63,7 @@ void objfile_section_overwrite_raw(struct objfile_section *s,
                                    size_t offset,
                                    const void *buf, size_t n);
 void objfile_section_align_dword(struct objfile_section *s);
+void objfile_section_align_quadword(struct objfile_section *s);
 void objfile_fillercode_align_double_quadword(struct objfile *f);
 void objfile_section_append_zeros(struct objfile_section *s, size_t count);
 

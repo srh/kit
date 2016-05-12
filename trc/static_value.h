@@ -5,6 +5,7 @@
 #include "primitive.h"
 
 enum static_value_tag {
+  STATIC_VALUE_U64,
   STATIC_VALUE_U32,
   STATIC_VALUE_I32,
   STATIC_VALUE_U8,
@@ -23,6 +24,7 @@ struct static_value_enum_void {
 struct static_value {
   enum static_value_tag tag;
   union {
+    uint64_t u64_value;
     uint32_t u32_value;
     int32_t i32_value;
     uint8_t u8_value;

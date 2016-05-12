@@ -5059,6 +5059,17 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_instantiation *inst) {
   struct static_value *value = di_value(inst);
   switch (value->tag) {
+  case STATIC_VALUE_U64: {
+    STATIC_CHECK(sizeof(value->u.u64_value) == 8);
+    /* y86/x64 */
+    objfile_section_align_quadword(objfile_data(f));
+    objfile_set_symbol_value(f, di_symbol_table_index(inst),
+                             objfile_section_size(objfile_data(f)));
+    char buf[8];
+    write_le_u64(buf, value->u.u64_value);
+    objfile_section_append_raw(objfile_data(f), buf, sizeof(buf));
+    return 1;
+  } break;
   case STATIC_VALUE_U32: {
     STATIC_CHECK(sizeof(value->u.u32_value) == 4);
     objfile_section_align_dword(objfile_data(f));
