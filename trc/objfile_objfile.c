@@ -161,7 +161,7 @@ void objfile_section_overwrite_raw(struct objfile_section *s,
   databuf_overwrite(&s->raw, offset, buf, n);
 }
 
-void objfile_section_align_pow2(struct objfile_section *s, uint32_t align) {
+void objfile_section_align(struct objfile_section *s, uint32_t align) {
   CHECK(0 == (align & (align - 1)));
   append_zeros_to_align(&s->raw, align);
   if (s->max_requested_alignment < align) {
@@ -169,12 +169,14 @@ void objfile_section_align_pow2(struct objfile_section *s, uint32_t align) {
   }
 }
 
+/* x86: Just get rid of all uses of this? */
 void objfile_section_align_quadword(struct objfile_section *s) {
-  objfile_section_align_pow2(s, 8);
+  objfile_section_align(s, 8);
 }
 
+/* x86: Get rid of all uses of this? */
 void objfile_section_align_dword(struct objfile_section *s) {
-  objfile_section_align_pow2(s, 4);
+  objfile_section_align(s, 4);
 }
 
 void objfile_section_append_zeros(struct objfile_section *s, size_t count) {
@@ -183,6 +185,9 @@ void objfile_section_append_zeros(struct objfile_section *s, size_t count) {
 
 void objfile_fillercode_align_double_quadword(struct objfile *f) {
   append_fillercode_to_align(&f->text.raw, 16);
+  if (f->text.max_requested_alignment < 16) {
+    f->text.max_requested_alignment = 16;
+  }
 }
 
 void objfile_set_symbol_value(struct objfile *f,

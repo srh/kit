@@ -5113,11 +5113,14 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_ENUMVOID: {
-    /* Chase x86 - dword alignment might be no good. */
-    /* x86: All uses of objfile_section_align_dword. */
-    objfile_section_align_dword(objfile_data(f));
+    /* We just align to max alignment instead of computing alignof.
+    As long as enum tags are 4 or 8 bytes, we could use exact alignof,
+    I think -- but see comments above about global byte alignment
+    having to be... extra. */
+    objfile_section_align(objfile_data(f), max_possible_alignof(cs->platform));
     objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
+    /* TODO(): well crap, this is tied to enum representation. */
     char buf[4];
     write_le_u32(buf, size_to_uint32(size_add(value->u.enumvoid_value.enumconstruct_number, FIRST_ENUM_TAG_NUMBER)));
     objfile_section_append_raw(objfile_data(f), buf, sizeof(buf));

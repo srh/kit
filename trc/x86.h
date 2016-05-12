@@ -19,6 +19,7 @@ struct name_table;
 
 
 uint32_t ptr_size(enum target_platform platform);
+uint32_t max_possible_alignof(enum target_platform platform);
 
 struct type_attrs {
   uint32_t size;
