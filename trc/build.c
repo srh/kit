@@ -5032,6 +5032,7 @@ void tie_stack_adjustments(struct objfile *f, struct frame *h) {
   }
 }
 
+/* Chase x86 */
 int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
                     struct ast_expr *a) {
   CHECK(a->tag == AST_EXPR_LAMBDA);
@@ -5128,12 +5129,12 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {
-    /* Chase x86 - we should align how on x64? */
+    /* y86/x64: 16 byte function pointer alignment. */
+    /* TODO(): Verify this on Linux, Windows. */
     objfile_fillercode_align_double_quadword(f);
     objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_text(f)));
 
-    /* Chase x86 */
     return gen_lambda_expr(cs, f, &value->u.typechecked_lambda);
   } break;
   default:
