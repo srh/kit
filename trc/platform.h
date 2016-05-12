@@ -8,5 +8,12 @@ enum target_platform {
   TARGET_PLATFORM_OSX_32BIT,
 };
 
+enum target_arch {
+  TARGET_ARCH_Y86,
+  TARGET_ARCH_X64,
+};
+
+enum target_arch platform_arch(enum target_platform platform);
+
 #endif /* KIT_PLATFORM_H_ */
 
