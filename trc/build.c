@@ -639,8 +639,7 @@ void frame_restore_offset(struct frame *h, int32_t stack_offset) {
 }
 
 void frame_pop(struct frame *h, uint32_t size) {
-  /* X86 */
-  uint32_t aligned = uint32_ceil_aligned(size, DWORD_SIZE);
+  uint32_t aligned = frame_padded_push_size(size);
   h->stack_offset = int32_add(h->stack_offset, uint32_to_int32(aligned));
 }
 
