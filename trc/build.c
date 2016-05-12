@@ -5054,6 +5054,7 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
   return res;
 }
 
+/* Chase x86 */
 int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_instantiation *inst) {
   struct static_value *value = di_value(inst);
@@ -5142,6 +5143,7 @@ int build_def(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+/* Chase x86 */
 void build_typetrav_defs(struct checkstate *cs,
                          struct objfile *f) {
   /* cs.typetrav_symbol_infos_count is a moving target -- we see more
