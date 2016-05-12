@@ -639,8 +639,8 @@ void frame_restore_offset(struct frame *h, int32_t stack_offset) {
 }
 
 void frame_pop(struct frame *h, uint32_t size) {
-  uint32_t aligned = frame_padded_push_size(size);
-  h->stack_offset = int32_add(h->stack_offset, uint32_to_int32(aligned));
+  uint32_t padded_size = frame_padded_push_size(size);
+  h->stack_offset = int32_add(h->stack_offset, uint32_to_int32(padded_size));
 }
 
 int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *return_type,
