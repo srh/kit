@@ -4959,16 +4959,6 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_instantiation *inst) {
   struct static_value *value = di_value(inst);
   switch (value->tag) {
-  case STATIC_VALUE_I32: {
-    STATIC_CHECK(sizeof(value->u.i32_value) == 4);
-    objfile_section_align_dword(objfile_data(f));
-    objfile_set_symbol_value(f, di_symbol_table_index(inst),
-                             objfile_section_size(objfile_data(f)));
-    char buf[4];
-    write_le_i32(buf, value->u.i32_value);
-    objfile_section_append_raw(objfile_data(f), buf, sizeof(buf));
-    return 1;
-  } break;
   case STATIC_VALUE_U32: {
     STATIC_CHECK(sizeof(value->u.u32_value) == 4);
     objfile_section_align_dword(objfile_data(f));
@@ -4976,6 +4966,16 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
                              objfile_section_size(objfile_data(f)));
     char buf[4];
     write_le_u32(buf, value->u.u32_value);
+    objfile_section_append_raw(objfile_data(f), buf, sizeof(buf));
+    return 1;
+  } break;
+  case STATIC_VALUE_I32: {
+    STATIC_CHECK(sizeof(value->u.i32_value) == 4);
+    objfile_section_align_dword(objfile_data(f));
+    objfile_set_symbol_value(f, di_symbol_table_index(inst),
+                             objfile_section_size(objfile_data(f)));
+    char buf[4];
+    write_le_i32(buf, value->u.i32_value);
     objfile_section_append_raw(objfile_data(f), buf, sizeof(buf));
     return 1;
   } break;

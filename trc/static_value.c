@@ -43,11 +43,11 @@ void static_value_init_primitive_op(struct static_value *a,
 void static_value_init_copy(struct static_value *a, struct static_value *c) {
   a->tag = c->tag;
   switch (c->tag) {
-  case STATIC_VALUE_I32:
-    a->u.i32_value = c->u.i32_value;
-    break;
   case STATIC_VALUE_U32:
     a->u.u32_value = c->u.u32_value;
+    break;
+  case STATIC_VALUE_I32:
+    a->u.i32_value = c->u.i32_value;
     break;
   case STATIC_VALUE_U8:
     a->u.u8_value = c->u.u8_value;
@@ -73,11 +73,11 @@ void static_value_init_copy(struct static_value *a, struct static_value *c) {
 void static_value_init_move(struct static_value *a, struct static_value *m) {
   a->tag = m->tag;
   switch (m->tag) {
-  case STATIC_VALUE_I32:
-    a->u.i32_value = m->u.i32_value;
-    break;
   case STATIC_VALUE_U32:
     a->u.u32_value = m->u.u32_value;
+    break;
+  case STATIC_VALUE_I32:
+    a->u.i32_value = m->u.i32_value;
     break;
   case STATIC_VALUE_U8:
     a->u.u8_value = m->u.u8_value;
@@ -101,8 +101,8 @@ void static_value_init_move(struct static_value *a, struct static_value *m) {
 
 void static_value_destroy(struct static_value *sv) {
   switch (sv->tag) {
-  case STATIC_VALUE_I32: /* fallthrough */
   case STATIC_VALUE_U32: /* fallthrough */
+  case STATIC_VALUE_I32: /* fallthrough */
   case STATIC_VALUE_U8: /* fallthrough */
   case STATIC_VALUE_BOOL: /* fallthrough */
   case STATIC_VALUE_ENUMVOID:

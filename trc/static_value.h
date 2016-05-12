@@ -5,8 +5,8 @@
 #include "primitive.h"
 
 enum static_value_tag {
-  STATIC_VALUE_I32,
   STATIC_VALUE_U32,
+  STATIC_VALUE_I32,
   STATIC_VALUE_U8,
   STATIC_VALUE_BOOL,
   STATIC_VALUE_LAMBDA,
@@ -23,8 +23,8 @@ struct static_value_enum_void {
 struct static_value {
   enum static_value_tag tag;
   union {
-    int32_t i32_value;
     uint32_t u32_value;
+    int32_t i32_value;
     uint8_t u8_value;
     int bool_value;
     struct static_value_enum_void enumvoid_value;
