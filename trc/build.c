@@ -695,8 +695,7 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
   }
 }
 
-/* X86 calling convention stuff. */
-void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
+void y86_note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
   struct ast_typeexpr *type = ast_expr_type(expr);
   size_t args_count = expr->u.lambda.params_count;
   struct ast_typeexpr *return_type
@@ -735,6 +734,19 @@ void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_exp
   } else {
     struct loc loc = frame_push_loc(h, return_type_size);
     frame_specify_calling_info(h, vars_pushed, loc, is_return_hidden);
+  }
+}
+
+void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
+  switch (platform_arch(cs->platform)) {
+  case TARGET_ARCH_Y86:
+    y86_note_param_locations(cs, h, expr);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
   }
 }
 
@@ -1454,10 +1466,15 @@ void x86_gen_store8(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp
 }
 
 void gen_function_intro(struct objfile *f, struct frame *h) {
-  /* X86 */
-  x86_gen_push32(f, X86_EBP);
-  x86_gen_mov_reg32(f, X86_EBP, X86_ESP);
-  gen_placeholder_stack_adjustment(f, h, 1);
+  switch (platform_arch(h->platform)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_push32(f, X86_EBP);
+    x86_gen_mov_reg32(f, X86_EBP, X86_ESP);
+    gen_placeholder_stack_adjustment(f, h, 1);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+  }
 }
 
 void push_address(struct objfile *f, struct frame *h, struct loc loc) {
@@ -2033,22 +2050,40 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
     SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
   }
 
-  int hidden_return_param = frame_hidden_return_param(h);
-  gen_returnloc_funcreturn_convention(f, hidden_return_param,
-                                      h->return_loc);
+  switch (platform_arch(h->platform)) {
+  case TARGET_ARCH_Y86: {
+    int hidden_return_param = frame_hidden_return_param(h);
+    gen_returnloc_funcreturn_convention(f, hidden_return_param,
+                                        h->return_loc);
 
-  x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
-  x86_gen_pop32(f, X86_EBP);
-  if (hidden_return_param && platform_ret4_hrp(cs)) {
-    x86_gen_retn(f, 4);
-  } else {
-    x86_gen_ret(f);
+    x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
+    x86_gen_pop32(f, X86_EBP);
+    if (hidden_return_param && platform_ret4_hrp(cs)) {
+      x86_gen_retn(f, 4);
+    } else {
+      x86_gen_ret(f);
+    }
+  } break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
   }
 
   if (h->crash_target_exists) {
     frame_define_target(h, h->crash_target_number,
                         objfile_section_size(objfile_text(f)));
-    x86_gen_int_3(f);
+    switch (platform_arch(h->platform)) {
+    case TARGET_ARCH_Y86: {
+      x86_gen_int_3(f);
+    } break;
+    case TARGET_ARCH_X64:
+      TODO_IMPLEMENT;
+      break;
+    default:
+      UNREACHABLE();
+    }
   }
 }
 
@@ -5017,6 +5052,7 @@ void tie_jmps(struct objfile *f, struct frame *h) {
     CHECK(jd.target_number < h->targetdata_count);
     struct targetdata td = h->targetdata[jd.target_number];
     CHECK(td.target_known);
+    /* Chase x86 */
     replace_placeholder_jump(f, jd.jmp_location, td.target_offset);
   }
 }
@@ -5024,6 +5060,7 @@ void tie_jmps(struct objfile *f, struct frame *h) {
 void tie_stack_adjustments(struct objfile *f, struct frame *h) {
   for (size_t i = 0, e = h->espdata_count; i < e; i++) {
     struct reset_esp_data red = h->espdata[i];
+    /* Chase x86 */
     replace_placeholder_stack_adjustment(
         f, red.reset_esp_offset,
         red.downward
@@ -5032,7 +5069,6 @@ void tie_stack_adjustments(struct objfile *f, struct frame *h) {
   }
 }
 
-/* Chase x86 */
 int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
                     struct ast_expr *a) {
   CHECK(a->tag == AST_EXPR_LAMBDA);
