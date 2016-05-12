@@ -324,6 +324,8 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
 
 enum immediate_tag {
   IMMEDIATE_FUNC,
+  IMMEDIATE_U64,
+  IMMEDIATE_I64,
   IMMEDIATE_U32,
   IMMEDIATE_I32,
   IMMEDIATE_U8,
@@ -335,6 +337,8 @@ struct immediate {
   enum immediate_tag tag;
   union {
     struct sti func_sti;
+    uint64_t u64;
+    int64_t i64;
     uint32_t u32;
     int32_t i32;
     uint8_t u8;
@@ -342,13 +346,16 @@ struct immediate {
   } u;
 };
 
-uint32_t immediate_size(struct immediate imm) {
+uint32_t immediate_size(enum target_platform platform, struct immediate imm) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC:
-    return DWORD_SIZE;
+    return ptr_size(platform);
+  case IMMEDIATE_U64:
+  case IMMEDIATE_I64:
+    return 8;
   case IMMEDIATE_U32:
   case IMMEDIATE_I32:
-    return DWORD_SIZE;
+    return 4;
   case IMMEDIATE_U8:
   case IMMEDIATE_I8:
     return 1;
@@ -1286,6 +1293,10 @@ void x86_gen_mov_mem_imm32(struct objfile *f,
     x86_gen_mov_reg_stiptr(f, aux, imm.u.func_sti);
     x86_gen_store32(f, dest, dest_disp, aux);
   } break;
+  case IMMEDIATE_U64:
+    UNREACHABLE();
+  case IMMEDIATE_I64:
+    UNREACHABLE();
   case IMMEDIATE_U32: {
     char buf[4];
     write_le_u32(buf, imm.u.u32);
@@ -1482,6 +1493,10 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
   case IMMEDIATE_FUNC:
     gen_call_imm_func(cs, f, h, imm.u.func_sti, hidden_return_param);
     break;
+  case IMMEDIATE_U64:
+    UNREACHABLE();
+  case IMMEDIATE_I64:
+    UNREACHABLE();
   case IMMEDIATE_U32:
     UNREACHABLE();
   case IMMEDIATE_I32:
@@ -2272,8 +2287,10 @@ void gen_store_biregister(struct objfile *f, struct loc dest, enum x86_reg lo, e
 void gen_mov_mem_imm(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
                      enum x86_reg aux,
                      struct immediate src) {
-  switch (immediate_size(src)) {
-  case DWORD_SIZE:
+  switch (immediate_size(objfile_platform(f), src)) {
+  case 8:
+    TODO_IMPLEMENT;
+  case 4:
     x86_gen_mov_mem_imm32(f, dest_addr, dest_disp, aux, src);
     break;
   case 1:
@@ -2297,7 +2314,7 @@ void gen_mov_mem_imm(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
 }
 
 void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src) {
-  CHECK(dest.size == immediate_size(src));
+  CHECK(dest.size == immediate_size(objfile_platform(f), src));
 
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
@@ -4092,7 +4109,7 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
     er_set_tr(er, temp_exists_trivial(erd_loc(&er->u.demand), 1));
   } break;
   case EXPR_RETURN_OPEN: {
-    struct loc floc = frame_push_loc(h, immediate_size(imm));
+    struct loc floc = frame_push_loc(h, immediate_size(objfile_platform(f), imm));
     gen_mov_immediate(f, floc, imm);
     ero_set_loc(&er->u.open, floc);
     /* TODO: tr crap like this is bad -- it's a temporary, it should

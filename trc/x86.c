@@ -9,6 +9,16 @@
 #include "typecheck.h"
 #include "objfile_objfile.h"
 
+uint32_t ptr_size(enum target_platform platform) {
+  switch (platform_arch(platform)) {
+  case TARGET_ARCH_Y86:
+    return 4;
+  case TARGET_ARCH_X64:
+    return 8;
+  default:
+    UNREACHABLE();
+  }
+}
 
 void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
                       ident_value fieldstop, uint32_t *offsetof_out,
