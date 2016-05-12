@@ -626,9 +626,9 @@ void frame_define_target(struct frame *h, size_t target_number, uint32_t target_
   td->target_offset = target_offset;
 }
 
-uint32_t frame_padded_push_size(uint32_t size) {
-  /* X86 */
-  return uint32_ceil_aligned(size, DWORD_SIZE);
+uint32_t frame_padded_push_size(enum target_platform platform, uint32_t size) {
+  /* Y86/X64 */
+  return uint32_ceil_aligned(size, ptr_size(platform));
 }
 
 /* Pushes an exact amount to the frame. */
@@ -640,7 +640,8 @@ void frame_push_exact_amount(struct frame *h, uint32_t size) {
 }
 
 struct loc frame_push_loc(struct frame *h, uint32_t size) {
-  uint32_t padded_size = frame_padded_push_size(size);
+  /* X86: Make sure new generic padding logic is right for callers on X64. */
+  uint32_t padded_size = frame_padded_push_size(h->platform, size);
   frame_push_exact_amount(h, padded_size);
   return ebp_loc(size, padded_size, h->stack_offset);
 }
@@ -658,7 +659,7 @@ void frame_restore_offset(struct frame *h, int32_t stack_offset) {
 }
 
 void frame_pop(struct frame *h, uint32_t size) {
-  uint32_t padded_size = frame_padded_push_size(size);
+  uint32_t padded_size = frame_padded_push_size(h->platform, size);
   h->stack_offset = int32_add(h->stack_offset, uint32_to_int32(padded_size));
 }
 
@@ -694,7 +695,7 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
   }
 }
 
-/* X86 and maybe WINDOWS-specific calling convention stuff. */
+/* X86 calling convention stuff. */
 void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
   struct ast_typeexpr *type = ast_expr_type(expr);
   size_t args_count = expr->u.lambda.params_count;
@@ -1460,7 +1461,7 @@ void gen_function_intro(struct objfile *f, struct frame *h) {
 }
 
 void push_address(struct objfile *f, struct frame *h, struct loc loc) {
-  struct loc dest = frame_push_loc(h, DWORD_SIZE);
+  struct loc dest = frame_push_loc(h, ptr_size(h->platform));
   gen_mov_addressof(f, dest, loc);
 }
 
@@ -3623,6 +3624,7 @@ void get_funcall_arglist_info(struct checkstate *cs,
                               struct ast_expr *a,
                               struct funcall_arglist_info *info_out,
                               struct ast_typeexpr **return_type_out) {
+  /* X86 */
   /* We specifically process our calculations _up_ from the call site
   -- if fields ever need alignment calculations, we'll be ready. */
   struct ast_typeexpr *return_type = ast_expr_type(a);
@@ -3637,7 +3639,7 @@ void get_funcall_arglist_info(struct checkstate *cs,
   for (size_t i = 0; i < args_count; i++) {
     struct ast_expr *arg = &a->u.funcall.args[i].expr;
     uint32_t arg_size = x86_sizeof(&cs->nt, ast_expr_type(arg));
-    uint32_t padded_size = frame_padded_push_size(arg_size);
+    uint32_t padded_size = frame_padded_push_size(cs->platform, arg_size);
     infos[i].offset_from_callsite = uint32_to_int32(total_size);
     infos[i].arg_size = arg_size;
     infos[i].padded_size = padded_size;
