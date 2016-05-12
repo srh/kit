@@ -5054,7 +5054,6 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
   return res;
 }
 
-/* Chase x86 */
 int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_instantiation *inst) {
   struct static_value *value = di_value(inst);
@@ -5114,6 +5113,8 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_ENUMVOID: {
+    /* Chase x86 - dword alignment might be no good. */
+    /* x86: All uses of objfile_section_align_dword. */
     objfile_section_align_dword(objfile_data(f));
     objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
@@ -5124,10 +5125,12 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {
+    /* Chase x86 - we should align how on x64? */
     objfile_fillercode_align_double_quadword(f);
     objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_text(f)));
 
+    /* Chase x86 */
     return gen_lambda_expr(cs, f, &value->u.typechecked_lambda);
   } break;
   default:
