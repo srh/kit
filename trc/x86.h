@@ -12,6 +12,12 @@ struct name_table;
 /* TODO(): This is an honorary use of X86.  Fix all uses. */
 #define DWORD_SIZE 4
 
+/* Marks "acceptable" uses of DWORD_SIZE, typically under some platform switch. */
+/* TODO(): Drop the Y86, blessing DWORD_SIZE usage. */
+#define DWORD_Y86_SIZE 4
+
+
+
 uint32_t ptr_size(enum target_platform platform);
 
 struct type_attrs {

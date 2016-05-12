@@ -672,8 +672,8 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
   case TARGET_PLATFORM_WIN_32BIT: {
     uint32_t return_type_size = return_type_attrs.size;
     *return_type_size_out = return_type_size;
-    if (!(return_type_size <= 2 || return_type_size == DWORD_SIZE
-          || return_type_size == 2 * DWORD_SIZE)) {
+    if (!(return_type_size <= 2 || return_type_size == DWORD_Y86_SIZE
+          || return_type_size == 2 * DWORD_Y86_SIZE)) {
       return 1;
     } else {
       struct typeexpr_traits traits;
