@@ -391,7 +391,7 @@ struct loc {
 };
 
 struct loc ebp_loc(uint32_t size, uint32_t padded_size, int32_t ebp_offset) {
-  CHECK(size <= padded_size && padded_size - size < DWORD_SIZE);
+  CHECK(size <= padded_size);
   struct loc ret;
   ret.tag = LOC_EBP_OFFSET;
   ret.size = size;
@@ -401,7 +401,7 @@ struct loc ebp_loc(uint32_t size, uint32_t padded_size, int32_t ebp_offset) {
 }
 
 struct loc global_loc(uint32_t size, uint32_t padded_size, struct sti global_sti) {
-  CHECK(size <= padded_size && padded_size - size < DWORD_SIZE);
+  CHECK(size <= padded_size);
   struct loc ret;
   ret.tag = LOC_GLOBAL;
   ret.size = size;
@@ -411,7 +411,7 @@ struct loc global_loc(uint32_t size, uint32_t padded_size, struct sti global_sti
 }
 
 struct loc ebp_indirect_loc(uint32_t size, uint32_t padded_size, int32_t ebp_offset) {
-  CHECK(size <= padded_size && padded_size - size < DWORD_SIZE);
+  CHECK(size <= padded_size);
   struct loc ret;
   ret.tag = LOC_EBP_INDIRECT;
   ret.size = size;
