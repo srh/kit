@@ -1221,7 +1221,7 @@ void gen_placeholder_jcc(struct objfile *f, struct frame *h,
                          enum x86_jcc code, size_t target_number) {
   struct jmpdata jd;
   jd.target_number = target_number;
-  /* X86 */
+  /* y86/x64 */
   jd.jmp_location = 2 + objfile_section_size(objfile_text(f));
   SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
 
@@ -3982,7 +3982,7 @@ void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_numbe
   jd.target_number = target_number;
   jd.jmp_location = 1 + objfile_section_size(objfile_text(f));
   SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
-  /* X86 */
+  /* y86/x64 */
   /* E9 jmp instruction */
   uint8_t b[5] = { 0xE9, 0, 0, 0, 0 };
   objfile_section_append_raw(objfile_text(f), b, 5);
@@ -3990,6 +3990,7 @@ void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_numbe
 
 void replace_placeholder_jump(struct objfile *f, size_t jmp_location,
                               size_t target_offset) {
+  /* y86/x64 - we use same jmp instructions. */
   int32_t target32 = size_to_int32(target_offset);
   int32_t jmp32 = size_to_int32(size_add(jmp_location, 4));
   int32_t diff = int32_sub(target32, jmp32);
@@ -5052,7 +5053,6 @@ void tie_jmps(struct objfile *f, struct frame *h) {
     CHECK(jd.target_number < h->targetdata_count);
     struct targetdata td = h->targetdata[jd.target_number];
     CHECK(td.target_known);
-    /* Chase x86 */
     replace_placeholder_jump(f, jd.jmp_location, td.target_offset);
   }
 }
