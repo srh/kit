@@ -535,9 +535,12 @@ struct frame {
   or 16-byte aligned?  For function calls?  Remember that ret ptr
   and ebp take up 8 bytes.  */
   int32_t min_stack_offset;
+
+  /* Same as checkstate's platform, is const and for convenience. */
+  enum target_platform platform;
 };
 
-void frame_init(struct frame *h) {
+void frame_init(struct frame *h, enum target_platform platform) {
   h->vardata = NULL;
   h->vardata_count = 0;
   h->vardata_limit = 0;
@@ -562,6 +565,8 @@ void frame_init(struct frame *h) {
 
   h->stack_offset = 0;
   h->min_stack_offset = 0;
+
+  h->platform = platform;
 }
 
 void frame_destroy(struct frame *h) {
@@ -579,6 +584,7 @@ void frame_destroy(struct frame *h) {
   h->espdata = NULL;
   h->espdata_count = 0;
   h->espdata_limit = 0;
+  h->platform = (enum target_platform)-1;
 }
 
 void frame_specify_calling_info(struct frame *h, size_t arg_count,
@@ -4109,7 +4115,7 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
     er_set_tr(er, temp_exists_trivial(erd_loc(&er->u.demand), 1));
   } break;
   case EXPR_RETURN_OPEN: {
-    struct loc floc = frame_push_loc(h, immediate_size(objfile_platform(f), imm));
+    struct loc floc = frame_push_loc(h, immediate_size(h->platform, imm));
     gen_mov_immediate(f, floc, imm);
     ero_set_loc(&er->u.open, floc);
     /* TODO: tr crap like this is bad -- it's a temporary, it should
@@ -5029,7 +5035,7 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
   CHECK(a->tag == AST_EXPR_LAMBDA);
   /* This code is much like build_typetrav_defs. */
   struct frame h;
-  frame_init(&h);
+  frame_init(&h, cs->platform);
 
   gen_function_intro(f, &h);
   note_param_locations(cs, &h, a);
@@ -5146,7 +5152,7 @@ void build_typetrav_defs(struct checkstate *cs,
     /* TODO: frame has vardata, targetdata, jmpdata -- maybe we should
     decouple the raw codegen stuff. */
     struct frame h;
-    frame_init(&h);
+    frame_init(&h, cs->platform);
 
     gen_function_intro(f, &h);
     {
