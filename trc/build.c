@@ -1233,11 +1233,13 @@ void gen_placeholder_jcc(struct objfile *f, struct frame *h,
 void gen_placeholder_stack_adjustment(struct objfile *f,
                                       struct frame *h,
                                       int downward) {
+  /* Chase x86 -- we need a REX.W byte before 0x81. */
   struct reset_esp_data red;
   red.reset_esp_offset = size_add(objfile_section_size(objfile_text(f)), 2);
   red.ebp_offset = h->stack_offset;
   red.downward = downward;
   SLICE_PUSH(h->espdata, h->espdata_count, h->espdata_limit, red);
+  /* X86 ADD instruction */
   uint8_t b[6] = { 0x81, 0 };
   b[1] = mod_reg_rm(MOD11, 0, X86_ESP);
   objfile_section_append_raw(objfile_text(f), b, 6);
@@ -1474,6 +1476,10 @@ void gen_function_intro(struct objfile *f, struct frame *h) {
     break;
   case TARGET_ARCH_X64:
     TODO_IMPLEMENT;
+    /* TODO(): We should just push EBP like before. */
+    break;
+  default:
+    UNREACHABLE();
   }
 }
 
@@ -5060,7 +5066,6 @@ void tie_jmps(struct objfile *f, struct frame *h) {
 void tie_stack_adjustments(struct objfile *f, struct frame *h) {
   for (size_t i = 0, e = h->espdata_count; i < e; i++) {
     struct reset_esp_data red = h->espdata[i];
-    /* Chase x86 */
     replace_placeholder_stack_adjustment(
         f, red.reset_esp_offset,
         red.downward
