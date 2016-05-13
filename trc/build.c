@@ -468,7 +468,7 @@ struct jmpdata {
 };
 
 struct reset_esp_data {
-  /* The .text offset where we need to reset esp. */
+  /* The .text offset where we need to place an addend. */
   size_t reset_esp_offset;
   /* esp's current offset relative to ebp, when we need to reset it.
   (This is a nonpositive value). */
@@ -1199,7 +1199,7 @@ void gen_placeholder_stack_adjustment(struct objfile *f,
                                       struct frame *h,
                                       int downward) {
   struct reset_esp_data red;
-  red.reset_esp_offset = objfile_section_size(objfile_text(f));
+  red.reset_esp_offset = size_add(objfile_section_size(objfile_text(f)), 2);
   red.ebp_offset = h->stack_offset;
   red.downward = downward;
   SLICE_PUSH(h->espdata, h->espdata_count, h->espdata_limit, red);
@@ -1214,7 +1214,7 @@ void replace_placeholder_stack_adjustment(struct objfile *f,
   char buf[4];
   write_le_i32(buf, stack_adjustment);
   objfile_section_overwrite_raw(objfile_text(f),
-                                size_add(location, 2),
+                                location,
                                 buf,
                                 sizeof(buf));
 }
