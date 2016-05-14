@@ -44,6 +44,7 @@ void objfile_init(struct objfile *f, enum target_platform platform) {
   f->symbol_table_limit = 0;
 
   f->platform = platform;
+  f->arch = platform_arch(platform);
 }
 
 void objfile_destroy(struct objfile *f) {
@@ -57,6 +58,7 @@ void objfile_destroy(struct objfile *f) {
   f->symbol_table_limit = 0;
 
   f->platform = (enum target_platform)-1;
+  f->arch = (enum target_arch)-1;
 }
 
 void objfile_alloc(struct objfile **p_out, enum target_platform platform) {
@@ -76,6 +78,10 @@ void objfile_free(struct objfile **p_ref) {
 
 enum target_platform objfile_platform(struct objfile *f) {
   return f->platform;
+}
+
+enum target_arch objfile_arch(struct objfile *f) {
+  return f->arch;
 }
 
 void append_fillercode_to_align(struct databuf *d, size_t alignment) {

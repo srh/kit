@@ -72,8 +72,9 @@ struct objfile {
   size_t symbol_table_count;
   size_t symbol_table_limit;
 
-  /* Nothing in objfile code (besides objfile_platform) should use this. */
+  /* Nothing in objfile code (besides objfile_platform and objfile_arch) should use these. */
   enum target_platform platform;
+  enum target_arch arch;
 };
 
 size_t objfile_section_raw_size(struct objfile_section *s);

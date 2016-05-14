@@ -42,6 +42,7 @@ void objfile_alloc(struct objfile **p_out, enum target_platform platform);
 void objfile_free(struct objfile **p_ref);
 
 enum target_platform objfile_platform(struct objfile *f);
+enum target_arch objfile_arch(struct objfile *f);
 
 struct objfile_section *objfile_data(struct objfile *f);
 struct objfile_section *objfile_rdata(struct objfile *f);

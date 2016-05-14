@@ -899,7 +899,7 @@ void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
 
 void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_ptr_reg dest,
                            struct sti symbol_table_index) {
-  switch (platform_arch(objfile_platform(f))) {
+  switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
     x86_gen_mov_reg_stiptr(f, map_x86_ptr_reg(dest), symbol_table_index);
     break;
@@ -2221,7 +2221,7 @@ void gen_memmem_mov(struct objfile *f,
 }
 
 void gp_gen_load_ptr(struct objfile *f, enum gp_ptr_reg dest, enum gp_ptr_reg src_addr, int32_t src_disp) {
-  switch (platform_arch(objfile_platform(f))) {
+  switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
     x86_gen_load32(f, map_x86_ptr_reg(dest), map_x86_ptr_reg(src_addr), src_disp);
     break;
@@ -2303,7 +2303,7 @@ void gen_bzero(struct objfile *f, struct loc dest) {
   int32_t disp;
   put_ptr_in_reg(f, dest, GP_PTR_A, &reg, &disp);
 
-  switch (platform_arch(objfile_platform(f))) {
+  switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
     y86_gen_mem_bzero(f, map_x86_ptr_reg(reg), disp, dest.padded_size);
     break;
