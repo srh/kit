@@ -2268,7 +2268,7 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   gen_memmem_mov(f, map_x86_ptr_reg(dest_reg), dest_disp, map_x86_ptr_reg(src_reg), src_disp, padded_size);
 }
 
-void gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32_t upadded_size) {
+void y86_gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32_t upadded_size) {
   enum x86_reg zreg = choose_altreg(reg);
   x86_gen_mov_reg_imm32(f, zreg, 0);
 
@@ -2285,13 +2285,22 @@ void gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32_t u
   }
 }
 
-/* chase x86 */
+/* chase mark x86 */
 void gen_bzero(struct objfile *f, struct loc dest) {
   enum gp_ptr_reg reg;
   int32_t disp;
   put_ptr_in_reg(f, dest, GP_PTR_A, &reg, &disp);
 
-  gen_mem_bzero(f, map_x86_ptr_reg(reg), disp, dest.padded_size);
+  switch (platform_arch(objfile_platform(f))) {
+  case TARGET_ARCH_Y86:
+    y86_gen_mem_bzero(f, map_x86_ptr_reg(reg), disp, dest.padded_size);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
