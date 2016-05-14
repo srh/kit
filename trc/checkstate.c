@@ -66,6 +66,10 @@ void checkstate_destroy(struct checkstate *cs) {
   cs->total_filesize = 0;
   SLICE_FREE(cs->imports, cs->imports_count, import_destroy);
   cs->imports_limit = 0;
+  cs->arch = (enum target_arch)-1;
+  cs->platform = (enum target_platform)-1;
+  cs->loader = NULL;
+  cs->loader_ctx = NULL;
   cs->im = NULL;
 }
 
@@ -77,6 +81,7 @@ void checkstate_init(struct checkstate *cs, struct identmap *im,
   cs->loader_ctx = loader_ctx;
   cs->loader = loader;
   cs->platform = platform;
+  cs->arch = platform_arch(platform);
   cs->imports = NULL;
   cs->imports_count = 0;
   cs->imports_limit = 0;

@@ -73,6 +73,7 @@ struct checkstate {
   module_loader *loader;
 
   enum target_platform platform;
+  enum target_arch arch;
 
   struct import *imports;
   size_t imports_count;

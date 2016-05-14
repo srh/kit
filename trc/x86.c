@@ -9,8 +9,8 @@
 #include "typecheck.h"
 #include "objfile_objfile.h"
 
-uint32_t ptr_size(enum target_platform platform) {
-  switch (platform_arch(platform)) {
+uint32_t ptr_size(enum target_arch arch) {
+  switch (arch) {
   case TARGET_ARCH_Y86:
     return 4;
   case TARGET_ARCH_X64:
@@ -20,8 +20,8 @@ uint32_t ptr_size(enum target_platform platform) {
   }
 }
 
-uint32_t max_possible_alignof(enum target_platform platform) {
-  switch (platform_arch(platform)) {
+uint32_t max_possible_alignof(enum target_arch arch) {
+  switch (arch) {
   case TARGET_ARCH_Y86:
     return 4;
   case TARGET_ARCH_X64:

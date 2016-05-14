@@ -370,10 +370,10 @@ struct immediate {
   } u;
 };
 
-uint32_t immediate_size(enum target_platform platform, struct immediate imm) {
+uint32_t immediate_size(enum target_arch arch, struct immediate imm) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC:
-    return ptr_size(platform);
+    return ptr_size(arch);
   case IMMEDIATE_U64:
   case IMMEDIATE_I64:
     return 8;
@@ -562,6 +562,7 @@ struct frame {
 
   /* Same as checkstate's platform, is const and for convenience. */
   enum target_platform platform;
+  enum target_arch arch;
 };
 
 void frame_init(struct frame *h, enum target_platform platform) {
@@ -591,6 +592,7 @@ void frame_init(struct frame *h, enum target_platform platform) {
   h->min_stack_offset = 0;
 
   h->platform = platform;
+  h->arch = platform_arch(platform);
 }
 
 void frame_destroy(struct frame *h) {
@@ -609,6 +611,7 @@ void frame_destroy(struct frame *h) {
   h->espdata_count = 0;
   h->espdata_limit = 0;
   h->platform = (enum target_platform)-1;
+  h->arch = (enum target_arch)-1;
 }
 
 void frame_specify_calling_info(struct frame *h, size_t arg_count,
@@ -650,9 +653,9 @@ void frame_define_target(struct frame *h, size_t target_number, uint32_t target_
   td->target_offset = target_offset;
 }
 
-uint32_t frame_padded_push_size(enum target_platform platform, uint32_t size) {
+uint32_t frame_padded_push_size(enum target_arch arch, uint32_t size) {
   /* Y86/X64 */
-  return uint32_ceil_aligned(size, ptr_size(platform));
+  return uint32_ceil_aligned(size, ptr_size(arch));
 }
 
 /* Pushes an exact amount to the frame. */
@@ -665,7 +668,7 @@ void frame_push_exact_amount(struct frame *h, uint32_t size) {
 
 struct loc frame_push_loc(struct frame *h, uint32_t size) {
   /* X86: Make sure new generic padding logic is right for callers on X64. */
-  uint32_t padded_size = frame_padded_push_size(h->platform, size);
+  uint32_t padded_size = frame_padded_push_size(h->arch, size);
   frame_push_exact_amount(h, padded_size);
   return ebp_loc(size, padded_size, h->stack_offset);
 }
@@ -683,7 +686,7 @@ void frame_restore_offset(struct frame *h, int32_t stack_offset) {
 }
 
 void frame_pop(struct frame *h, uint32_t size) {
-  uint32_t padded_size = frame_padded_push_size(h->platform, size);
+  uint32_t padded_size = frame_padded_push_size(h->arch, size);
   h->stack_offset = int32_add(h->stack_offset, uint32_to_int32(padded_size));
 }
 
@@ -762,7 +765,7 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h, struct ast
 }
 
 void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
-  switch (platform_arch(cs->platform)) {
+  switch (cs->arch) {
   case TARGET_ARCH_Y86:
     y86_note_param_locations(cs, h, expr);
     break;
@@ -1269,8 +1272,8 @@ void gen_placeholder_jcc(struct objfile *f, struct frame *h,
   objfile_section_append_raw(objfile_text(f), b, 6);
 }
 
-size_t place_rexw(uint8_t *b, enum target_platform platform) {
-  switch (platform_arch(platform)) {
+size_t place_rexw(uint8_t *b, enum target_arch arch) {
+  switch (arch) {
   case TARGET_ARCH_Y86:
     return 0;
   case TARGET_ARCH_X64:
@@ -1288,7 +1291,7 @@ void gen_placeholder_stack_adjustment(struct objfile *f,
   struct reset_esp_data red;
   uint8_t b[7] = { 0 };
   /* y86/x64 ADD instruction */
-  size_t insnbase = place_rexw(b, h->platform);
+  size_t insnbase = place_rexw(b, h->arch);
   b[insnbase] = 0x81;
   b[insnbase + 1] = mod_reg_rm(MOD11, 0, X86_ESP);
 
@@ -1523,7 +1526,7 @@ void x86_gen_store8(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp
 }
 
 void gen_function_intro(struct objfile *f, struct frame *h) {
-  switch (platform_arch(h->platform)) {
+  switch (h->arch) {
   case TARGET_ARCH_Y86:
     x86_gen_push32(f, X86_EBP);
     x86_gen_mov_reg32(f, X86_EBP, X86_ESP);
@@ -1539,7 +1542,7 @@ void gen_function_intro(struct objfile *f, struct frame *h) {
 }
 
 void push_address(struct objfile *f, struct frame *h, struct loc loc) {
-  struct loc dest = frame_push_loc(h, ptr_size(h->platform));
+  struct loc dest = frame_push_loc(h, ptr_size(h->arch));
   gen_mov_addressof(f, dest, loc);
 }
 
@@ -2118,7 +2121,7 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
     SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
   }
 
-  switch (platform_arch(h->platform)) {
+  switch (h->arch) {
   case TARGET_ARCH_Y86: {
     int hidden_return_param = frame_hidden_return_param(h);
     gen_returnloc_funcreturn_convention(f, hidden_return_param,
@@ -2142,7 +2145,7 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
   if (h->crash_target_exists) {
     frame_define_target(h, h->crash_target_number,
                         objfile_section_size(objfile_text(f)));
-    switch (platform_arch(h->platform)) {
+    switch (h->arch) {
     case TARGET_ARCH_Y86: {
       x86_gen_int_3(f);
     } break;
@@ -2421,7 +2424,7 @@ void gen_store_biregister(struct objfile *f, struct loc dest, enum x86_reg lo, e
 void gen_mov_mem_imm(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
                      enum x86_reg aux,
                      struct immediate src) {
-  switch (immediate_size(objfile_platform(f), src)) {
+  switch (immediate_size(objfile_arch(f), src)) {
   case 8:
     TODO_IMPLEMENT;
   case 4:
@@ -2448,7 +2451,7 @@ void gen_mov_mem_imm(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
 }
 
 void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src) {
-  CHECK(dest.size == immediate_size(objfile_platform(f), src));
+  CHECK(dest.size == immediate_size(objfile_arch(f), src));
 
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
@@ -3766,7 +3769,7 @@ void get_funcall_arglist_info(struct checkstate *cs,
   for (size_t i = 0; i < args_count; i++) {
     struct ast_expr *arg = &a->u.funcall.args[i].expr;
     uint32_t arg_size = x86_sizeof(&cs->nt, ast_expr_type(arg));
-    uint32_t padded_size = frame_padded_push_size(cs->platform, arg_size);
+    uint32_t padded_size = frame_padded_push_size(cs->arch, arg_size);
     infos[i].offset_from_callsite = uint32_to_int32(total_size);
     infos[i].arg_size = arg_size;
     infos[i].padded_size = padded_size;
@@ -4245,7 +4248,7 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
     er_set_tr(er, temp_exists_trivial(erd_loc(&er->u.demand), 1));
   } break;
   case EXPR_RETURN_OPEN: {
-    struct loc floc = frame_push_loc(h, immediate_size(h->platform, imm));
+    struct loc floc = frame_push_loc(h, immediate_size(h->arch, imm));
     gen_mov_immediate(f, floc, imm);
     ero_set_loc(&er->u.open, floc);
     /* TODO: tr crap like this is bad -- it's a temporary, it should
@@ -5249,7 +5252,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     As long as enum tags are 4 or 8 bytes, we could use exact alignof,
     I think -- but see comments above about global byte alignment
     having to be... extra. */
-    objfile_section_align(objfile_data(f), max_possible_alignof(cs->platform));
+    objfile_section_align(objfile_data(f), max_possible_alignof(cs->arch));
     objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
     /* TODO(): well crap, this is tied to enum representation. */
