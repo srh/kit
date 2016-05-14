@@ -1778,6 +1778,7 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
   }
 }
 
+/* chase mark x86 */
 int try_gen_trivial_typetrav_func(struct checkstate *cs, struct objfile *f,
                                   enum typetrav_func tf,
                                   struct loc dest, struct loc src,
@@ -1988,12 +1989,14 @@ struct sti lookup_or_make_typetrav_sti(
   return cs->typetrav_symbol_infos[id]->symbol_table_index;
 }
 
+/* chase mark x86 */
 void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                        enum typetrav_func tf, struct loc dest, int has_src,
                        struct loc src, struct ast_typeexpr *type) {
   if (try_gen_trivial_typetrav_func(cs, f, tf, dest, src, type)) {
     return;
   }
+  /* vvv chase x86 */
   /* TODO: Go deeper on names to avoid needless function layers. */
   struct sti sti = lookup_or_make_typetrav_sti(f, cs, tf, type);
 
@@ -2011,6 +2014,7 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
   frame_restore_offset(h, saved_offset);
 }
 
+/* chase mark x86 */
 void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
                  struct loc loc, struct ast_typeexpr *type) {
   struct loc ignore;
@@ -2018,14 +2022,17 @@ void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_DESTROY, loc, 0, ignore, type);
 }
 
+/* chase mark x86 */
 void gen_copy(struct checkstate *cs, struct objfile *f, struct frame *h,
               struct loc dest, struct loc src, struct ast_typeexpr *type) {
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_COPY, dest, 1, src, type);
 }
+/* chase mark x86 */
 void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct frame *h,
                              struct loc dest, struct loc src, struct ast_typeexpr *type) {
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_MOVE_OR_COPYDESTROY, dest, 1, src, type);
 }
+/* chase mark x86 */
 void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
                            struct loc loc, struct ast_typeexpr *type) {
   struct loc ignore;
@@ -2200,6 +2207,7 @@ void put_ptr_in_reg(struct objfile *f, struct loc loc, enum x86_reg free_reg,
 ebp) are dest or loc.  It's safe to use this if dest and src point to
 the same _exact_ memory location, through different means (or through
 the same means). */
+/* chase x86 */
 void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   CHECK(dest.size == src.size);
   if (loc_equal(dest, src)) {
@@ -2237,6 +2245,7 @@ void gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32_t u
   }
 }
 
+/* chase x86 */
 void gen_bzero(struct objfile *f, struct loc dest) {
   enum x86_reg reg;
   int32_t disp;
@@ -4780,6 +4789,7 @@ void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
   }
 }
 
+/* Chase x86 */
 int gen_statement(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_statement *s,
                   size_t *vars_pushed_ref) {
@@ -5046,7 +5056,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* Chase x86 */
+/* chase mark x86 */
 int gen_bracebody(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_bracebody *a) {
   size_t vars_pushed = 0;
@@ -5091,6 +5101,7 @@ void tie_stack_adjustments(struct objfile *f, struct frame *h) {
   }
 }
 
+/* chase mark x86 */
 int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
                     struct ast_expr *a) {
   CHECK(a->tag == AST_EXPR_LAMBDA);
@@ -5113,6 +5124,7 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
   return res;
 }
 
+/* chase mark x86 */
 int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_instantiation *inst) {
   struct static_value *value = di_value(inst);
