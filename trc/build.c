@@ -2220,6 +2220,19 @@ void gen_memmem_mov(struct objfile *f,
   }
 }
 
+void gp_gen_load_ptr(struct objfile *f, enum gp_ptr_reg dest, enum gp_ptr_reg src_addr, int32_t src_disp) {
+  switch (platform_arch(objfile_platform(f))) {
+  case TARGET_ARCH_Y86:
+    x86_gen_load32(f, map_x86_ptr_reg(dest), map_x86_ptr_reg(src_addr), src_disp);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void put_ptr_in_reg(struct objfile *f, struct loc loc, enum gp_ptr_reg free_reg,
                     enum gp_ptr_reg *reg_out, int32_t *disp_out) {
   switch (loc.tag) {
@@ -2233,8 +2246,7 @@ void put_ptr_in_reg(struct objfile *f, struct loc loc, enum gp_ptr_reg free_reg,
     *disp_out = 0;
   } break;
   case LOC_EBP_INDIRECT: {
-    /* Chase x86 */
-    x86_gen_load32(f, map_x86_ptr_reg(free_reg), X86_EBP, loc.u.ebp_indirect);
+    gp_gen_load_ptr(f, free_reg, GP_PTR_BP, loc.u.ebp_indirect);
     *reg_out = free_reg;
     *disp_out = 0;
   } break;
