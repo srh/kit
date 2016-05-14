@@ -1230,19 +1230,35 @@ void gen_placeholder_jcc(struct objfile *f, struct frame *h,
   objfile_section_append_raw(objfile_text(f), b, 6);
 }
 
+size_t place_rexw(uint8_t *b, enum target_platform platform) {
+  switch (platform_arch(platform)) {
+  case TARGET_ARCH_Y86:
+    return 0;
+  case TARGET_ARCH_X64:
+    /* REX.W */
+    b[0] = 0x48;
+    return 1;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void gen_placeholder_stack_adjustment(struct objfile *f,
                                       struct frame *h,
                                       int downward) {
-  /* Chase x86 -- we need a REX.W byte before 0x81. */
   struct reset_esp_data red;
-  red.reset_esp_offset = size_add(objfile_section_size(objfile_text(f)), 2);
+  uint8_t b[7] = { 0 };
+  /* y86/x64 ADD instruction */
+  size_t insnbase = place_rexw(b, h->platform);
+  b[insnbase] = 0x81;
+  b[insnbase + 1] = mod_reg_rm(MOD11, 0, X86_ESP);
+
+  red.reset_esp_offset = size_add(objfile_section_size(objfile_text(f)), insnbase + 2);
   red.ebp_offset = h->stack_offset;
   red.downward = downward;
   SLICE_PUSH(h->espdata, h->espdata_count, h->espdata_limit, red);
-  /* X86 ADD instruction */
-  uint8_t b[6] = { 0x81, 0 };
-  b[1] = mod_reg_rm(MOD11, 0, X86_ESP);
-  objfile_section_append_raw(objfile_text(f), b, 6);
+
+  objfile_section_append_raw(objfile_text(f), b, insnbase + 6);
 }
 
 void replace_placeholder_stack_adjustment(struct objfile *f,
@@ -5030,6 +5046,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+/* Chase x86 */
 int gen_bracebody(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_bracebody *a) {
   size_t vars_pushed = 0;
