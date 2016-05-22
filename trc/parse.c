@@ -383,7 +383,7 @@ int skip_ws(struct ps *p) {
       if (ch2 == '/') {
         ps_step(p);
         goto top;
-      } else if (is_ok_in_comment(ch)) {
+      } else if (is_ok_in_comment(ch2)) {
         ps_step(p);
       } else {
         return 0;
