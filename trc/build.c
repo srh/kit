@@ -723,14 +723,19 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
   }
 }
 
-void y86_note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
+int lambda_exists_hidden_return_param(struct checkstate *cs, struct ast_expr *expr,
+                                      uint32_t *return_type_size_out) {
   struct ast_typeexpr *type = ast_expr_type(expr);
   size_t args_count = expr->u.lambda.params_count;
   struct ast_typeexpr *return_type
     = expose_func_return_type(&cs->cm, type, size_add(args_count, 1));
 
+  return exists_hidden_return_param(cs, return_type, return_type_size_out);
+}
+
+void y86_note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
   uint32_t return_type_size;
-  int is_return_hidden = exists_hidden_return_param(cs, return_type, &return_type_size);
+  int is_return_hidden = lambda_exists_hidden_return_param(cs, expr, &return_type_size);
   int32_t offset = (2 + is_return_hidden) * DWORD_SIZE;
 
   size_t vars_pushed = 0;
