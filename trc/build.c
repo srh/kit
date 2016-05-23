@@ -5296,13 +5296,13 @@ int build_def(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* Chase x86 */
 void build_typetrav_defs(struct checkstate *cs,
                          struct objfile *f) {
   /* cs.typetrav_symbol_infos_count is a moving target -- we see more
   typetravs to generate when we generate the first. */
   while (cs->typetrav_symbol_infos_first_ungenerated < cs->typetrav_symbol_infos_count) {
     struct typetrav_symbol_info *info = cs->typetrav_symbol_infos[cs->typetrav_symbol_infos_first_ungenerated];
+    /* y86/x64: 16 byte function pointer alignment. */
     objfile_fillercode_align_double_quadword(f);
     objfile_set_symbol_value(f, info->symbol_table_index,
                              objfile_section_size(objfile_text(f)));
@@ -5319,15 +5319,24 @@ void build_typetrav_defs(struct checkstate *cs,
       frame_specify_calling_info(&h, 0, dummy_void_return_loc, 0);
     }
 
-    uint32_t sz = x86_sizeof(&cs->nt, &info->type);
+    switch (cs->arch) {
+    case TARGET_ARCH_Y86: {
+      uint32_t sz = x86_sizeof(&cs->nt, &info->type);
 
-    /* TODO: This duplicates calling-convention-specific logic of
-    note_param_locations. */
-    int has_src = info->func == TYPETRAV_FUNC_COPY || info->func == TYPETRAV_FUNC_MOVE_OR_COPYDESTROY;
-    struct loc src = ebp_indirect_loc(sz, sz, 3 * DWORD_SIZE);
-    struct loc dest = ebp_indirect_loc(sz, sz, 2 * DWORD_SIZE);
+      /* TODO: This duplicates calling-convention-specific logic of
+      note_param_locations. */
+      int has_src = info->func == TYPETRAV_FUNC_COPY || info->func == TYPETRAV_FUNC_MOVE_OR_COPYDESTROY;
+      struct loc src = ebp_indirect_loc(sz, sz, 3 * DWORD_SIZE);
+      struct loc dest = ebp_indirect_loc(sz, sz, 2 * DWORD_SIZE);
 
-    really_gen_typetrav_behavior(cs, f, &h, info->func, dest, has_src, src, &info->type);
+      really_gen_typetrav_behavior(cs, f, &h, info->func, dest, has_src, src, &info->type);
+    } break;
+    case TARGET_ARCH_X64:
+      TODO_IMPLEMENT;
+      break;
+    default:
+      UNREACHABLE();
+    }
 
     gen_function_exit(cs, f, &h);
     tie_jmps(f, &h);
