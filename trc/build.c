@@ -693,6 +693,7 @@ void frame_pop(struct frame *h, uint32_t size) {
 
 int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *return_type,
                                uint32_t *return_type_size_out) {
+  /* TODO(): The calling paths for this are probably x86/x64-specific, so it can/should be broken into two functions. */
   struct type_attrs return_type_attrs = x86_attrsof(&cs->nt, return_type);
   switch (cs->platform) {
     /* TODO: OSX isn't quite like Windows -- see the b3sb3 case. */
@@ -771,6 +772,9 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h, struct ast
 }
 
 void x64_note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
+  uint32_t return_type_size;
+  int is_return_hidden = lambda_exists_hidden_return_param(cs, expr, &return_type_size);
+  /* x64: The HRP gets passed in %rdi */
   (void)cs, (void)h, (void)expr;
   TODO_IMPLEMENT;
 }
