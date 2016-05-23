@@ -190,6 +190,7 @@ int platform_prefix_underscore(enum target_platform platform) {
 /* Right now we don't worry about generating multiple objfiles, so we
 just blithely attach a serial number to each name to make them
 unique. */
+/* chase x86 */
 void generate_kit_name(struct checkstate *cs,
                        const void *name, size_t name_count,
                        int is_export,
@@ -2038,10 +2039,10 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
   if (try_gen_trivial_typetrav_func(cs, f, tf, dest, src, type)) {
     return;
   }
-  /* vvv chase x86 */
   /* TODO: Go deeper on names to avoid needless function layers. */
   struct sti sti = lookup_or_make_typetrav_sti(f, cs, tf, type);
 
+  /* vvv chase x86 (callconv) */
   int32_t saved_offset = frame_save_offset(h);
   if (has_src) {
     /* X86 - pointer size */
