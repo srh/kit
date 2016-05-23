@@ -2201,12 +2201,12 @@ void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc) {
   gen_store_register(f, dest, X86_EAX);
 }
 
-void gen_memmem_mov(struct objfile *f,
-                    enum x86_reg dest_reg,
-                    int32_t dest_disp,
-                    enum x86_reg src_reg,
-                    int32_t src_disp,
-                    uint32_t upadded_size) {
+void x86_gen_memmem_mov(struct objfile *f,
+                        enum x86_reg dest_reg,
+                        int32_t dest_disp,
+                        enum x86_reg src_reg,
+                        int32_t src_disp,
+                        uint32_t upadded_size) {
   int32_t padded_size = uint32_to_int32(upadded_size);
   enum x86_reg reg = choose_register_2(dest_reg, src_reg);
   int32_t n = 0;
@@ -2263,7 +2263,6 @@ void put_ptr_in_reg(struct objfile *f, struct loc loc, enum gp_ptr_reg free_reg,
 ebp) are dest or loc.  It's safe to use this if dest and src point to
 the same _exact_ memory location, through different means (or through
 the same means). */
-/* chase x86 */
 void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   CHECK(dest.size == src.size);
   if (loc_equal(dest, src)) {
@@ -2281,7 +2280,16 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
 
   uint32_t padded_size = dest.padded_size < src.padded_size ? dest.padded_size : src.padded_size;
   CHECK(padded_size >= src.size);
-  gen_memmem_mov(f, map_x86_ptr_reg(dest_reg), dest_disp, map_x86_ptr_reg(src_reg), src_disp, padded_size);
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_memmem_mov(f, map_x86_ptr_reg(dest_reg), dest_disp, map_x86_ptr_reg(src_reg), src_disp, padded_size);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void y86_gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32_t upadded_size) {
