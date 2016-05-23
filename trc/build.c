@@ -4862,12 +4862,12 @@ void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
   }
 }
 
-/* Chase x86 */
 int gen_statement(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_statement *s,
                   size_t *vars_pushed_ref) {
   switch (s->tag) {
   case AST_STATEMENT_EXPR: {
+    /* Chase x86 */
     int32_t saved_offset = frame_save_offset(h);
     struct expr_return er = open_expr_return();
     if (!gen_expr(cs, f, h, s->u.expr, &er)) {
@@ -4877,6 +4877,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_RETURN: {
+    /* Chase x86 */
     int32_t saved_offset = frame_save_offset(h);
     struct expr_return er = demand_expr_return(frame_return_loc(h));
     if (s->u.return_statement.has_expr) {
@@ -4891,6 +4892,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_VAR: {
+    /* Chase x86 */
     /* TODO: We could also get this information from some var info or
     something.  We could save the cost of copying the
     ast_typeexpr. */
@@ -4923,6 +4925,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     (*vars_pushed_ref)++;
   } break;
   case AST_STATEMENT_IFTHEN: {
+    /* Chase x86 */
     int32_t saved_offset = frame_save_offset(h);
     struct condition_state cstate;
     if (!gen_condition(cs, f, h, &s->u.ifthen_statement.condition, &cstate)) {
@@ -4945,6 +4948,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_IFTHENELSE: {
+    /* Chase x86 */
     int32_t saved_offset = frame_save_offset(h);
     struct condition_state cstate;
     if (!gen_condition(cs, f, h, &s->u.ifthenelse_statement.condition, &cstate)) {
@@ -4971,6 +4975,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_WHILE: {
+    /* Chase x86 */
     size_t top_target_number = frame_add_target(h);
     frame_define_target(h, top_target_number, objfile_section_size(objfile_text(f)));
 
@@ -4995,6 +5000,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_FOR: {
+    /* Chase x86 */
     struct ast_for_statement *fs = &s->u.for_statement;
     size_t vars_pushed = 0;
     if (fs->has_initializer) {
@@ -5051,6 +5057,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     }
   } break;
   case AST_STATEMENT_SWITCH: {
+    /* Chase x86 */
     struct ast_switch_statement *ss = &s->u.switch_statement;
     int32_t saved_offset = frame_save_offset(h);
 
