@@ -765,13 +765,18 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h, struct ast
   }
 }
 
+void x64_note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
+  (void)cs, (void)h, (void)expr;
+  TODO_IMPLEMENT;
+}
+
 void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
   switch (cs->arch) {
   case TARGET_ARCH_Y86:
     y86_note_param_locations(cs, h, expr);
     break;
   case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
+    x64_note_param_locations(cs, h, expr);
     break;
   default:
     UNREACHABLE();
