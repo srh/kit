@@ -2616,6 +2616,7 @@ struct temp_return *er_tr(struct expr_return *er) {
   return &er->tr_;
 }
 
+/* Chase x86 */
 void gen_destroy_temp(struct checkstate *cs, struct objfile *f, struct frame *h,
                       struct temp_return tr) {
   if (tr.exists) {
@@ -4542,6 +4543,7 @@ int gen_string_literal(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+/* Chase x86 */
 int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *er) {
@@ -4862,12 +4864,12 @@ void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
   }
 }
 
+/* Chase mark x86 */
 int gen_statement(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_statement *s,
                   size_t *vars_pushed_ref) {
   switch (s->tag) {
   case AST_STATEMENT_EXPR: {
-    /* Chase x86 */
     int32_t saved_offset = frame_save_offset(h);
     struct expr_return er = open_expr_return();
     if (!gen_expr(cs, f, h, s->u.expr, &er)) {
