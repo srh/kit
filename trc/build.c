@@ -693,8 +693,19 @@ void frame_pop(struct frame *h, uint32_t size) {
 
 int x64_sysv_memory_param(struct checkstate *cs, struct ast_typeexpr *type,
                           uint32_t *type_size_out) {
-  (void)cs, (void)type, (void)type_size_out;
-  TODO_IMPLEMENT;
+  uint32_t size = x86_sizeof(&cs->nt, type);
+  *type_size_out = size;
+  /* (Are unaligned fields possible?  Like, a struct { u32; { u32;
+  u32; }; u32; } might have an unaligned field?  Or is it just the
+  inner primitive fields?  Who cares if this is wrong?  This is a
+  bootstrapping compiler impl.) */
+  if (size > 16) {
+    return 1;
+  }
+  struct typeexpr_traits traits;
+  int success = check_typeexpr_traits(cs, type, NULL, &traits);
+  CHECK(success);
+  return traits.movable != TYPEEXPR_TRAIT_TRIVIALLY_HAD;
 }
 
 int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *return_type,
