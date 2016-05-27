@@ -2777,7 +2777,7 @@ struct temp_return *er_tr(struct expr_return *er) {
   return &er->tr_;
 }
 
-/* Chase x86 */
+/* Chase mark x86 */
 void gen_destroy_temp(struct checkstate *cs, struct objfile *f, struct frame *h,
                       struct temp_return tr) {
   if (tr.exists) {
