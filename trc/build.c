@@ -19,6 +19,7 @@
 
 /* TODO(): Change x86 to y86 as code gets ported. */
 /* TODO(): Change y86 back to x86 when done. */
+/* TODO(): Get rid of "chase mark" comments. */
 
 struct expr_return;
 struct loc;
@@ -661,7 +662,7 @@ size_t frame_arg_count(struct frame *h) {
   return h->arg_count;
 }
 
-/* chase mark x86 */
+/* chase mark */
 size_t frame_add_target(struct frame *h) {
   size_t ret = h->targetdata_count;
   struct targetdata td;
@@ -670,7 +671,7 @@ size_t frame_add_target(struct frame *h) {
   return ret;
 }
 
-/* chase mark x86 */
+/* chase mark */
 void frame_define_target(struct frame *h, size_t target_number, uint32_t target_offset) {
   struct targetdata *td = &h->targetdata[target_number];
   CHECK(!td->target_known);
@@ -698,7 +699,7 @@ struct loc frame_push_loc(struct frame *h, uint32_t size) {
   return ebp_loc(size, padded_size, h->stack_offset);
 }
 
-/* chase mark x86 */
+/* chase mark */
 int32_t frame_save_offset(struct frame *h) {
   return h->stack_offset;
 }
@@ -1963,7 +1964,7 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
   }
 }
 
-/* chase mark x86 */
+/* chase mark */
 int try_gen_trivial_typetrav_func(struct checkstate *cs, struct objfile *f,
                                   enum typetrav_func tf,
                                   struct loc dest, struct loc src,
@@ -2174,7 +2175,7 @@ struct sti lookup_or_make_typetrav_sti(
   return cs->typetrav_symbol_infos[id]->symbol_table_index;
 }
 
-/* chase mark x86 */
+/* chase mark */
 void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                        enum typetrav_func tf, struct loc dest, int has_src,
                        struct loc src, struct ast_typeexpr *type) {
@@ -2210,7 +2211,7 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
   frame_restore_offset(h, saved_offset);
 }
 
-/* chase mark x86 */
+/* chase mark */
 void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
                  struct loc loc, struct ast_typeexpr *type) {
   struct loc ignore;
@@ -2218,17 +2219,17 @@ void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_DESTROY, loc, 0, ignore, type);
 }
 
-/* chase mark x86 */
+/* chase mark */
 void gen_copy(struct checkstate *cs, struct objfile *f, struct frame *h,
               struct loc dest, struct loc src, struct ast_typeexpr *type) {
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_COPY, dest, 1, src, type);
 }
-/* chase mark x86 */
+/* chase mark */
 void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct frame *h,
                              struct loc dest, struct loc src, struct ast_typeexpr *type) {
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_MOVE_OR_COPYDESTROY, dest, 1, src, type);
 }
-/* chase mark x86 */
+/* chase mark */
 void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
                            struct loc loc, struct ast_typeexpr *type) {
   struct loc ignore;
@@ -2468,7 +2469,7 @@ void y86_gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32
   }
 }
 
-/* chase mark x86 */
+/* chase mark */
 void gen_bzero(struct objfile *f, struct loc dest) {
   enum gp_ptr_reg reg;
   int32_t disp;
@@ -2781,7 +2782,7 @@ struct temp_return *er_tr(struct expr_return *er) {
   return &er->tr_;
 }
 
-/* Chase mark x86 */
+/* chase mark */
 void gen_destroy_temp(struct checkstate *cs, struct objfile *f, struct frame *h,
                       struct temp_return tr) {
   if (tr.exists) {
@@ -2882,7 +2883,7 @@ struct expr_return free_expr_return(void) {
   return ret;
 }
 
-/* chase mark x86 */
+/* chase mark */
 struct expr_return open_expr_return(void) {
   struct expr_return ret;
   ret.tag = EXPR_RETURN_OPEN;
@@ -4973,7 +4974,7 @@ int gen_condition(struct checkstate *cs, struct objfile *f,
   }
 }
 
-/* chase mark x86 */
+/* chase mark */
 void pop_cstate_vardata(struct frame *h, struct condition_state *cstate) {
   switch (cstate->tag) {
   case AST_CONDITION_EXPR: {
@@ -5041,7 +5042,7 @@ void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
   }
 }
 
-/* Chase mark x86 */
+/* chase mark */
 int gen_statement(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_statement *s,
                   size_t *vars_pushed_ref) {
@@ -5311,7 +5312,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* chase mark x86 */
+/* chase mark */
 int gen_bracebody(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_bracebody *a) {
   size_t vars_pushed = 0;
@@ -5356,7 +5357,7 @@ void tie_stack_adjustments(struct objfile *f, struct frame *h) {
   }
 }
 
-/* chase mark x86 */
+/* chase mark */
 int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
                     struct ast_expr *a) {
   CHECK(a->tag == AST_EXPR_LAMBDA);
@@ -5379,7 +5380,7 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
   return res;
 }
 
-/* chase mark x86 */
+/* chase mark */
 int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_instantiation *inst) {
   struct static_value *value = di_value(inst);
