@@ -1720,18 +1720,33 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
 }
 
 /* Put this right beneath where you save the stack offset. */
-/* Chase x86 -- uh, this is complete nonsense for all callers of this, on x86 things are passed in registers, the arglist types matter.  */
+/* TODO() -- uh, this is complete nonsense for all callers of this?  On x86 things are passed in registers, so the arglist types matter. */
 void adjust_frame_for_callsite_alignment(struct frame *h, uint32_t arglist_size) {
-  /* X86 - particularly for 32-bit OS X's 16-byte alignment. */
+  /* y86/x64 - particularly for 32-bit OS X's 16-byte alignment. */
   int32_t unadjusted_callsite_offset
     = int32_sub(h->stack_offset, uint32_to_int32(arglist_size));
-  /* We want to lower the stack so that the callsite will be 8-mod-16
-  (because we start counting below the ret-ptr and ebp-ptr). */
-  /* We specifically _don't_ want overflow checking on this addition
-  -- unadjusted_callsite_offset could easily be -4, or -8. */
-  uint32_t callsite_adjustment
-    = (8 + (uint32_t)unadjusted_callsite_offset) % 16;
-  CHECK(callsite_adjustment % DWORD_SIZE == 0);
+
+  uint32_t callsite_adjustment;
+  switch (h->arch) {
+  case TARGET_ARCH_Y86: {
+    /* We want to lower the stack so that the callsite will be
+    8-mod-16 (because we start counting below the ret-ptr and
+    ebp-ptr). */
+    /* We specifically _don't_ want overflow checking on this addition
+    -- unadjusted_callsite_offset could easily be -4, or -8. */
+    callsite_adjustment = (8 + (uint32_t)unadjusted_callsite_offset) % 16;
+    CHECK(callsite_adjustment % DWORD_Y86_SIZE == 0);
+  } break;
+  case TARGET_ARCH_X64: {
+    /* We want to lower the stack so that the callsite will be
+    0-mod-16.  (We start counting below the ret-ptr and our gratuitous
+    rbp-ptr, but they have size 8 + 8 = 16.) */
+    callsite_adjustment = ((uint32_t)unadjusted_callsite_offset) % 16;
+    CHECK(callsite_adjustment % X64_EIGHTBYTE_SIZE == 0);
+  } break;
+  default:
+    UNREACHABLE();
+  }
   frame_push_exact_amount(h, callsite_adjustment);
 }
 
