@@ -29,13 +29,13 @@ struct type_attrs {
   int is_primitive;
 };
 
-uint32_t x86_sizeof(struct name_table *nt, struct ast_typeexpr *type);
-uint32_t x86_alignof(struct name_table *nt, struct ast_typeexpr *type);
-struct type_attrs x86_attrsof(struct name_table *nt, struct ast_typeexpr *type);
+uint32_t gp_sizeof(struct name_table *nt, struct ast_typeexpr *type);
+uint32_t gp_alignof(struct name_table *nt, struct ast_typeexpr *type);
+struct type_attrs gp_attrsof(struct name_table *nt, struct ast_typeexpr *type);
 
-void x86_field_sizeoffset(struct name_table *nt, struct ast_typeexpr *type,
-                          ident_value field_name, uint32_t *sizeof_out,
-                          uint32_t *offsetof_out);
+void gp_field_sizeoffset(struct name_table *nt, struct ast_typeexpr *type,
+                         ident_value field_name, uint32_t *sizeof_out,
+                         uint32_t *offsetof_out);
 
 #endif /* KIT_X86_H_ */
 

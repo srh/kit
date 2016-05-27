@@ -93,7 +93,6 @@ void unionfields_sizealignof(struct name_table *nt,
   return;
 }
 
-/* X86 WINDOWS */
 /* This is a bi-use function -- if fieldstop is IDENT_VALUE_INVALID,
 then *attrs_out is initialized with the size and alignment (and other
 attributes) of the type.  Otherwise, *offsetof_out and attrs_out->size
@@ -259,9 +258,9 @@ void help_rhs_sizealignof(struct name_table *nt,
   }
 }
 
-void x86_field_sizeoffset(struct name_table *nt, struct ast_typeexpr *type,
-                          ident_value field_name, uint32_t *sizeof_out,
-                          uint32_t *offsetof_out) {
+void gp_field_sizeoffset(struct name_table *nt, struct ast_typeexpr *type,
+                         ident_value field_name, uint32_t *sizeof_out,
+                         uint32_t *offsetof_out) {
   CHECK(field_name != IDENT_VALUE_INVALID);
   uint32_t offset;
   struct type_attrs attrs;
@@ -270,7 +269,7 @@ void x86_field_sizeoffset(struct name_table *nt, struct ast_typeexpr *type,
   *offsetof_out = offset;
 }
 
-struct type_attrs x86_attrsof(struct name_table *nt, struct ast_typeexpr *type) {
+struct type_attrs gp_attrsof(struct name_table *nt, struct ast_typeexpr *type) {
   struct type_attrs attrs;
   uint32_t invalid_offsetof_param;
   help_sizealignof(nt, type, IDENT_VALUE_INVALID,
@@ -278,12 +277,12 @@ struct type_attrs x86_attrsof(struct name_table *nt, struct ast_typeexpr *type) 
   return attrs;
 }
 
-uint32_t x86_sizeof(struct name_table *nt, struct ast_typeexpr *type) {
-  struct type_attrs attrs = x86_attrsof(nt, type);
+uint32_t gp_sizeof(struct name_table *nt, struct ast_typeexpr *type) {
+  struct type_attrs attrs = gp_attrsof(nt, type);
   return attrs.size;
 }
 
-uint32_t x86_alignof(struct name_table *nt, struct ast_typeexpr *type) {
-  struct type_attrs attrs = x86_attrsof(nt, type);
+uint32_t gp_alignof(struct name_table *nt, struct ast_typeexpr *type) {
+  struct type_attrs attrs = gp_attrsof(nt, type);
   return attrs.align;
 }

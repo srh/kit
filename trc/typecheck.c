@@ -5259,19 +5259,19 @@ int compute_static_values(struct checkstate *cs, struct def_entry *ent) {
       switch (ent->primitive_op.tag) {
       case PRIMITIVE_OP_SIZEOF: {
         CHECK(inst->substitutions_count == 1);
-        uint32_t size = x86_sizeof(&cs->nt, &inst->substitutions[0]);
+        uint32_t size = gp_sizeof(&cs->nt, &inst->substitutions[0]);
         static_value_init_u32(di_value_for_set(inst), size);
       } break;
       case PRIMITIVE_OP_ALIGNOF: {
         CHECK(inst->substitutions_count == 1);
-        uint32_t alignment = x86_alignof(&cs->nt, &inst->substitutions[0]);
+        uint32_t alignment = gp_alignof(&cs->nt, &inst->substitutions[0]);
         static_value_init_u32(di_value_for_set(inst), alignment);
       } break;
       case PRIMITIVE_OP_ENUMVOID: {
         static_value_init_enumvoid(
             di_value_for_set(inst),
             ent->primitive_op.u.enumconstruct_number,
-            x86_sizeof(&cs->nt, &inst->type));
+            gp_sizeof(&cs->nt, &inst->type));
       } break;
       default:
         static_value_init_primitive_op(di_value_for_set(inst), ent->primitive_op);

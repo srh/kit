@@ -715,7 +715,7 @@ void frame_pop(struct frame *h, uint32_t size) {
 
 int x64_sysv_memory_param(struct checkstate *cs, struct ast_typeexpr *type,
                           uint32_t *type_size_out) {
-  uint32_t size = x86_sizeof(&cs->nt, type);
+  uint32_t size = gp_sizeof(&cs->nt, type);
   *type_size_out = size;
   /* (Are unaligned fields possible?  Like, a struct { u32; { u32;
   u32; }; u32; } might have an unaligned field?  Or is it just the
@@ -733,7 +733,7 @@ int x64_sysv_memory_param(struct checkstate *cs, struct ast_typeexpr *type,
 int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *return_type,
                                uint32_t *return_type_size_out) {
   /* TODO(): The calling paths for this are probably x86/x64-specific, so it can/should be broken into two functions. */
-  struct type_attrs return_type_attrs = x86_attrsof(&cs->nt, return_type);
+  struct type_attrs return_type_attrs = gp_attrsof(&cs->nt, return_type);
   switch (cs->platform) {
     /* TODO: OSX isn't quite like Windows -- see the b3sb3 case. */
   case TARGET_PLATFORM_OSX_32BIT: /* fallthrough */
@@ -784,7 +784,7 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h, struct ast
   for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
     struct ast_typeexpr *param_type = ast_var_info_type(&expr->u.lambda.params[i].var_info);
 
-    uint32_t size = x86_sizeof(&cs->nt, param_type);
+    uint32_t size = gp_sizeof(&cs->nt, param_type);
     uint32_t padded_size = uint32_ceil_aligned(size, DWORD_SIZE);
 
     struct loc loc = ebp_loc(size, padded_size, offset);
@@ -1931,7 +1931,7 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
       }
 
       if (tagnum != 0) {
-        struct type_attrs field_attrs = x86_attrsof(&cs->nt, &rhs->u.enumspec.enumfields[tagnum - FIRST_ENUM_TAG_NUMBER].type);
+        struct type_attrs field_attrs = gp_attrsof(&cs->nt, &rhs->u.enumspec.enumfields[tagnum - FIRST_ENUM_TAG_NUMBER].type);
         struct loc dest_body_loc = make_enum_body_loc(f, h, dest, field_attrs.size, field_attrs.align);
         struct loc src_body_loc;
         if (has_src) {
@@ -2233,6 +2233,7 @@ void gen_default_construct(struct checkstate *cs, struct objfile *f, struct fram
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_DEFAULT_CONSTRUCT, loc, 0, ignore, type);
 }
 
+/* chase x86 */
 void gen_returnloc_funcreturn_convention(struct objfile *f,
                                          int hidden_return_param,
                                          struct loc return_loc) {
@@ -2954,7 +2955,7 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   arg/return locations and sizes for this op. */
   int32_t saved_stack_offset = frame_save_offset(h);
 
-  struct type_attrs arg_attrs = x86_attrsof(&cs->nt, arg0_type);
+  struct type_attrs arg_attrs = gp_attrsof(&cs->nt, arg0_type);
 
   uint32_t return_size;
   int hidden_return_param = exists_hidden_return_param(cs, return_type, &return_size);
@@ -3007,7 +3008,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     struct ast_typeexpr *target;
     int success = view_ptr_target(&cs->cm, arg0_type_or_null, &target);
     CHECK(success);
-    uint32_t size = x86_sizeof(&cs->nt, target);
+    uint32_t size = gp_sizeof(&cs->nt, target);
     gen_default_construct(cs, f, h, ebp_indirect_loc(size, size, off0),
                           target);
   } break;
@@ -3015,7 +3016,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     struct ast_typeexpr *target;
     int success = view_ptr_target(&cs->cm, arg0_type_or_null, &target);
     CHECK(success);
-    uint32_t size = x86_sizeof(&cs->nt, target);
+    uint32_t size = gp_sizeof(&cs->nt, target);
     gen_copy(cs, f, h, ebp_indirect_loc(size, size, off0),
              ebp_indirect_loc(size, size, off1),
              target);
@@ -3024,7 +3025,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     struct ast_typeexpr *target;
     int success = view_ptr_target(&cs->cm, arg0_type_or_null, &target);
     CHECK(success);
-    uint32_t size = x86_sizeof(&cs->nt, target);
+    uint32_t size = gp_sizeof(&cs->nt, target);
     gen_move_or_copydestroy(cs, f, h, ebp_indirect_loc(size, size, off0),
                             ebp_indirect_loc(size, size, off1),
                             target);
@@ -3033,7 +3034,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     struct ast_typeexpr *target;
     int success = view_ptr_target(&cs->cm, arg0_type_or_null, &target);
     CHECK(success);
-    uint32_t size = x86_sizeof(&cs->nt, target);
+    uint32_t size = gp_sizeof(&cs->nt, target);
     gen_destroy(cs, f, h, ebp_indirect_loc(size, size, off0),
                 target);
   } break;
@@ -3940,7 +3941,7 @@ void get_funcall_arglist_info(struct checkstate *cs,
   uint32_t total_size = (hidden_return_param ? DWORD_SIZE : 0);
   for (size_t i = 0; i < args_count; i++) {
     struct ast_expr *arg = &a->u.funcall.args[i].expr;
-    uint32_t arg_size = x86_sizeof(&cs->nt, ast_expr_type(arg));
+    uint32_t arg_size = gp_sizeof(&cs->nt, ast_expr_type(arg));
     uint32_t padded_size = frame_padded_push_size(cs->arch, arg_size);
     infos[i].offset_from_callsite = uint32_to_int32(total_size);
     infos[i].arg_size = arg_size;
@@ -4112,7 +4113,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
     wipe_temporaries(cs, f, h, &rhs_er, ast_expr_type(ue->rhs), &rhs_loc);
 
     struct ast_typeexpr *type = ast_expr_type(a);
-    uint32_t size = x86_sizeof(&cs->nt, type);
+    uint32_t size = gp_sizeof(&cs->nt, type);
     apply_dereference(cs, f, h, rhs_loc, size, er, type);
     return 1;
   } break;
@@ -4178,7 +4179,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   uint32_t elem_size;
   if (is_ptr) {
     CHECK(ptr_target->tag == AST_TYPEEXPR_ARRAY);
-    elem_size = x86_sizeof(&cs->nt, ptr_target->u.arraytype.param);
+    elem_size = gp_sizeof(&cs->nt, ptr_target->u.arraytype.param);
 
     CHECK(lhs_loc.size == DWORD_SIZE);
     CHECK(rhs_loc.size == DWORD_SIZE);
@@ -4187,7 +4188,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   } else {
     struct ast_typeexpr *lhs_type = ast_expr_type(ie->lhs);
     CHECK(lhs_type->tag == AST_TYPEEXPR_ARRAY);
-    elem_size = x86_sizeof(&cs->nt, lhs_type->u.arraytype.param);
+    elem_size = gp_sizeof(&cs->nt, lhs_type->u.arraytype.param);
 
     CHECK(lhs_loc.size == uint32_mul(elem_size, unsafe_numeric_literal_u32(&lhs_type->u.arraytype.number)));
     CHECK(rhs_loc.size == DWORD_SIZE);
@@ -4534,7 +4535,7 @@ struct loc gen_array_element_loc(struct checkstate *cs,
                                  struct loc src,
                                  struct ast_typeexpr *elem_type,
                                  uint32_t index) {
-  uint32_t elem_size = x86_sizeof(&cs->nt, elem_type);
+  uint32_t elem_size = gp_sizeof(&cs->nt, elem_type);
   uint32_t elem_offset = uint32_mul(elem_size, index);
 
   gen_load_addressof(f, X86_EDX, src);
@@ -4559,7 +4560,7 @@ struct loc gen_field_loc(struct checkstate *cs,
   touching subsequent fields. */
   uint32_t size;
   uint32_t offset;
-  x86_field_sizeoffset(&cs->nt, type, fieldname, &size, &offset);
+  gp_field_sizeoffset(&cs->nt, type, fieldname, &size, &offset);
 
   return gen_subobject_loc(f, h, lhs_loc, size, offset);
 }
@@ -4652,7 +4653,7 @@ void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
       /* TODO: Support immediate values, distinction between defs
       of variables and other defs -- only make a symbol for
       exported defs (if they're small). */
-      uint32_t size = x86_sizeof(&cs->nt, &inst->type);
+      uint32_t size = gp_sizeof(&cs->nt, &inst->type);
       /* TODO: Maybe globals' alignment rules are softer. */
       uint32_t padded_size = size;
       struct loc loc = global_loc(size, padded_size,
@@ -4666,7 +4667,7 @@ int gen_strinit_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
   struct ast_typeexpr *stype = ast_strinit_structish_type(&a->u.strinit);
-  uint32_t size = x86_sizeof(&cs->nt, stype);
+  uint32_t size = gp_sizeof(&cs->nt, stype);
   struct loc loc = frame_push_loc(h, size);
 
   for (size_t i = 0, e = a->u.strinit.exprs_count; i < e; i++) {
@@ -4794,7 +4795,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
       CRASH("deref field access typechecked on a non-pointer.");
     }
 
-    uint32_t full_size = x86_sizeof(&cs->nt, ptr_target);
+    uint32_t full_size = gp_sizeof(&cs->nt, ptr_target);
     struct expr_return deref_er = open_expr_return();
     apply_dereference(cs, f, h, lhs_loc, full_size, &deref_er, ptr_target);
 
@@ -4846,7 +4847,7 @@ int gen_swartch(struct checkstate *cs, struct objfile *f,
                 struct frame *h, struct ast_expr *swartch,
                 struct swartch_facts *out) {
   struct ast_typeexpr *swartch_type = ast_expr_type(swartch);
-  struct loc swartch_loc = frame_push_loc(h, x86_sizeof(&cs->nt, swartch_type));
+  struct loc swartch_loc = frame_push_loc(h, gp_sizeof(&cs->nt, swartch_type));
 
   {
     int32_t swartch_saved_offset = frame_save_offset(h);
@@ -4863,7 +4864,7 @@ int gen_swartch(struct checkstate *cs, struct objfile *f,
     struct ast_typeexpr *target;
     if (view_ptr_target(&cs->cm, swartch_type, &target)) {
       CHECK(swartch_loc.tag == LOC_EBP_OFFSET);
-      uint32_t size = x86_sizeof(&cs->nt, target);
+      uint32_t size = gp_sizeof(&cs->nt, target);
       enum_loc = ebp_indirect_loc(size, size, swartch_loc.u.ebp_offset);
     } else {
       enum_loc = swartch_loc;
@@ -4904,7 +4905,7 @@ int gen_casebody(struct checkstate *cs, struct objfile *f,
   struct vardata vd;
   if (constructor->has_decl) {
     struct ast_typeexpr *var_type = ast_var_info_type(&constructor->decl_.var_info);
-    struct type_attrs var_attrs = x86_attrsof(&cs->nt, var_type);
+    struct type_attrs var_attrs = gp_attrsof(&cs->nt, var_type);
     struct loc var_loc = make_enum_body_loc(f, h, facts->enum_loc,
                                             var_attrs.size, var_attrs.align);
 
@@ -5045,7 +5046,6 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, saved_offset);
   } break;
   case AST_STATEMENT_RETURN: {
-    /* Chase x86 */
     int32_t saved_offset = frame_save_offset(h);
     struct expr_return er = demand_expr_return(frame_return_loc(h));
     if (s->u.return_statement.has_expr) {
@@ -5065,7 +5065,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     something.  We could save the cost of copying the
     ast_typeexpr. */
     struct ast_typeexpr *var_type = ast_var_statement_type(&s->u.var_statement);
-    uint32_t var_size = x86_sizeof(&cs->nt, var_type);
+    uint32_t var_size = gp_sizeof(&cs->nt, var_type);
     struct loc var_loc = frame_push_loc(h, var_size);
 
     if (s->u.var_statement.has_rhs) {
@@ -5506,7 +5506,7 @@ void build_typetrav_defs(struct checkstate *cs,
 
     switch (cs->arch) {
     case TARGET_ARCH_Y86: {
-      uint32_t sz = x86_sizeof(&cs->nt, &info->type);
+      uint32_t sz = gp_sizeof(&cs->nt, &info->type);
 
       /* TODO: This duplicates calling-convention-specific logic of
       note_param_locations. */
