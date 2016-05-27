@@ -71,6 +71,14 @@ int try_uint32_sub(uint32_t x, uint32_t y, uint32_t *out) {
   *out = x - y;
   return 1;
 }
+
+uint32_t uint32_sub(uint32_t x, uint32_t y) {
+  uint32_t ret;
+  int success = try_uint32_sub(x, y, &ret);
+  CHECK(success);
+  return ret;
+}
+
 int try_uint32_div(uint32_t x, uint32_t y, uint32_t *out) {
   if (y == 0) {
     return 0;

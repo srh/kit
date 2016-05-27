@@ -16,6 +16,7 @@ struct name_table;
 /* TODO(): Drop the Y86, blessing DWORD_SIZE usage. */
 #define DWORD_Y86_SIZE 4
 
+#define X64_EIGHTBYTE_SIZE 8
 
 
 uint32_t ptr_size(enum target_arch arch);

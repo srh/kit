@@ -16,6 +16,7 @@ uint32_t uint32_mul(uint32_t x, uint32_t y);
 int try_uint32_add(uint32_t x, uint32_t y, uint32_t *out);
 uint32_t uint32_add(uint32_t x, uint32_t y);
 int try_uint32_sub(uint32_t x, uint32_t y, uint32_t *out);
+uint32_t uint32_sub(uint32_t x, uint32_t y);
 int try_uint32_div(uint32_t x, uint32_t y, uint32_t *out);
 int try_uint32_mod(uint32_t x, uint32_t y, uint32_t *out);
 uint32_t uint32_ceil_aligned(uint32_t x, uint32_t m);

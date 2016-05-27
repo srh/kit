@@ -46,6 +46,25 @@ enum gp_ptr_reg {
   GP_PTR_DI,
 };
 
+enum x64_reg {
+  X64_RAX,
+  X64_RCX,
+  X64_RDX,
+  X64_RBX,
+  X64_RSP,
+  X64_RBP,
+  X64_RSI,
+  X64_RDI,
+  X64_R8,
+  X64_R9,
+  X64_R10,
+  X64_R11,
+  X64_R12,
+  X64_R13,
+  X64_R14,
+  X64_R15,
+};
+
 enum x86_reg {
   X86_EAX,
   X86_ECX,
@@ -166,8 +185,10 @@ void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct fr
                              struct loc dest, struct loc src, struct ast_typeexpr *type);
 void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
                            struct loc dest, struct ast_typeexpr *var_type);
+/* TODO(): Rename to y86_gen_store_register. */
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg);
 void gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src);
+void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg);
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number);
 void gen_crash_jmp(struct objfile *f, struct frame *h);
@@ -789,21 +810,85 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h, struct ast
   }
 }
 
-void x64_note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
-  uint32_t return_type_size;
-  int is_return_hidden = lambda_exists_hidden_return_param(cs, expr, &return_type_size);
-  /* x64: The HRP gets passed in %rdi */
-  (void)cs, (void)h, (void)expr, (void)is_return_hidden;
+void x64_gen_store64(struct objfile *f, enum x64_reg dest, int32_t dest_disp, enum x64_reg src) {
+  (void)f, (void)dest, (void)dest_disp, (void)src;
   TODO_IMPLEMENT;
 }
 
-void note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
+/* X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8, X64_R9, */
+void x64_note_param_locations(struct checkstate *cs, struct objfile *f, struct frame *h, struct ast_expr *expr) {
+  uint32_t return_type_size;
+  int is_return_hidden = lambda_exists_hidden_return_param(cs, expr, &return_type_size);
+
+  int register_usage_count = 0;
+  static const enum x64_reg param_regs[6] = {
+    X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8, X64_R9,
+  };
+
+  struct loc return_loc;
+  if (is_return_hidden) {
+    struct loc hrp_loc = frame_push_loc(h, X64_EIGHTBYTE_SIZE);
+    return_loc = ebp_indirect_loc(return_type_size, return_type_size, hrp_loc.u.ebp_offset);
+    x64_gen_store64(f, X64_RBP, hrp_loc.u.ebp_offset, X64_RDI);
+    register_usage_count++;
+  } else {
+    return_loc = frame_push_loc(h, return_type_size);
+  }
+
+  /* Memory params start above the stored ebp and return pointer.
+  (The HRP comes from a register and is put in memory below ebp, like
+  other register params.)  */
+  int32_t memory_param_offset = 2 * X64_EIGHTBYTE_SIZE;
+
+  size_t vars_pushed = 0;
+  for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
+    struct ast_typeexpr *param_type = ast_var_info_type(&expr->u.lambda.params[i].var_info);
+
+    uint32_t size;
+    int memory_param = x64_sysv_memory_param(cs, param_type, &size);
+    /* (We assume everything is at worst 8-byte aligned, because we at worst have u64.) */
+
+    struct loc param_loc;
+    if (memory_param || register_usage_count + (size > 8 ? 2 : 1) > 6) {
+      /* Padded as the sysv x64 callconv goes. */
+      uint32_t padded_size = uint32_ceil_aligned(size, X64_EIGHTBYTE_SIZE);
+      param_loc = ebp_loc(size, padded_size, memory_param_offset);
+      memory_param_offset = int32_add(memory_param_offset, padded_size);
+    } else {
+      param_loc = frame_push_loc(h, size);
+      if (size <= 8) {
+        CHECK(register_usage_count < 6);
+        x64_gen_store_register(f, param_loc, param_regs[register_usage_count]);
+        register_usage_count++;
+      } else {
+        CHECK(register_usage_count < 5);
+        x64_gen_store_register(f, param_loc, param_regs[register_usage_count]);
+        register_usage_count++;
+        CHECK(register_usage_count < 6);
+        x64_gen_store_register(f, ebp_loc(uint32_sub(param_loc.size, 8), uint32_sub(param_loc.padded_size, 8), param_loc.u.ebp_offset), param_regs[register_usage_count]);
+        register_usage_count++;
+      }
+
+      struct vardata vd;
+      vardata_init(&vd, expr->u.lambda.params[i].name.value,
+                   1, param_type, param_loc);
+      SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+
+      vars_pushed = size_add(vars_pushed, 1);
+    }
+    /* TODO(): If we use 5 registers and then have a 16-byte object, can we use the 6th register on a later parameter? */
+  }
+
+  frame_specify_calling_info(h, vars_pushed, return_loc, is_return_hidden);
+}
+
+void note_param_locations(struct checkstate *cs, struct objfile *f, struct frame *h, struct ast_expr *expr) {
   switch (cs->arch) {
   case TARGET_ARCH_Y86: {
     y86_note_param_locations(cs, h, expr);
   } break;
   case TARGET_ARCH_X64: {
-    x64_note_param_locations(cs, h, expr);
+    x64_note_param_locations(cs, f, h, expr);
   } break;
   default:
     UNREACHABLE();
@@ -2364,6 +2449,7 @@ void gen_bzero(struct objfile *f, struct loc dest) {
   }
 }
 
+/* x86: Rename function or generify it as with gen_gp_store_register. */
 void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
   CHECK(dest.size <= DWORD_SIZE);
   CHECK(dest.size <= dest.padded_size);
@@ -2401,6 +2487,11 @@ void gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
   default:
     CRASH("not implemented or unreachable.");
   }
+}
+
+void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg) {
+  (void)f, (void)dest, (void)reg;
+  TODO_IMPLEMENT;
 }
 
 void gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src) {
@@ -5236,7 +5327,7 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
   frame_init(&h, cs->platform);
 
   gen_function_intro(f, &h);
-  note_param_locations(cs, &h, a);
+  note_param_locations(cs, f, &h, a);
 
   int res = gen_bracebody(cs, f, &h, &a->u.lambda.body);
 
