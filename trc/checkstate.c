@@ -81,14 +81,15 @@ void checkstate_init(struct checkstate *cs, struct identmap *im,
   cs->loader_ctx = loader_ctx;
   cs->loader = loader;
   cs->platform = platform;
-  cs->arch = platform_arch(platform);
+  enum target_arch arch = platform_arch(platform);
+  cs->arch = arch;
   cs->imports = NULL;
   cs->imports_count = 0;
   cs->imports_limit = 0;
   cs->total_filesize = 0;
   cs->template_instantiation_recursion_depth = 0;
   cs->kit_name_counter = 0;
-  name_table_init(&cs->nt);
+  name_table_init(&cs->nt, arch);
 
   identmap_init(&cs->sli_values);
   cs->sli_symbol_table_indexes = 0;

@@ -1745,18 +1745,22 @@ struct loc gen_subobject_loc(struct objfile *f,
 struct loc make_enum_num_loc(struct objfile *f,
                              struct frame *h,
                              struct loc loc) {
-  CHECK(loc.size >= DWORD_SIZE);
-  /* All enums start with a DWORD-sized tag. */
-  return gen_subobject_loc(f, h, loc, DWORD_SIZE, 0);
+  uint32_t tag_size = enum_tag_size(h->arch);
+  CHECK(loc.size >= tag_size);
+  /* All enums start with a tag, in [0, tag_size). */
+  return gen_subobject_loc(f, h, loc, tag_size, 0);
 }
 
 struct loc make_enum_body_loc(struct objfile *f,
                               struct frame *h,
                               struct loc loc,
-                              uint32_t body_size) {
-  CHECK(loc.size >= uint32_add(DWORD_SIZE, body_size));
-  /* All enums start with a DWORD-sized tag. */
-  return gen_subobject_loc(f, h, loc, body_size, DWORD_SIZE);
+                              uint32_t body_size,
+                              uint32_t body_alignment) {
+  uint32_t tag_size = enum_tag_size(h->arch);
+  uint32_t body_offset = uint32_max(tag_size, body_alignment);
+  CHECK(loc.size >= uint32_add(body_offset, body_size));
+  /* All enums start with a tag, in [0, tag_size). */
+  return gen_subobject_loc(f, h, loc, body_size, body_offset);
 }
 
 void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
@@ -1786,6 +1790,7 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
       dest_num_loc.tag = (enum loc_tag)-1;
     }
 
+    /* TODO(): Enum tag size presumption, and such. */
     gen_load_register(f, X86_EAX, enum_num_loc);
 
     size_t end_target = frame_add_target(h);
@@ -1813,11 +1818,11 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
       }
 
       if (tagnum != 0) {
-        uint32_t field_size = x86_sizeof(&cs->nt, &rhs->u.enumspec.enumfields[tagnum - FIRST_ENUM_TAG_NUMBER].type);
-        struct loc dest_body_loc = make_enum_body_loc(f, h, dest, field_size);
+        struct type_attrs field_attrs = x86_attrsof(&cs->nt, &rhs->u.enumspec.enumfields[tagnum - FIRST_ENUM_TAG_NUMBER].type);
+        struct loc dest_body_loc = make_enum_body_loc(f, h, dest, field_attrs.size, field_attrs.align);
         struct loc src_body_loc;
         if (has_src) {
-          src_body_loc = make_enum_body_loc(f, h, src, field_size);
+          src_body_loc = make_enum_body_loc(f, h, src, field_attrs.size, field_attrs.align);
         } else {
           src_body_loc.tag = (enum loc_tag)-1;
         }
@@ -2814,12 +2819,12 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   arg/return locations and sizes for this op. */
   int32_t saved_stack_offset = frame_save_offset(h);
 
-  uint32_t arg_size = x86_sizeof(&cs->nt, arg0_type);
+  struct type_attrs arg_attrs = x86_attrsof(&cs->nt, arg0_type);
 
   uint32_t return_size;
   int hidden_return_param = exists_hidden_return_param(cs, return_type, &return_size);
 
-  struct loc arg_loc = ebp_loc(arg_size, arg_size,
+  struct loc arg_loc = ebp_loc(arg_attrs.size, arg_attrs.size,
                                h->stack_offset + (hidden_return_param ? DWORD_SIZE : 0));
 
   struct loc return_loc;
@@ -2830,8 +2835,9 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   }
 
   struct loc return_enum_num_loc = make_enum_num_loc(f, h, return_loc);
-  struct loc return_enum_body_loc = make_enum_body_loc(f, h, return_loc, arg_size);
+  struct loc return_enum_body_loc = make_enum_body_loc(f, h, return_loc, arg_attrs.size, arg_attrs.align);
 
+  /* x86-specific enum tag size logic. */
   int32_t enum_num_i32
     = int32_add(FIRST_ENUM_TAG_NUMBER, size_to_int32(enumconstruct_number));
   x86_gen_mov_reg_imm32(f, X86_EAX, enum_num_i32);
@@ -4752,6 +4758,7 @@ int gen_casebody(struct checkstate *cs, struct objfile *f,
                  struct ast_constructor_pattern *constructor,
                  struct ast_bracebody *body,
                  size_t fail_target_number) {
+  /* TODO(): Enum tag logic? */
   x86_gen_cmp_imm32(f, X86_EAX,
                     int32_add(
                         size_to_int32(
@@ -4762,8 +4769,9 @@ int gen_casebody(struct checkstate *cs, struct objfile *f,
   struct vardata vd;
   if (constructor->has_decl) {
     struct ast_typeexpr *var_type = ast_var_info_type(&constructor->decl_.var_info);
+    struct type_attrs var_attrs = x86_attrsof(&cs->nt, var_type);
     struct loc var_loc = make_enum_body_loc(f, h, facts->enum_loc,
-                                            x86_sizeof(&cs->nt, var_type));
+                                            var_attrs.size, var_attrs.align);
 
     /* We don't destroy the variable -- the swartch gets push/popped instead. */
     vardata_init(&vd, constructor->decl_.name.value, 0, var_type, var_loc);
@@ -4850,6 +4858,7 @@ int gen_successbody(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_CONDITION_PATTERN: {
+    /* TODO(): Enum tag size presumption? */
     struct loc swartch_num_loc = make_enum_num_loc(f, h, cstate->u.pattern.facts.enum_loc);
     gen_load_register(f, X86_EAX, swartch_num_loc);
     if (!gen_casebody(cs, f, h, &cstate->u.pattern.facts,
@@ -4875,6 +4884,7 @@ void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
   case AST_CONDITION_PATTERN: {
     /* Check for zero-tag. */
     /* TODO: Check for other out-of-range cases. */
+    /* TODO(): Enum tag size presumption */
     struct loc swartch_num_loc = make_enum_num_loc(f, h, cstate->u.pattern.facts.enum_loc);
     gen_load_register(f, X86_EAX, swartch_num_loc);
     STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
@@ -5091,6 +5101,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
     struct loc swartch_num_loc = make_enum_num_loc(f, h, facts.enum_loc);
 
+    /* TODO(): Enum tag size presumption? */
     gen_load_register(f, X86_EAX, swartch_num_loc);
 
     size_t end_target = frame_add_target(h);
@@ -5125,6 +5136,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
     if (has_default) {
       struct ast_cased_statement *cas = &ss->cased_statements[default_case_num];
+      /* TODO(): Enum tag size presumption. */
       STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
       /* We carefully make the 0 tag and nonsense tag values redirect
       to the crash branch. */

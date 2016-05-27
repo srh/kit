@@ -158,9 +158,12 @@ struct name_table {
   size_t deftypes_limit;
 
   struct identmap deftypes_by_name;
+
+  enum target_arch arch;
 };
 
-void name_table_init(struct name_table *t);
+/* Merely carries target_arch for callee convenience in places.  TODO(): Don't. */
+void name_table_init(struct name_table *t, enum target_arch arch);
 void name_table_destroy(struct name_table *t);
 
 int name_table_add_def(struct identmap *im,

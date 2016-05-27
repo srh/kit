@@ -297,7 +297,7 @@ void deftype_entry_ptr_destroy(struct deftype_entry **ptr) {
   *ptr = NULL;
 }
 
-void name_table_init(struct name_table *t) {
+void name_table_init(struct name_table *t, enum target_arch arch) {
   arena_init(&t->arena);
 
   t->defs = NULL;
@@ -311,9 +311,13 @@ void name_table_init(struct name_table *t) {
   t->deftypes_limit = 0;
 
   identmap_init(&t->deftypes_by_name);
+
+  t->arch = arch;
 }
 
 void name_table_destroy(struct name_table *t) {
+  t->arch = (enum target_arch)-1;
+
   identmap_destroy(&t->deftypes_by_name);
 
   SLICE_FREE(t->deftypes, t->deftypes_count, deftype_entry_ptr_destroy);
