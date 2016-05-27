@@ -192,6 +192,7 @@ void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number);
 void gen_crash_jmp(struct objfile *f, struct frame *h);
+void x64_gen_load_addressof(struct objfile *f, enum x64_reg dest, struct loc loc);
 
 int platform_prefix_underscore(enum target_platform platform) {
   switch (platform) {
@@ -1719,6 +1720,7 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
 }
 
 /* Put this right beneath where you save the stack offset. */
+/* Chase x86 -- uh, this is complete nonsense for all callers of this, on x86 things are passed in registers, the arglist types matter.  */
 void adjust_frame_for_callsite_alignment(struct frame *h, uint32_t arglist_size) {
   /* X86 - particularly for 32-bit OS X's 16-byte alignment. */
   int32_t unadjusted_callsite_offset
@@ -2164,17 +2166,28 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
   /* TODO: Go deeper on names to avoid needless function layers. */
   struct sti sti = lookup_or_make_typetrav_sti(f, cs, tf, type);
 
-  /* vvv chase x86 (callconv) */
   int32_t saved_offset = frame_save_offset(h);
-  if (has_src) {
-    /* X86 - pointer size */
-    adjust_frame_for_callsite_alignment(h, 2 * DWORD_SIZE);
-    push_address(f, h, src);
-  } else {
-    /* X86 - pointer size */
-    adjust_frame_for_callsite_alignment(h, DWORD_SIZE);
+  switch (cs->arch) {
+  case TARGET_ARCH_Y86: {
+    if (has_src) {
+      /* X86 - pointer size */
+      adjust_frame_for_callsite_alignment(h, 2 * DWORD_SIZE);
+      push_address(f, h, src);
+    } else {
+      /* X86 - pointer size */
+      adjust_frame_for_callsite_alignment(h, DWORD_SIZE);
+    }
+    push_address(f, h, dest);
+  } break;
+  case TARGET_ARCH_X64: {
+    /* TODO(): Generally the "callsite alignment" logic will need to be tweaked for x64, in the more general case.  We pass parameters in registers here. */
+    adjust_frame_for_callsite_alignment(h, 0);
+    if (has_src) {
+      x64_gen_load_addressof(f, X64_RSI, src);
+    }
+    x64_gen_load_addressof(f, X64_RDI, dest);
+  } break;
   }
-  push_address(f, h, dest);
   gen_call_imm_func(cs, f, h, sti, 0);
   frame_restore_offset(h, saved_offset);
 }
@@ -2315,6 +2328,11 @@ void gen_load_addressof(struct objfile *f, enum x86_reg dest, struct loc loc) {
   default:
     UNREACHABLE();
   }
+}
+
+void x64_gen_load_addressof(struct objfile *f, enum x64_reg dest, struct loc loc) {
+  (void)f, (void)dest, (void)loc;
+  TODO_IMPLEMENT;
 }
 
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc) {
