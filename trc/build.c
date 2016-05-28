@@ -191,7 +191,8 @@ void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
 void gen_copy(struct checkstate *cs, struct objfile *f, struct frame *h,
               struct loc dest, struct loc src, struct ast_typeexpr *type);
 void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct frame *h,
-                             struct loc dest, struct loc src, struct ast_typeexpr *type);
+                             struct loc dest, struct loc src,
+                             struct ast_typeexpr *type);
 void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
                            struct loc dest, struct ast_typeexpr *var_type);
 void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg);
@@ -350,7 +351,8 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
     databuf_init(&namebuf);
     databuf_append(&namebuf, name, name_count);
     if (inst->owner->generics.has_type_params) {
-      sprint_type_param_list(&namebuf, cs->im, inst->substitutions, inst->substitutions_count);
+      sprint_type_param_list(&namebuf, cs->im, inst->substitutions,
+                             inst->substitutions_count);
     }
 
     void *gen_name;
@@ -679,7 +681,8 @@ size_t frame_add_target(struct frame *h) {
 }
 
 /* chase mark */
-void frame_define_target(struct frame *h, size_t target_number, uint32_t target_offset) {
+void frame_define_target(struct frame *h, size_t target_number,
+                         uint32_t target_offset) {
   struct targetdata *td = &h->targetdata[target_number];
   CHECK(!td->target_known);
   td->target_known = 1;
@@ -743,7 +746,8 @@ int x64_sysv_memory_param(struct checkstate *cs, struct ast_typeexpr *type,
 
 int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *return_type,
                                uint32_t *return_type_size_out) {
-  /* TODO(): The calling paths for this are probably x86/x64-specific, so it can/should be broken into two functions. */
+  /* TODO(): The calling paths for this are probably x86/x64-specific,
+  so it can/should be broken into two functions. */
   struct type_attrs return_type_attrs = gp_attrsof(&cs->nt, return_type);
   switch (cs->platform) {
     /* TODO: OSX isn't quite like Windows -- see the b3sb3 case. */
@@ -785,15 +789,18 @@ int lambda_exists_hidden_return_param(struct checkstate *cs, struct ast_expr *ex
   return exists_hidden_return_param(cs, return_type, return_type_size_out);
 }
 
-void y86_note_param_locations(struct checkstate *cs, struct frame *h, struct ast_expr *expr) {
+void y86_note_param_locations(struct checkstate *cs, struct frame *h,
+                              struct ast_expr *expr) {
   uint32_t return_type_size;
-  int is_return_hidden = lambda_exists_hidden_return_param(cs, expr, &return_type_size);
+  int is_return_hidden = lambda_exists_hidden_return_param(cs, expr,
+                                                           &return_type_size);
   int32_t offset = (2 + is_return_hidden) * DWORD_SIZE;
 
   size_t vars_pushed = 0;
 
   for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
-    struct ast_typeexpr *param_type = ast_var_info_type(&expr->u.lambda.params[i].var_info);
+    struct ast_typeexpr *param_type
+      = ast_var_info_type(&expr->u.lambda.params[i].var_info);
 
     uint32_t size = gp_sizeof(&cs->nt, param_type);
     uint32_t padded_size = uint32_ceil_aligned(size, DWORD_SIZE);
@@ -822,15 +829,18 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h, struct ast
   }
 }
 
-void x64_gen_store64(struct objfile *f, enum x64_reg dest, int32_t dest_disp, enum x64_reg src) {
+void x64_gen_store64(struct objfile *f, enum x64_reg dest, int32_t dest_disp,
+                     enum x64_reg src) {
   (void)f, (void)dest, (void)dest_disp, (void)src;
   TODO_IMPLEMENT;
 }
 
 /* X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8, X64_R9, */
-void x64_note_param_locations(struct checkstate *cs, struct objfile *f, struct frame *h, struct ast_expr *expr) {
+void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
+                              struct frame *h, struct ast_expr *expr) {
   uint32_t return_type_size;
-  int is_return_hidden = lambda_exists_hidden_return_param(cs, expr, &return_type_size);
+  int is_return_hidden = lambda_exists_hidden_return_param(cs, expr,
+                                                           &return_type_size);
 
   int register_usage_count = 0;
   static const enum x64_reg param_regs[6] = {
@@ -840,7 +850,8 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f, struct f
   struct loc return_loc;
   if (is_return_hidden) {
     struct loc hrp_loc = frame_push_loc(h, X64_EIGHTBYTE_SIZE);
-    return_loc = ebp_indirect_loc(return_type_size, return_type_size, hrp_loc.u.ebp_offset);
+    return_loc = ebp_indirect_loc(return_type_size, return_type_size,
+                                  hrp_loc.u.ebp_offset);
     x64_gen_store64(f, X64_RBP, hrp_loc.u.ebp_offset, X64_RDI);
     register_usage_count++;
   } else {
@@ -854,11 +865,13 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f, struct f
 
   size_t vars_pushed = 0;
   for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
-    struct ast_typeexpr *param_type = ast_var_info_type(&expr->u.lambda.params[i].var_info);
+    struct ast_typeexpr *param_type
+      = ast_var_info_type(&expr->u.lambda.params[i].var_info);
 
     uint32_t size;
     int memory_param = x64_sysv_memory_param(cs, param_type, &size);
-    /* (We assume everything is at worst 8-byte aligned, because we at worst have u64.) */
+    /* (We assume everything is at worst 8-byte aligned, because we at
+    worst have u64.) */
 
     struct loc param_loc;
     if (memory_param || register_usage_count + (size > 8 ? 2 : 1) > 6) {
@@ -877,7 +890,10 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f, struct f
         x64_gen_store_register(f, param_loc, param_regs[register_usage_count]);
         register_usage_count++;
         CHECK(register_usage_count < 6);
-        x64_gen_store_register(f, ebp_loc(uint32_sub(param_loc.size, 8), uint32_sub(param_loc.padded_size, 8), param_loc.u.ebp_offset), param_regs[register_usage_count]);
+        x64_gen_store_register(f, ebp_loc(uint32_sub(param_loc.size, 8),
+                                          uint32_sub(param_loc.padded_size, 8),
+                                          param_loc.u.ebp_offset),
+                               param_regs[register_usage_count]);
         register_usage_count++;
       }
 
@@ -888,13 +904,15 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f, struct f
 
       vars_pushed = size_add(vars_pushed, 1);
     }
-    /* TODO(): If we use 5 registers and then have a 16-byte object, can we use the 6th register on a later parameter? */
+    /* TODO(): If we use 5 registers and then have a 16-byte object,
+    can we use the 6th register on a later parameter? */
   }
 
   frame_specify_calling_info(h, vars_pushed, return_loc, is_return_hidden);
 }
 
-void note_param_locations(struct checkstate *cs, struct objfile *f, struct frame *h, struct ast_expr *expr) {
+void note_param_locations(struct checkstate *cs, struct objfile *f, struct frame *h,
+                          struct ast_expr *expr) {
   switch (cs->arch) {
   case TARGET_ARCH_Y86: {
     y86_note_param_locations(cs, h, expr);
@@ -1848,7 +1866,8 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
 }
 
 /* Put this right beneath where you save the stack offset. */
-/* TODO() -- uh, this is complete nonsense for all callers of this?  On x86 things are passed in registers, so the arglist types matter. */
+/* TODO() -- uh, this is complete nonsense for all callers of this?
+On x86 things are passed in registers, so the arglist types matter. */
 void adjust_frame_for_callsite_alignment(struct frame *h, uint32_t arglist_size) {
   /* y86/x64 - particularly for 32-bit OS X's 16-byte alignment. */
   int32_t unadjusted_callsite_offset
@@ -1881,7 +1900,8 @@ void adjust_frame_for_callsite_alignment(struct frame *h, uint32_t arglist_size)
 void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                         struct def_instantiation *inst);
 
-void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f, struct frame *h,
+void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f,
+                              struct frame *h,
                               struct loc loc, struct def_instantiation *inst) {
   int32_t stack_offset = frame_save_offset(h);
   /* X86 - assumes pointer is dword-sized */
@@ -1891,8 +1911,10 @@ void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f, struct f
   frame_restore_offset(h, stack_offset);
 }
 
-void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f, struct frame *h,
-                              struct loc dest, struct loc src, struct def_instantiation *inst) {
+void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
+                              struct frame *h,
+                              struct loc dest, struct loc src,
+                              struct def_instantiation *inst) {
   int32_t stack_offset = frame_save_offset(h);
   /* X86 - assumes pointer is dword-sized */
   adjust_frame_for_callsite_alignment(h, 2 * DWORD_SIZE);
@@ -2060,10 +2082,12 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
 
       if (tagnum != 0) {
         struct type_attrs field_attrs = gp_attrsof(&cs->nt, &rhs->u.enumspec.enumfields[tagnum - FIRST_ENUM_TAG_NUMBER].type);
-        struct loc dest_body_loc = make_enum_body_loc(f, h, dest, field_attrs.size, field_attrs.align);
+        struct loc dest_body_loc = make_enum_body_loc(f, h, dest, field_attrs.size,
+                                                      field_attrs.align);
         struct loc src_body_loc;
         if (has_src) {
-          src_body_loc = make_enum_body_loc(f, h, src, field_attrs.size, field_attrs.align);
+          src_body_loc = make_enum_body_loc(f, h, src, field_attrs.size,
+                                            field_attrs.align);
         } else {
           src_body_loc.tag = (enum loc_tag)-1;
         }
@@ -2177,15 +2201,18 @@ void really_gen_typetrav_behavior(struct checkstate *cs, struct objfile *f,
   case AST_TYPEEXPR_STRUCTE: {
     for (size_t i = 0, e = type->u.structe.fields_count; i < e; i++) {
       int32_t saved_offset = frame_save_offset(h);
-      struct loc dest_field_loc = gen_field_loc(cs, f, h, dest, type, type->u.structe.fields[i].name.value);
+      struct loc dest_field_loc = gen_field_loc(cs, f, h, dest, type,
+                                                type->u.structe.fields[i].name.value);
       struct loc src_field_loc;
       if (has_src) {
-        src_field_loc = gen_field_loc(cs, f, h, src, type, type->u.structe.fields[i].name.value);
+        src_field_loc = gen_field_loc(cs, f, h, src, type,
+                                      type->u.structe.fields[i].name.value);
       } else {
         src_field_loc.tag = (enum loc_tag)-1;
       }
 
-      gen_typetrav_func(cs, f, h, tf, dest_field_loc, has_src, src_field_loc, &type->u.structe.fields[i].type);
+      gen_typetrav_func(cs, f, h, tf, dest_field_loc, has_src, src_field_loc,
+                        &type->u.structe.fields[i].type);
       frame_restore_offset(h, saved_offset);
     }
     return;
@@ -2209,15 +2236,18 @@ void really_gen_typetrav_behavior(struct checkstate *cs, struct objfile *f,
     uint32_t arraytype_count = unsafe_numeric_literal_u32(&type->u.arraytype.number);
     for (uint32_t i = 0; i < arraytype_count; i++) {
       int32_t saved_offset = frame_save_offset(h);
-      struct loc dest_element_loc = gen_array_element_loc(cs, f, h, dest, type->u.arraytype.param, i);
+      struct loc dest_element_loc = gen_array_element_loc(cs, f, h, dest,
+                                                          type->u.arraytype.param, i);
       struct loc src_element_loc;
       if (has_src) {
-        src_element_loc = gen_array_element_loc(cs, f, h, src, type->u.arraytype.param, i);
+        src_element_loc = gen_array_element_loc(cs, f, h, src,
+                                                type->u.arraytype.param, i);
       } else {
         src_element_loc.tag = (enum loc_tag)-1;
       }
 
-      gen_typetrav_func(cs, f, h, tf, dest_element_loc, has_src, src_element_loc, type->u.arraytype.param);
+      gen_typetrav_func(cs, f, h, tf, dest_element_loc, has_src, src_element_loc,
+                        type->u.arraytype.param);
 
       frame_restore_offset(h, saved_offset);
     }
@@ -2323,7 +2353,9 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
     push_address(f, h, dest);
   } break;
   case TARGET_ARCH_X64: {
-    /* TODO(): Generally the "callsite alignment" logic will need to be tweaked for x64, in the more general case.  We pass parameters in registers here. */
+    /* TODO(): Generally the "callsite alignment" logic will need to
+    be tweaked for x64, in the more general case.  We pass parameters
+    in registers here. */
     adjust_frame_for_callsite_alignment(h, 0);
     if (has_src) {
       x64_gen_load_addressof(f, X64_RSI, src);
@@ -2350,7 +2382,8 @@ void gen_copy(struct checkstate *cs, struct objfile *f, struct frame *h,
 }
 /* chase mark */
 void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct frame *h,
-                             struct loc dest, struct loc src, struct ast_typeexpr *type) {
+                             struct loc dest, struct loc src,
+                             struct ast_typeexpr *type) {
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_MOVE_OR_COPYDESTROY, dest, 1, src, type);
 }
 /* chase mark */
@@ -2381,7 +2414,8 @@ void x86_gen_returnloc_funcreturn_convention(struct objfile *f,
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
     CHECK(return_loc.padded_size == 2 * DWORD_SIZE);
     x86_gen_load32(f, X86_EAX, X86_EBP, return_loc.u.ebp_offset);
-    x86_gen_load32(f, X86_EDX, X86_EBP, int32_add(return_loc.u.ebp_offset, DWORD_SIZE));
+    x86_gen_load32(f, X86_EDX, X86_EBP,
+                   int32_add(return_loc.u.ebp_offset, DWORD_SIZE));
   }
 }
 
@@ -2538,7 +2572,8 @@ void gp_gen_memmem_mov(struct objfile *f,
   }
 }
 
-void gp_gen_load_ptr(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr, int32_t src_disp) {
+void gp_gen_load_ptr(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                     int32_t src_disp) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
     x86_gen_load32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
@@ -2597,7 +2632,8 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   gp_gen_memmem_mov(f, dest_reg, dest_disp, src_reg, src_disp, padded_size);
 }
 
-void gp_gen_mem_bzero(struct objfile *f, enum gp_reg reg, int32_t disp, uint32_t upadded_size) {
+void gp_gen_mem_bzero(struct objfile *f, enum gp_reg reg, int32_t disp,
+                      uint32_t upadded_size) {
   enum gp_reg zreg = gp_choose_altreg(reg);
   gp_gen_mov_reg_imm32(f, zreg, 0);
 
@@ -2647,7 +2683,8 @@ void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg) 
 }
 
 void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg) {
-  /* We actually do have to implement this, because reg can be a calling convention register like r8 or r9, not named by gp_reg. */
+  /* We actually do have to implement this, because reg can be a
+  calling convention register like r8 or r9, not named by gp_reg. */
   (void)f, (void)dest, (void)reg;
   TODO_IMPLEMENT;
 }
@@ -2681,7 +2718,8 @@ void x64_gen_load_register(struct objfile *f, enum x64_reg reg, struct loc src) 
 }
 
 
-void gen_store_biregister(struct objfile *f, struct loc dest, enum x86_reg lo, enum x86_reg hi) {
+void gen_store_biregister(struct objfile *f, struct loc dest,
+                          enum x86_reg lo, enum x86_reg hi) {
   CHECK(DWORD_SIZE < dest.size && dest.size <= 2 * DWORD_SIZE);
   CHECK(dest.padded_size == 2 * DWORD_SIZE);
   switch (dest.tag) {
@@ -2897,9 +2935,9 @@ void gen_destroy_temp(struct checkstate *cs, struct objfile *f, struct frame *h,
   }
 }
 
-void move_or_copy_temporary_into_loc(struct checkstate *cs, struct objfile *f, struct frame *h,
-                                     struct loc dest, struct loc src, struct ast_typeexpr *type,
-                                     struct temp_return tr) {
+void move_or_copy_temporary_into_loc(struct checkstate *cs, struct objfile *f,
+                                     struct frame *h, struct loc dest, struct loc src,
+                                     struct ast_typeexpr *type, struct temp_return tr) {
   /* We have to copy the value, unless tr.exists and tr.whole_thing. */
   if (tr.exists && tr.whole_thing) {
     /* (Still possible we have to copy the value because... a move
@@ -2937,7 +2975,8 @@ void expr_return_set(struct checkstate *cs, struct objfile *f, struct frame *h,
 
 /* chase x86 */
 void wipe_temporaries(struct checkstate *cs, struct objfile *f, struct frame *h,
-                      struct expr_return *src, struct ast_typeexpr *value_type, struct loc *dest_out) {
+                      struct expr_return *src, struct ast_typeexpr *value_type,
+                      struct loc *dest_out) {
   CHECK(src->tag != EXPR_RETURN_DEMANDED);
 
   struct loc loc;
@@ -3084,7 +3123,8 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   }
 
   struct loc return_enum_num_loc = make_enum_num_loc(f, h, return_loc);
-  struct loc return_enum_body_loc = make_enum_body_loc(f, h, return_loc, arg_attrs.size, arg_attrs.align);
+  struct loc return_enum_body_loc
+    = make_enum_body_loc(f, h, return_loc, arg_attrs.size, arg_attrs.align);
 
   /* x86-specific enum tag size logic. */
   int32_t enum_num_i32
@@ -4118,7 +4158,8 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                                  arg_info.padded_size,
                                  int32_add(callsite_base_offset, arg_info.offset_from_callsite));
 
-    /* TODO: We must use ast_exprcatch information to force the temporary in arg_loc. */
+    /* TODO: We must use ast_exprcatch information to force the
+    temporary in arg_loc. */
     /* (Right now, EXPR_RETURN_DEMANDED is known to work this way only
     when it encounters another funcall.) */
     struct expr_return arg_er = demand_expr_return(arg_loc);
@@ -4324,7 +4365,8 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   if (is_ptr) {
     expr_return_set(cs, f, h, er, retloc, ast_expr_type(a), temp_none());
   } else {
-    expr_return_set(cs, f, h, er, retloc, ast_expr_type(a), temp_subobject(*er_tr(&lhs_er)));
+    expr_return_set(cs, f, h, er, retloc, ast_expr_type(a),
+                    temp_subobject(*er_tr(&lhs_er)));
   }
   return 1;
 }
@@ -4740,7 +4782,8 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
   if (lhs_type->tag == AST_TYPEEXPR_ARRAY) {
     CHECK(a->u.local_field_access.fieldname.ident.value == cs->cm.array_length_fieldname);
     gen_destroy_temp(cs, f, h, *er_tr(&lhs_er));
-    uint32_t lhs_arraytype_count = unsafe_numeric_literal_u32(&lhs_type->u.arraytype.number);
+    uint32_t lhs_arraytype_count
+      = unsafe_numeric_literal_u32(&lhs_type->u.arraytype.number);
     /* X86 32-bit size specific. */
     expr_return_immediate(f, h, er, imm_u32(lhs_arraytype_count));
   } else {
@@ -4836,7 +4879,8 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
       size_t vi;
       int found_vi = lookup_vardata_by_name(h, a->u.name.ident.value, &vi);
       CHECK(found_vi);
-      expr_return_set(cs, f, h, er, h->vardata[vi].loc, h->vardata[vi].concrete_type, temp_none());
+      expr_return_set(cs, f, h, er, h->vardata[vi].loc, h->vardata[vi].concrete_type,
+                      temp_none());
     }
     return 1;
   } break;
@@ -4900,7 +4944,8 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
       if (!gen_expr(cs, f, h, a->u.deref_field_access.lhs, &lhs_er)) {
         return 0;
       }
-      wipe_temporaries(cs, f, h, &lhs_er, ast_expr_type(a->u.deref_field_access.lhs), &lhs_loc);
+      wipe_temporaries(cs, f, h, &lhs_er, ast_expr_type(a->u.deref_field_access.lhs),
+                       &lhs_loc);
     }
 
     struct ast_typeexpr *ptr_target;
@@ -4915,7 +4960,8 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
 
     /* An unimportant fact about a check we know. */
     CHECK(!er_tr(&deref_er)->exists);
-    apply_field_access(cs, f, h, ero_loc(&deref_er.u.open), *er_tr(&deref_er), ptr_target,
+    apply_field_access(cs, f, h, ero_loc(&deref_er.u.open), *er_tr(&deref_er),
+                       ptr_target,
                        &a->u.deref_field_access.fieldname,
                        ast_expr_type(a), er);
     return 1;
@@ -5139,7 +5185,8 @@ void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
     /* Check for zero-tag. */
     /* TODO: Check for other out-of-range cases. */
     /* TODO(): Enum tag size presumption */
-    struct loc swartch_num_loc = make_enum_num_loc(f, h, cstate->u.pattern.facts.enum_loc);
+    struct loc swartch_num_loc
+      = make_enum_num_loc(f, h, cstate->u.pattern.facts.enum_loc);
     gp_gen_load_register(f, GP_A, swartch_num_loc);
     STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
     x86_gen_test_regs32(f, X86_EAX, X86_EAX);
@@ -5274,7 +5321,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       return 0;
     }
 
-    frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
+    frame_define_target(h, bottom_target_number,
+                        objfile_section_size(objfile_text(f)));
     gen_afterfail_condition_cleanup(cs, f, h, &cstate);
     frame_define_target(h, end_target_number,
                         objfile_section_size(objfile_text(f)));
@@ -5326,7 +5374,8 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
     gen_placeholder_jmp(f, h, top_target_number);
     if (fs->has_condition) {
-      frame_define_target(h, bottom_target_number, objfile_section_size(objfile_text(f)));
+      frame_define_target(h, bottom_target_number,
+                          objfile_section_size(objfile_text(f)));
     }
 
     /* TODO: Dedup with code in gen_bracebody. */
@@ -5558,7 +5607,8 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     char buf[4];
     write_le_u32(buf, size_to_uint32(size_add(value->u.enumvoid_value.enumconstruct_number, FIRST_ENUM_TAG_NUMBER)));
     objfile_section_append_raw(objfile_data(f), buf, sizeof(buf));
-    objfile_section_append_zeros(objfile_data(f), size_sub(value->u.enumvoid_value.enumsize, 4));
+    objfile_section_append_zeros(objfile_data(f),
+                                 size_sub(value->u.enumvoid_value.enumsize, 4));
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {
@@ -5627,7 +5677,8 @@ void build_typetrav_defs(struct checkstate *cs,
       struct loc src = ebp_indirect_loc(sz, sz, 3 * DWORD_SIZE);
       struct loc dest = ebp_indirect_loc(sz, sz, 2 * DWORD_SIZE);
 
-      really_gen_typetrav_behavior(cs, f, &h, info->func, dest, has_src, src, &info->type);
+      really_gen_typetrav_behavior(cs, f, &h, info->func, dest, has_src, src,
+                                   &info->type);
     } break;
     case TARGET_ARCH_X64:
       TODO_IMPLEMENT;
