@@ -2498,7 +2498,7 @@ void gp_gen_memmem_mov(struct objfile *f,
                        int32_t src_disp,
                        uint32_t upadded_size) {
   int32_t padded_size = uint32_to_int32(upadded_size);
-  enum x86_reg reg = gp_choose_register_2(dest_reg, src_reg);
+  enum gp_reg reg = gp_choose_register_2(dest_reg, src_reg);
   int32_t n = 0;
   while (n < padded_size) {
     if (padded_size - n >= 4) {
@@ -2506,9 +2506,8 @@ void gp_gen_memmem_mov(struct objfile *f,
       gp_gen_store32(f, dest_reg, int32_add(n, dest_disp), reg);
       n += 4;
     } else {
-      enum x86_reg8 lowreg = lowbytereg(reg);
-      gp_gen_movzx8(f, lowreg, src_reg, int32_add(n, src_disp));
-      gp_gen_store8(f, dest_reg, int32_add(n, dest_disp), lowreg);
+      gp_gen_movzx8(f, reg, src_reg, int32_add(n, src_disp));
+      gp_gen_store8(f, dest_reg, int32_add(n, dest_disp), reg);
       n += 1;
     }
   }
@@ -2609,13 +2608,13 @@ void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg) 
     TODO_IMPLEMENT;
     break;
   case 4:
-    x86_gen_store32(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg(reg));
+    gp_gen_store32(f, dest_addr, dest_disp, reg);
     break;
   case 2:
-    x86_gen_store16(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg16(reg));
+    gp_gen_store16(f, dest_addr, dest_disp, reg);
     break;
   case 1:
-    x86_gen_store8(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg8(reg));
+    gp_gen_store8(f, dest_addr, dest_disp, reg);
     break;
   default:
     CRASH("not implemented or unreachable.");
