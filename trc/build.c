@@ -27,9 +27,9 @@ struct frame;
 
 #define FIRST_ENUM_TAG_NUMBER 1
 
-/* These "general purpose" register names mimic the x86 mnemonics (for
+/* These "general purpose" register names mimic the y86 mnemonics (for
 now) because they stomp on registers of the same name, and legacy code
-uses x86-specific names. */
+uses y86-specific names. */
 enum gp_reg {
   /* 3 caller-save registers */
   GP_A,
@@ -80,6 +80,7 @@ enum x86_reg map_x86_reg(enum gp_reg reg) {
   return (enum x86_reg)reg;
 }
 
+/* TODO(): Remove this?  Possibly. */
 enum gp_reg unmap_x86_reg(enum x86_reg reg) {
   return (enum gp_reg)reg;
 }
@@ -2423,7 +2424,7 @@ enum gp_reg gp_choose_altreg(enum gp_reg used) {
   }
 }
 
-enum x86_reg choose_register_2(enum x86_reg used1, enum x86_reg used2) {
+enum x86_reg x86_choose_register_2(enum x86_reg used1, enum x86_reg used2) {
   if (used1 == X86_EAX || used2 == X86_EAX) {
     if (used1 == X86_ECX || used2 == X86_ECX) {
       return X86_EDX;
@@ -2432,6 +2433,18 @@ enum x86_reg choose_register_2(enum x86_reg used1, enum x86_reg used2) {
     }
   } else {
     return X86_EAX;
+  }
+}
+
+enum gp_reg gp_choose_register_2(enum gp_reg used1, enum gp_reg used2) {
+  if (used1 == GP_A || used2 == GP_A) {
+    if (used1 == GP_C || used2 == GP_C) {
+      return GP_D;
+    } else {
+      return GP_C;
+    }
+  } else {
+    return GP_A;
   }
 }
 
@@ -2463,24 +2476,24 @@ void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc) {
   gp_gen_store_register(f, dest, GP_A);
 }
 
-void x86_gen_memmem_mov(struct objfile *f,
-                        enum x86_reg dest_reg,
-                        int32_t dest_disp,
-                        enum x86_reg src_reg,
-                        int32_t src_disp,
-                        uint32_t upadded_size) {
+void gp_gen_memmem_mov(struct objfile *f,
+                       enum gp_reg dest_reg,
+                       int32_t dest_disp,
+                       enum gp_reg src_reg,
+                       int32_t src_disp,
+                       uint32_t upadded_size) {
   int32_t padded_size = uint32_to_int32(upadded_size);
-  enum x86_reg reg = choose_register_2(dest_reg, src_reg);
+  enum x86_reg reg = gp_choose_register_2(dest_reg, src_reg);
   int32_t n = 0;
   while (n < padded_size) {
-    if (padded_size - n >= DWORD_SIZE) {
-      x86_gen_load32(f, reg, src_reg, int32_add(n, src_disp));
-      x86_gen_store32(f, dest_reg, int32_add(n, dest_disp), reg);
-      n += DWORD_SIZE;
+    if (padded_size - n >= 4) {
+      gp_gen_load32(f, reg, src_reg, int32_add(n, src_disp));
+      gp_gen_store32(f, dest_reg, int32_add(n, dest_disp), reg);
+      n += 4;
     } else {
       enum x86_reg8 lowreg = lowbytereg(reg);
-      x86_gen_load8(f, lowreg, src_reg, int32_add(n, src_disp));
-      x86_gen_store8(f, dest_reg, int32_add(n, dest_disp), lowreg);
+      gp_gen_movzx8(f, lowreg, src_reg, int32_add(n, src_disp));
+      gp_gen_store8(f, dest_reg, int32_add(n, dest_disp), lowreg);
       n += 1;
     }
   }
@@ -2542,16 +2555,7 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
 
   uint32_t padded_size = dest.padded_size < src.padded_size ? dest.padded_size : src.padded_size;
   CHECK(padded_size >= src.size);
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_memmem_mov(f, map_x86_reg(dest_reg), dest_disp, map_x86_reg(src_reg), src_disp, padded_size);
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
+  gp_gen_memmem_mov(f, dest_reg, dest_disp, src_reg, src_disp, padded_size);
 }
 
 void y86_gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32_t upadded_size) {
@@ -2659,7 +2663,7 @@ void gen_store_biregister(struct objfile *f, struct loc dest, enum x86_reg lo, e
     CRASH("Writing to globals is impossible.");
   } break;
   case LOC_EBP_INDIRECT: {
-    enum x86_reg altreg = choose_register_2(lo, hi);
+    enum x86_reg altreg = x86_choose_register_2(lo, hi);
     x86_gen_load32(f, altreg, X86_EBP, dest.u.ebp_indirect);
     x86_gen_store32(f, altreg, 0, lo);
     x86_gen_store32(f, altreg, DWORD_SIZE, hi);
