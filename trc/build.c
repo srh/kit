@@ -149,8 +149,12 @@ enum x86_reg8 lowbytereg(enum x86_reg reg) {
   return (enum x86_reg8)reg;
 }
 
-enum x86_reg16 halfwidthreg(enum x86_reg reg) {
+enum x86_reg16 map_x86_reg16(enum gp_reg reg) {
   return (enum x86_reg16)reg;
+}
+
+enum x86_reg8 map_x86_reg8(enum gp_reg reg) {
+  return lowbytereg(map_x86_reg(reg));
 }
 
 void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
@@ -189,7 +193,7 @@ void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct fr
                              struct loc dest, struct loc src, struct ast_typeexpr *type);
 void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
                            struct loc dest, struct ast_typeexpr *var_type);
-void x86_gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg);
+void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg);
 void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src);
 void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg);
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
@@ -1485,6 +1489,9 @@ void x86_help_gen_mov_mem_imm32(struct objfile *f,
 void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
                      enum x86_reg src);
 
+void gp_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                    enum gp_reg src);
+
 void x86_gen_mov_mem_imm32(struct objfile *f,
                            enum x86_reg dest,
                            int32_t dest_disp,
@@ -1673,6 +1680,20 @@ void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
+void gp_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                    enum gp_reg src) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86: {
+    x86_gen_store32(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg(src));
+  } break;
+  case TARGET_ARCH_X64: {
+    TODO_IMPLEMENT;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void x86_gen_store16(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
                      enum x86_reg16 src) {
   uint8_t b[11];
@@ -1683,6 +1704,20 @@ void x86_gen_store16(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
   objfile_section_append_raw(objfile_text(f), b, count + 2);
 }
 
+void gp_gen_store16(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                    enum gp_reg src) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86: {
+    x86_gen_store16(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg16(src));
+  } break;
+  case TARGET_ARCH_X64: {
+    TODO_IMPLEMENT;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void x86_gen_store8(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
                     enum x86_reg8 src) {
   uint8_t b[10];
@@ -1690,6 +1725,20 @@ void x86_gen_store8(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp
   size_t count = x86_encode_reg_rm(b + 1, src, dest_addr, dest_disp);
   CHECK(count <= 9);
   objfile_section_append_raw(objfile_text(f), b, count + 1);
+}
+
+void gp_gen_store8(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                   enum gp_reg src) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86: {
+    x86_gen_store8(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg8(src));
+  } break;
+  case TARGET_ARCH_X64: {
+    TODO_IMPLEMENT;
+  } break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void gen_function_intro(struct objfile *f, struct frame *h) {
@@ -1968,7 +2017,7 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
         break;
       case TYPETRAV_FUNC_COPY: /* fallthrough */
       case TYPETRAV_FUNC_MOVE_OR_COPYDESTROY:
-        x86_gen_store_register(f, dest_num_loc, X86_EAX);
+        gp_gen_store_register(f, dest_num_loc, GP_A);
         break;
       case TYPETRAV_FUNC_DEFAULT_CONSTRUCT:
         /* Unreachable because default construction is a trivial
@@ -2366,6 +2415,14 @@ enum x86_reg x86_choose_altreg(enum x86_reg used) {
   }
 }
 
+enum gp_reg gp_choose_altreg(enum gp_reg used) {
+  if (used == GP_A) {
+    return GP_C;
+  } else {
+    return GP_A;
+  }
+}
+
 enum x86_reg choose_register_2(enum x86_reg used1, enum x86_reg used2) {
   if (used1 == X86_EAX || used2 == X86_EAX) {
     if (used1 == X86_ECX || used2 == X86_ECX) {
@@ -2400,9 +2457,10 @@ void x64_gen_load_addressof(struct objfile *f, enum x64_reg dest, struct loc loc
 }
 
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc) {
+  /* x86 */
   CHECK(dest.size == DWORD_SIZE);
   x86_gen_load_addressof(f, X86_EAX, loc);
-  x86_gen_store_register(f, dest, X86_EAX);
+  gp_gen_store_register(f, dest, GP_A);
 }
 
 void x86_gen_memmem_mov(struct objfile *f,
@@ -2531,40 +2589,23 @@ void gen_bzero(struct objfile *f, struct loc dest) {
   }
 }
 
-/* x86: Rename function or generify it as with gen_gp_store_register. */
-void x86_gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg) {
-  CHECK(dest.size <= DWORD_SIZE);
-  CHECK(dest.size <= dest.padded_size);
-
-  enum x86_reg dest_addr;
+void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg) {
+  enum gp_reg dest_addr;
   int32_t dest_disp;
-
-  switch (dest.tag) {
-  case LOC_EBP_OFFSET:
-    dest_addr = X86_EBP;
-    dest_disp = dest.u.ebp_offset;
-    break;
-  case LOC_GLOBAL:
-    CRASH("Writing to globals is impossible.");
-    break;
-  case LOC_EBP_INDIRECT: {
-    dest_addr = x86_choose_altreg(reg);
-    dest_disp = 0;
-    x86_gen_load32(f, dest_addr, X86_EBP, dest.u.ebp_indirect);
-  } break;
-  default:
-    UNREACHABLE();
-  }
+  put_ptr_in_reg(f, dest, gp_choose_altreg(reg), &dest_addr, &dest_disp);
 
   switch (dest.size) {
-  case DWORD_SIZE:
-    x86_gen_store32(f, dest_addr, dest_disp, reg);
+  case 8:
+    TODO_IMPLEMENT;
+    break;
+  case 4:
+    x86_gen_store32(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg(reg));
     break;
   case 2:
-    x86_gen_store16(f, dest_addr, dest_disp, halfwidthreg(reg));
+    x86_gen_store16(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg16(reg));
     break;
   case 1:
-    x86_gen_store8(f, dest_addr, dest_disp, lowbytereg(reg));
+    x86_gen_store8(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg8(reg));
     break;
   default:
     CRASH("not implemented or unreachable.");
@@ -2572,6 +2613,7 @@ void x86_gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg
 }
 
 void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg) {
+  /* We actually do have to implement this, because reg can be a calling convention register like r8 or r9, not named by gp_reg. */
   (void)f, (void)dest, (void)reg;
   TODO_IMPLEMENT;
 }
@@ -3014,7 +3056,7 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   int32_t enum_num_i32
     = int32_add(FIRST_ENUM_TAG_NUMBER, size_to_int32(enumconstruct_number));
   x86_gen_mov_reg_imm32(f, X86_EAX, enum_num_i32);
-  x86_gen_store_register(f, return_enum_num_loc, X86_EAX);
+  gp_gen_store_register(f, return_enum_num_loc, GP_A);
 
   gen_move_or_copydestroy(cs, f, h, return_enum_body_loc, arg_loc, arg0_type);
 
@@ -4100,7 +4142,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                     temp_exists(return_loc, return_type, 1));
   } else if (arglist_info.return_type_size <= DWORD_SIZE) {
     /* Return value in eax. */
-    x86_gen_store_register(f, return_loc, X86_EAX);
+    gp_gen_store_register(f, return_loc, GP_A);
     expr_return_set(cs, f, h, er, return_loc, return_type,
                     temp_exists(return_loc, return_type, 1));
   } else {
@@ -4242,7 +4284,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   x86_gen_add_w32(f, X86_EAX, X86_EDX);
 
   struct loc loc = frame_push_loc(h, DWORD_SIZE);
-  x86_gen_store_register(f, loc, X86_EAX);
+  gp_gen_store_register(f, loc, GP_A);
 
   struct loc retloc = ebp_indirect_loc(elem_size, elem_size, loc.u.ebp_offset);
   if (is_ptr) {
@@ -4565,6 +4607,7 @@ int gen_immediate_numeric_literal(struct checkstate *cs,
                                     numeric_literal_value, er);
 }
 
+/* chase x86 */
 struct loc gen_array_element_loc(struct checkstate *cs,
                                  struct objfile *f,
                                  struct frame *h,
@@ -4578,7 +4621,7 @@ struct loc gen_array_element_loc(struct checkstate *cs,
   x86_gen_mov_reg_imm32(f, X86_ECX, elem_offset);
   x86_gen_add_w32(f, X86_EDX, X86_ECX);
   struct loc loc = frame_push_loc(h, DWORD_SIZE);
-  x86_gen_store_register(f, loc, X86_EDX);
+  gp_gen_store_register(f, loc, GP_D);
 
   struct loc retloc = ebp_indirect_loc(elem_size, elem_size, loc.u.ebp_offset);
   return retloc;
