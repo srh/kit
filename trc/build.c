@@ -940,9 +940,19 @@ void x86_gen_pop32(struct objfile *f, enum x86_reg reg) {
   objfile_section_append_raw(objfile_text(f), &b, 1);
 }
 
+void x64_gen_pop64(struct objfile *f, enum x64_reg reg) {
+  (void)f, (void)reg;
+  TODO_IMPLEMENT;
+}
+
 void x86_gen_ret(struct objfile *f) {
   uint8_t b = 0xC3;
   objfile_section_append_raw(objfile_text(f), &b, 1);
+}
+
+void x64_gen_ret(struct objfile *f) {
+  (void)f;
+  TODO_IMPLEMENT;
 }
 
 void x86_gen_retn(struct objfile *f, uint16_t imm16) {
@@ -959,6 +969,11 @@ void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   b[0] = 0x8B;
   b[1] = mod_reg_rm(MOD11, dest, src);
   objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x64_gen_mov_reg64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
+  (void)f, (void)dest, (void)src;
+  TODO_IMPLEMENT;
 }
 
 void x86_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
@@ -1786,7 +1801,7 @@ int platform_ret4_hrp(struct checkstate *cs) {
   case TARGET_PLATFORM_OSX_32BIT:
     return 1;
   case TARGET_PLATFORM_LINUX_64BIT:
-    TODO_IMPLEMENT;
+    CRASH("We shouldn't be asking this question for x64.");
   default:
     UNREACHABLE();
   }
@@ -2346,10 +2361,9 @@ void gen_default_construct(struct checkstate *cs, struct objfile *f, struct fram
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_DEFAULT_CONSTRUCT, loc, 0, ignore, type);
 }
 
-/* chase x86 */
-void gen_returnloc_funcreturn_convention(struct objfile *f,
-                                         int hidden_return_param,
-                                         struct loc return_loc) {
+void x86_gen_returnloc_funcreturn_convention(struct objfile *f,
+                                             int hidden_return_param,
+                                             struct loc return_loc) {
   /* return_loc is always in the stack frame (and padded to
   DWORD_SIZE) or via a hidden return param. */
   if (hidden_return_param) {
@@ -2371,6 +2385,13 @@ void gen_returnloc_funcreturn_convention(struct objfile *f,
   }
 }
 
+void x64_gen_returnloc_funcreturn_convention(struct objfile *f,
+                                             int hidden_return_param,
+                                             struct loc return_loc) {
+  (void)f, (void)hidden_return_param, (void)return_loc;
+  TODO_IMPLEMENT;
+}
+
 void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h) {
   if (h->return_target_valid) {
     frame_define_target(h, h->return_target_number,
@@ -2386,11 +2407,11 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
     SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
   }
 
+  int hidden_return_param = frame_hidden_return_param(h);
   switch (h->arch) {
   case TARGET_ARCH_Y86: {
-    int hidden_return_param = frame_hidden_return_param(h);
-    gen_returnloc_funcreturn_convention(f, hidden_return_param,
-                                        h->return_loc);
+    x86_gen_returnloc_funcreturn_convention(f, hidden_return_param,
+                                            h->return_loc);
 
     x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
     x86_gen_pop32(f, X86_EBP);
@@ -2400,9 +2421,13 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
       x86_gen_ret(f);
     }
   } break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
+  case TARGET_ARCH_X64: {
+    x64_gen_returnloc_funcreturn_convention(f, hidden_return_param,
+                                            h->return_loc);
+    x64_gen_mov_reg64(f, X64_RSP, X64_RBP);
+    x64_gen_pop64(f, X64_RBP);
+    x64_gen_ret(f);
+  } break;
   default:
     UNREACHABLE();
   }
@@ -3069,7 +3094,7 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
 
   gen_move_or_copydestroy(cs, f, h, return_enum_body_loc, arg_loc, arg0_type);
 
-  gen_returnloc_funcreturn_convention(f, hidden_return_param, return_loc);
+  x86_gen_returnloc_funcreturn_convention(f, hidden_return_param, return_loc);
   frame_restore_offset(h, saved_stack_offset);
 }
 
