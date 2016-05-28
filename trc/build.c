@@ -27,24 +27,23 @@ struct frame;
 
 #define FIRST_ENUM_TAG_NUMBER 1
 
-/* These "general purpose pointer" register names mimic the x86
-mnemonics (for now) because they stomp on registers of the same name,
-and legacy code uses x86-specific names.  They're pointer-sized
-registers. */
-enum gp_ptr_reg {
+/* These "general purpose" register names mimic the x86 mnemonics (for
+now) because they stomp on registers of the same name, and legacy code
+uses x86-specific names. */
+enum gp_reg {
   /* 3 caller-save registers */
-  GP_PTR_A,
-  GP_PTR_C,
-  GP_PTR_D,
+  GP_A,
+  GP_C,
+  GP_D,
 
   /* 5 callee-save registers, we don't use any but SP and BP */
-  GP_PTR_B,
+  GP_B,
   /* stack pointer */
-  GP_PTR_SP,
+  GP_SP,
   /* frame pointer */
-  GP_PTR_BP,
-  GP_PTR_SI,
-  GP_PTR_DI,
+  GP_BP,
+  GP_SI,
+  GP_DI,
 };
 
 enum x64_reg {
@@ -77,12 +76,12 @@ enum x86_reg {
   X86_EDI,
 };
 
-enum x86_reg map_x86_ptr_reg(enum gp_ptr_reg reg) {
+enum x86_reg map_x86_reg(enum gp_reg reg) {
   return (enum x86_reg)reg;
 }
 
-enum gp_ptr_reg unmap_x86_ptr_reg(enum x86_reg reg) {
-  return (enum gp_ptr_reg)reg;
+enum gp_reg unmap_x86_reg(enum x86_reg reg) {
+  return (enum gp_reg)reg;
 }
 
 enum x86_reg8 {
@@ -1026,11 +1025,11 @@ void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
   }
 }
 
-void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_ptr_reg dest,
+void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_reg dest,
                            struct sti symbol_table_index) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    x86_gen_mov_reg_stiptr(f, map_x86_ptr_reg(dest), symbol_table_index);
+    x86_gen_mov_reg_stiptr(f, map_x86_reg(dest), symbol_table_index);
     break;
   case TARGET_ARCH_X64:
     TODO_IMPLEMENT;
@@ -2387,10 +2386,10 @@ void x86_gen_memmem_mov(struct objfile *f,
   }
 }
 
-void gp_gen_load_ptr(struct objfile *f, enum gp_ptr_reg dest, enum gp_ptr_reg src_addr, int32_t src_disp) {
+void gp_gen_load_ptr(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr, int32_t src_disp) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    x86_gen_load32(f, map_x86_ptr_reg(dest), map_x86_ptr_reg(src_addr), src_disp);
+    x86_gen_load32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
     break;
   case TARGET_ARCH_X64:
     TODO_IMPLEMENT;
@@ -2400,11 +2399,11 @@ void gp_gen_load_ptr(struct objfile *f, enum gp_ptr_reg dest, enum gp_ptr_reg sr
   }
 }
 
-void put_ptr_in_reg(struct objfile *f, struct loc loc, enum gp_ptr_reg free_reg,
-                    enum gp_ptr_reg *reg_out, int32_t *disp_out) {
+void put_ptr_in_reg(struct objfile *f, struct loc loc, enum gp_reg free_reg,
+                    enum gp_reg *reg_out, int32_t *disp_out) {
   switch (loc.tag) {
   case LOC_EBP_OFFSET: {
-    *reg_out = GP_PTR_BP;
+    *reg_out = GP_BP;
     *disp_out = loc.u.ebp_offset;
   } break;
   case LOC_GLOBAL: {
@@ -2413,7 +2412,7 @@ void put_ptr_in_reg(struct objfile *f, struct loc loc, enum gp_ptr_reg free_reg,
     *disp_out = 0;
   } break;
   case LOC_EBP_INDIRECT: {
-    gp_gen_load_ptr(f, free_reg, GP_PTR_BP, loc.u.ebp_indirect);
+    gp_gen_load_ptr(f, free_reg, GP_BP, loc.u.ebp_indirect);
     *reg_out = free_reg;
     *disp_out = 0;
   } break;
@@ -2434,18 +2433,18 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
 
   CHECK(dest.tag != LOC_GLOBAL);
 
-  enum gp_ptr_reg dest_reg;
+  enum gp_reg dest_reg;
   int32_t dest_disp;
-  put_ptr_in_reg(f, dest, GP_PTR_A, &dest_reg, &dest_disp);
-  enum gp_ptr_reg src_reg;
+  put_ptr_in_reg(f, dest, GP_A, &dest_reg, &dest_disp);
+  enum gp_reg src_reg;
   int32_t src_disp;
-  put_ptr_in_reg(f, src, GP_PTR_D, &src_reg, &src_disp);
+  put_ptr_in_reg(f, src, GP_D, &src_reg, &src_disp);
 
   uint32_t padded_size = dest.padded_size < src.padded_size ? dest.padded_size : src.padded_size;
   CHECK(padded_size >= src.size);
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    x86_gen_memmem_mov(f, map_x86_ptr_reg(dest_reg), dest_disp, map_x86_ptr_reg(src_reg), src_disp, padded_size);
+    x86_gen_memmem_mov(f, map_x86_reg(dest_reg), dest_disp, map_x86_reg(src_reg), src_disp, padded_size);
     break;
   case TARGET_ARCH_X64:
     TODO_IMPLEMENT;
@@ -2474,13 +2473,13 @@ void y86_gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32
 
 /* chase mark */
 void gen_bzero(struct objfile *f, struct loc dest) {
-  enum gp_ptr_reg reg;
+  enum gp_reg reg;
   int32_t disp;
-  put_ptr_in_reg(f, dest, GP_PTR_A, &reg, &disp);
+  put_ptr_in_reg(f, dest, GP_A, &reg, &disp);
 
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    y86_gen_mem_bzero(f, map_x86_ptr_reg(reg), disp, dest.padded_size);
+    y86_gen_mem_bzero(f, map_x86_reg(reg), disp, dest.padded_size);
     break;
   case TARGET_ARCH_X64:
     TODO_IMPLEMENT;
@@ -2540,9 +2539,9 @@ void x86_gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src) 
 
   enum x86_reg src_addr;
   int32_t src_disp;
-  enum gp_ptr_reg gp_src_addr;
-  put_ptr_in_reg(f, src, unmap_x86_ptr_reg(reg), &gp_src_addr, &src_disp);
-  src_addr = map_x86_ptr_reg(gp_src_addr);
+  enum gp_reg gp_src_addr;
+  put_ptr_in_reg(f, src, unmap_x86_reg(reg), &gp_src_addr, &src_disp);
+  src_addr = map_x86_reg(gp_src_addr);
 
   switch (src.size) {
   case DWORD_SIZE:
