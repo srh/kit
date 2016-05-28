@@ -275,7 +275,7 @@ int is_primitive_but_not_sizeof_alignof(struct def_entry *ent) {
 }
 
 /* TODO: Put string literals in rdata (add section number to loc_global). */
-/* chase x86 */
+/* chase mark */
 struct sti add_data_string(struct checkstate *cs, struct objfile *f,
                            const void *data, uint32_t length) {
   ident_value index = identmap_intern(&cs->sli_values, data, length);
@@ -2858,6 +2858,7 @@ struct temp_return temp_primitive_op(void) {
   return temp_none();
 }
 
+/* chase mark */
 struct temp_return temp_exists(struct loc loc,
                                struct ast_typeexpr *temporary_type,
                                int whole_thing) {
@@ -2895,6 +2896,7 @@ struct loc ero_loc(struct expr_return_open *ero) {
   return ero->loc_;
 }
 
+/* chase mark */
 void ero_set_loc(struct expr_return_open *ero, struct loc loc) {
   CHECK(!ero->has_loc);
   ero->has_loc = 1;
@@ -2943,6 +2945,7 @@ void gen_destroy_temp(struct checkstate *cs, struct objfile *f, struct frame *h,
   }
 }
 
+/* chase mark */
 void move_or_copy_temporary_into_loc(struct checkstate *cs, struct objfile *f,
                                      struct frame *h, struct loc dest, struct loc src,
                                      struct ast_typeexpr *type, struct temp_return tr) {
@@ -2959,7 +2962,7 @@ void move_or_copy_temporary_into_loc(struct checkstate *cs, struct objfile *f,
 
 /* The tr argument applies to the temporary in _loc_, the parameter,
 and it's not the same as the tr value that ends up in er. */
-/* chase x86 */
+/* chase mark */
 void expr_return_set(struct checkstate *cs, struct objfile *f, struct frame *h,
                      struct expr_return *er, struct loc loc, struct ast_typeexpr *type,
                      struct temp_return tr) {
