@@ -430,6 +430,13 @@ struct immediate imm_u32(uint32_t u32) {
   return imm;
 }
 
+struct immediate imm_u64(uint64_t u64) {
+  struct immediate imm;
+  imm.tag = IMMEDIATE_U64;
+  imm.u.u64 = u64;
+  return imm;
+}
+
 enum loc_tag {
   LOC_EBP_OFFSET,
   LOC_GLOBAL,
@@ -4903,11 +4910,18 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_NULL_LITERAL: {
-    /* Chase x86 */
-    /* Returns an immediate DWORD_SIZE sized value zero for a null
-    pointer. */
-    STATIC_CHECK(DWORD_SIZE == 4);
-    expr_return_immediate(f, h, er, imm_u32(0));
+    struct immediate imm;
+    switch (ptr_size(h->arch)) {
+    case 4:
+      imm = imm_u32(0);
+      break;
+    case 8:
+      imm = imm_u64(0);
+      break;
+    default:
+      UNREACHABLE();
+    }
+    expr_return_immediate(f, h, er, imm);
     return 1;
   } break;
   case AST_EXPR_VOID_LITERAL: {
