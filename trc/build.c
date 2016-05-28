@@ -2951,6 +2951,7 @@ void move_or_copy_temporary_into_loc(struct checkstate *cs, struct objfile *f,
 
 /* The tr argument applies to the temporary in _loc_, the parameter,
 and it's not the same as the tr value that ends up in er. */
+/* chase x86 */
 void expr_return_set(struct checkstate *cs, struct objfile *f, struct frame *h,
                      struct expr_return *er, struct loc loc, struct ast_typeexpr *type,
                      struct temp_return tr) {
@@ -4611,6 +4612,7 @@ void expr_return_primitive_op(struct expr_return *er,
   }
 }
 
+/* chase x86 */
 int help_gen_immediate_numeric(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
@@ -4665,6 +4667,7 @@ int help_gen_immediate_numeric(struct checkstate *cs,
   }
 }
 
+/* chase mark */
 int gen_immediate_numeric_literal(struct checkstate *cs,
                                   struct objfile *f,
                                   struct frame *h,
@@ -4674,6 +4677,7 @@ int gen_immediate_numeric_literal(struct checkstate *cs,
   CHECK(type->tag == AST_TYPEEXPR_NAME);
   CHECK(is_numeric_type(cs->im, type));
 
+  /* TODO: Allow 64-bit numeric literals on 64-bit platforms. */
   uint32_t numeric_literal_value;
   if (!numeric_literal_to_u32(a, &numeric_literal_value)) {
     return 0;
@@ -4795,6 +4799,7 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+/* chase x86 */
 void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
                     struct def_instantiation *inst, struct expr_return *er) {
   if (inst->value_computed && di_value(inst)->tag == STATIC_VALUE_PRIMITIVE_OP) {
@@ -4863,7 +4868,7 @@ int gen_string_literal(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* Chase x86 */
+/* chase mark */
 int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *er) {
@@ -4889,6 +4894,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
                                          &a->u.numeric_literal, er);
   } break;
   case AST_EXPR_BOOL_LITERAL: {
+    /* Chase x86 */
     CHECK(a->u.bool_literal.value == 0 || a->u.bool_literal.value == 1);
     struct immediate imm;
     imm.tag = IMMEDIATE_U8;
@@ -4897,6 +4903,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_NULL_LITERAL: {
+    /* Chase x86 */
     /* Returns an immediate DWORD_SIZE sized value zero for a null
     pointer. */
     STATIC_CHECK(DWORD_SIZE == 4);
@@ -4904,30 +4911,37 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_VOID_LITERAL: {
+    /* Chase x86 */
     struct immediate imm;
     imm.tag = IMMEDIATE_VOID;
     expr_return_immediate(f, h, er, imm);
     return 1;
   } break;
   case AST_EXPR_CHAR_LITERAL: {
+    /* Chase x86 */
     return help_gen_immediate_numeric(cs, f, h, ast_expr_type(a),
                                       &a->u.char_literal.meta,
                                       (uint32_t)a->u.char_literal.value,
                                       er);
   } break;
   case AST_EXPR_STRING_LITERAL: {
+    /* Chase x86 */
     return gen_string_literal(cs, f, h, a, er);
   } break;
   case AST_EXPR_FUNCALL: {
+    /* Chase x86 */
     return gen_funcall_expr(cs, f, h, a, er);
   } break;
   case AST_EXPR_INDEX: {
+    /* Chase x86 */
     return gen_index_expr(cs, f, h, a, er);
   } break;
   case AST_EXPR_UNOP: {
+    /* Chase x86 */
     return gen_unop_expr(cs, f, h, a, er);
   } break;
   case AST_EXPR_BINOP: {
+    /* Chase x86 */
     return gen_binop_expr(cs, f, h, a, er);
   } break;
   case AST_EXPR_LAMBDA: {
@@ -4935,9 +4949,11 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     TODO_IMPLEMENT;
   } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
+    /* Chase x86 */
     return gen_local_field_access(cs, f, h, a, er);
   } break;
   case AST_EXPR_DEREF_FIELD_ACCESS: {
+    /* Chase x86 */
     struct loc lhs_loc;
     {
       struct expr_return lhs_er = open_expr_return();
@@ -4967,8 +4983,10 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_TYPED:
+    /* Chase x86 */
     return gen_expr(cs, f, h, a->u.typed_expr.expr, er);
   case AST_EXPR_STRINIT:
+    /* Chase x86 */
     return gen_strinit_expr(cs, f, h, a, er);
   default:
     UNREACHABLE();
