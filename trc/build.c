@@ -4938,10 +4938,9 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     }
     return 1;
   } break;
-  case AST_EXPR_NUMERIC_LITERAL: {
+  case AST_EXPR_NUMERIC_LITERAL:
     return gen_immediate_numeric_literal(cs, f, h, ast_expr_type(a),
                                          &a->u.numeric_literal, er);
-  } break;
   case AST_EXPR_BOOL_LITERAL: {
     CHECK(a->u.bool_literal.value == 0 || a->u.bool_literal.value == 1);
     struct immediate imm;
@@ -4971,37 +4970,29 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     expr_return_immediate(f, h, er, imm);
     return 1;
   } break;
-  case AST_EXPR_CHAR_LITERAL: {
+  case AST_EXPR_CHAR_LITERAL:
     return help_gen_immediate_numeric(cs, f, h, ast_expr_type(a),
                                       &a->u.char_literal.meta,
                                       (uint32_t)a->u.char_literal.value,
                                       er);
-  } break;
-  case AST_EXPR_STRING_LITERAL: {
+  case AST_EXPR_STRING_LITERAL:
     return gen_string_literal(cs, f, h, a, er);
-  } break;
-  case AST_EXPR_FUNCALL: {
+  case AST_EXPR_FUNCALL:
     return gen_funcall_expr(cs, f, h, a, er);
-  } break;
-  case AST_EXPR_INDEX: {
+  case AST_EXPR_INDEX:
     return gen_index_expr(cs, f, h, a, er);
-  } break;
-  case AST_EXPR_UNOP: {
+  case AST_EXPR_UNOP:
     return gen_unop_expr(cs, f, h, a, er);
-  } break;
-  case AST_EXPR_BINOP: {
+  case AST_EXPR_BINOP:
     return gen_binop_expr(cs, f, h, a, er);
-  } break;
   case AST_EXPR_LAMBDA: {
     /* Lambdas should be compiled to global functions.. separately. */
     TODO_IMPLEMENT;
   } break;
-  case AST_EXPR_LOCAL_FIELD_ACCESS: {
+  case AST_EXPR_LOCAL_FIELD_ACCESS:
     return gen_local_field_access(cs, f, h, a, er);
-  } break;
-  case AST_EXPR_DEREF_FIELD_ACCESS: {
+  case AST_EXPR_DEREF_FIELD_ACCESS:
     return gen_deref_field_access(cs, f, h, a, er);
-  } break;
   case AST_EXPR_TYPED:
     return gen_expr(cs, f, h, a->u.typed_expr.expr, er);
   case AST_EXPR_STRINIT:
