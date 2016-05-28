@@ -2495,20 +2495,20 @@ void x86_gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg
   int32_t dest_disp;
 
   switch (dest.tag) {
-    case LOC_EBP_OFFSET:
-      dest_addr = X86_EBP;
-      dest_disp = dest.u.ebp_offset;
-      break;
-    case LOC_GLOBAL:
-      CRASH("Writing to globals is impossible.");
-      break;
-    case LOC_EBP_INDIRECT: {
-      dest_addr = choose_altreg(reg);
-      dest_disp = 0;
-      x86_gen_load32(f, dest_addr, X86_EBP, dest.u.ebp_indirect);
-    } break;
-    default:
-      UNREACHABLE();
+  case LOC_EBP_OFFSET:
+    dest_addr = X86_EBP;
+    dest_disp = dest.u.ebp_offset;
+    break;
+  case LOC_GLOBAL:
+    CRASH("Writing to globals is impossible.");
+    break;
+  case LOC_EBP_INDIRECT: {
+    dest_addr = choose_altreg(reg);
+    dest_disp = 0;
+    x86_gen_load32(f, dest_addr, X86_EBP, dest.u.ebp_indirect);
+  } break;
+  default:
+    UNREACHABLE();
   }
 
   switch (dest.size) {
