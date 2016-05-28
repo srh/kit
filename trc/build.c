@@ -1543,6 +1543,20 @@ void x86_gen_load32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
+void gp_gen_load32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                   int32_t src_disp) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_load32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void x86_gen_movzx8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
                     int32_t src_disp) {
   uint8_t b[11];
@@ -1553,6 +1567,20 @@ void x86_gen_movzx8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   objfile_section_append_raw(objfile_text(f), b, count + 2);
 }
 
+void gp_gen_movzx8(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                   int32_t src_disp) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_movzx8(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void x86_gen_movzx16(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
                      int32_t src_disp) {
   uint8_t b[11];
@@ -1561,6 +1589,20 @@ void x86_gen_movzx16(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr
   size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
   CHECK(count <= 9);
   objfile_section_append_raw(objfile_text(f), b, count + 2);
+}
+
+void gp_gen_movzx16(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                    int32_t src_disp) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_movzx16(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void x86_gen_movsx8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
@@ -2537,21 +2579,19 @@ void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg
 void x86_gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src) {
   CHECK(src.size <= DWORD_SIZE);
 
-  enum x86_reg src_addr;
+  enum gp_reg src_addr;
   int32_t src_disp;
-  enum gp_reg gp_src_addr;
-  put_ptr_in_reg(f, src, unmap_x86_reg(reg), &gp_src_addr, &src_disp);
-  src_addr = map_x86_reg(gp_src_addr);
+  put_ptr_in_reg(f, src, unmap_x86_reg(reg), &src_addr, &src_disp);
 
   switch (src.size) {
   case DWORD_SIZE:
-    x86_gen_load32(f, reg, src_addr, src_disp);
+    gp_gen_load32(f, unmap_x86_reg(reg), src_addr, src_disp);
     break;
   case 2:
-    x86_gen_movzx16(f, reg, src_addr, src_disp);
+    gp_gen_movzx16(f, unmap_x86_reg(reg), src_addr, src_disp);
     break;
   case 1:
-    x86_gen_movzx8(f, reg, src_addr, src_disp);
+    gp_gen_movzx8(f, unmap_x86_reg(reg), src_addr, src_disp);
     break;
   default:
     CRASH("not implemented or unreachable.");
