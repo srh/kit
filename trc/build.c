@@ -710,6 +710,7 @@ void frame_push_exact_amount(struct frame *h, uint32_t size) {
   }
 }
 
+/* chase x86 */
 struct loc frame_push_loc(struct frame *h, uint32_t size) {
   /* X86: Make sure new generic padding logic is right for callers on X64. */
   uint32_t padded_size = frame_padded_push_size(h->arch, size);
@@ -2926,12 +2927,14 @@ struct expr_return {
   struct temp_return tr_;
 };
 
+/* chase mark */
 void er_set_tr(struct expr_return *er, struct temp_return tr) {
   CHECK(!er->has_tr);
   er->has_tr = 1;
   er->tr_ = tr;
 }
 
+/* chase mark */
 struct temp_return *er_tr(struct expr_return *er) {
   CHECK(er->has_tr);
   return &er->tr_;
@@ -2985,7 +2988,7 @@ void expr_return_set(struct checkstate *cs, struct objfile *f, struct frame *h,
   }
 }
 
-/* chase x86 */
+/* chase mark */
 void wipe_temporaries(struct checkstate *cs, struct objfile *f, struct frame *h,
                       struct expr_return *src, struct ast_typeexpr *value_type,
                       struct loc *dest_out) {
