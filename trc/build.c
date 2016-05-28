@@ -2358,7 +2358,7 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
   }
 }
 
-enum x86_reg choose_altreg(enum x86_reg used) {
+enum x86_reg x86_choose_altreg(enum x86_reg used) {
   if (used == X86_EAX) {
     return X86_ECX;
   } else {
@@ -2497,7 +2497,7 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
 }
 
 void y86_gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32_t upadded_size) {
-  enum x86_reg zreg = choose_altreg(reg);
+  enum x86_reg zreg = x86_choose_altreg(reg);
   x86_gen_mov_reg_imm32(f, zreg, 0);
 
   int32_t padded_size = uint32_to_int32(upadded_size);
@@ -2548,7 +2548,7 @@ void x86_gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg
     CRASH("Writing to globals is impossible.");
     break;
   case LOC_EBP_INDIRECT: {
-    dest_addr = choose_altreg(reg);
+    dest_addr = x86_choose_altreg(reg);
     dest_disp = 0;
     x86_gen_load32(f, dest_addr, X86_EBP, dest.u.ebp_indirect);
   } break;
