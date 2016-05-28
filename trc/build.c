@@ -996,6 +996,21 @@ void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
   }
 }
 
+void gp_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
+                          int32_t imm32) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_mov_reg_imm32(f, map_x86_reg(dest), imm32);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+
 size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest);
 
 /* TODO(): Move callers to gp_gen_mov_reg_stiptr */
@@ -2558,18 +2573,18 @@ void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   gp_gen_memmem_mov(f, dest_reg, dest_disp, src_reg, src_disp, padded_size);
 }
 
-void y86_gen_mem_bzero(struct objfile *f, enum x86_reg reg, int32_t disp, uint32_t upadded_size) {
-  enum x86_reg zreg = x86_choose_altreg(reg);
-  x86_gen_mov_reg_imm32(f, zreg, 0);
+void gp_gen_mem_bzero(struct objfile *f, enum gp_reg reg, int32_t disp, uint32_t upadded_size) {
+  enum gp_reg zreg = gp_choose_altreg(reg);
+  gp_gen_mov_reg_imm32(f, zreg, 0);
 
   int32_t padded_size = uint32_to_int32(upadded_size);
   int32_t n = 0;
   while (n < padded_size) {
-    if (padded_size - n >= DWORD_SIZE) {
-      x86_gen_store32(f, reg, int32_add(n, disp), zreg);
-      n += DWORD_SIZE;
+    if (padded_size - n >= 4) {
+      gp_gen_store32(f, reg, int32_add(n, disp), zreg);
+      n += 4;
     } else {
-      x86_gen_store8(f, reg, int32_add(n, disp), lowbytereg(zreg));
+      gp_gen_store8(f, reg, int32_add(n, disp), zreg);
       n += 1;
     }
   }
@@ -2581,16 +2596,7 @@ void gen_bzero(struct objfile *f, struct loc dest) {
   int32_t disp;
   put_ptr_in_reg(f, dest, GP_A, &reg, &disp);
 
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    y86_gen_mem_bzero(f, map_x86_reg(reg), disp, dest.padded_size);
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
+  gp_gen_mem_bzero(f, reg, disp, dest.padded_size);
 }
 
 void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg) {
