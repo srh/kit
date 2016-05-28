@@ -190,7 +190,7 @@ void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct fr
 void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
                            struct loc dest, struct ast_typeexpr *var_type);
 void x86_gen_store_register(struct objfile *f, struct loc dest, enum x86_reg reg);
-void x86_gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src);
+void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src);
 void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg);
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number);
@@ -1952,7 +1952,7 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
     }
 
     /* TODO(): Enum tag size presumption, and such. */
-    x86_gen_load_register(f, X86_EAX, enum_num_loc);
+    gp_gen_load_register(f, GP_A, enum_num_loc);
 
     size_t end_target = frame_add_target(h);
     size_t next_target = frame_add_target(h);
@@ -2576,22 +2576,23 @@ void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg
   TODO_IMPLEMENT;
 }
 
-void x86_gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src) {
-  CHECK(src.size <= DWORD_SIZE);
-
+void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src) {
   enum gp_reg src_addr;
   int32_t src_disp;
-  put_ptr_in_reg(f, src, unmap_x86_reg(reg), &src_addr, &src_disp);
+  put_ptr_in_reg(f, src, reg, &src_addr, &src_disp);
 
   switch (src.size) {
-  case DWORD_SIZE:
-    gp_gen_load32(f, unmap_x86_reg(reg), src_addr, src_disp);
+  case 8:
+    TODO_IMPLEMENT;
+    break;
+  case 4:
+    gp_gen_load32(f, reg, src_addr, src_disp);
     break;
   case 2:
-    gp_gen_movzx16(f, unmap_x86_reg(reg), src_addr, src_disp);
+    gp_gen_movzx16(f, reg, src_addr, src_disp);
     break;
   case 1:
-    gp_gen_movzx8(f, unmap_x86_reg(reg), src_addr, src_disp);
+    gp_gen_movzx8(f, reg, src_addr, src_disp);
     break;
   default:
     CRASH("not implemented or unreachable.");
@@ -4065,7 +4066,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     struct loc func_loc;
     wipe_temporaries(cs, f, h, &func_er,
                      ast_expr_type(&a->u.funcall.func->expr), &func_loc);
-    x86_gen_load_register(f, X86_EAX, func_loc);
+    gp_gen_load_register(f, GP_A, func_loc);
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_indirect_call_reg(f, X86_EAX);
     if (arglist_info.hidden_return_param && platform_ret4_hrp(cs)) {
@@ -4220,7 +4221,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
     CHECK(lhs_loc.size == DWORD_SIZE);
     CHECK(rhs_loc.size == DWORD_SIZE);
 
-    x86_gen_load_register(f, X86_EDX, lhs_loc);
+    gp_gen_load_register(f, GP_D, lhs_loc);
   } else {
     struct ast_typeexpr *lhs_type = ast_expr_type(ie->lhs);
     CHECK(lhs_type->tag == AST_TYPEEXPR_ARRAY);
@@ -4232,7 +4233,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
     x86_gen_load_addressof(f, X86_EDX, lhs_loc);
   }
 
-  x86_gen_load_register(f, X86_EAX, rhs_loc);
+  gp_gen_load_register(f, GP_A, rhs_loc);
 
   x86_gen_mov_reg_imm32(f, X86_ECX, elem_size);
   x86_gen_imul_w32(f, X86_EAX, X86_ECX);
@@ -4257,7 +4258,7 @@ void gen_placeholder_jmp_if_false(struct objfile *f, struct frame *h,
                                   struct loc loc, size_t target_number) {
   CHECK(loc.size == KIT_BOOL_SIZE);
 
-  x86_gen_load_register(f, X86_EAX, loc);
+  gp_gen_load_register(f, GP_A, loc);
   x86_gen_test_regs32(f, X86_EAX, X86_EAX);
   gen_placeholder_jcc(f, h, X86_JCC_Z, target_number);
 }
@@ -5035,7 +5036,7 @@ int gen_successbody(struct checkstate *cs, struct objfile *f,
   case AST_CONDITION_PATTERN: {
     /* TODO(): Enum tag size presumption? */
     struct loc swartch_num_loc = make_enum_num_loc(f, h, cstate->u.pattern.facts.enum_loc);
-    x86_gen_load_register(f, X86_EAX, swartch_num_loc);
+    gp_gen_load_register(f, GP_A, swartch_num_loc);
     if (!gen_casebody(cs, f, h, &cstate->u.pattern.facts,
                       cstate->u.pattern.constructor, body,
                       fail_target_number)) {
@@ -5062,7 +5063,7 @@ void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
     /* TODO: Check for other out-of-range cases. */
     /* TODO(): Enum tag size presumption */
     struct loc swartch_num_loc = make_enum_num_loc(f, h, cstate->u.pattern.facts.enum_loc);
-    x86_gen_load_register(f, X86_EAX, swartch_num_loc);
+    gp_gen_load_register(f, GP_A, swartch_num_loc);
     STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
     x86_gen_test_regs32(f, X86_EAX, X86_EAX);
     gen_crash_jcc(f, h, X86_JCC_Z);
@@ -5272,7 +5273,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     struct loc swartch_num_loc = make_enum_num_loc(f, h, facts.enum_loc);
 
     /* TODO(): Enum tag size presumption? */
-    x86_gen_load_register(f, X86_EAX, swartch_num_loc);
+    gp_gen_load_register(f, GP_A, swartch_num_loc);
 
     size_t end_target = frame_add_target(h);
     size_t next_target = frame_add_target(h);
