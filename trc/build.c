@@ -4813,6 +4813,39 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+/* Chase x86 */
+int gen_deref_field_access(struct checkstate *cs, struct objfile *f,
+                           struct frame *h, struct ast_expr *a,
+                           struct expr_return *er) {
+  struct loc lhs_loc;
+  {
+    struct expr_return lhs_er = open_expr_return();
+    if (!gen_expr(cs, f, h, a->u.deref_field_access.lhs, &lhs_er)) {
+      return 0;
+    }
+    wipe_temporaries(cs, f, h, &lhs_er, ast_expr_type(a->u.deref_field_access.lhs),
+                     &lhs_loc);
+  }
+
+  struct ast_typeexpr *ptr_target;
+  if (!view_ptr_target(&cs->cm, ast_expr_type(a->u.deref_field_access.lhs),
+                       &ptr_target)) {
+    CRASH("deref field access typechecked on a non-pointer.");
+  }
+
+  uint32_t full_size = gp_sizeof(&cs->nt, ptr_target);
+  struct expr_return deref_er = open_expr_return();
+  apply_dereference(cs, f, h, lhs_loc, full_size, &deref_er, ptr_target);
+
+  /* An unimportant fact about a check we know. */
+  CHECK(!er_tr(&deref_er)->exists);
+  apply_field_access(cs, f, h, ero_loc(&deref_er.u.open), *er_tr(&deref_er),
+                     ptr_target,
+                     &a->u.deref_field_access.fieldname,
+                     ast_expr_type(a), er);
+  return 1;
+}
+
 /* chase x86 */
 void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
                     struct def_instantiation *inst, struct expr_return *er) {
@@ -4967,34 +5000,7 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return gen_local_field_access(cs, f, h, a, er);
   } break;
   case AST_EXPR_DEREF_FIELD_ACCESS: {
-    /* Chase x86 */
-    struct loc lhs_loc;
-    {
-      struct expr_return lhs_er = open_expr_return();
-      if (!gen_expr(cs, f, h, a->u.deref_field_access.lhs, &lhs_er)) {
-        return 0;
-      }
-      wipe_temporaries(cs, f, h, &lhs_er, ast_expr_type(a->u.deref_field_access.lhs),
-                       &lhs_loc);
-    }
-
-    struct ast_typeexpr *ptr_target;
-    if (!view_ptr_target(&cs->cm, ast_expr_type(a->u.deref_field_access.lhs),
-                         &ptr_target)) {
-      CRASH("deref field access typechecked on a non-pointer.");
-    }
-
-    uint32_t full_size = gp_sizeof(&cs->nt, ptr_target);
-    struct expr_return deref_er = open_expr_return();
-    apply_dereference(cs, f, h, lhs_loc, full_size, &deref_er, ptr_target);
-
-    /* An unimportant fact about a check we know. */
-    CHECK(!er_tr(&deref_er)->exists);
-    apply_field_access(cs, f, h, ero_loc(&deref_er.u.open), *er_tr(&deref_er),
-                       ptr_target,
-                       &a->u.deref_field_access.fieldname,
-                       ast_expr_type(a), er);
-    return 1;
+    return gen_deref_field_access(cs, f, h, a, er);
   } break;
   case AST_EXPR_TYPED:
     return gen_expr(cs, f, h, a->u.typed_expr.expr, er);
