@@ -4567,6 +4567,7 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
+/* chase x86 */
 void expr_return_immediate(struct objfile *f, struct frame *h,
                            struct expr_return *er,
                            struct immediate imm) {
@@ -4612,7 +4613,7 @@ void expr_return_primitive_op(struct expr_return *er,
   }
 }
 
-/* chase x86 */
+/* chase mark */
 int help_gen_immediate_numeric(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
@@ -4894,7 +4895,6 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
                                          &a->u.numeric_literal, er);
   } break;
   case AST_EXPR_BOOL_LITERAL: {
-    /* Chase x86 */
     CHECK(a->u.bool_literal.value == 0 || a->u.bool_literal.value == 1);
     struct immediate imm;
     imm.tag = IMMEDIATE_U8;
@@ -4911,14 +4911,12 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_VOID_LITERAL: {
-    /* Chase x86 */
     struct immediate imm;
     imm.tag = IMMEDIATE_VOID;
     expr_return_immediate(f, h, er, imm);
     return 1;
   } break;
   case AST_EXPR_CHAR_LITERAL: {
-    /* Chase x86 */
     return help_gen_immediate_numeric(cs, f, h, ast_expr_type(a),
                                       &a->u.char_literal.meta,
                                       (uint32_t)a->u.char_literal.value,
