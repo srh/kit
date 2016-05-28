@@ -275,6 +275,7 @@ int is_primitive_but_not_sizeof_alignof(struct def_entry *ent) {
 }
 
 /* TODO: Put string literals in rdata (add section number to loc_global). */
+/* chase x86 */
 struct sti add_data_string(struct checkstate *cs, struct objfile *f,
                            const void *data, uint32_t length) {
   ident_value index = identmap_intern(&cs->sli_values, data, length);
@@ -4117,6 +4118,7 @@ void get_funcall_arglist_info(struct checkstate *cs,
   *return_type_out = return_type;
 }
 
+/* chase x86 */
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
@@ -4260,6 +4262,7 @@ void apply_dereference(struct checkstate *cs, struct objfile *f,
   expr_return_set(cs, f, h, er, ret, type, temp_none());
 }
 
+/* chase x86 */
 int gen_unop_expr(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_expr *a,
                   struct expr_return *er) {
@@ -4305,6 +4308,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
+/* chase x86 */
 int gen_index_expr(struct checkstate *cs, struct objfile *f,
                    struct frame *h, struct ast_expr *a,
                    struct expr_return *er) {
@@ -4478,6 +4482,7 @@ void gen_assignment(struct checkstate *cs, struct objfile *f,
   frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
 }
 
+/* chase x86 */
 int gen_binop_expr(struct checkstate *cs, struct objfile *f,
                    struct frame *h, struct ast_expr *a,
                    struct expr_return *er) {
@@ -4783,6 +4788,7 @@ void apply_field_access(struct checkstate *cs,
   expr_return_set(cs, f, h, er, field_loc, field_type, temp_subobject(lhs_tr));
 }
 
+/* chase x86 */
 int gen_local_field_access(struct checkstate *cs, struct objfile *f,
                            struct frame *h, struct ast_expr *a,
                            struct expr_return *er) {
@@ -4833,6 +4839,7 @@ void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
   }
 }
 
+/* chase x86 */
 int gen_strinit_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
@@ -4864,6 +4871,7 @@ int gen_strinit_expr(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+/* chase mark */
 int gen_string_literal(struct checkstate *cs, struct objfile *f,
                        struct frame *h, struct ast_expr *a,
                        struct expr_return *er) {
@@ -4937,23 +4945,18 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
                                       er);
   } break;
   case AST_EXPR_STRING_LITERAL: {
-    /* Chase x86 */
     return gen_string_literal(cs, f, h, a, er);
   } break;
   case AST_EXPR_FUNCALL: {
-    /* Chase x86 */
     return gen_funcall_expr(cs, f, h, a, er);
   } break;
   case AST_EXPR_INDEX: {
-    /* Chase x86 */
     return gen_index_expr(cs, f, h, a, er);
   } break;
   case AST_EXPR_UNOP: {
-    /* Chase x86 */
     return gen_unop_expr(cs, f, h, a, er);
   } break;
   case AST_EXPR_BINOP: {
-    /* Chase x86 */
     return gen_binop_expr(cs, f, h, a, er);
   } break;
   case AST_EXPR_LAMBDA: {
@@ -4961,7 +4964,6 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     TODO_IMPLEMENT;
   } break;
   case AST_EXPR_LOCAL_FIELD_ACCESS: {
-    /* Chase x86 */
     return gen_local_field_access(cs, f, h, a, er);
   } break;
   case AST_EXPR_DEREF_FIELD_ACCESS: {
@@ -4995,10 +4997,8 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_EXPR_TYPED:
-    /* Chase x86 */
     return gen_expr(cs, f, h, a->u.typed_expr.expr, er);
   case AST_EXPR_STRINIT:
-    /* Chase x86 */
     return gen_strinit_expr(cs, f, h, a, er);
   default:
     UNREACHABLE();
