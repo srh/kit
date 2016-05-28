@@ -81,6 +81,10 @@ enum x86_reg map_x86_ptr_reg(enum gp_ptr_reg reg) {
   return (enum x86_reg)reg;
 }
 
+enum gp_ptr_reg unmap_x86_ptr_reg(enum x86_reg reg) {
+  return (enum gp_ptr_reg)reg;
+}
+
 enum x86_reg8 {
   X86_AL,
   X86_CL,
@@ -2536,25 +2540,9 @@ void x86_gen_load_register(struct objfile *f, enum x86_reg reg, struct loc src) 
 
   enum x86_reg src_addr;
   int32_t src_disp;
-
-  switch (src.tag) {
-  case LOC_EBP_OFFSET:
-    src_addr = X86_EBP;
-    src_disp = src.u.ebp_offset;
-    break;
-  case LOC_GLOBAL:
-    x86_gen_mov_reg_stiptr(f, reg, src.u.global_sti);
-    src_addr = reg;
-    src_disp = 0;
-    break;
-  case LOC_EBP_INDIRECT:
-    x86_gen_load32(f, reg, X86_EBP, src.u.ebp_indirect);
-    src_addr = reg;
-    src_disp = 0;
-    break;
-  default:
-    UNREACHABLE();
-  }
+  enum gp_ptr_reg gp_src_addr;
+  put_ptr_in_reg(f, src, unmap_x86_ptr_reg(reg), &gp_src_addr, &src_disp);
+  src_addr = map_x86_ptr_reg(gp_src_addr);
 
   switch (src.size) {
   case DWORD_SIZE:
