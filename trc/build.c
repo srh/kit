@@ -1832,7 +1832,8 @@ void gen_function_intro(struct objfile *f, struct frame *h) {
   }
 }
 
-void push_address(struct objfile *f, struct frame *h, struct loc loc) {
+void y86_push_address(struct objfile *f, struct frame *h, struct loc loc) {
+  CHECK(h->arch == TARGET_ARCH_Y86);
   struct loc dest = frame_push_loc(h, ptr_size(h->arch));
   gen_mov_addressof(f, dest, loc);
 }
@@ -1930,9 +1931,9 @@ void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f,
                               struct frame *h,
                               struct loc loc, struct def_instantiation *inst) {
   int32_t stack_offset = frame_save_offset(h);
-  /* X86 - assumes pointer is dword-sized */
+  /* X86 - assumes pointer is dword-sized, passed on stack */
   adjust_frame_for_callsite_alignment(h, DWORD_SIZE);
-  push_address(f, h, loc);
+  y86_push_address(f, h, loc);
   typetrav_call_func(cs, f, h, inst);
   frame_restore_offset(h, stack_offset);
 }
@@ -1942,10 +1943,10 @@ void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
                               struct loc dest, struct loc src,
                               struct def_instantiation *inst) {
   int32_t stack_offset = frame_save_offset(h);
-  /* X86 - assumes pointer is dword-sized */
+  /* X86 - assumes pointer is dword-sized, passed on stack */
   adjust_frame_for_callsite_alignment(h, 2 * DWORD_SIZE);
-  push_address(f, h, src);
-  push_address(f, h, dest);
+  y86_push_address(f, h, src);
+  y86_push_address(f, h, dest);
   typetrav_call_func(cs, f, h, inst);
   frame_restore_offset(h, stack_offset);
 }
@@ -2371,12 +2372,12 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
     if (has_src) {
       /* X86 - pointer size */
       adjust_frame_for_callsite_alignment(h, 2 * DWORD_SIZE);
-      push_address(f, h, src);
+      y86_push_address(f, h, src);
     } else {
       /* X86 - pointer size */
       adjust_frame_for_callsite_alignment(h, DWORD_SIZE);
     }
-    push_address(f, h, dest);
+    y86_push_address(f, h, dest);
   } break;
   case TARGET_ARCH_X64: {
     /* TODO(): Generally the "callsite alignment" logic will need to
@@ -4108,6 +4109,7 @@ void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
 
 /* Used to precompute arglist size, so that we can align the stack to
 16-byte boundary at the function call. */
+/* chase x86 */
 void get_funcall_arglist_info(struct checkstate *cs,
                               struct ast_expr *a,
                               struct funcall_arglist_info *info_out,
