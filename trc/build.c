@@ -221,7 +221,7 @@ int platform_prefix_underscore(enum target_platform platform) {
 /* Right now we don't worry about generating multiple objfiles, so we
 just blithely attach a serial number to each name to make them
 unique. */
-/* chase x86 */
+/* chase mark */
 void generate_kit_name(struct checkstate *cs,
                        const void *name, size_t name_count,
                        int is_export,
@@ -710,7 +710,7 @@ void frame_push_exact_amount(struct frame *h, uint32_t size) {
   }
 }
 
-/* chase x86 */
+/* chase mark */
 struct loc frame_push_loc(struct frame *h, uint32_t size) {
   /* X86: Make sure new generic padding logic is right for callers on X64. */
   uint32_t padded_size = frame_padded_push_size(h->arch, size);
