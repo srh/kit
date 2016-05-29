@@ -3648,9 +3648,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
   int32_t callsite_base_offset = frame_save_offset(h);
 
-  for (size_t i = args_count; i > 0;) {
-    i--;
-
+  for (size_t i = 0; i < args_count; i++) {
     struct ast_expr *arg = &a->u.funcall.args[i].expr;
 
     struct funcall_arg_info arg_info = arglist_info.arg_infos[i];
