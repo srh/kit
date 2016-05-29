@@ -3579,9 +3579,9 @@ void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
 
 /* Used to precompute arglist size, so that we can align the stack to
 16-byte boundary at the function call. */
-uint32_t funcall_arglist_size(struct checkstate *cs,
-                              struct ast_expr *a,
-                              struct funcall_arglist_info *info_out) {
+void funcall_arglist_size(struct checkstate *cs,
+                          struct ast_expr *a,
+                          struct funcall_arglist_info *info_out) {
   /* We specifically process our calculations _up_ from the call site
   -- if fields ever need alignment calculations, we'll be ready. */
   uint32_t return_size_discard;
@@ -3604,7 +3604,6 @@ uint32_t funcall_arglist_size(struct checkstate *cs,
   }
 
   funcall_arglist_info_init(info_out, infos, args_count, hidden_return_param, total_size);
-  return total_size;
 }
 
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
@@ -3642,8 +3641,8 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   int32_t saved_offset = frame_save_offset(h);
 
   struct funcall_arglist_info arglist_info;
-  uint32_t arglist_size = funcall_arglist_size(cs, a, &arglist_info);
-  adjust_frame_for_callsite_alignment(h, arglist_size);
+  funcall_arglist_size(cs, a, &arglist_info);
+  adjust_frame_for_callsite_alignment(h, arglist_info.total_size);
 
   for (size_t i = args_count; i > 0;) {
     i--;
