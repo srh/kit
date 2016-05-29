@@ -3583,10 +3583,10 @@ void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
 
 /* Used to precompute arglist size, so that we can align the stack to
 16-byte boundary at the function call. */
-void funcall_arglist_info(struct checkstate *cs,
-                          struct ast_expr *a,
-                          struct funcall_arglist_info *info_out,
-                          struct ast_typeexpr **return_type_out) {
+void get_funcall_arglist_info(struct checkstate *cs,
+                              struct ast_expr *a,
+                              struct funcall_arglist_info *info_out,
+                              struct ast_typeexpr **return_type_out) {
   /* We specifically process our calculations _up_ from the call site
   -- if fields ever need alignment calculations, we'll be ready. */
   struct ast_typeexpr *return_type = ast_expr_type(a);
@@ -3631,7 +3631,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
   struct funcall_arglist_info arglist_info;
   struct ast_typeexpr *return_type;
-  funcall_arglist_info(cs, a, &arglist_info, &return_type);
+  get_funcall_arglist_info(cs, a, &arglist_info, &return_type);
 
   /* X86 */
   struct loc return_loc;
