@@ -3546,7 +3546,7 @@ int platform_can_return_in_eaxedx(struct checkstate *cs) {
 }
 
 /* Used to precompute arglist size, so that we can align the stack to
-16-bit boundary at the function call. */
+16-byte boundary at the function call. */
 uint32_t funcall_arglist_size(struct checkstate *cs,
                               struct ast_expr *a) {
   /* We specifically process our calculations _up_ from the call site
