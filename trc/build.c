@@ -3554,6 +3554,7 @@ struct funcall_arg_info {
 struct funcall_arglist_info {
   struct funcall_arg_info *arg_infos;
   size_t args_count;
+  size_t return_type_size;
   int hidden_return_param;
   uint32_t total_size;
 };
@@ -3561,10 +3562,12 @@ struct funcall_arglist_info {
 void funcall_arglist_info_init(struct funcall_arglist_info *a,
                                struct funcall_arg_info *arg_infos,
                                size_t args_count,
+                               size_t return_type_size,
                                int hidden_return_param,
                                uint32_t total_size) {
   a->arg_infos = arg_infos;
   a->args_count = args_count;
+  a->return_type_size = return_type_size;
   a->hidden_return_param = hidden_return_param;
   a->total_size = total_size;
 }
@@ -3573,6 +3576,7 @@ void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
   free(a->arg_infos);
   a->arg_infos = NULL;
   a->args_count = 0;
+  a->return_type_size = 0;
   a->hidden_return_param = 0;
   a->total_size = 0;
 }
@@ -3581,12 +3585,14 @@ void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
 16-byte boundary at the function call. */
 void funcall_arglist_info(struct checkstate *cs,
                           struct ast_expr *a,
-                          struct funcall_arglist_info *info_out) {
+                          struct funcall_arglist_info *info_out,
+                          struct ast_typeexpr **return_type_out) {
   /* We specifically process our calculations _up_ from the call site
   -- if fields ever need alignment calculations, we'll be ready. */
-  uint32_t return_size_discard;
+  struct ast_typeexpr *return_type = ast_expr_type(a);
+  uint32_t return_type_size;
   int hidden_return_param
-    = exists_hidden_return_param(cs, ast_expr_type(a), &return_size_discard);
+    = exists_hidden_return_param(cs, return_type, &return_type_size);
 
   size_t args_count = a->u.funcall.args_count;
   struct funcall_arg_info *infos = malloc_mul(sizeof(*infos), args_count);
@@ -3603,7 +3609,10 @@ void funcall_arglist_info(struct checkstate *cs,
     total_size = uint32_add(total_size, padded_size);
   }
 
-  funcall_arglist_info_init(info_out, infos, args_count, hidden_return_param, total_size);
+  funcall_arglist_info_init(info_out, infos, args_count,
+                            return_type_size, hidden_return_param,
+                            total_size);
+  *return_type_out = return_type;
 }
 
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
@@ -3620,9 +3629,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     goto fail;
   }
 
-  struct ast_typeexpr *return_type = ast_expr_type(a);
-  uint32_t return_size;
-  int hidden_return_param = exists_hidden_return_param(cs, return_type, &return_size);
+  struct funcall_arglist_info arglist_info;
+  struct ast_typeexpr *return_type;
+  funcall_arglist_info(cs, a, &arglist_info, &return_type);
 
   /* X86 */
   struct loc return_loc;
@@ -3635,13 +3644,11 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
               && erd_loc(&er->u.demand).u.ebp_indirect == 2 * DWORD_SIZE));
     return_loc = erd_loc(&er->u.demand);
   } else {
-    return_loc = frame_push_loc(h, return_size);
+    return_loc = frame_push_loc(h, arglist_info.return_type_size);
   }
 
   int32_t saved_offset = frame_save_offset(h);
 
-  struct funcall_arglist_info arglist_info;
-  funcall_arglist_info(cs, a, &arglist_info);
   adjust_frame_for_callsite_alignment(h, arglist_info.total_size);
 
   frame_push_exact_amount(h, arglist_info.total_size);
@@ -3667,16 +3674,14 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, callsite_base_offset);
   }
 
-  if (hidden_return_param) {
+  if (arglist_info.hidden_return_param) {
     struct loc ptr_loc = ebp_loc(DWORD_SIZE, DWORD_SIZE, callsite_base_offset);
     gen_mov_addressof(f, ptr_loc, return_loc);
   }
 
-  funcall_arglist_info_destroy(&arglist_info);
-
   switch (func_er.u.free.tag) {
   case EXPR_RETURN_FREE_IMM: {
-    gen_call_imm(cs, f, h, func_er.u.free.u.imm, hidden_return_param);
+    gen_call_imm(cs, f, h, func_er.u.free.u.imm, arglist_info.hidden_return_param);
   } break;
   case EXPR_RETURN_FREE_LOC: {
     struct loc func_loc;
@@ -3685,7 +3690,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     gen_load_register(f, X86_EAX, func_loc);
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_indirect_call_reg(f, X86_EAX);
-    if (hidden_return_param && platform_ret4_hrp(cs)) {
+    if (arglist_info.hidden_return_param && platform_ret4_hrp(cs)) {
       /* TODO: We could do this more elegantly, but right now undo the
       callee's pop of esp. */
       x86_gen_add_esp_i32(f, -4);
@@ -3701,7 +3706,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     UNREACHABLE();
   }
 
-  if (hidden_return_param) {
+  if (arglist_info.hidden_return_param) {
     if (er->tag != EXPR_RETURN_DEMANDED) {
       /* Let's just pray that the pointer returned by the callee (in
       EAX) is the same as the hidden return param that we passed! */
@@ -3711,17 +3716,17 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       /* TODO: Icky. */
       er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
     }
-  } else if (return_size == 0) {
+  } else if (arglist_info.return_type_size == 0) {
     expr_return_set(cs, f, h, er, return_loc, return_type,
                     temp_exists(return_loc, return_type, 1));
-  } else if (return_size <= DWORD_SIZE) {
+  } else if (arglist_info.return_type_size <= DWORD_SIZE) {
     /* Return value in eax. */
     gen_store_register(f, return_loc, X86_EAX);
     expr_return_set(cs, f, h, er, return_loc, return_type,
                     temp_exists(return_loc, return_type, 1));
   } else {
     CHECK(platform_can_return_in_eaxedx(cs));
-    CHECK(return_size == 2 * DWORD_SIZE);
+    CHECK(arglist_info.return_type_size == 2 * DWORD_SIZE);
     gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
     expr_return_set(cs, f, h, er, return_loc, return_type,
                     temp_exists(return_loc, return_type, 1));
