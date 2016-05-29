@@ -3545,37 +3545,80 @@ int platform_can_return_in_eaxedx(struct checkstate *cs) {
   }
 }
 
+struct funcall_arg_info {
+  int32_t offset_from_callsite;
+  uint32_t arg_size;
+  uint32_t padded_size;
+};
+
+struct funcall_arglist_info {
+  struct funcall_arg_info *arg_infos;
+  size_t args_count;
+  int hidden_return_param;
+  uint32_t total_size;
+};
+
+void funcall_arglist_info_init(struct funcall_arglist_info *a,
+                               struct funcall_arg_info *arg_infos,
+                               size_t args_count,
+                               int hidden_return_param,
+                               uint32_t total_size) {
+  a->arg_infos = arg_infos;
+  a->args_count = args_count;
+  a->hidden_return_param = hidden_return_param;
+  a->total_size = total_size;
+}
+
+void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
+  free(a->arg_infos);
+  a->arg_infos = NULL;
+  a->args_count = 0;
+  a->hidden_return_param = 0;
+  a->total_size = 0;
+}
+
 /* Used to precompute arglist size, so that we can align the stack to
 16-byte boundary at the function call. */
 uint32_t funcall_arglist_size(struct checkstate *cs,
-                              struct ast_expr *a) {
+                              struct ast_expr *a,
+                              struct funcall_arglist_info *info_out) {
   /* We specifically process our calculations _up_ from the call site
   -- if fields ever need alignment calculations, we'll be ready. */
   uint32_t return_size_discard;
   int hidden_return_param
     = exists_hidden_return_param(cs, ast_expr_type(a), &return_size_discard);
 
+  size_t args_count = a->u.funcall.args_count;
+  struct funcall_arg_info *infos = malloc_mul(sizeof(*infos), args_count);
+
   uint32_t total_size = (hidden_return_param ? DWORD_SIZE : 0);
-  for (size_t i = 0, e = a->u.funcall.args_count; i < e; i++) {
+  for (size_t i = 0; i < args_count; i++) {
     struct ast_expr *arg = &a->u.funcall.args[i].expr;
     uint32_t arg_size = x86_sizeof(&cs->nt, ast_expr_type(arg));
     uint32_t padded_size = frame_padded_push_size(arg_size);
+    infos[i].offset_from_callsite = uint32_to_int32(total_size);
+    infos[i].arg_size = arg_size;
+    infos[i].padded_size = padded_size;
     /* No alignment concerns, (yet!)! */
     total_size = uint32_add(total_size, padded_size);
   }
+
+  funcall_arglist_info_init(info_out, infos, args_count, hidden_return_param, total_size);
   return total_size;
 }
 
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
+  int ret;
   size_t args_count = a->u.funcall.args_count;
 
   struct expr_return func_er = free_expr_return();
   /* TODO: We must use exprcatch information to see if we should free
   a temporary. */
   if (!gen_expr(cs, f, h, &a->u.funcall.func->expr, &func_er)) {
-    return 0;
+    ret = 0;
+    goto fail;
   }
 
   struct ast_typeexpr *return_type = ast_expr_type(a);
@@ -3598,7 +3641,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
   int32_t saved_offset = frame_save_offset(h);
 
-  adjust_frame_for_callsite_alignment(h, funcall_arglist_size(cs, a));
+  struct funcall_arglist_info arglist_info;
+  uint32_t arglist_size = funcall_arglist_size(cs, a, &arglist_info);
+  adjust_frame_for_callsite_alignment(h, arglist_size);
 
   for (size_t i = args_count; i > 0;) {
     i--;
@@ -3613,10 +3658,12 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     struct expr_return arg_er = demand_expr_return(arg_loc);
     int32_t arg_saved_offset = frame_save_offset(h);
     if (!gen_expr(cs, f, h, arg, &arg_er)) {
-      return 0;
+      goto fail_arglist_info;
     }
     frame_restore_offset(h, arg_saved_offset);
   }
+
+  funcall_arglist_info_destroy(&arglist_info);
 
   if (hidden_return_param) {
     struct loc ptr_loc = frame_push_loc(h, DWORD_SIZE);
@@ -3678,7 +3725,11 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
   frame_restore_offset(h, saved_offset);
 
-  return 1;
+  ret = 1;
+ fail_arglist_info:
+  funcall_arglist_info_destroy(&arglist_info);
+ fail:
+  return ret;
 }
 
 void apply_dereference(struct checkstate *cs, struct objfile *f,
