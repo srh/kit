@@ -3644,30 +3644,37 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   funcall_arglist_size(cs, a, &arglist_info);
   adjust_frame_for_callsite_alignment(h, arglist_info.total_size);
 
+  frame_push_exact_amount(h, arglist_info.total_size);
+
+  int32_t callsite_base_offset = frame_save_offset(h);
+
   for (size_t i = args_count; i > 0;) {
     i--;
 
     struct ast_expr *arg = &a->u.funcall.args[i].expr;
 
-    struct loc arg_loc = frame_push_loc(h, x86_sizeof(&cs->nt, ast_expr_type(arg)));
+    struct funcall_arg_info arg_info = arglist_info.arg_infos[i];
+
+    struct loc arg_loc = ebp_loc(arg_info.arg_size,
+                                 arg_info.padded_size,
+                                 int32_add(callsite_base_offset, arg_info.offset_from_callsite));
 
     /* TODO: We must use ast_exprcatch information to force the temporary in arg_loc. */
     /* (Right now, EXPR_RETURN_DEMANDED is known to work this way only
     when it encounters another funcall.) */
     struct expr_return arg_er = demand_expr_return(arg_loc);
-    int32_t arg_saved_offset = frame_save_offset(h);
     if (!gen_expr(cs, f, h, arg, &arg_er)) {
       goto fail_arglist_info;
     }
-    frame_restore_offset(h, arg_saved_offset);
+    frame_restore_offset(h, callsite_base_offset);
+  }
+
+  if (hidden_return_param) {
+    struct loc ptr_loc = ebp_loc(DWORD_SIZE, DWORD_SIZE, callsite_base_offset);
+    gen_mov_addressof(f, ptr_loc, return_loc);
   }
 
   funcall_arglist_info_destroy(&arglist_info);
-
-  if (hidden_return_param) {
-    struct loc ptr_loc = frame_push_loc(h, DWORD_SIZE);
-    gen_mov_addressof(f, ptr_loc, return_loc);
-  }
 
   switch (func_er.u.free.tag) {
   case EXPR_RETURN_FREE_IMM: {
