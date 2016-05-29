@@ -798,6 +798,22 @@ int lambda_exists_hidden_return_param(struct checkstate *cs, struct ast_expr *ex
   return exists_hidden_return_param(cs, return_type, return_type_size_out);
 }
 
+const int64_t Y86_HRP_EBP_DISP = 2 * DWORD_Y86_SIZE;
+const int64_t X64_HRP_EBP_DISP = -X64_EIGHTBYTE_SIZE;
+
+/* Returns the ebp_indirect location of the hidden return pointer --
+always the same value. */
+int64_t hrp_ebp_indirect(enum target_arch arch) {
+  switch (arch) {
+  case TARGET_ARCH_Y86:
+    return Y86_HRP_EBP_DISP;
+  case TARGET_ARCH_X64:
+    return X64_HRP_EBP_DISP;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void y86_note_param_locations(struct checkstate *cs, struct frame *h,
                               struct ast_expr *expr) {
   uint32_t return_type_size;
@@ -830,7 +846,7 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h,
     /* I don't know if anybody promises padding, so we assume none. */
     struct loc loc = ebp_indirect_loc(return_type_size,
                                       return_type_size,
-                                      2 * DWORD_SIZE);
+                                      Y86_HRP_EBP_DISP);
     frame_specify_calling_info(h, vars_pushed, loc, is_return_hidden);
   } else {
     struct loc loc = frame_push_loc(h, return_type_size);
@@ -859,6 +875,7 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
   struct loc return_loc;
   if (is_return_hidden) {
     struct loc hrp_loc = frame_push_loc(h, X64_EIGHTBYTE_SIZE);
+    CHECK(hrp_loc.u.ebp_offset == X64_HRP_EBP_DISP);
     return_loc = ebp_indirect_loc(return_type_size, return_type_size,
                                   hrp_loc.u.ebp_offset);
     x64_gen_store64(f, X64_RBP, hrp_loc.u.ebp_offset, X64_RDI);
@@ -4124,7 +4141,7 @@ void get_funcall_arglist_info(struct checkstate *cs,
   *return_type_out = return_type;
 }
 
-/* chase x86 */
+/* chase mark */
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
@@ -4151,12 +4168,13 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     hidden return param pointer. */
     CHECK(erd_loc(&er->u.demand).tag == LOC_EBP_OFFSET
           || (erd_loc(&er->u.demand).tag == LOC_EBP_INDIRECT
-              && erd_loc(&er->u.demand).u.ebp_indirect == 2 * DWORD_SIZE));
+              && erd_loc(&er->u.demand).u.ebp_indirect == hrp_ebp_indirect(h->arch)));
     return_loc = erd_loc(&er->u.demand);
   } else {
     return_loc = frame_push_loc(h, arglist_info.return_type_size);
   }
 
+  /* vvv chase x86 */
   int32_t saved_offset = frame_save_offset(h);
 
   adjust_frame_for_callsite_alignment(h, arglist_info.total_size);
