@@ -4167,23 +4167,20 @@ void x64_get_funcall_arglist_info(struct checkstate *cs,
 /* y86/x64 */
 /* chase mark */
 void get_funcall_arglist_info(struct checkstate *cs,
-                              struct ast_expr *a,
-                              struct funcall_arglist_info *info_out,
-                              struct ast_typeexpr **return_type_out) {
-  struct ast_typeexpr *return_type = ast_expr_type(a);
+                              struct ast_typeexpr *return_type,
+                              struct ast_exprcall *args,
+                              size_t args_count,
+                              struct funcall_arglist_info *info_out) {
   switch (cs->arch) {
   case TARGET_ARCH_Y86: {
-    y86_get_funcall_arglist_info(cs, return_type, a->u.funcall.args, a->u.funcall.args_count,
-                                 info_out);
+    y86_get_funcall_arglist_info(cs, return_type, args, args_count, info_out);
   } break;
   case TARGET_ARCH_X64: {
-    x64_get_funcall_arglist_info(cs, return_type, a->u.funcall.args, a->u.funcall.args_count,
-                                 info_out);
+    x64_get_funcall_arglist_info(cs, return_type, args, args_count, info_out);
   } break;
   default:
     UNREACHABLE();
   }
-  *return_type_out = return_type;
 }
 
 
@@ -4203,10 +4200,11 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     goto fail;
   }
 
+  struct ast_typeexpr *return_type = ast_expr_type(a);
   /* vvv chase x86 */
   struct funcall_arglist_info arglist_info;
-  struct ast_typeexpr *return_type;
-  get_funcall_arglist_info(cs, a, &arglist_info, &return_type);
+  get_funcall_arglist_info(cs, return_type, a->u.funcall.args, a->u.funcall.args_count,
+                           &arglist_info);
 
   /* X86 */
   struct loc return_loc;
