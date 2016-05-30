@@ -859,9 +859,10 @@ void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
 }
 
 void y86_get_funcall_arglist_info(struct checkstate *cs,
-                                  struct ast_expr *a,
-                                  struct funcall_arglist_info *info_out,
-                                  struct ast_typeexpr **return_type_out);
+                                  struct ast_typeexpr *return_type,
+                                  struct ast_exprcall *args,
+                                  size_t args_count,
+                                  struct funcall_arglist_info *info_out);
 
 void y86_note_param_locations(struct checkstate *cs, struct frame *h,
                               struct ast_expr *expr) {
@@ -4124,22 +4125,21 @@ int platform_can_return_in_eaxedx(struct checkstate *cs) {
 16-byte boundary at the function call. */
 /* chase mark */
 void y86_get_funcall_arglist_info(struct checkstate *cs,
-                                  struct ast_expr *a,
-                                  struct funcall_arglist_info *info_out,
-                                  struct ast_typeexpr **return_type_out) {
+                                  struct ast_typeexpr *return_type,
+                                  struct ast_exprcall *args,
+                                  size_t args_count,
+                                  struct funcall_arglist_info *info_out) {
   /* We specifically process our calculations _up_ from the call site
   -- if fields ever need alignment calculations, we'll be ready. */
-  struct ast_typeexpr *return_type = ast_expr_type(a);
   uint32_t return_type_size;
   int hidden_return_param
     = exists_hidden_return_param(cs, return_type, &return_type_size);
 
-  size_t args_count = a->u.funcall.args_count;
   struct funcall_arg_info *infos = malloc_mul(sizeof(*infos), args_count);
 
   uint32_t total_size = (hidden_return_param ? DWORD_SIZE : 0);
   for (size_t i = 0; i < args_count; i++) {
-    struct ast_expr *arg = &a->u.funcall.args[i].expr;
+    struct ast_expr *arg = &args[i].expr;
     uint32_t arg_size = gp_sizeof(&cs->nt, ast_expr_type(arg));
     uint32_t padded_size = frame_padded_push_size(cs->arch, arg_size);
     infos[i].first_register = -1;
@@ -4153,7 +4153,6 @@ void y86_get_funcall_arglist_info(struct checkstate *cs,
   funcall_arglist_info_init(info_out, infos, args_count,
                             return_type_size, hidden_return_param,
                             total_size);
-  *return_type_out = return_type;
 }
 
 void x64_get_funcall_arglist_info(struct checkstate *cs,
@@ -4171,12 +4170,15 @@ void get_funcall_arglist_info(struct checkstate *cs,
                               struct funcall_arglist_info *info_out,
                               struct ast_typeexpr **return_type_out) {
   switch (cs->arch) {
-  case TARGET_ARCH_Y86:
-    y86_get_funcall_arglist_info(cs, a, info_out, return_type_out);
-    break;
-  case TARGET_ARCH_X64:
+  case TARGET_ARCH_Y86: {
+    struct ast_typeexpr *return_type = ast_expr_type(a);
+    y86_get_funcall_arglist_info(cs, return_type, a->u.funcall.args, a->u.funcall.args_count,
+                                 info_out);
+    *return_type_out = return_type;
+  } break;
+  case TARGET_ARCH_X64: {
     x64_get_funcall_arglist_info(cs, a, info_out, return_type_out);
-    break;
+  } break;
   default:
     UNREACHABLE();
   }
