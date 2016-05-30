@@ -860,7 +860,7 @@ void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
 
 void y86_get_funcall_arglist_info(struct checkstate *cs,
                                   struct ast_typeexpr *return_type,
-                                  struct ast_exprcall *args,
+                                  struct ast_typeexpr *args,
                                   size_t args_count,
                                   struct funcall_arglist_info *info_out);
 
@@ -4126,7 +4126,7 @@ int platform_can_return_in_eaxedx(struct checkstate *cs) {
 /* chase mark */
 void y86_get_funcall_arglist_info(struct checkstate *cs,
                                   struct ast_typeexpr *return_type,
-                                  struct ast_exprcall *args,
+                                  struct ast_typeexpr *args,
                                   size_t args_count,
                                   struct funcall_arglist_info *info_out) {
   /* We specifically process our calculations _up_ from the call site
@@ -4139,8 +4139,7 @@ void y86_get_funcall_arglist_info(struct checkstate *cs,
 
   uint32_t total_size = (hidden_return_param ? DWORD_SIZE : 0);
   for (size_t i = 0; i < args_count; i++) {
-    struct ast_expr *arg = &args[i].expr;
-    uint32_t arg_size = gp_sizeof(&cs->nt, ast_expr_type(arg));
+    uint32_t arg_size = gp_sizeof(&cs->nt, &args[i]);
     uint32_t padded_size = frame_padded_push_size(cs->arch, arg_size);
     infos[i].first_register = -1;
     infos[i].offset_from_callsite = uint32_to_int32(total_size);
@@ -4157,7 +4156,7 @@ void y86_get_funcall_arglist_info(struct checkstate *cs,
 
 void x64_get_funcall_arglist_info(struct checkstate *cs,
                                   struct ast_typeexpr *return_type,
-                                  struct ast_exprcall *args,
+                                  struct ast_typeexpr *args,
                                   size_t args_count,
                                   struct funcall_arglist_info *info_out) {
   (void)cs, (void)return_type, (void)args, (void)args_count, (void)info_out;
@@ -4168,7 +4167,7 @@ void x64_get_funcall_arglist_info(struct checkstate *cs,
 /* chase mark */
 void get_funcall_arglist_info(struct checkstate *cs,
                               struct ast_typeexpr *return_type,
-                              struct ast_exprcall *args,
+                              struct ast_typeexpr *args,
                               size_t args_count,
                               struct funcall_arglist_info *info_out) {
   switch (cs->arch) {
@@ -4190,7 +4189,6 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
   int ret;
-  size_t args_count = a->u.funcall.args_count;
 
   struct expr_return func_er = free_expr_return();
   /* TODO: We must use exprcatch information to see if we should free
@@ -4201,12 +4199,15 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   }
 
   struct ast_typeexpr *func_type = ast_expr_type(&a->u.funcall.func->expr);
+  struct ast_typeexpr *args;
+  size_t args_count;
+  struct ast_typeexpr *return_type;
+  expose_func_type_parts(&cs->cm, func_type, &args, &args_count, &return_type);
+  CHECK(args_count == a->u.funcall.args_count);
 
-  struct ast_typeexpr *return_type = expose_func_return_type(&cs->cm, func_type, size_add(a->u.funcall.args_count, 1));
   /* vvv chase x86 */
   struct funcall_arglist_info arglist_info;
-  get_funcall_arglist_info(cs, return_type, a->u.funcall.args, a->u.funcall.args_count,
-                           &arglist_info);
+  get_funcall_arglist_info(cs, return_type, args, args_count, &arglist_info);
 
   /* X86 */
   struct loc return_loc;
