@@ -814,6 +814,55 @@ int64_t hrp_ebp_indirect(enum target_arch arch) {
   }
 }
 
+struct funcall_arg_info {
+  /* -1 if the arg will not get put in a register.  Otherwise, the
+  number of the first register that gets used to pass the argument.
+  (It might take up two registers.) */
+  int first_register;
+  /* a negative offset value, if the arg will get put in a register
+  before the funcall.  (This is an actual offset value that gets used,
+  though.) */
+  int32_t offset_from_callsite;
+
+  uint32_t arg_size;
+  uint32_t padded_size;
+};
+
+struct funcall_arglist_info {
+  struct funcall_arg_info *arg_infos;
+  size_t args_count;
+  size_t return_type_size;
+  int hidden_return_param;
+  uint32_t total_size;
+};
+
+void funcall_arglist_info_init(struct funcall_arglist_info *a,
+                               struct funcall_arg_info *arg_infos,
+                               size_t args_count,
+                               size_t return_type_size,
+                               int hidden_return_param,
+                               uint32_t total_size) {
+  a->arg_infos = arg_infos;
+  a->args_count = args_count;
+  a->return_type_size = return_type_size;
+  a->hidden_return_param = hidden_return_param;
+  a->total_size = total_size;
+}
+
+void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
+  free(a->arg_infos);
+  a->arg_infos = NULL;
+  a->args_count = 0;
+  a->return_type_size = 0;
+  a->hidden_return_param = 0;
+  a->total_size = 0;
+}
+
+void y86_get_funcall_arglist_info(struct checkstate *cs,
+                                  struct ast_expr *a,
+                                  struct funcall_arglist_info *info_out,
+                                  struct ast_typeexpr **return_type_out);
+
 void y86_note_param_locations(struct checkstate *cs, struct frame *h,
                               struct ast_expr *expr) {
   uint32_t return_type_size;
@@ -4069,50 +4118,6 @@ int platform_can_return_in_eaxedx(struct checkstate *cs) {
   default:
     UNREACHABLE();
   }
-}
-
-struct funcall_arg_info {
-  /* -1 if the arg will not get put in a register.  Otherwise, the
-  number of the first register that gets used to pass the argument.
-  (It might take up two registers.) */
-  int first_register;
-  /* a negative offset value, if the arg will get put in a register
-  before the funcall.  (This is an actual offset value that gets used,
-  though.) */
-  int32_t offset_from_callsite;
-
-  uint32_t arg_size;
-  uint32_t padded_size;
-};
-
-struct funcall_arglist_info {
-  struct funcall_arg_info *arg_infos;
-  size_t args_count;
-  size_t return_type_size;
-  int hidden_return_param;
-  uint32_t total_size;
-};
-
-void funcall_arglist_info_init(struct funcall_arglist_info *a,
-                               struct funcall_arg_info *arg_infos,
-                               size_t args_count,
-                               size_t return_type_size,
-                               int hidden_return_param,
-                               uint32_t total_size) {
-  a->arg_infos = arg_infos;
-  a->args_count = args_count;
-  a->return_type_size = return_type_size;
-  a->hidden_return_param = hidden_return_param;
-  a->total_size = total_size;
-}
-
-void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
-  free(a->arg_infos);
-  a->arg_infos = NULL;
-  a->args_count = 0;
-  a->return_type_size = 0;
-  a->hidden_return_param = 0;
-  a->total_size = 0;
 }
 
 /* Used to precompute arglist size, so that we can align the stack to
