@@ -4072,7 +4072,15 @@ int platform_can_return_in_eaxedx(struct checkstate *cs) {
 }
 
 struct funcall_arg_info {
+  /* -1 if the arg will not get put in a register.  Otherwise, the
+  number of the first register that gets used to pass the argument.
+  (It might take up two registers.) */
+  int first_register;
+  /* a negative offset value, if the arg will get put in a register
+  before the funcall.  (This is an actual offset value that gets used,
+  though.) */
   int32_t offset_from_callsite;
+
   uint32_t arg_size;
   uint32_t padded_size;
 };
@@ -4109,12 +4117,11 @@ void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
 
 /* Used to precompute arglist size, so that we can align the stack to
 16-byte boundary at the function call. */
-/* chase x86 */
-void get_funcall_arglist_info(struct checkstate *cs,
-                              struct ast_expr *a,
-                              struct funcall_arglist_info *info_out,
-                              struct ast_typeexpr **return_type_out) {
-  /* X86 */
+/* chase mark */
+void y86_get_funcall_arglist_info(struct checkstate *cs,
+                                  struct ast_expr *a,
+                                  struct funcall_arglist_info *info_out,
+                                  struct ast_typeexpr **return_type_out) {
   /* We specifically process our calculations _up_ from the call site
   -- if fields ever need alignment calculations, we'll be ready. */
   struct ast_typeexpr *return_type = ast_expr_type(a);
@@ -4130,6 +4137,7 @@ void get_funcall_arglist_info(struct checkstate *cs,
     struct ast_expr *arg = &a->u.funcall.args[i].expr;
     uint32_t arg_size = gp_sizeof(&cs->nt, ast_expr_type(arg));
     uint32_t padded_size = frame_padded_push_size(cs->arch, arg_size);
+    infos[i].first_register = -1;
     infos[i].offset_from_callsite = uint32_to_int32(total_size);
     infos[i].arg_size = arg_size;
     infos[i].padded_size = padded_size;
@@ -4142,6 +4150,34 @@ void get_funcall_arglist_info(struct checkstate *cs,
                             total_size);
   *return_type_out = return_type;
 }
+
+void x64_get_funcall_arglist_info(struct checkstate *cs,
+                                  struct ast_expr *a,
+                                  struct funcall_arglist_info *info_out,
+                                  struct ast_typeexpr **return_type_out) {
+  (void)cs, (void)a, (void)info_out, (void)return_type_out;
+  TODO_IMPLEMENT;
+}
+
+/* y86/x64 */
+/* chase mark */
+void get_funcall_arglist_info(struct checkstate *cs,
+                              struct ast_expr *a,
+                              struct funcall_arglist_info *info_out,
+                              struct ast_typeexpr **return_type_out) {
+  switch (cs->arch) {
+  case TARGET_ARCH_Y86:
+    y86_get_funcall_arglist_info(cs, a, info_out, return_type_out);
+    break;
+  case TARGET_ARCH_X64:
+    x64_get_funcall_arglist_info(cs, a, info_out, return_type_out);
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+
 
 /* chase mark */
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
@@ -4158,6 +4194,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     goto fail;
   }
 
+  /* vvv chase x86 */
   struct funcall_arglist_info arglist_info;
   struct ast_typeexpr *return_type;
   get_funcall_arglist_info(cs, a, &arglist_info, &return_type);
@@ -4176,7 +4213,6 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     return_loc = frame_push_loc(h, arglist_info.return_type_size);
   }
 
-  /* vvv chase x86 */
   int32_t saved_offset = frame_save_offset(h);
 
   adjust_frame_for_callsite_alignment(h, arglist_info.total_size);
