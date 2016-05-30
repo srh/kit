@@ -857,21 +857,21 @@ void y86_get_funcall_arglist_info(struct checkstate *cs,
 void y86_note_param_locations(struct checkstate *cs, struct frame *h,
                               struct ast_expr *expr) {
   struct ast_typeexpr *param_types;
-  size_t params_count;
+  size_t param_types_count;
   struct ast_typeexpr *return_type;
   expose_func_type_parts(&cs->cm, ast_expr_type(expr),
-                         &param_types, &params_count, &return_type);
-  CHECK(params_count == expr->u.lambda.params_count);
+                         &param_types, &param_types_count, &return_type);
+  CHECK(param_types_count == expr->u.lambda.params_count);
 
+  struct funcall_arglist_info arglist_info;
+  y86_get_funcall_arglist_info(cs, return_type, param_types, param_types_count,
+                               &arglist_info);
 
-  uint32_t return_type_size;
-  int is_return_hidden = exists_hidden_return_param(cs, return_type,
-                                                    &return_type_size);
-  int32_t offset = (2 + is_return_hidden) * DWORD_SIZE;
+  int32_t offset = (2 + arglist_info.hidden_return_param) * DWORD_SIZE;
 
   size_t vars_pushed = 0;
 
-  for (size_t i = 0; i < params_count; i++) {
+  for (size_t i = 0; i < param_types_count; i++) {
     uint32_t size = gp_sizeof(&cs->nt, &param_types[i]);
     uint32_t padded_size = uint32_ceil_aligned(size, DWORD_SIZE);
 
@@ -887,16 +887,20 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h,
     offset = int32_add(offset, uint32_to_int32(padded_size));
   }
 
-  if (is_return_hidden) {
+  if (arglist_info.hidden_return_param) {
     /* I don't know if anybody promises padding, so we assume none. */
-    struct loc loc = ebp_indirect_loc(return_type_size,
-                                      return_type_size,
+    struct loc loc = ebp_indirect_loc(arglist_info.return_type_size,
+                                      arglist_info.return_type_size,
                                       Y86_HRP_EBP_DISP);
-    frame_specify_calling_info(h, vars_pushed, loc, is_return_hidden);
+    frame_specify_calling_info(h, vars_pushed, loc,
+                               arglist_info.hidden_return_param);
   } else {
-    struct loc loc = frame_push_loc(h, return_type_size);
-    frame_specify_calling_info(h, vars_pushed, loc, is_return_hidden);
+    struct loc loc = frame_push_loc(h, arglist_info.return_type_size);
+    frame_specify_calling_info(h, vars_pushed, loc,
+                               arglist_info.hidden_return_param);
   }
+
+  funcall_arglist_info_destroy(&arglist_info);
 }
 
 void x64_gen_store64(struct objfile *f, enum x64_reg dest, int32_t dest_disp,
@@ -909,11 +913,11 @@ void x64_gen_store64(struct objfile *f, enum x64_reg dest, int32_t dest_disp,
 void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
                               struct frame *h, struct ast_expr *expr) {
   struct ast_typeexpr *param_types;
-  size_t params_count;
+  size_t param_types_count;
   struct ast_typeexpr *return_type;
   expose_func_type_parts(&cs->cm, ast_expr_type(expr),
-                         &param_types, &params_count, &return_type);
-  CHECK(params_count == expr->u.lambda.params_count);
+                         &param_types, &param_types_count, &return_type);
+  CHECK(param_types_count == expr->u.lambda.params_count);
 
 
   uint32_t return_type_size;
@@ -943,7 +947,7 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
   int32_t memory_param_offset = 2 * X64_EIGHTBYTE_SIZE;
 
   size_t vars_pushed = 0;
-  for (size_t i = 0; i < params_count; i++) {
+  for (size_t i = 0; i < param_types_count; i++) {
     uint32_t size;
     int memory_param = x64_sysv_memory_param(cs, &param_types[i], &size);
     /* (We assume everything is at worst 8-byte aligned, because we at
