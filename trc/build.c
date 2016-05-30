@@ -867,15 +867,15 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h,
   y86_get_funcall_arglist_info(cs, return_type, param_types, param_types_count,
                                &arglist_info);
 
-  int32_t offset = (2 + arglist_info.hidden_return_param) * DWORD_SIZE;
+  int32_t ebp_callsite_offset = 2 * DWORD_Y86_SIZE;
 
   size_t vars_pushed = 0;
 
   for (size_t i = 0; i < param_types_count; i++) {
-    uint32_t size = gp_sizeof(&cs->nt, &param_types[i]);
-    uint32_t padded_size = uint32_ceil_aligned(size, DWORD_SIZE);
-
-    struct loc loc = ebp_loc(size, padded_size, offset);
+    struct funcall_arg_info *arg_info = &arglist_info.arg_infos[i];
+    CHECK(arg_info->first_register == -1);
+    struct loc loc = ebp_loc(arg_info->arg_size, arg_info->padded_size,
+                             int32_add(arg_info->offset_from_callsite, ebp_callsite_offset));
 
     struct vardata vd;
     vardata_init(&vd, expr->u.lambda.params[i].name.value,
@@ -883,8 +883,6 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h,
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
     vars_pushed = size_add(vars_pushed, 1);
-
-    offset = int32_add(offset, uint32_to_int32(padded_size));
   }
 
   if (arglist_info.hidden_return_param) {
