@@ -806,8 +806,12 @@ int64_t hrp_ebp_indirect(enum target_arch arch) {
 
 struct funcall_arg_info {
   /* -1 if the arg will not get put in a register.  Otherwise, the
-  number of the first register that gets used to pass the argument.
-  (It might take up two registers.) */
+  "number" of the first register that gets used to pass the argument.
+  (It might take up two registers, this value only gets used on x64.)
+
+  On sysv x64, the "number" is from 0 to 5, identifying a register (or
+  two) in the sequence {X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8,
+  X64_R9}. */
   int first_register;
   /* a negative offset value, if the arg will get put in a register
   before the funcall.  (This is an actual offset value that gets used,
@@ -824,6 +828,7 @@ struct funcall_arglist_info {
   size_t return_type_size;
   int hidden_return_param;
   uint32_t total_size;
+  int32_t neg_size;
 };
 
 void funcall_arglist_info_init(struct funcall_arglist_info *a,
@@ -831,12 +836,14 @@ void funcall_arglist_info_init(struct funcall_arglist_info *a,
                                size_t args_count,
                                size_t return_type_size,
                                int hidden_return_param,
-                               uint32_t total_size) {
+                               uint32_t total_size,
+                               int32_t neg_size) {
   a->arg_infos = arg_infos;
   a->args_count = args_count;
   a->return_type_size = return_type_size;
   a->hidden_return_param = hidden_return_param;
   a->total_size = total_size;
+  a->neg_size = neg_size;
 }
 
 void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
@@ -846,6 +853,7 @@ void funcall_arglist_info_destroy(struct funcall_arglist_info *a) {
   a->return_type_size = 0;
   a->hidden_return_param = 0;
   a->total_size = 0;
+  a->neg_size = 0;
 }
 
 void y86_get_funcall_arglist_info(struct checkstate *cs,
@@ -856,22 +864,22 @@ void y86_get_funcall_arglist_info(struct checkstate *cs,
 
 void y86_note_param_locations(struct checkstate *cs, struct frame *h,
                               struct ast_expr *expr) {
-  struct ast_typeexpr *param_types;
-  size_t param_types_count;
+  struct ast_typeexpr *params;
+  size_t params_count;
   struct ast_typeexpr *return_type;
   expose_func_type_parts(&cs->cm, ast_expr_type(expr),
-                         &param_types, &param_types_count, &return_type);
-  CHECK(param_types_count == expr->u.lambda.params_count);
+                         &params, &params_count, &return_type);
+  CHECK(params_count == expr->u.lambda.params_count);
 
   struct funcall_arglist_info arglist_info;
-  y86_get_funcall_arglist_info(cs, return_type, param_types, param_types_count,
+  y86_get_funcall_arglist_info(cs, return_type, params, params_count,
                                &arglist_info);
 
   int32_t ebp_callsite_offset = 2 * DWORD_Y86_SIZE;
 
   size_t vars_pushed = 0;
 
-  for (size_t i = 0; i < param_types_count; i++) {
+  for (size_t i = 0; i < params_count; i++) {
     struct funcall_arg_info *arg_info = &arglist_info.arg_infos[i];
     CHECK(arg_info->first_register == -1);
     struct loc loc = ebp_loc(arg_info->arg_size, arg_info->padded_size,
@@ -879,7 +887,7 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h,
 
     struct vardata vd;
     vardata_init(&vd, expr->u.lambda.params[i].name.value,
-                 1, &param_types[i], loc);
+                 1, &params[i], loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
     vars_pushed = size_add(vars_pushed, 1);
@@ -910,12 +918,12 @@ void x64_gen_store64(struct objfile *f, enum x64_reg dest, int32_t dest_disp,
 /* X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8, X64_R9, */
 void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
                               struct frame *h, struct ast_expr *expr) {
-  struct ast_typeexpr *param_types;
-  size_t param_types_count;
+  struct ast_typeexpr *params;
+  size_t params_count;
   struct ast_typeexpr *return_type;
   expose_func_type_parts(&cs->cm, ast_expr_type(expr),
-                         &param_types, &param_types_count, &return_type);
-  CHECK(param_types_count == expr->u.lambda.params_count);
+                         &params, &params_count, &return_type);
+  CHECK(params_count == expr->u.lambda.params_count);
 
 
   uint32_t return_type_size;
@@ -945,9 +953,9 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
   int32_t memory_param_offset = 2 * X64_EIGHTBYTE_SIZE;
 
   size_t vars_pushed = 0;
-  for (size_t i = 0; i < param_types_count; i++) {
+  for (size_t i = 0; i < params_count; i++) {
     uint32_t size;
-    int memory_param = x64_sysv_memory_param(cs, &param_types[i], &size);
+    int memory_param = x64_sysv_memory_param(cs, &params[i], &size);
     /* (We assume everything is at worst 8-byte aligned, because we at
     worst have u64.) */
 
@@ -977,7 +985,7 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
 
       struct vardata vd;
       vardata_init(&vd, expr->u.lambda.params[i].name.value,
-                   1, &param_types[i], param_loc);
+                   1, &params[i], param_loc);
       SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
       vars_pushed = size_add(vars_pushed, 1);
@@ -4153,7 +4161,7 @@ void y86_get_funcall_arglist_info(struct checkstate *cs,
 
   funcall_arglist_info_init(info_out, infos, args_count,
                             return_type_size, hidden_return_param,
-                            total_size);
+                            total_size, 0);
 }
 
 void x64_get_funcall_arglist_info(struct checkstate *cs,
@@ -4161,8 +4169,47 @@ void x64_get_funcall_arglist_info(struct checkstate *cs,
                                   struct ast_typeexpr *args,
                                   size_t args_count,
                                   struct funcall_arglist_info *info_out) {
-  (void)cs, (void)return_type, (void)args, (void)args_count, (void)info_out;
-  TODO_IMPLEMENT;
+  uint32_t return_type_size;
+  int hidden_return_param
+    = exists_hidden_return_param(cs, return_type, &return_type_size);
+
+  struct funcall_arg_info *infos = malloc_mul(sizeof(*infos), args_count);
+
+  /* Offset of arg locations (non-negative values) relative to callsite. */
+  int32_t offset = 0;
+  /* Bottom offset of where register arg locations (non-positive
+  values) are placed, relative to... something.  (When we do a
+  funcall, it's relative to callsite.  If we use this information to
+  dump register params, it'll be relative to the callee's ebp
+  offset.) */
+  int32_t neg_offset = hidden_return_param ? -8 : 0;
+
+  int registers_used = hidden_return_param ? 1 : 0;
+  for (size_t i = 0; i < args_count; i++) {
+    uint32_t arg_size;
+    int memory_param = x64_sysv_memory_param(cs, &args[i], &arg_size);
+
+    uint32_t padded_size = uint32_ceil_aligned(arg_size, X64_EIGHTBYTE_SIZE);
+    if (memory_param || registers_used + (arg_size > 8 ? 2 : 1) > 6) {
+      /* Padded as the sysv x64 callconv goes. */
+      infos[i].first_register = -1;
+      infos[i].offset_from_callsite = offset;
+      infos[i].arg_size = arg_size;
+      infos[i].padded_size = padded_size;
+      offset = int32_add(offset, uint32_to_int32(padded_size));
+    } else {
+      neg_offset = int32_sub(neg_offset, uint32_to_int32(padded_size));
+      infos[i].first_register = registers_used;
+      infos[i].offset_from_callsite = neg_offset;
+      infos[i].arg_size = arg_size;
+      infos[i].padded_size = padded_size;
+      registers_used += 1 + (arg_size > 8);
+    }
+  }
+
+  funcall_arglist_info_init(info_out, infos, args_count,
+                            return_type_size, hidden_return_param,
+                            offset, neg_offset);
 }
 
 /* y86/x64 */
