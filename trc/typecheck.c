@@ -346,13 +346,28 @@ void init_name_type(struct ast_typeexpr *a, ident_value name) {
   a->u.name = make_ast_ident(name);
 }
 
+void expose_func_type_parts(struct common_idents *cm,
+                            struct ast_typeexpr *func,
+                            struct ast_typeexpr **args_out,
+                            size_t *args_count_out,
+                            struct ast_typeexpr **return_type_out) {
+  CHECK(func->tag == AST_TYPEEXPR_APP);
+  CHECK(func->u.app.name.value == cm->func);
+  *args_out = func->u.app.params;
+  size_t args_count = size_sub(func->u.app.params_count, 1);
+  *args_count_out = args_count;
+  *return_type_out = &func->u.app.params[args_count];
+}
+
 struct ast_typeexpr *expose_func_return_type(struct common_idents *cm,
                                              struct ast_typeexpr *func,
                                              size_t expected_params_count) {
-  CHECK(func->tag == AST_TYPEEXPR_APP);
-  CHECK(func->u.app.name.value == cm->func);
-  CHECK(func->u.app.params_count == expected_params_count);
-  return &func->u.app.params[size_sub(expected_params_count, 1)];
+  struct ast_typeexpr *args;
+  size_t args_count;
+  struct ast_typeexpr *return_type;
+  expose_func_type_parts(cm, func, &args, &args_count, &return_type);
+  CHECK(size_add(args_count, 1) == expected_params_count);
+  return return_type;
 }
 
 void copy_func_return_type(struct common_idents *cm,

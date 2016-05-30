@@ -4200,7 +4200,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     goto fail;
   }
 
-  struct ast_typeexpr *return_type = ast_expr_type(a);
+  struct ast_typeexpr *func_type = ast_expr_type(&a->u.funcall.func->expr);
+
+  struct ast_typeexpr *return_type = expose_func_return_type(&cs->cm, func_type, size_add(a->u.funcall.args_count, 1));
   /* vvv chase x86 */
   struct funcall_arglist_info arglist_info;
   get_funcall_arglist_info(cs, return_type, a->u.funcall.args, a->u.funcall.args_count,
@@ -4260,8 +4262,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   } break;
   case EXPR_RETURN_FREE_LOC: {
     struct loc func_loc;
-    wipe_temporaries(cs, f, h, &func_er,
-                     ast_expr_type(&a->u.funcall.func->expr), &func_loc);
+    wipe_temporaries(cs, f, h, &func_er, func_type, &func_loc);
     gp_gen_load_register(f, GP_A, func_loc);
     gen_placeholder_stack_adjustment(f, h, 0);
     x86_gen_indirect_call_reg(f, X86_EAX);

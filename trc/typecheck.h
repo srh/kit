@@ -71,6 +71,11 @@ void do_replace_rhs_generics(struct ast_generics *generics,
                              size_t generics_substitutions_count,
                              struct ast_deftype_rhs *a,
                              struct ast_deftype_rhs *out);
+void expose_func_type_parts(struct common_idents *cm,
+                            struct ast_typeexpr *func,
+                            struct ast_typeexpr **args_out,
+                            size_t *args_count_out,
+                            struct ast_typeexpr **return_type_out);
 struct ast_typeexpr *expose_func_return_type(struct common_idents *cm,
                                              struct ast_typeexpr *func,
                                              size_t expected_params_count);
