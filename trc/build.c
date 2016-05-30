@@ -788,16 +788,6 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
   }
 }
 
-int lambda_exists_hidden_return_param(struct checkstate *cs, struct ast_expr *expr,
-                                      uint32_t *return_type_size_out) {
-  struct ast_typeexpr *type = ast_expr_type(expr);
-  size_t args_count = expr->u.lambda.params_count;
-  struct ast_typeexpr *return_type
-    = expose_func_return_type(&cs->cm, type, size_add(args_count, 1));
-
-  return exists_hidden_return_param(cs, return_type, return_type_size_out);
-}
-
 const int64_t Y86_HRP_EBP_DISP = 2 * DWORD_Y86_SIZE;
 const int64_t X64_HRP_EBP_DISP = -X64_EIGHTBYTE_SIZE;
 
@@ -866,25 +856,30 @@ void y86_get_funcall_arglist_info(struct checkstate *cs,
 
 void y86_note_param_locations(struct checkstate *cs, struct frame *h,
                               struct ast_expr *expr) {
+  struct ast_typeexpr *param_types;
+  size_t params_count;
+  struct ast_typeexpr *return_type;
+  expose_func_type_parts(&cs->cm, ast_expr_type(expr),
+                         &param_types, &params_count, &return_type);
+  CHECK(params_count == expr->u.lambda.params_count);
+
+
   uint32_t return_type_size;
-  int is_return_hidden = lambda_exists_hidden_return_param(cs, expr,
-                                                           &return_type_size);
+  int is_return_hidden = exists_hidden_return_param(cs, return_type,
+                                                    &return_type_size);
   int32_t offset = (2 + is_return_hidden) * DWORD_SIZE;
 
   size_t vars_pushed = 0;
 
-  for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
-    struct ast_typeexpr *param_type
-      = ast_var_info_type(&expr->u.lambda.params[i].var_info);
-
-    uint32_t size = gp_sizeof(&cs->nt, param_type);
+  for (size_t i = 0; i < params_count; i++) {
+    uint32_t size = gp_sizeof(&cs->nt, &param_types[i]);
     uint32_t padded_size = uint32_ceil_aligned(size, DWORD_SIZE);
 
     struct loc loc = ebp_loc(size, padded_size, offset);
 
     struct vardata vd;
     vardata_init(&vd, expr->u.lambda.params[i].name.value,
-                 1, param_type, loc);
+                 1, &param_types[i], loc);
     SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
     vars_pushed = size_add(vars_pushed, 1);
@@ -913,9 +908,17 @@ void x64_gen_store64(struct objfile *f, enum x64_reg dest, int32_t dest_disp,
 /* X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8, X64_R9, */
 void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
                               struct frame *h, struct ast_expr *expr) {
+  struct ast_typeexpr *param_types;
+  size_t params_count;
+  struct ast_typeexpr *return_type;
+  expose_func_type_parts(&cs->cm, ast_expr_type(expr),
+                         &param_types, &params_count, &return_type);
+  CHECK(params_count == expr->u.lambda.params_count);
+
+
   uint32_t return_type_size;
-  int is_return_hidden = lambda_exists_hidden_return_param(cs, expr,
-                                                           &return_type_size);
+  int is_return_hidden = exists_hidden_return_param(cs, return_type,
+                                                    &return_type_size);
 
   int register_usage_count = 0;
   static const enum x64_reg param_regs[6] = {
@@ -940,12 +943,9 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
   int32_t memory_param_offset = 2 * X64_EIGHTBYTE_SIZE;
 
   size_t vars_pushed = 0;
-  for (size_t i = 0, e = expr->u.lambda.params_count; i < e; i++) {
-    struct ast_typeexpr *param_type
-      = ast_var_info_type(&expr->u.lambda.params[i].var_info);
-
+  for (size_t i = 0; i < params_count; i++) {
     uint32_t size;
-    int memory_param = x64_sysv_memory_param(cs, param_type, &size);
+    int memory_param = x64_sysv_memory_param(cs, &param_types[i], &size);
     /* (We assume everything is at worst 8-byte aligned, because we at
     worst have u64.) */
 
@@ -975,7 +975,7 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
 
       struct vardata vd;
       vardata_init(&vd, expr->u.lambda.params[i].name.value,
-                   1, param_type, param_loc);
+                   1, &param_types[i], param_loc);
       SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
 
       vars_pushed = size_add(vars_pushed, 1);
