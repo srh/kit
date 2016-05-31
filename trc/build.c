@@ -814,8 +814,9 @@ struct funcall_arg_info {
   X64_R9}. */
   int first_register;
   /* a negative offset value, if the arg will get put in a register
-  before the funcall.  (This is an actual offset value that gets used,
-  though.) */
+  before the funcall.  If so, it's in the range [neg_size, 0].  This
+  is an actual value that gets used either way, though, to avoid
+  unnecessary recomputation. */
   int32_t offset_from_callsite;
 
   uint32_t arg_size;
@@ -828,6 +829,10 @@ struct funcall_arglist_info {
   size_t return_type_size;
   int hidden_return_param;
   uint32_t total_size;
+  /* neg_size is -1 times the amount of space used for arguments below
+  the call-site.  On the caller side, that's _at_ the callsite.  On
+  the callee side, that's below the return pointer, the ebp/rbp
+  pointer that we push, _and_ below the HRP or direct return_loc. */
   int32_t neg_size;
 };
 
@@ -4184,11 +4189,11 @@ void x64_get_funcall_arglist_info(struct checkstate *cs,
   /* Offset of arg locations (non-negative values) relative to callsite. */
   int32_t offset = 0;
   /* Bottom offset of where register arg locations (non-positive
-  values) are placed, relative to... something.  (When we do a
+  values) are placed, relative to the HRP or return_loc.  (When we do a
   funcall, it's relative to callsite.  If we use this information to
   dump register params, it'll be relative to the callee's ebp
   offset.) */
-  int32_t neg_offset = hidden_return_param ? -8 : 0;
+  int32_t neg_offset = 0;
 
   int registers_used = hidden_return_param ? 1 : 0;
   for (size_t i = 0; i < args_count; i++) {
