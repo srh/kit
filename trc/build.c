@@ -862,6 +862,12 @@ void y86_get_funcall_arglist_info(struct checkstate *cs,
                                   size_t args_count,
                                   struct funcall_arglist_info *info_out);
 
+void x64_get_funcall_arglist_info(struct checkstate *cs,
+                                  struct ast_typeexpr *return_type,
+                                  struct ast_typeexpr *args,
+                                  size_t args_count,
+                                  struct funcall_arglist_info *info_out);
+
 void y86_note_param_locations(struct checkstate *cs, struct frame *h,
                               struct ast_expr *expr) {
   struct ast_typeexpr *params;
@@ -925,10 +931,9 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
                          &params, &params_count, &return_type);
   CHECK(params_count == expr->u.lambda.params_count);
 
-
-  uint32_t return_type_size;
-  int is_return_hidden = exists_hidden_return_param(cs, return_type,
-                                                    &return_type_size);
+  struct funcall_arglist_info arglist_info;
+  x64_get_funcall_arglist_info(cs, return_type, params, params_count,
+                               &arglist_info);
 
   int register_usage_count = 0;
   static const enum x64_reg param_regs[6] = {
@@ -936,15 +941,15 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
   };
 
   struct loc return_loc;
-  if (is_return_hidden) {
+  if (arglist_info.hidden_return_param) {
     struct loc hrp_loc = frame_push_loc(h, X64_EIGHTBYTE_SIZE);
     CHECK(hrp_loc.u.ebp_offset == X64_HRP_EBP_DISP);
-    return_loc = ebp_indirect_loc(return_type_size, return_type_size,
+    return_loc = ebp_indirect_loc(arglist_info.return_type_size, arglist_info.return_type_size,
                                   hrp_loc.u.ebp_offset);
     x64_gen_store64(f, X64_RBP, hrp_loc.u.ebp_offset, X64_RDI);
     register_usage_count++;
   } else {
-    return_loc = frame_push_loc(h, return_type_size);
+    return_loc = frame_push_loc(h, arglist_info.return_type_size);
   }
 
   /* Memory params start above the stored ebp and return pointer.
@@ -990,11 +995,12 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
 
       vars_pushed = size_add(vars_pushed, 1);
     }
-    /* TODO(): If we use 5 registers and then have a 16-byte object,
-    can we use the 6th register on a later parameter? */
   }
 
-  frame_specify_calling_info(h, vars_pushed, return_loc, is_return_hidden);
+  frame_specify_calling_info(h, vars_pushed, return_loc,
+                             arglist_info.hidden_return_param);
+
+  funcall_arglist_info_destroy(&arglist_info);
 }
 
 void note_param_locations(struct checkstate *cs, struct objfile *f, struct frame *h,
@@ -4205,6 +4211,8 @@ void x64_get_funcall_arglist_info(struct checkstate *cs,
       infos[i].padded_size = padded_size;
       registers_used += 1 + (arg_size > 8);
     }
+    /* TODO(): If we use 5 registers and then have a 16-byte object,
+    can we use the 6th register on a later parameter? */
   }
 
   funcall_arglist_info_init(info_out, infos, args_count,
