@@ -926,6 +926,10 @@ void x64_gen_store64(struct objfile *f, enum x64_reg dest, int32_t dest_disp,
   TODO_IMPLEMENT;
 }
 
+static const enum x64_reg x64_param_regs[6] = {
+  X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8, X64_R9,
+};
+
 /* X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8, X64_R9, */
 void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
                               struct frame *h, struct ast_expr *expr) {
@@ -940,9 +944,6 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
   x64_get_funcall_arglist_info(cs, return_type, params, params_count,
                                &arglist_info);
 
-  static const enum x64_reg param_regs[6] = {
-    X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8, X64_R9,
-  };
 
   CHECK(h->stack_offset == 0);
   struct loc return_loc;
@@ -977,14 +978,14 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
                           int32_add(negloc_offset, ai.relative_disp));
       if (ai.arg_size <= 8) {
         CHECK(0 <= ai.first_register && ai.first_register < 6);
-        x64_gen_store_register(f, param_loc, param_regs[ai.first_register]);
+        x64_gen_store_register(f, param_loc, x64_param_regs[ai.first_register]);
       } else {
         CHECK(0 <= ai.first_register && ai.first_register < 5);
-        x64_gen_store_register(f, param_loc, param_regs[ai.first_register]);
+        x64_gen_store_register(f, param_loc, x64_param_regs[ai.first_register]);
         x64_gen_store_register(f, ebp_loc(uint32_sub(param_loc.size, 8),
                                           uint32_sub(param_loc.padded_size, 8),
                                           int32_add(param_loc.u.ebp_offset, 8)),
-                               param_regs[ai.first_register + 1]);
+                               x64_param_regs[ai.first_register + 1]);
       }
     }
 
@@ -2887,6 +2888,12 @@ void x86_gen_indirect_call_reg(struct objfile *f, enum x86_reg reg) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x64_gen_indirect_call_reg(struct objfile *f, enum x64_reg reg) {
+  (void)f, (void)reg;
+  TODO_IMPLEMENT;
+}
+
+
 enum expr_return_free_tag {
   EXPR_RETURN_FREE_LOC,
   EXPR_RETURN_FREE_IMM,
@@ -4231,7 +4238,36 @@ void get_funcall_arglist_info(struct checkstate *cs,
   }
 }
 
+void x64_load_register_params(struct objfile *f, struct funcall_arglist_info *arglist_info,
+                              int32_t callsite_base_offset, struct loc return_loc) {
+  for (size_t i = 0, e = arglist_info->args_count; i < e; i++) {
+    struct funcall_arg_info arg_info = arglist_info->arg_infos[i];
+    if (arg_info.first_register != -1) {
+      CHECK(arg_info.first_register >= 0 && arg_info.first_register < 6);
+      struct loc arg_loc = ebp_loc(arg_info.arg_size,
+                                   arg_info.padded_size,
+                                   int32_add(callsite_base_offset, arg_info.relative_disp));
 
+      x64_gen_load_register(f, x64_param_regs[arg_info.first_register],
+                            ebp_loc(uint32_min(arg_loc.size, X64_EIGHTBYTE_SIZE),
+                                    uint32_min(arg_loc.padded_size, X64_EIGHTBYTE_SIZE),
+                                    arg_loc.u.ebp_offset));
+      if (arg_loc.size > X64_EIGHTBYTE_SIZE) {
+        CHECK(arg_loc.size <= 2 * X64_EIGHTBYTE_SIZE);
+        CHECK(arg_loc.padded_size <= 2 * X64_EIGHTBYTE_SIZE);
+        CHECK(arg_info.first_register < 5);
+        x64_gen_load_register(f, x64_param_regs[arg_info.first_register + 1],
+                              ebp_loc(uint32_sub(arg_loc.size, X64_EIGHTBYTE_SIZE),
+                                      uint32_sub(arg_loc.padded_size, X64_EIGHTBYTE_SIZE),
+                                      int32_add(arg_loc.u.ebp_offset, X64_EIGHTBYTE_SIZE)));
+      }
+    }
+  }
+
+  if (arglist_info->hidden_return_param) {
+    x64_gen_load_addressof(f, X64_RDI, return_loc);
+  }
+}
 
 /* chase mark */
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
@@ -4279,8 +4315,6 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   int32_t arglist_neg_offset = frame_save_offset(h);
 
   for (size_t i = 0; i < args_count; i++) {
-    struct ast_expr *arg = &a->u.funcall.args[i].expr;
-
     struct funcall_arg_info arg_info = arglist_info.arg_infos[i];
 
     /* Notably, the arg loc is correct whether it's put in a register
@@ -4293,6 +4327,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     temporary in arg_loc. */
     /* (Right now, EXPR_RETURN_DEMANDED is known to work this way only
     when it encounters another funcall.) */
+    struct ast_expr *arg = &a->u.funcall.args[i].expr;
     struct expr_return arg_er = demand_expr_return(arg_loc);
     if (!gen_expr(cs, f, h, arg, &arg_er)) {
       ret = 0;
@@ -4302,7 +4337,6 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   }
 
   /* vvv chase x86 */
-  /* TODO(): put register args into registers */
   switch (cs->arch) {
   case TARGET_ARCH_Y86: {
     if (arglist_info.hidden_return_param) {
@@ -4340,8 +4374,6 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
     if (arglist_info.hidden_return_param) {
       if (er->tag != EXPR_RETURN_DEMANDED) {
-        /* Let's just pray that the pointer returned by the callee (in
-        EAX) is the same as the hidden return param that we passed! */
         expr_return_set(cs, f, h, er, return_loc, return_type,
                         temp_exists(return_loc, return_type, 1));
       } else {
@@ -4365,7 +4397,41 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     }
   } break;
   case TARGET_ARCH_X64: {
-    TODO_IMPLEMENT;
+    switch (func_er.u.free.tag) {
+    case EXPR_RETURN_FREE_IMM: {
+      x64_load_register_params(f, &arglist_info, callsite_base_offset, return_loc);
+      frame_restore_offset(h, callsite_base_offset);
+      gen_call_imm(cs, f, h, func_er.u.free.u.imm, arglist_info.hidden_return_param);
+    } break;
+    case EXPR_RETURN_FREE_LOC: {
+      struct loc func_loc;
+      wipe_temporaries(cs, f, h, &func_er, func_type, &func_loc);
+
+      x64_load_register_params(f, &arglist_info, callsite_base_offset, return_loc);
+      frame_restore_offset(h, callsite_base_offset);
+
+      gp_gen_load_register(f, GP_A, func_loc);
+      gen_placeholder_stack_adjustment(f, h, 0);
+      x64_gen_indirect_call_reg(f, X64_RAX);
+      gen_placeholder_stack_adjustment(f, h, 1);
+    } break;
+    case EXPR_RETURN_FREE_PRIMITIVE_OP: {
+      /* TODO(): 64-bit friendly primitive ops */
+      TODO_IMPLEMENT;
+    } break;
+    default:
+      UNREACHABLE();
+    }
+
+    if (arglist_info.hidden_return_param) {
+      TODO_IMPLEMENT;
+    } else if (arglist_info.return_type_size == 0) {
+      TODO_IMPLEMENT;
+    } else if (arglist_info.return_type_size <= X64_EIGHTBYTE_SIZE) {
+      TODO_IMPLEMENT;
+    } else if (arglist_info.return_type_size <= 2 * X64_EIGHTBYTE_SIZE) {
+      TODO_IMPLEMENT;
+    }
   } break;
   default:
     UNREACHABLE();

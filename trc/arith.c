@@ -112,6 +112,10 @@ uint32_t uint32_max(uint32_t x, uint32_t y) {
   return x < y ? y : x;
 }
 
+uint32_t uint32_min(uint32_t x, uint32_t y) {
+  return x < y ? x : y;
+}
+
 
 
 uint32_t size_to_uint32(size_t x) {
