@@ -1938,20 +1938,13 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
   case IMMEDIATE_FUNC:
     gen_call_imm_func(cs, f, h, imm.u.func_sti, hidden_return_param);
     break;
-  case IMMEDIATE_U64:
-    UNREACHABLE();
+  case IMMEDIATE_U64: /* fallthrough... */
   case IMMEDIATE_I64:
-    UNREACHABLE();
   case IMMEDIATE_U32:
-    UNREACHABLE();
   case IMMEDIATE_I32:
-    UNREACHABLE();
   case IMMEDIATE_U8:
-    UNREACHABLE();
   case IMMEDIATE_I8:
-    UNREACHABLE();
   case IMMEDIATE_VOID:
-    UNREACHABLE();
   default:
     UNREACHABLE();
   }
