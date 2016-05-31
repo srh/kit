@@ -79,6 +79,10 @@ uint32_t uint32_sub(uint32_t x, uint32_t y) {
   return ret;
 }
 
+int32_t int32_negate(int32_t x) {
+  return int32_sub(0, x);
+}
+
 int try_uint32_div(uint32_t x, uint32_t y, uint32_t *out) {
   if (y == 0) {
     return 0;
@@ -269,6 +273,13 @@ int try_uint32_to_uint8(uint32_t x, uint8_t *out) {
 int32_t uint32_to_int32(uint32_t x) {
   int32_t ret;
   int success = try_uint32_to_int32(x, &ret);
+  CHECK(success);
+  return ret;
+}
+
+uint32_t int32_to_uint32(int32_t x) {
+  uint32_t ret;
+  int success = try_int32_to_uint32(x, &ret);
   CHECK(success);
   return ret;
 }

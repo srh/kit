@@ -940,11 +940,11 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
   x64_get_funcall_arglist_info(cs, return_type, params, params_count,
                                &arglist_info);
 
-  int register_usage_count = 0;
   static const enum x64_reg param_regs[6] = {
     X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8, X64_R9,
   };
 
+  CHECK(h->stack_offset == 0);
   struct loc return_loc;
   if (arglist_info.hidden_return_param) {
     struct loc hrp_loc = frame_push_loc(h, X64_EIGHTBYTE_SIZE);
@@ -952,10 +952,11 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
     return_loc = ebp_indirect_loc(arglist_info.return_type_size, arglist_info.return_type_size,
                                   hrp_loc.u.ebp_offset);
     x64_gen_store64(f, X64_RBP, hrp_loc.u.ebp_offset, X64_RDI);
-    register_usage_count++;
   } else {
     return_loc = frame_push_loc(h, arglist_info.return_type_size);
   }
+  int32_t negloc_offset = h->stack_offset;
+  frame_push_exact_amount(h, int32_to_uint32(int32_negate(arglist_info.neg_size)));
 
   /* Memory params start above the stored ebp and return pointer.
   (The HRP comes from a register and is put in memory below ebp, like
@@ -964,42 +965,35 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
 
   size_t vars_pushed = 0;
   for (size_t i = 0; i < params_count; i++) {
-    uint32_t size;
-    int memory_param = x64_sysv_memory_param(cs, &params[i], &size);
-    /* (We assume everything is at worst 8-byte aligned, because we at
-    worst have u64.) */
-
+    struct funcall_arg_info *ai = &arglist_info.arg_infos[i];
     struct loc param_loc;
-    if (memory_param || register_usage_count + (size > 8 ? 2 : 1) > 6) {
-      /* Padded as the sysv x64 callconv goes. */
-      uint32_t padded_size = uint32_ceil_aligned(size, X64_EIGHTBYTE_SIZE);
-      param_loc = ebp_loc(size, padded_size, memory_param_offset);
-      memory_param_offset = int32_add(memory_param_offset, padded_size);
+    if (ai->first_register == -1) {
+      CHECK(ai->offset_from_callsite >= 0);
+      param_loc = ebp_loc(ai->arg_size, ai->padded_size,
+                          int32_add(memory_param_offset, ai->offset_from_callsite));
     } else {
-      param_loc = frame_push_loc(h, size);
-      if (size <= 8) {
-        CHECK(register_usage_count < 6);
-        x64_gen_store_register(f, param_loc, param_regs[register_usage_count]);
-        register_usage_count++;
+      CHECK(ai->offset_from_callsite <= 0);
+      param_loc = ebp_loc(ai->arg_size, ai->padded_size,
+                          int32_add(negloc_offset, ai->offset_from_callsite));
+      if (ai->arg_size <= 8) {
+        CHECK(0 <= ai->first_register && ai->first_register < 6);
+        x64_gen_store_register(f, param_loc, param_regs[ai->first_register]);
       } else {
-        CHECK(register_usage_count < 5);
-        x64_gen_store_register(f, param_loc, param_regs[register_usage_count]);
-        register_usage_count++;
-        CHECK(register_usage_count < 6);
+        CHECK(0 <= ai->first_register && ai->first_register < 5);
+        x64_gen_store_register(f, param_loc, param_regs[ai->first_register]);
         x64_gen_store_register(f, ebp_loc(uint32_sub(param_loc.size, 8),
                                           uint32_sub(param_loc.padded_size, 8),
-                                          param_loc.u.ebp_offset),
-                               param_regs[register_usage_count]);
-        register_usage_count++;
+                                          int32_add(param_loc.u.ebp_offset, 8)),
+                               param_regs[ai->first_register + 1]);
       }
-
-      struct vardata vd;
-      vardata_init(&vd, expr->u.lambda.params[i].name.value,
-                   1, &params[i], param_loc);
-      SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
-
-      vars_pushed = size_add(vars_pushed, 1);
     }
+
+    struct vardata vd;
+    vardata_init(&vd, expr->u.lambda.params[i].name.value,
+                 1, &params[i], param_loc);
+    SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+
+    vars_pushed = size_add(vars_pushed, 1);
   }
 
   frame_specify_calling_info(h, vars_pushed, return_loc,

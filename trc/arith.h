@@ -34,6 +34,7 @@ int try_uint8_mod(uint8_t x, uint8_t y, uint8_t *out);
 int try_int32_add(int32_t x, int32_t y, int32_t *out);
 int try_int32_sub(int32_t x, int32_t y, int32_t *out);
 int32_t int32_sub(int32_t x, int32_t y);
+int32_t int32_negate(int32_t x);
 int try_int32_mul(int32_t x, int32_t y, int32_t *out);
 int32_t int32_add(int32_t x, int32_t y);
 int32_t int32_div(int32_t x, int32_t y);
@@ -45,6 +46,7 @@ int try_uint32_to_int32(uint32_t x, int32_t *out);
 int try_uint32_to_uint8(uint32_t x, uint8_t *out);
 
 int32_t uint32_to_int32(uint32_t x);
+uint32_t int32_to_uint32(int32_t x);
 
 size_t uint64_to_size(uint64_t x);
 
