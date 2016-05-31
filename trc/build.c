@@ -817,7 +817,7 @@ struct funcall_arg_info {
   before the funcall.  If so, it's in the range [neg_size, 0].  This
   is an actual value that gets used either way, though, to avoid
   unnecessary recomputation. */
-  int32_t offset_from_callsite;
+  int32_t relative_disp;
 
   uint32_t arg_size;
   uint32_t padded_size;
@@ -891,10 +891,10 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h,
   size_t vars_pushed = 0;
 
   for (size_t i = 0; i < params_count; i++) {
-    struct funcall_arg_info *arg_info = &arglist_info.arg_infos[i];
-    CHECK(arg_info->first_register == -1);
-    struct loc loc = ebp_loc(arg_info->arg_size, arg_info->padded_size,
-                             int32_add(arg_info->offset_from_callsite, ebp_callsite_offset));
+    struct funcall_arg_info arg_info = arglist_info.arg_infos[i];
+    CHECK(arg_info.first_register == -1);
+    struct loc loc = ebp_loc(arg_info.arg_size, arg_info.padded_size,
+                             int32_add(arg_info.relative_disp, ebp_callsite_offset));
 
     struct vardata vd;
     vardata_init(&vd, expr->u.lambda.params[i].name.value,
@@ -965,26 +965,26 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
 
   size_t vars_pushed = 0;
   for (size_t i = 0; i < params_count; i++) {
-    struct funcall_arg_info *ai = &arglist_info.arg_infos[i];
+    struct funcall_arg_info ai = arglist_info.arg_infos[i];
     struct loc param_loc;
-    if (ai->first_register == -1) {
-      CHECK(ai->offset_from_callsite >= 0);
-      param_loc = ebp_loc(ai->arg_size, ai->padded_size,
-                          int32_add(memory_param_offset, ai->offset_from_callsite));
+    if (ai.first_register == -1) {
+      CHECK(ai.relative_disp >= 0);
+      param_loc = ebp_loc(ai.arg_size, ai.padded_size,
+                          int32_add(memory_param_offset, ai.relative_disp));
     } else {
-      CHECK(ai->offset_from_callsite <= 0);
-      param_loc = ebp_loc(ai->arg_size, ai->padded_size,
-                          int32_add(negloc_offset, ai->offset_from_callsite));
-      if (ai->arg_size <= 8) {
-        CHECK(0 <= ai->first_register && ai->first_register < 6);
-        x64_gen_store_register(f, param_loc, param_regs[ai->first_register]);
+      CHECK(ai.relative_disp <= 0);
+      param_loc = ebp_loc(ai.arg_size, ai.padded_size,
+                          int32_add(negloc_offset, ai.relative_disp));
+      if (ai.arg_size <= 8) {
+        CHECK(0 <= ai.first_register && ai.first_register < 6);
+        x64_gen_store_register(f, param_loc, param_regs[ai.first_register]);
       } else {
-        CHECK(0 <= ai->first_register && ai->first_register < 5);
-        x64_gen_store_register(f, param_loc, param_regs[ai->first_register]);
+        CHECK(0 <= ai.first_register && ai.first_register < 5);
+        x64_gen_store_register(f, param_loc, param_regs[ai.first_register]);
         x64_gen_store_register(f, ebp_loc(uint32_sub(param_loc.size, 8),
                                           uint32_sub(param_loc.padded_size, 8),
                                           int32_add(param_loc.u.ebp_offset, 8)),
-                               param_regs[ai->first_register + 1]);
+                               param_regs[ai.first_register + 1]);
       }
     }
 
@@ -4150,7 +4150,7 @@ void y86_get_funcall_arglist_info(struct checkstate *cs,
     uint32_t arg_size = gp_sizeof(&cs->nt, &args[i]);
     uint32_t padded_size = frame_padded_push_size(cs->arch, arg_size);
     infos[i].first_register = -1;
-    infos[i].offset_from_callsite = uint32_to_int32(total_size);
+    infos[i].relative_disp = uint32_to_int32(total_size);
     infos[i].arg_size = arg_size;
     infos[i].padded_size = padded_size;
     /* No alignment concerns, (yet!)! */
@@ -4191,14 +4191,14 @@ void x64_get_funcall_arglist_info(struct checkstate *cs,
     if (memory_param || registers_used + (arg_size > 8 ? 2 : 1) > 6) {
       /* Padded as the sysv x64 callconv goes. */
       infos[i].first_register = -1;
-      infos[i].offset_from_callsite = offset;
+      infos[i].relative_disp = offset;
       infos[i].arg_size = arg_size;
       infos[i].padded_size = padded_size;
       offset = int32_add(offset, uint32_to_int32(padded_size));
     } else {
       neg_offset = int32_sub(neg_offset, uint32_to_int32(padded_size));
       infos[i].first_register = registers_used;
-      infos[i].offset_from_callsite = neg_offset;
+      infos[i].relative_disp = neg_offset;
       infos[i].arg_size = arg_size;
       infos[i].padded_size = padded_size;
       registers_used += 1 + (arg_size > 8);
@@ -4254,11 +4254,10 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   expose_func_type_parts(&cs->cm, func_type, &args, &args_count, &return_type);
   CHECK(args_count == a->u.funcall.args_count);
 
-  /* vvv chase x86 */
   struct funcall_arglist_info arglist_info;
   get_funcall_arglist_info(cs, return_type, args, args_count, &arglist_info);
 
-  /* X86 */
+  /* y86/x64 */
   struct loc return_loc;
   if (er->tag == EXPR_RETURN_DEMANDED) {
     /* Return locations perhaps must be non-aliasable locations on the
@@ -4273,21 +4272,22 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   }
 
   int32_t saved_offset = frame_save_offset(h);
-
   adjust_frame_for_callsite_alignment(h, arglist_info.total_size);
-
   frame_push_exact_amount(h, arglist_info.total_size);
-
   int32_t callsite_base_offset = frame_save_offset(h);
+  frame_push_exact_amount(h, int32_to_uint32(int32_negate(arglist_info.neg_size)));
+  int32_t arglist_neg_offset = frame_save_offset(h);
 
   for (size_t i = 0; i < args_count; i++) {
     struct ast_expr *arg = &a->u.funcall.args[i].expr;
 
     struct funcall_arg_info arg_info = arglist_info.arg_infos[i];
 
+    /* Notably, the arg loc is correct whether it's put in a register
+    (with negative offset) or not. */
     struct loc arg_loc = ebp_loc(arg_info.arg_size,
                                  arg_info.padded_size,
-                                 int32_add(callsite_base_offset, arg_info.offset_from_callsite));
+                                 int32_add(callsite_base_offset, arg_info.relative_disp));
 
     /* TODO: We must use ast_exprcatch information to force the
     temporary in arg_loc. */
@@ -4298,13 +4298,18 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       ret = 0;
       goto fail_arglist_info;
     }
-    frame_restore_offset(h, callsite_base_offset);
+    frame_restore_offset(h, arglist_neg_offset);
   }
+
+  /* vvv chase x86 */
+  /* TODO(): put register args into registers */
 
   if (arglist_info.hidden_return_param) {
     struct loc ptr_loc = ebp_loc(DWORD_SIZE, DWORD_SIZE, callsite_base_offset);
     gen_mov_addressof(f, ptr_loc, return_loc);
   }
+
+  frame_restore_offset(h, callsite_base_offset);
 
   switch (func_er.u.free.tag) {
   case EXPR_RETURN_FREE_IMM: {
