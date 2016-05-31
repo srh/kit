@@ -788,8 +788,8 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
   }
 }
 
-const int64_t Y86_HRP_EBP_DISP = 2 * DWORD_Y86_SIZE;
-const int64_t X64_HRP_EBP_DISP = -X64_EIGHTBYTE_SIZE;
+const int32_t Y86_HRP_EBP_DISP = 2 * DWORD_Y86_SIZE;
+const int32_t X64_HRP_EBP_DISP = -X64_EIGHTBYTE_SIZE;
 
 /* Returns the ebp_indirect location of the hidden return pointer --
 always the same value. */
