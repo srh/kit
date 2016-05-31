@@ -4303,64 +4303,72 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
   /* vvv chase x86 */
   /* TODO(): put register args into registers */
-
-  if (arglist_info.hidden_return_param) {
-    struct loc ptr_loc = ebp_loc(DWORD_SIZE, DWORD_SIZE, callsite_base_offset);
-    gen_mov_addressof(f, ptr_loc, return_loc);
-  }
-
-  frame_restore_offset(h, callsite_base_offset);
-
-  switch (func_er.u.free.tag) {
-  case EXPR_RETURN_FREE_IMM: {
-    gen_call_imm(cs, f, h, func_er.u.free.u.imm, arglist_info.hidden_return_param);
-  } break;
-  case EXPR_RETURN_FREE_LOC: {
-    struct loc func_loc;
-    wipe_temporaries(cs, f, h, &func_er, func_type, &func_loc);
-    gp_gen_load_register(f, GP_A, func_loc);
-    gen_placeholder_stack_adjustment(f, h, 0);
-    x86_gen_indirect_call_reg(f, X86_EAX);
-    if (arglist_info.hidden_return_param && platform_ret4_hrp(cs)) {
-      /* TODO: We could do this more elegantly, but right now undo the
-      callee's pop of esp. */
-      x86_gen_add_esp_i32(f, -4);
+  switch (cs->arch) {
+  case TARGET_ARCH_Y86: {
+    if (arglist_info.hidden_return_param) {
+      struct loc ptr_loc = ebp_loc(DWORD_SIZE, DWORD_SIZE, callsite_base_offset);
+      gen_mov_addressof(f, ptr_loc, return_loc);
     }
-    gen_placeholder_stack_adjustment(f, h, 1);
-  } break;
-  case EXPR_RETURN_FREE_PRIMITIVE_OP: {
-    gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
-                              args_count == 0 ? NULL : ast_expr_type(&a->u.funcall.args[0].expr),
-                              return_type);
-  } break;
-  default:
-    UNREACHABLE();
-  }
 
-  if (arglist_info.hidden_return_param) {
-    if (er->tag != EXPR_RETURN_DEMANDED) {
-      /* Let's just pray that the pointer returned by the callee (in
-      EAX) is the same as the hidden return param that we passed! */
+    frame_restore_offset(h, callsite_base_offset);
+
+    switch (func_er.u.free.tag) {
+    case EXPR_RETURN_FREE_IMM: {
+      gen_call_imm(cs, f, h, func_er.u.free.u.imm, arglist_info.hidden_return_param);
+    } break;
+    case EXPR_RETURN_FREE_LOC: {
+      struct loc func_loc;
+      wipe_temporaries(cs, f, h, &func_er, func_type, &func_loc);
+      gp_gen_load_register(f, GP_A, func_loc);
+      gen_placeholder_stack_adjustment(f, h, 0);
+      x86_gen_indirect_call_reg(f, X86_EAX);
+      if (arglist_info.hidden_return_param && platform_ret4_hrp(cs)) {
+        /* TODO: We could do this more elegantly, but right now undo the
+        callee's pop of esp. */
+        x86_gen_add_esp_i32(f, -4);
+      }
+      gen_placeholder_stack_adjustment(f, h, 1);
+    } break;
+    case EXPR_RETURN_FREE_PRIMITIVE_OP: {
+      gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
+                                args_count == 0 ? NULL : ast_expr_type(&a->u.funcall.args[0].expr),
+                                return_type);
+    } break;
+    default:
+      UNREACHABLE();
+    }
+
+    if (arglist_info.hidden_return_param) {
+      if (er->tag != EXPR_RETURN_DEMANDED) {
+        /* Let's just pray that the pointer returned by the callee (in
+        EAX) is the same as the hidden return param that we passed! */
+        expr_return_set(cs, f, h, er, return_loc, return_type,
+                        temp_exists(return_loc, return_type, 1));
+      } else {
+        /* TODO: Icky. */
+        er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
+      }
+    } else if (arglist_info.return_type_size == 0) {
+      expr_return_set(cs, f, h, er, return_loc, return_type,
+                      temp_exists(return_loc, return_type, 1));
+    } else if (arglist_info.return_type_size <= DWORD_SIZE) {
+      /* Return value in eax. */
+      gp_gen_store_register(f, return_loc, GP_A);
       expr_return_set(cs, f, h, er, return_loc, return_type,
                       temp_exists(return_loc, return_type, 1));
     } else {
-      /* TODO: Icky. */
-      er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
+      CHECK(platform_can_return_in_eaxedx(cs));
+      CHECK(arglist_info.return_type_size == 2 * DWORD_SIZE);
+      gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
+      expr_return_set(cs, f, h, er, return_loc, return_type,
+                      temp_exists(return_loc, return_type, 1));
     }
-  } else if (arglist_info.return_type_size == 0) {
-    expr_return_set(cs, f, h, er, return_loc, return_type,
-                    temp_exists(return_loc, return_type, 1));
-  } else if (arglist_info.return_type_size <= DWORD_SIZE) {
-    /* Return value in eax. */
-    gp_gen_store_register(f, return_loc, GP_A);
-    expr_return_set(cs, f, h, er, return_loc, return_type,
-                    temp_exists(return_loc, return_type, 1));
-  } else {
-    CHECK(platform_can_return_in_eaxedx(cs));
-    CHECK(arglist_info.return_type_size == 2 * DWORD_SIZE);
-    gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
-    expr_return_set(cs, f, h, er, return_loc, return_type,
-                    temp_exists(return_loc, return_type, 1));
+  } break;
+  case TARGET_ARCH_X64: {
+    TODO_IMPLEMENT;
+  } break;
+  default:
+    UNREACHABLE();
   }
 
   frame_restore_offset(h, saved_offset);
