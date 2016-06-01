@@ -3240,6 +3240,7 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   frame_restore_offset(h, saved_stack_offset);
 }
 
+/* chase x86 */
 void gen_primitive_op_behavior(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
@@ -4430,8 +4431,20 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       gen_placeholder_stack_adjustment(f, h, 1);
     } break;
     case EXPR_RETURN_FREE_PRIMITIVE_OP: {
-      /* TODO(): 64-bit friendly primitive ops */
-      TODO_IMPLEMENT;
+      /* off0 and off1 values don't matter if they aren't set. */
+      int32_t off0 = INT32_MIN;
+      int32_t off1 = INT32_MIN;
+      if (args_count > 0) {
+        off0 = int32_add(callsite_base_offset, arglist_info.arg_infos[0].relative_disp);
+      }
+      if (args_count > 1) {
+        CHECK(args_count == 2);
+        off1 = int32_add(callsite_base_offset, arglist_info.arg_infos[1].relative_disp);
+      }
+      gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
+                                args_count == 0 ? NULL : ast_expr_type(&a->u.funcall.args[0].expr),
+                                return_type,
+                                off0, off1);
     } break;
     default:
       UNREACHABLE();
