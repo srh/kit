@@ -983,7 +983,8 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
         x64_gen_store_register(f, param_loc, x64_param_regs[ai.first_register]);
       } else {
         CHECK(0 <= ai.first_register && ai.first_register < 5);
-        x64_gen_store_register(f, param_loc, x64_param_regs[ai.first_register]);
+        x64_gen_store_register(f, ebp_loc(8, 8, param_loc.u.ebp_offset),
+                               x64_param_regs[ai.first_register]);
         x64_gen_store_register(f, ebp_loc(uint32_sub(param_loc.size, 8),
                                           uint32_sub(param_loc.padded_size, 8),
                                           int32_add(param_loc.u.ebp_offset, 8)),
@@ -2808,8 +2809,8 @@ void x64_gen_load_register(struct objfile *f, enum x64_reg reg, struct loc src) 
 }
 
 
-void gen_store_biregister(struct objfile *f, struct loc dest,
-                          enum x86_reg lo, enum x86_reg hi) {
+void x86_gen_store_biregister(struct objfile *f, struct loc dest,
+                              enum x86_reg lo, enum x86_reg hi) {
   CHECK(DWORD_SIZE < dest.size && dest.size <= 2 * DWORD_SIZE);
   CHECK(dest.padded_size == 2 * DWORD_SIZE);
   switch (dest.tag) {
@@ -4391,7 +4392,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
         expr_return_set(cs, f, h, er, return_loc, return_type,
                         temp_exists(return_loc, return_type, 1));
       } else {
-        /* TODO: Icky. */
+        /* TODO: Icky.  x64 case identically icky. */
         er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
       }
     } else if (arglist_info.return_type_size == 0) {
@@ -4405,13 +4406,12 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     } else {
       CHECK(platform_can_return_in_eaxedx(cs));
       CHECK(arglist_info.return_type_size == 2 * DWORD_SIZE);
-      gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
+      x86_gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
       expr_return_set(cs, f, h, er, return_loc, return_type,
                       temp_exists(return_loc, return_type, 1));
     }
   } break;
   case TARGET_ARCH_X64: {
-    /* vvv chase x86 */
     switch (func_er.u.free.tag) {
     case EXPR_RETURN_FREE_IMM: {
       x64_load_register_params(f, &arglist_info, callsite_base_offset, return_loc);
@@ -4451,13 +4451,29 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     }
 
     if (arglist_info.hidden_return_param) {
-      TODO_IMPLEMENT;
+      if (er->tag != EXPR_RETURN_DEMANDED) {
+        expr_return_set(cs, f, h, er, return_loc, return_type,
+                        temp_exists(return_loc, return_type, 1));
+      } else {
+        /* TODO: Icky.  And mindlessly copied from the y86 code. */
+        er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
+      }
     } else if (arglist_info.return_type_size == 0) {
-      TODO_IMPLEMENT;
+      expr_return_set(cs, f, h, er, return_loc, return_type,
+                      temp_exists(return_loc, return_type, 1));
     } else if (arglist_info.return_type_size <= X64_EIGHTBYTE_SIZE) {
-      TODO_IMPLEMENT;
-    } else if (arglist_info.return_type_size <= 2 * X64_EIGHTBYTE_SIZE) {
-      TODO_IMPLEMENT;
+      x64_gen_store_register(f, return_loc, X64_RAX);
+      expr_return_set(cs, f, h, er, return_loc, return_type,
+                      temp_exists(return_loc, return_type, 1));
+    } else {
+      CHECK(arglist_info.return_type_size <= 2 * X64_EIGHTBYTE_SIZE);
+      /* TODO(): Hey maybe a x64_gen_store_biregister would be handy. */
+      x64_gen_store_register(f, ebp_loc(8, 8, return_loc.u.ebp_offset),
+                             X64_RAX);
+      x64_gen_store_register(f, ebp_loc(uint32_sub(return_loc.size, 8),
+                                        uint32_sub(return_loc.padded_size, 8),
+                                        int32_add(return_loc.u.ebp_offset, 8)),
+                             X64_RDX);
     }
   } break;
   default:
