@@ -183,7 +183,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
                                struct ast_typeexpr *return_type,
                                int32_t off0,
                                int32_t off1);
-void x86_gen_call(struct objfile *f, struct sti func_sti);
+void y86x64_gen_call(struct objfile *f, struct sti func_sti);
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc);
 void gen_mov(struct objfile *f, struct loc dest, struct loc src);
 void gen_bzero(struct objfile *f, struct loc dest);
@@ -1922,21 +1922,31 @@ int platform_ret4_hrp(struct checkstate *cs) {
   }
 }
 
+/* chase mark */
 void gen_call_imm_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                        struct sti func_sti,
                        int hidden_return_param) {
   /* Dupes code with typetrav_call_func. */
   gen_placeholder_stack_adjustment(f, h, 0);
-  x86_gen_call(f, func_sti);
-  if (hidden_return_param && platform_ret4_hrp(cs)) {
-    /* TODO: We could do this more elegantly, but right now undo the
-    callee's pop of esp. */
-    x86_gen_add_esp_i32(f, -4);
+  /* y86/x64 */
+  y86x64_gen_call(f, func_sti);
+  switch (cs->arch) {
+  case TARGET_ARCH_Y86: {
+    if (hidden_return_param && platform_ret4_hrp(cs)) {
+      /* TODO: We could do this more elegantly, but right now undo the
+      callee's pop of esp. */
+      x86_gen_add_esp_i32(f, -4);
+    }
+  } break;
+  case TARGET_ARCH_X64:
+    break;
+  default:
+    UNREACHABLE();
   }
   gen_placeholder_stack_adjustment(f, h, 1);
 }
 
-/* chase x86 */
+/* chase mark */
 void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
                   struct immediate imm,
                   int hidden_return_param) {
@@ -2880,9 +2890,10 @@ void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src)
 }
 
 
-void x86_gen_call(struct objfile *f, struct sti func_sti) {
+void y86x64_gen_call(struct objfile *f, struct sti func_sti) {
   uint8_t b = 0xE8;
   objfile_section_append_raw(objfile_text(f), &b, 1);
+  /* TODO(): x64 needs rel32 as the relocation type too, right? */
   objfile_section_append_rel32(objfile_text(f), func_sti);
 }
 
@@ -3160,7 +3171,8 @@ void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *
 
   /* Dupes code with gen_call_imm. */
   gen_placeholder_stack_adjustment(f, h, 0);
-  x86_gen_call(f, di_symbol_table_index(inst));
+  /* y86/x64 */
+  y86x64_gen_call(f, di_symbol_table_index(inst));
   gen_placeholder_stack_adjustment(f, h, 1);
 }
 
