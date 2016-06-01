@@ -4378,7 +4378,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       /* Right now y86 doesn't have 8-byte sized primitive ops.  No u64. */
       int32_t off1 = int32_add(h->stack_offset, DWORD_Y86_SIZE);
       gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
-                                args_count == 0 ? NULL : ast_expr_type(&a->u.funcall.args[0].expr),
+                                (args_count == 0 ? NULL : &args[0]),
                                 return_type,
                                 off0, off1);
     } break;
@@ -4442,7 +4442,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
         off1 = int32_add(callsite_base_offset, arglist_info.arg_infos[1].relative_disp);
       }
       gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
-                                args_count == 0 ? NULL : ast_expr_type(&a->u.funcall.args[0].expr),
+                                (args_count == 0 ? NULL : &args[0]),
                                 return_type,
                                 off0, off1);
     } break;
