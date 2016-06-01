@@ -4439,18 +4439,17 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
         /* TODO: Icky.  x64 case identically icky. */
         er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
       }
-    } else if (arglist_info.return_type_size == 0) {
-      expr_return_set(cs, f, h, er, return_loc, return_type,
-                      temp_exists(return_loc, return_type, 1));
-    } else if (arglist_info.return_type_size <= DWORD_SIZE) {
-      /* Return value in eax. */
-      gp_gen_store_register(f, return_loc, GP_A);
-      expr_return_set(cs, f, h, er, return_loc, return_type,
-                      temp_exists(return_loc, return_type, 1));
     } else {
-      CHECK(platform_can_return_in_eaxedx(cs));
-      CHECK(arglist_info.return_type_size == 2 * DWORD_SIZE);
-      x86_gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
+      if (arglist_info.return_type_size == 0) {
+        /* nothing */
+      } else if (arglist_info.return_type_size <= DWORD_SIZE) {
+        /* Return value in eax. */
+        gp_gen_store_register(f, return_loc, GP_A);
+      } else {
+        CHECK(platform_can_return_in_eaxedx(cs));
+        CHECK(arglist_info.return_type_size == 2 * DWORD_SIZE);
+        x86_gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
+      }
       expr_return_set(cs, f, h, er, return_loc, return_type,
                       temp_exists(return_loc, return_type, 1));
     }
@@ -4502,17 +4501,18 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
         /* TODO: Icky.  And mindlessly copied from the y86 code. */
         er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
       }
-    } else if (arglist_info.return_type_size == 0) {
-      expr_return_set(cs, f, h, er, return_loc, return_type,
-                      temp_exists(return_loc, return_type, 1));
-    } else if (arglist_info.return_type_size <= X64_EIGHTBYTE_SIZE) {
-      x64_gen_store_register(f, return_loc, X64_RAX, X64_RCX);
-      expr_return_set(cs, f, h, er, return_loc, return_type,
-                      temp_exists(return_loc, return_type, 1));
     } else {
-      CHECK(arglist_info.return_type_size <= 2 * X64_EIGHTBYTE_SIZE);
-      x64_gen_store_biregister(f, ebp_loc(8, 8, return_loc.u.ebp_offset),
-                               X64_RAX, X64_RDX, X64_RCX);
+      if (arglist_info.return_type_size == 0) {
+        /* nothing */
+      } else if (arglist_info.return_type_size <= X64_EIGHTBYTE_SIZE) {
+        x64_gen_store_register(f, return_loc, X64_RAX, X64_RCX);
+      } else {
+        CHECK(arglist_info.return_type_size <= 2 * X64_EIGHTBYTE_SIZE);
+        x64_gen_store_biregister(f, ebp_loc(8, 8, return_loc.u.ebp_offset),
+                                 X64_RAX, X64_RDX, X64_RCX);
+      }
+      expr_return_set(cs, f, h, er, return_loc, return_type,
+                      temp_exists(return_loc, return_type, 1));
     }
   } break;
   default:
