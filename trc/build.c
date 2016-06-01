@@ -199,11 +199,14 @@ void gen_default_construct(struct checkstate *cs, struct objfile *f, struct fram
                            struct loc dest, struct ast_typeexpr *var_type);
 void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg);
 void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src);
-void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg);
+void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg,
+                            enum x64_reg spare);
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number);
 void gen_crash_jmp(struct objfile *f, struct frame *h);
 void x64_gen_load_addressof(struct objfile *f, enum x64_reg dest, struct loc loc);
+void x64_gen_store_biregister(struct objfile *f, struct loc dest,
+                              enum x64_reg lo, enum x64_reg hi, enum x64_reg spare);
 
 int platform_prefix_underscore(enum target_platform platform) {
   switch (platform) {
@@ -922,6 +925,12 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h,
   funcall_arglist_info_destroy(&arglist_info);
 }
 
+void x64_gen_load64(struct objfile *f, enum x64_reg dest, enum x64_reg src,
+                    int32_t src_disp) {
+  (void)f, (void)dest, (void)src, (void)src_disp;
+  TODO_IMPLEMENT;
+}
+
 void x64_gen_store64(struct objfile *f, enum x64_reg dest, int32_t dest_disp,
                      enum x64_reg src) {
   (void)f, (void)dest, (void)dest_disp, (void)src;
@@ -980,15 +989,14 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
                           int32_add(negloc_offset, ai.relative_disp));
       if (ai.arg_size <= 8) {
         CHECK(0 <= ai.first_register && ai.first_register < 6);
-        x64_gen_store_register(f, param_loc, x64_param_regs[ai.first_register]);
+        x64_gen_store_register(f, param_loc, x64_param_regs[ai.first_register],
+                               X64_RAX);
       } else {
         CHECK(0 <= ai.first_register && ai.first_register < 5);
-        x64_gen_store_register(f, ebp_loc(8, 8, param_loc.u.ebp_offset),
-                               x64_param_regs[ai.first_register]);
-        x64_gen_store_register(f, ebp_loc(uint32_sub(param_loc.size, 8),
-                                          uint32_sub(param_loc.padded_size, 8),
-                                          int32_add(param_loc.u.ebp_offset, 8)),
-                               x64_param_regs[ai.first_register + 1]);
+        x64_gen_store_biregister(f, param_loc,
+                                 x64_param_regs[ai.first_register],
+                                 x64_param_regs[ai.first_register + 1],
+                                 X64_RAX);
       }
     }
 
@@ -2783,10 +2791,11 @@ void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg) 
   }
 }
 
-void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg) {
+void x64_gen_store_register(struct objfile *f, struct loc dest,
+                            enum x64_reg reg, enum x64_reg spare) {
   /* We actually do have to implement this, because reg can be a
   calling convention register like r8 or r9, not named by gp_reg. */
-  (void)f, (void)dest, (void)reg;
+  (void)f, (void)dest, (void)reg, (void)spare;
   TODO_IMPLEMENT;
 }
 
@@ -2836,6 +2845,28 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
     x86_gen_load32(f, altreg, X86_EBP, dest.u.ebp_indirect);
     x86_gen_store32(f, altreg, 0, lo);
     x86_gen_store32(f, altreg, DWORD_SIZE, hi);
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void x64_gen_store_biregister(struct objfile *f, struct loc dest,
+                              enum x64_reg lo, enum x64_reg hi, enum x64_reg spare) {
+  CHECK(X64_EIGHTBYTE_SIZE < dest.size && dest.size <= 2 * X64_EIGHTBYTE_SIZE);
+  CHECK(dest.padded_size == 2 * X64_EIGHTBYTE_SIZE);
+  switch (dest.tag) {
+  case LOC_EBP_OFFSET:
+    x64_gen_store64(f, X64_RBP, dest.u.ebp_offset, lo);
+    x64_gen_store64(f, X64_RBP, int32_add(dest.u.ebp_offset, X64_EIGHTBYTE_SIZE), hi);
+    break;
+  case LOC_GLOBAL: {
+    CRASH("Writing to globals is impossible.");
+  } break;
+  case LOC_EBP_INDIRECT: {
+    x64_gen_load64(f, spare, X64_RBP, dest.u.ebp_indirect);
+    x64_gen_store64(f, spare, 0, lo);
+    x64_gen_store64(f, spare, X64_EIGHTBYTE_SIZE, hi);
   } break;
   default:
     UNREACHABLE();
@@ -4475,18 +4506,13 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       expr_return_set(cs, f, h, er, return_loc, return_type,
                       temp_exists(return_loc, return_type, 1));
     } else if (arglist_info.return_type_size <= X64_EIGHTBYTE_SIZE) {
-      x64_gen_store_register(f, return_loc, X64_RAX);
+      x64_gen_store_register(f, return_loc, X64_RAX, X64_RCX);
       expr_return_set(cs, f, h, er, return_loc, return_type,
                       temp_exists(return_loc, return_type, 1));
     } else {
       CHECK(arglist_info.return_type_size <= 2 * X64_EIGHTBYTE_SIZE);
-      /* TODO(): Hey maybe a x64_gen_store_biregister would be handy. */
-      x64_gen_store_register(f, ebp_loc(8, 8, return_loc.u.ebp_offset),
-                             X64_RAX);
-      x64_gen_store_register(f, ebp_loc(uint32_sub(return_loc.size, 8),
-                                        uint32_sub(return_loc.padded_size, 8),
-                                        int32_add(return_loc.u.ebp_offset, 8)),
-                             X64_RDX);
+      x64_gen_store_biregister(f, ebp_loc(8, 8, return_loc.u.ebp_offset),
+                               X64_RAX, X64_RDX, X64_RCX);
     }
   } break;
   default:
