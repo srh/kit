@@ -3211,6 +3211,8 @@ void gen_cmp8_behavior(struct objfile *f,
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
 
+/* chase x86 */
+/* TODO(): Yah, this is totally nutso, another calling convention fix needed here. */
 void gen_enumconstruct_behavior(struct checkstate *cs,
                                 struct objfile *f,
                                 struct frame *h,
@@ -3253,7 +3255,7 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   frame_restore_offset(h, saved_stack_offset);
 }
 
-/* chase x86 */
+/* chase mark */
 void gen_primitive_op_behavior(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
@@ -3314,6 +3316,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
                 target);
   } break;
 
+    /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_U8_TO_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
   } break;
