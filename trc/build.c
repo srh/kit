@@ -180,7 +180,9 @@ void gen_primitive_op_behavior(struct checkstate *cs,
                                struct frame *h,
                                struct primitive_op prim_op,
                                struct ast_typeexpr *arg0_type_or_null,
-                               struct ast_typeexpr *return_type);
+                               struct ast_typeexpr *return_type,
+                               int32_t off0,
+                               int32_t off1);
 void x86_gen_call(struct objfile *f, struct sti func_sti);
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc);
 void gen_mov(struct objfile *f, struct loc dest, struct loc src);
@@ -1555,6 +1557,7 @@ size_t place_rexw(uint8_t *b, enum target_arch arch) {
   }
 }
 
+/* chase mark */
 void gen_placeholder_stack_adjustment(struct objfile *f,
                                       struct frame *h,
                                       int downward) {
@@ -1932,6 +1935,7 @@ void gen_call_imm_func(struct checkstate *cs, struct objfile *f, struct frame *h
   gen_placeholder_stack_adjustment(f, h, 1);
 }
 
+/* chase x86 */
 void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
                   struct immediate imm,
                   int hidden_return_param) {
@@ -3240,10 +3244,16 @@ void gen_primitive_op_behavior(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
                                struct primitive_op prim_op,
+
+                               /* is NULL if op has arity 0 */
                                struct ast_typeexpr *arg0_type_or_null,
-                               struct ast_typeexpr *return_type) {
-  int32_t off0 = h->stack_offset;
-  int32_t off1 = int32_add(h->stack_offset, DWORD_SIZE);
+                               struct ast_typeexpr *return_type,
+
+                               /* displacements of operands, relative to ebp */
+                               /* is meaningful if op has arity 1 or 2 */
+                               int32_t off0,
+                               /* is meaningful if op has arity 2 */
+                               int32_t off1) {
   switch (prim_op.tag) {
   case PRIMITIVE_OP_ENUMCONSTRUCT: {
     CHECK(arg0_type_or_null);
@@ -4336,7 +4346,6 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     frame_restore_offset(h, arglist_neg_offset);
   }
 
-  /* vvv chase x86 */
   switch (cs->arch) {
   case TARGET_ARCH_Y86: {
     if (arglist_info.hidden_return_param) {
@@ -4364,9 +4373,13 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       gen_placeholder_stack_adjustment(f, h, 1);
     } break;
     case EXPR_RETURN_FREE_PRIMITIVE_OP: {
+      int32_t off0 = h->stack_offset;
+      /* Right now y86 doesn't have 8-byte sized primitive ops.  No u64. */
+      int32_t off1 = int32_add(h->stack_offset, DWORD_Y86_SIZE);
       gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
                                 args_count == 0 ? NULL : ast_expr_type(&a->u.funcall.args[0].expr),
-                                return_type);
+                                return_type,
+                                off0, off1);
     } break;
     default:
       UNREACHABLE();
@@ -4397,6 +4410,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     }
   } break;
   case TARGET_ARCH_X64: {
+    /* vvv chase x86 */
     switch (func_er.u.free.tag) {
     case EXPR_RETURN_FREE_IMM: {
       x64_load_register_params(f, &arglist_info, callsite_base_offset, return_loc);
