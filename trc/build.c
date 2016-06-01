@@ -4222,8 +4222,6 @@ void x64_get_funcall_arglist_info(struct checkstate *cs,
       infos[i].padded_size = padded_size;
       registers_used += 1 + (arg_size > 8);
     }
-    /* TODO(): If we use 5 registers and then have a 16-byte object,
-    can we use the 6th register on a later parameter? */
   }
 
   funcall_arglist_info_init(info_out, infos, args_count,
