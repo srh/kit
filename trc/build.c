@@ -4419,9 +4419,14 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       gen_placeholder_stack_adjustment(f, h, 1);
     } break;
     case EXPR_RETURN_FREE_PRIMITIVE_OP: {
-      int32_t off0 = h->stack_offset;
-      /* Right now y86 doesn't have 8-byte sized primitive ops.  No u64. */
-      int32_t off1 = int32_add(h->stack_offset, DWORD_Y86_SIZE);
+      int32_t off0 = INT32_MIN;
+      int32_t off1 = INT32_MIN;
+      if (args_count > 0) {
+        off0 = int32_add(callsite_base_offset, arglist_info.arg_infos[0].relative_disp);
+      }
+      if (args_count > 1) {
+        off1 = int32_add(callsite_base_offset, arglist_info.arg_infos[1].relative_disp);
+      }
       gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
                                 (args_count == 0 ? NULL : &args[0]),
                                 return_type,
