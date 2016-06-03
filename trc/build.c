@@ -3287,30 +3287,22 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
 }
 
 /* chase mark */
-void gen_primitive_op_behavior(struct checkstate *cs,
-                               struct objfile *f,
-                               struct frame *h,
-                               struct primitive_op prim_op,
+void gen_very_primitive_op_behavior(struct checkstate *cs,
+                                    struct objfile *f,
+                                    struct frame *h,
+                                    struct primitive_op prim_op,
 
-                               /* is NULL if op has arity 0 */
-                               struct ast_typeexpr *arg0_type_or_null,
-                               struct ast_typeexpr *return_type,
+                                    /* is NULL if op has arity 0 */
+                                    struct ast_typeexpr *arg0_type_or_null,
 
-                               /* displacements of operands, relative to ebp */
-                               /* is meaningful if op has arity 1 or 2 */
-                               int32_t off0,
-                               /* is meaningful if op has arity 2 */
-                               int32_t off1) {
+                                    /* displacements of operands, relative to ebp */
+                                    /* is meaningful if op has arity 1 or 2 */
+                                    int32_t off0,
+                                    /* is meaningful if op has arity 2 */
+                                    int32_t off1) {
   switch (prim_op.tag) {
   case PRIMITIVE_OP_ENUMCONSTRUCT: {
-    CHECK(arg0_type_or_null);
-    /* Unlike with other ops, our calling convention doesn't involve
-    one parameter at off0 and another at off1 (and a return value, if
-    any, in registers).  We actually have to figure out whether a
-    hidden return parameter is involved. */
-    gen_enumconstruct_behavior(cs, f, h, prim_op.u.enumconstruct_number,
-                               arg0_type_or_null,
-                               return_type);
+    UNREACHABLE();
   } break;
   case PRIMITIVE_OP_INIT: {
     struct ast_typeexpr *target;
@@ -4180,6 +4172,37 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   }
 }
 
+void gen_primitive_op_behavior(struct checkstate *cs,
+                               struct objfile *f,
+                               struct frame *h,
+                               struct primitive_op prim_op,
+
+                               /* is NULL if op has arity 0 */
+                               struct ast_typeexpr *arg0_type_or_null,
+                               struct ast_typeexpr *return_type,
+
+                               /* displacements of operands, relative to ebp */
+                               /* is meaningful if op has arity 1 or 2 */
+                               int32_t off0,
+                               /* is meaningful if op has arity 2 */
+                               int32_t off1) {
+  switch (prim_op.tag) {
+  case PRIMITIVE_OP_ENUMCONSTRUCT: {
+    CHECK(arg0_type_or_null);
+    /* Unlike with other ops, our calling convention doesn't involve
+    one parameter at off0 and another at off1 (and a return value, if
+    any, in registers).  We actually have to figure out whether a
+    hidden return parameter is involved. */
+    gen_enumconstruct_behavior(cs, f, h, prim_op.u.enumconstruct_number,
+                               arg0_type_or_null,
+                               return_type);
+  } break;
+  default: {
+    gen_very_primitive_op_behavior(cs, f, h, prim_op, arg0_type_or_null, off0, off1);
+  } break;
+  }
+}
+
 int platform_can_return_in_eaxedx(struct checkstate *cs) {
   switch (cs->platform) {
   case TARGET_PLATFORM_OSX_32BIT: /* fallthrough */
@@ -4332,15 +4355,7 @@ void y86_postcall_return_in_loc(struct checkstate *cs,
                                 struct funcall_arglist_info *arglist_info,
                                 struct ast_typeexpr *return_type,
                                 struct loc return_loc) {
-  if (arglist_info->hidden_return_param) {
-    if (er->tag != EXPR_RETURN_DEMANDED) {
-      expr_return_set(cs, f, h, er, return_loc, return_type,
-                      temp_exists(return_loc, return_type, 1));
-    } else {
-      /* TODO: Icky.  x64 case identically icky. */
-      er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
-    }
-  } else {
+  if (!arglist_info->hidden_return_param) {
     if (arglist_info->return_type_size == 0) {
       /* nothing */
     } else if (arglist_info->return_type_size <= DWORD_SIZE) {
@@ -4351,8 +4366,14 @@ void y86_postcall_return_in_loc(struct checkstate *cs,
       CHECK(arglist_info->return_type_size == 2 * DWORD_SIZE);
       x86_gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
     }
+  }
+
+  if (er->tag != EXPR_RETURN_DEMANDED) {
     expr_return_set(cs, f, h, er, return_loc, return_type,
                     temp_exists(return_loc, return_type, 1));
+  } else {
+    /* TODO: Icky.  x64 case identically icky. */
+    er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
   }
 }
 
@@ -4364,15 +4385,7 @@ void x64_postcall_return_in_loc(struct checkstate *cs,
                                 struct ast_typeexpr *return_type,
                                 struct loc return_loc) {
 
-  if (arglist_info->hidden_return_param) {
-    if (er->tag != EXPR_RETURN_DEMANDED) {
-      expr_return_set(cs, f, h, er, return_loc, return_type,
-                      temp_exists(return_loc, return_type, 1));
-    } else {
-      /* TODO: Icky.  And mindlessly copied from the y86 code. */
-      er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
-    }
-  } else {
+  if (!arglist_info->hidden_return_param) {
     if (arglist_info->return_type_size == 0) {
       /* nothing */
     } else if (arglist_info->return_type_size <= X64_EIGHTBYTE_SIZE) {
@@ -4382,8 +4395,14 @@ void x64_postcall_return_in_loc(struct checkstate *cs,
       x64_gen_store_biregister(f, ebp_loc(8, 8, return_loc.u.ebp_offset),
                                X64_RAX, X64_RDX, X64_RCX);
     }
+  }
+
+  if (er->tag != EXPR_RETURN_DEMANDED) {
     expr_return_set(cs, f, h, er, return_loc, return_type,
                     temp_exists(return_loc, return_type, 1));
+  } else {
+    /* TODO: Icky.  And mindlessly copied from the y86 code. */
+    er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
   }
 }
 
