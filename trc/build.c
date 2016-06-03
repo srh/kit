@@ -175,14 +175,21 @@ struct loc gen_array_element_loc(struct checkstate *cs,
                                  struct ast_typeexpr *elem_type,
                                  uint32_t index);
 
+struct funcall_arglist_info;
 void gen_primitive_op_behavior(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
                                struct primitive_op prim_op,
                                struct ast_typeexpr *arg0_type_or_null,
                                struct ast_typeexpr *return_type,
+                               struct funcall_arglist_info *arglist_info,
+                               struct loc return_loc,
                                int32_t off0,
                                int32_t off1);
+void postcall_return_in_loc(struct checkstate *cs,
+                            struct objfile *f,
+                            struct funcall_arglist_info *arglist_info,
+                            struct loc return_loc);
 void y86x64_gen_call(struct objfile *f, struct sti func_sti);
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc);
 void gen_mov(struct objfile *f, struct loc dest, struct loc src);
@@ -4181,6 +4188,9 @@ void gen_primitive_op_behavior(struct checkstate *cs,
                                struct ast_typeexpr *arg0_type_or_null,
                                struct ast_typeexpr *return_type,
 
+                               struct funcall_arglist_info *arglist_info,
+                               struct loc return_loc,
+
                                /* displacements of operands, relative to ebp */
                                /* is meaningful if op has arity 1 or 2 */
                                int32_t off0,
@@ -4201,6 +4211,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
     gen_very_primitive_op_behavior(cs, f, h, prim_op, arg0_type_or_null, off0, off1);
   } break;
   }
+  postcall_return_in_loc(cs, f, arglist_info, return_loc);
 }
 
 int platform_can_return_in_eaxedx(struct checkstate *cs) {
@@ -4383,6 +4394,22 @@ void x64_postcall_return_in_loc(struct objfile *f,
   }
 }
 
+void postcall_return_in_loc(struct checkstate *cs,
+                            struct objfile *f,
+                            struct funcall_arglist_info *arglist_info,
+                            struct loc return_loc) {
+  switch (cs->arch) {
+  case TARGET_ARCH_Y86:
+    y86_postcall_return_in_loc(cs, f, arglist_info, return_loc);
+    break;
+  case TARGET_ARCH_X64:
+    x64_postcall_return_in_loc(f, arglist_info, return_loc);
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 /* chase mark */
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
@@ -4490,8 +4517,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
                                 (args_count == 0 ? NULL : &args[0]),
                                 return_type,
+                                &arglist_info,
+                                return_loc,
                                 off0, off1);
-      y86_postcall_return_in_loc(cs, f, &arglist_info, return_loc);
     } break;
     default:
       UNREACHABLE();
@@ -4533,8 +4561,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
                                 (args_count == 0 ? NULL : &args[0]),
                                 return_type,
+                                &arglist_info,
+                                return_loc,
                                 off0, off1);
-      x64_postcall_return_in_loc(f, &arglist_info, return_loc);
     } break;
     default:
       UNREACHABLE();
