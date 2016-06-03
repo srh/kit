@@ -3259,6 +3259,7 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
                                 struct ast_typeexpr *return_type,
                                 struct funcall_arglist_info *arglist_info,
                                 struct loc return_loc) {
+  (void)arglist_info;  /* TODO(): Use. */
   CHECK(arg0_type);
   /* We have to actually figure out the calling convention and
   arg/return locations and sizes for this op. */
@@ -3272,16 +3273,9 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   struct loc arg_loc = ebp_loc(arg_attrs.size, arg_attrs.size,
                                h->stack_offset + (hidden_return_param ? DWORD_SIZE : 0));
 
-  struct loc return_loc1;
-  if (hidden_return_param) {
-    return_loc1 = ebp_indirect_loc(return_size, return_size, h->stack_offset);
-  } else {
-    return_loc1 = frame_push_loc(h, return_size);
-  }
-
-  struct loc return_enum_num_loc = make_enum_num_loc(f, h, return_loc1);
+  struct loc return_enum_num_loc = make_enum_num_loc(f, h, return_loc);
   struct loc return_enum_body_loc
-    = make_enum_body_loc(f, h, return_loc1, arg_attrs.size, arg_attrs.align);
+    = make_enum_body_loc(f, h, return_loc, arg_attrs.size, arg_attrs.align);
 
   /* x86-specific enum tag size logic. */
   int32_t enum_num_i32
@@ -3291,9 +3285,7 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
 
   gen_move_or_copydestroy(cs, f, h, return_enum_body_loc, arg_loc, arg0_type);
 
-  x86_gen_returnloc_funcreturn_convention(f, hidden_return_param, return_loc1);
   frame_restore_offset(h, saved_stack_offset);
-  postcall_return_in_loc(cs, f, arglist_info, return_loc);
 }
 
 /* chase mark */
