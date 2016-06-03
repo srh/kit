@@ -4325,6 +4325,38 @@ void x64_load_register_params(struct objfile *f, struct funcall_arglist_info *ar
   }
 }
 
+void y86_postcall_return_in_loc(struct checkstate *cs,
+                                struct objfile *f,
+                                struct frame *h,
+                                struct expr_return *er,
+                                struct funcall_arglist_info *arglist_info,
+                                struct ast_typeexpr *return_type,
+                                struct loc return_loc) {
+  if (arglist_info->hidden_return_param) {
+    if (er->tag != EXPR_RETURN_DEMANDED) {
+      expr_return_set(cs, f, h, er, return_loc, return_type,
+                      temp_exists(return_loc, return_type, 1));
+    } else {
+      /* TODO: Icky.  x64 case identically icky. */
+      er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
+    }
+  } else {
+    if (arglist_info->return_type_size == 0) {
+      /* nothing */
+    } else if (arglist_info->return_type_size <= DWORD_SIZE) {
+      /* Return value in eax. */
+      gp_gen_store_register(f, return_loc, GP_A);
+    } else {
+      CHECK(platform_can_return_in_eaxedx(cs));
+      CHECK(arglist_info->return_type_size == 2 * DWORD_SIZE);
+      x86_gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
+    }
+    expr_return_set(cs, f, h, er, return_loc, return_type,
+                    temp_exists(return_loc, return_type, 1));
+  }
+
+}
+
 /* chase mark */
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
@@ -4436,28 +4468,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       UNREACHABLE();
     }
 
-    if (arglist_info.hidden_return_param) {
-      if (er->tag != EXPR_RETURN_DEMANDED) {
-        expr_return_set(cs, f, h, er, return_loc, return_type,
-                        temp_exists(return_loc, return_type, 1));
-      } else {
-        /* TODO: Icky.  x64 case identically icky. */
-        er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
-      }
-    } else {
-      if (arglist_info.return_type_size == 0) {
-        /* nothing */
-      } else if (arglist_info.return_type_size <= DWORD_SIZE) {
-        /* Return value in eax. */
-        gp_gen_store_register(f, return_loc, GP_A);
-      } else {
-        CHECK(platform_can_return_in_eaxedx(cs));
-        CHECK(arglist_info.return_type_size == 2 * DWORD_SIZE);
-        x86_gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
-      }
-      expr_return_set(cs, f, h, er, return_loc, return_type,
-                      temp_exists(return_loc, return_type, 1));
-    }
+    y86_postcall_return_in_loc(cs, f, h, er, &arglist_info, return_type, return_loc);
   } break;
   case TARGET_ARCH_X64: {
     switch (func_er.u.free.tag) {
