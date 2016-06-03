@@ -4354,7 +4354,37 @@ void y86_postcall_return_in_loc(struct checkstate *cs,
     expr_return_set(cs, f, h, er, return_loc, return_type,
                     temp_exists(return_loc, return_type, 1));
   }
+}
 
+void x64_postcall_return_in_loc(struct checkstate *cs,
+                                struct objfile *f,
+                                struct frame *h,
+                                struct expr_return *er,
+                                struct funcall_arglist_info *arglist_info,
+                                struct ast_typeexpr *return_type,
+                                struct loc return_loc) {
+
+  if (arglist_info->hidden_return_param) {
+    if (er->tag != EXPR_RETURN_DEMANDED) {
+      expr_return_set(cs, f, h, er, return_loc, return_type,
+                      temp_exists(return_loc, return_type, 1));
+    } else {
+      /* TODO: Icky.  And mindlessly copied from the y86 code. */
+      er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
+    }
+  } else {
+    if (arglist_info->return_type_size == 0) {
+      /* nothing */
+    } else if (arglist_info->return_type_size <= X64_EIGHTBYTE_SIZE) {
+      x64_gen_store_register(f, return_loc, X64_RAX, X64_RCX);
+    } else {
+      CHECK(arglist_info->return_type_size <= 2 * X64_EIGHTBYTE_SIZE);
+      x64_gen_store_biregister(f, ebp_loc(8, 8, return_loc.u.ebp_offset),
+                               X64_RAX, X64_RDX, X64_RCX);
+    }
+    expr_return_set(cs, f, h, er, return_loc, return_type,
+                    temp_exists(return_loc, return_type, 1));
+  }
 }
 
 /* chase mark */
@@ -4436,6 +4466,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     switch (func_er.u.free.tag) {
     case EXPR_RETURN_FREE_IMM: {
       gen_call_imm(cs, f, h, func_er.u.free.u.imm, arglist_info.hidden_return_param);
+      y86_postcall_return_in_loc(cs, f, h, er, &arglist_info, return_type, return_loc);
     } break;
     case EXPR_RETURN_FREE_LOC: {
       struct loc func_loc;
@@ -4449,6 +4480,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
         x86_gen_add_esp_i32(f, -4);
       }
       gen_placeholder_stack_adjustment(f, h, 1);
+      y86_postcall_return_in_loc(cs, f, h, er, &arglist_info, return_type, return_loc);
     } break;
     case EXPR_RETURN_FREE_PRIMITIVE_OP: {
       int32_t off0 = INT32_MIN;
@@ -4463,19 +4495,20 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                                 (args_count == 0 ? NULL : &args[0]),
                                 return_type,
                                 off0, off1);
+      y86_postcall_return_in_loc(cs, f, h, er, &arglist_info, return_type, return_loc);
     } break;
     default:
       UNREACHABLE();
     }
-
-    y86_postcall_return_in_loc(cs, f, h, er, &arglist_info, return_type, return_loc);
   } break;
+
   case TARGET_ARCH_X64: {
     switch (func_er.u.free.tag) {
     case EXPR_RETURN_FREE_IMM: {
       x64_load_register_params(f, &arglist_info, callsite_base_offset, return_loc);
       frame_restore_offset(h, callsite_base_offset);
       gen_call_imm(cs, f, h, func_er.u.free.u.imm, arglist_info.hidden_return_param);
+      x64_postcall_return_in_loc(cs, f, h, er, &arglist_info, return_type, return_loc);
     } break;
     case EXPR_RETURN_FREE_LOC: {
       struct loc func_loc;
@@ -4488,6 +4521,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       gen_placeholder_stack_adjustment(f, h, 0);
       x64_gen_indirect_call_reg(f, X64_RAX);
       gen_placeholder_stack_adjustment(f, h, 1);
+      x64_postcall_return_in_loc(cs, f, h, er, &arglist_info, return_type, return_loc);
     } break;
     case EXPR_RETURN_FREE_PRIMITIVE_OP: {
       /* off0 and off1 values don't matter if they aren't set. */
@@ -4504,31 +4538,10 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                                 (args_count == 0 ? NULL : &args[0]),
                                 return_type,
                                 off0, off1);
+      x64_postcall_return_in_loc(cs, f, h, er, &arglist_info, return_type, return_loc);
     } break;
     default:
       UNREACHABLE();
-    }
-
-    if (arglist_info.hidden_return_param) {
-      if (er->tag != EXPR_RETURN_DEMANDED) {
-        expr_return_set(cs, f, h, er, return_loc, return_type,
-                        temp_exists(return_loc, return_type, 1));
-      } else {
-        /* TODO: Icky.  And mindlessly copied from the y86 code. */
-        er_set_tr(er, temp_exists(erd_loc(&er->u.demand), return_type, 1));
-      }
-    } else {
-      if (arglist_info.return_type_size == 0) {
-        /* nothing */
-      } else if (arglist_info.return_type_size <= X64_EIGHTBYTE_SIZE) {
-        x64_gen_store_register(f, return_loc, X64_RAX, X64_RCX);
-      } else {
-        CHECK(arglist_info.return_type_size <= 2 * X64_EIGHTBYTE_SIZE);
-        x64_gen_store_biregister(f, ebp_loc(8, 8, return_loc.u.ebp_offset),
-                                 X64_RAX, X64_RDX, X64_RCX);
-      }
-      expr_return_set(cs, f, h, er, return_loc, return_type,
-                      temp_exists(return_loc, return_type, 1));
     }
   } break;
   default:
