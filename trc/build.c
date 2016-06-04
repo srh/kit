@@ -181,10 +181,9 @@ void gen_primitive_op_behavior(struct checkstate *cs,
                                struct frame *h,
                                struct primitive_op prim_op,
                                struct ast_typeexpr *arg0_type_or_null,
-                               struct ast_typeexpr *return_type,
+                               int32_t callsite_base_offset,
                                struct funcall_arglist_info *arglist_info,
                                struct loc return_loc,
-                               struct loc arg0_loc,
                                int32_t off0,
                                int32_t off1);
 void postcall_return_in_loc(struct checkstate *cs,
@@ -3268,11 +3267,8 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
                                 struct frame *h,
                                 size_t enumconstruct_number,
                                 struct ast_typeexpr *arg0_type,
-                                struct ast_typeexpr *return_type,
-                                struct funcall_arglist_info *arglist_info,
                                 struct loc return_loc,
                                 struct loc arg_loc) {
-  (void)return_type, (void)arglist_info;  /* TODO(): Use or get rid of. */
   CHECK(arg0_type);
   /* We have to actually figure out the calling convention and
   arg/return locations and sizes for this op. */
@@ -4188,29 +4184,27 @@ void gen_primitive_op_behavior(struct checkstate *cs,
 
                                /* is NULL if op has arity 0 */
                                struct ast_typeexpr *arg0_type_or_null,
-                               struct ast_typeexpr *return_type,
 
+                               int32_t callsite_base_offset,
                                struct funcall_arglist_info *arglist_info,
                                struct loc return_loc,
-                               /* is meaningful if op has arity 1 or 2 */
-                               struct loc arg0_loc,
 
                                /* displacements of operands, relative to ebp */
                                /* is meaningful if op has arity 1 or 2 */
                                int32_t off0,
                                /* is meaningful if op has arity 2 */
                                int32_t off1) {
+  /* TODO(): x86: callsite_base_offset needs to be used for x64 -- on x86 assert that it equals stack offset. */
   switch (prim_op.tag) {
   case PRIMITIVE_OP_ENUMCONSTRUCT: {
     CHECK(arg0_type_or_null);
+    struct loc arg0_loc = caller_arg_loc(callsite_base_offset, arglist_info, 0);
     /* Unlike with other ops, our calling convention doesn't involve
     one parameter at off0 and another at off1 (and a return value, if
     any, in registers).  We actually have to figure out whether a
     hidden return parameter is involved. */
     gen_enumconstruct_behavior(cs, f, h, prim_op.u.enumconstruct_number,
                                arg0_type_or_null,
-                               return_type,
-                               arglist_info,
                                return_loc,
                                arg0_loc);
   } break;
@@ -4460,15 +4454,10 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   frame_push_exact_amount(h, int32_to_uint32(int32_negate(arglist_info.neg_size)));
   int32_t arglist_neg_offset = frame_save_offset(h);
 
-  struct loc arg0_loc;
-
   for (size_t i = 0; i < args_count; i++) {
     /* Notably, the arg loc is correct whether it's put in a register
     (with negative offset) or not. */
     struct loc arg_loc = caller_arg_loc(callsite_base_offset, &arglist_info, i);
-    if (i == 0) {
-      arg0_loc = arg_loc;
-    }
 
     /* TODO: We must use ast_exprcatch information to force the
     temporary in arg_loc. */
@@ -4522,10 +4511,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       }
       gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
                                 (args_count == 0 ? NULL : &args[0]),
-                                return_type,
+                                callsite_base_offset,
                                 &arglist_info,
                                 return_loc,
-                                arg0_loc,
                                 off0, off1);
     } break;
     default:
@@ -4565,15 +4553,11 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
         CHECK(args_count == 2);
         off1 = int32_add(callsite_base_offset, arglist_info.arg_infos[1].relative_disp);
       }
-      /* TODO(): We're at arglist_neg_offset,
-      gen_primitive_op_behavior will assume we're at
-      callsite_base_offset because it was written for x86. */
       gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
                                 (args_count == 0 ? NULL : &args[0]),
-                                return_type,
+                                callsite_base_offset,
                                 &arglist_info,
                                 return_loc,
-                                arg0_loc,
                                 off0, off1);
     } break;
     default:
