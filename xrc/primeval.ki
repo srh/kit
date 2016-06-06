@@ -98,18 +98,7 @@ func st_eval_prim_ptr_compare(clq *clqueue, env *st_env, paramorefs *array[st_ob
       result = a.offset >= b.offset;
     }
   }
-  // TODO: This could be deduped in this file.
-  resultint bigint;
-  if result {
-    resultint = bigu(1);
-  } else {
-    resultint = bigu(0);
-  }
-  val st_value = st_bigint_to_value_unsigned(&env->plat, retvalref.count, resultint);
-  if case Unprinted(pm) = obj_write(env, retvalref, &val) {
-    dump_err_printed(pm);
-    ice(_u8("st_eval_prim_ptr_compare cannot write into retvalref"));
-  }
+  st_obj_write_bool(env, retvalref, result);
   return NoFail;
 }
 
@@ -132,18 +121,17 @@ func st_eval_prim_num_compare(clq *clqueue, env *st_env, paramorefs *array[st_ob
   case CmpLe: result = a <= b;
   case CmpGe: result = a >= b;
   }
-  resultint bigint;
-  if result {
-    resultint = bigu(1);
-  } else {
-    resultint = bigu(0);
-  }
-  val st_value = st_bigint_to_value_unsigned(&env->plat, retvalref.count, resultint);
-  if case Unprinted(pm) = obj_write(env, retvalref, &val) {
-    dump_err_printed(pm);
-    ice(_u8("st_eval_prim_num_compare cannot write into retvalref"));
-  }
+  st_obj_write_bool(env, retvalref, result);
   return NoFail;
+}
+
+func st_obj_write_bool(env *st_env, destref st_obj_ref, x bool) void {
+  xint bigint = bigu(x then @[u32]1 else @[u32]0);
+  val st_value = st_bigint_to_value_unsigned(&env->plat, destref.count, xint);
+  if case Unprinted(pm) = obj_write(env, destref, &val) {
+    dump_err_printed(pm);
+    ice(_u8("st_obj_write_bool cannot write"));
+  }
 }
 
 func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], retvalref st_obj_ref, op *primitive_numeric_op) np {
