@@ -293,8 +293,7 @@ func x86_eaxedx_mul_w32(f *objfile, src u8) void {
   appendtext(f, 0xF7, mrr(MOD11, 4, src));
 }
 
-// TODO: dxax is inconsistent with alah, eaxedx (also in s1).
-func x86_dxax_mul_w16(f *objfile, src u8) void {
+func x86_axdx_mul_w16(f *objfile, src u8) void {
   appendtext(f, 0x66, @[u8]0xF7, mrr(MOD11, 4, src));
 }
 

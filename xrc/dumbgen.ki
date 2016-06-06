@@ -1130,7 +1130,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
       } else if b.op_size == 2 {
         switch b.op_numtraits.repr {
         case Unsigned:
-          x86_dxax_mul_w16(f, X86_ECX);
+          x86_axdx_mul_w16(f, X86_ECX);
           if b.op_numtraits.trap_overflow {
             x86_gen_crash_jcc(f, h, X86_JCC_C);
           }
