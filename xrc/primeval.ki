@@ -149,14 +149,11 @@ func st_eval_prim_num(clq *clqueue, env *st_env, paramorefs *array[st_obj_ref], 
   case NumMul:
     return st_num_rangechecked_output(clq, env, retvalref, multiply(ref(&ps, 0), ref(&ps, 1)), op);
   case NumDiv:
-    // TODO: This does not have x86-compatible (or platform-compatible) behavior for signed division.
     div_result bigint;
     mod_discard bigint;
     #st_divmod(get(&ps, 0), get(&ps, 1), op, &div_result, &mod_discard);
     return st_num_rangechecked_output(clq, env, retvalref, div_result, op);
   case NumMod:
-    // TODO: This does not have x86-compatible (or platform-compatible) behavior for
-    // signed division.
     div_discard bigint;
     mod_result bigint;
     #st_divmod(get(&ps, 0), get(&ps, 1), op, &div_discard, &mod_result);
