@@ -477,7 +477,7 @@ func test_check_more_cases(ctx *check_ctx) void {
   run_check_test(ctx, "c045",
     _u8("def foo i32 = 7;\n"
         "def bar i32 = 5 << foo;\n"));
-  // TODO: Should fail, because the shift overflows.
+  // TODO: Should fail because overflow?  Because it happens at compile time?  Should warn?
   run_check_test(ctx, "c046",
     _u8("def foo i32 = 30;\n"
         "def bar i32 = 5 << foo;\n"));
@@ -782,8 +782,6 @@ func test_check_more_cases(ctx *check_ctx) void {
   // Passes because the char literal value is in range for an i8.
   run_check_test(ctx, "c083",
     _u8("def x i8 = '\\x12';\n"));
-  // TODO: This should fail if string literals not allowed in static evaluation.
-  // TODO: String literals should be allowed, this should pass.
   run_check_test(ctx, "c084",
     _u8("def x ^[5]u8 = \"pq\\x12rs\";\n"));
   // Fails because the array size is wrong.
