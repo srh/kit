@@ -98,16 +98,7 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
                                                    "fn[...] value, I bet)"))});
           }
           body_text_offset u32 = *un(&ref_fn_body(cs, fnid)->body_text_offset);
-          name string = lookup(cs->im, ent->def_name);
-          switch cs->plat.opsys {
-          case Linux32:
-            void;
-          case Win32:
-            name = _s("_") + name;
-          case Osx32:
-            name = _s("_") + name;
-          }
-          discard sti = add_local_symbol(f, intern(cs->im, name), body_text_offset, SectionText, IsStaticNo);
+          discard sti = add_local_symbol(f, c_symbol_name(cs, ent->def_name), body_text_offset, SectionText, IsStaticNo);
         } else {
           ice(_u8("add_export_symbols sees unevaled inst"));
         }
@@ -185,7 +176,6 @@ func generate_kit_name(cs *checkstate, informal_name sym, arg_types shray[cu_typ
   return intern(cs->im, build + from_u8(&btmp));
 }
 
-// TODO: There is some other underscore logic elsewhere in this file.
 func c_symbol_name(cs *checkstate, name sym) sym {
   switch cs->plat.opsys {
   case Linux32:
