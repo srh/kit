@@ -322,8 +322,6 @@ func osx32_flatten(im *identmap, f *objfile) array[u8] {
     append_reinterpret(&d, &h);
   }
 
-  // TODO: Align to max of max_requested_alignments when computing segment_fileoff, and
-  // when appending.
   /* The [addr, ceil_aligned(addr + size, align)) segments seem to
   connect.  (That's what I observe in other mach-o files.) */
   text_addr u32 = 0;
