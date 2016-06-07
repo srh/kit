@@ -3668,6 +3668,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     when it encounters another funcall.) */
     struct expr_return arg_er = demand_expr_return(arg_loc);
     if (!gen_expr(cs, f, h, arg, &arg_er)) {
+      ret = 0;
       goto fail_arglist_info;
     }
     frame_restore_offset(h, callsite_base_offset);
