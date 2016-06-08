@@ -1606,6 +1606,19 @@ void x86_gen_sub_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void gp_gen_sub(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_sub_w32(f, map_x86_reg(dest), map_x86_reg(src));
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void x86_gen_sub_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
   uint8_t b[3];
   b[0] = 0x66;
@@ -5879,7 +5892,6 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     }
   } break;
   case AST_STATEMENT_SWITCH: {
-    /* Chase x86 */
     struct ast_switch_statement *ss = &s->u.switch_statement;
     int32_t saved_offset = frame_save_offset(h);
 
@@ -5890,7 +5902,6 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
     struct loc swartch_num_loc = make_enum_num_loc(f, h, facts.enum_loc);
 
-    /* TODO(): Enum tag size presumption? */
     gp_gen_load_register(f, GP_A, swartch_num_loc);
 
     size_t end_target = frame_add_target(h);
@@ -5929,10 +5940,11 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
       /* We carefully make the 0 tag and nonsense tag values redirect
       to the crash branch. */
-      x86_gen_mov_reg_imm32(f, X86_ECX, FIRST_ENUM_TAG_NUMBER);
-      x86_gen_sub_w32(f, X86_EAX, X86_ECX);
-      x86_gen_cmp_imm32(f, X86_EAX,
-                        size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.u.default_pattern.info).value));
+      gp_gen_mov_reg_imm32(f, GP_C, FIRST_ENUM_TAG_NUMBER);
+      gp_gen_sub(f, GP_A, GP_C);
+      CHECK(4 == enum_tag_size(cs->arch));
+      gp_gen_cmp_w32_imm32(f, GP_A,
+                           size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.u.default_pattern.info).value));
       gen_placeholder_jcc(f, h, X86_JCC_AE, next_target);
 
       if (!gen_bracebody(cs, f, h,
