@@ -3258,6 +3258,7 @@ struct expr_return open_expr_return(void) {
   return ret;
 }
 
+/* chase mark */
 struct expr_return demand_expr_return(struct loc loc) {
   struct expr_return ret;
   ret.tag = EXPR_RETURN_DEMANDED;
@@ -4804,6 +4805,7 @@ void gen_crash_jmp(struct objfile *f, struct frame *h) {
   gen_placeholder_jmp(f, h, frame_crash_target_number(h));
 }
 
+/* chase mark */
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number) {
   struct jmpdata jd;
   jd.target_number = target_number;
@@ -4829,6 +4831,7 @@ void replace_placeholder_jump(struct objfile *f, size_t jmp_location,
                                 sizeof(buf));
 }
 
+/* chase x86 */
 void gen_assignment(struct checkstate *cs, struct objfile *f,
                     struct frame *h, struct loc lhs_loc,
                     struct loc rhs_loc, struct ast_typeexpr *type,
@@ -4875,7 +4878,7 @@ void gen_assignment(struct checkstate *cs, struct objfile *f,
   frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
 }
 
-/* chase x86 */
+/* chase mark */
 int gen_binop_expr(struct checkstate *cs, struct objfile *f,
                    struct frame *h, struct ast_expr *a,
                    struct expr_return *er) {
