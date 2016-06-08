@@ -1130,6 +1130,20 @@ void x86_gen_test_regs32(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+/* Tests the whole reg!!! */
+void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_test_regs32(f, map_x86_reg(reg1), map_x86_reg(reg2));
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void x86_gen_test_regs8(struct objfile *f, enum x86_reg8 reg1, enum x86_reg8 reg2) {
   uint8_t b[2];
   b[0] = 0x84;
@@ -1585,6 +1599,7 @@ void x86_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest, enum x86_setcc code
   objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
+/* chase mark */
 void gen_placeholder_jcc(struct objfile *f, struct frame *h,
                          enum x86_jcc code, size_t target_number) {
   struct jmpdata jd;
@@ -4760,13 +4775,13 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* chase x86 */
+/* chase mark */
 void gen_placeholder_jmp_if_false(struct objfile *f, struct frame *h,
                                   struct loc loc, size_t target_number) {
   CHECK(loc.size == KIT_BOOL_SIZE);
 
   gp_gen_load_register(f, GP_A, loc);
-  x86_gen_test_regs32(f, X86_EAX, X86_EAX);
+  gp_gen_test_regs(f, GP_A, GP_A);
   gen_placeholder_jcc(f, h, X86_JCC_Z, target_number);
 }
 
