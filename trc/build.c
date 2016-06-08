@@ -1786,8 +1786,8 @@ void x86_gen_load32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
 }
 
 /* TODO(): Audit callers, did they mean a pointer? */
-void gp_gen_load32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                   int32_t src_disp) {
+void gp_gen_movzx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                    int32_t src_disp) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
     x86_gen_load32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
@@ -2831,7 +2831,7 @@ void gp_gen_memmem_mov(struct objfile *f,
   int32_t n = 0;
   while (n < padded_size) {
     if (padded_size - n >= 4) {
-      gp_gen_load32(f, reg, src_reg, int32_add(n, src_disp));
+      gp_gen_movzx32(f, reg, src_reg, int32_add(n, src_disp));
       gp_gen_store32(f, dest_reg, int32_add(n, dest_disp), reg);
       n += 4;
     } else {
@@ -2971,7 +2971,7 @@ void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src) {
     TODO_IMPLEMENT;
     break;
   case 4:
-    gp_gen_load32(f, reg, src_addr, src_disp);
+    gp_gen_movzx32(f, reg, src_addr, src_disp);
     break;
   case 2:
     gp_gen_movzx16(f, reg, src_addr, src_disp);
