@@ -1859,6 +1859,20 @@ void x86_gen_movsx8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   objfile_section_append_raw(objfile_text(f), b, count + 2);
 }
 
+void gp_gen_movsx8(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                   int32_t src_disp) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_movsx8(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void x86_gen_movsx16(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
                      int32_t src_disp) {
   uint8_t b[11];
@@ -3499,27 +3513,26 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movzx8(f, GP_A, GP_BP, off0);
   } break;
 
-    /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_I8_TO_U8: {
-    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
-    x86_gen_test_regs8(f, X86_AL, X86_AL);
+    gp_gen_movzx8(f, GP_A, GP_BP, off0);
+    gp_gen_test_regs8(f, GP_A, GP_A);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_I8_TO_I8: {
-    x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movsx8(f, GP_A, GP_BP, off0);
   } break;
   case PRIMITIVE_OP_CONVERT_I8_TO_U16: {
-    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
-    x86_gen_test_regs8(f, X86_AL, X86_AL);
+    gp_gen_movzx8(f, GP_A, GP_BP, off0);
+    gp_gen_test_regs8(f, GP_A, GP_A);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_I8_TO_I16: {
-    x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movsx8(f, GP_A, GP_BP, off0);
   } break;
   case PRIMITIVE_OP_CONVERT_I8_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I8_TO_U32: {
-    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
-    x86_gen_test_regs8(f, X86_AL, X86_AL);
+    gp_gen_movzx8(f, GP_A, GP_BP, off0);
+    gp_gen_test_regs8(f, GP_A, GP_A);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
     /* I haven't thought hard about how converting to osize should
@@ -3529,9 +3542,10 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     conversion (but isn't that gross). */
   case PRIMITIVE_OP_CONVERT_I8_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I8_TO_I32: {
-    x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movsx8(f, GP_A, GP_BP, off0);
   } break;
 
+  /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_U16_TO_U8: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
