@@ -1883,6 +1883,20 @@ void x86_gen_movsx16(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr
   objfile_section_append_raw(objfile_text(f), b, count + 2);
 }
 
+void gp_gen_movsx16(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                    int32_t src_disp) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_movsx16(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void x86_gen_movzx8_reg8(struct objfile *f, enum x86_reg dest, enum x86_reg8 src) {
   uint8_t b[3];
   b[0] = 0x0F;
@@ -3570,38 +3584,38 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movzx16(f, GP_A, GP_BP, off0);
   } break;
 
-  /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_I16_TO_U8: {
-    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
-    x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
+    gp_gen_movzx16(f, GP_A, GP_BP, off0);
+    gp_gen_cmp_w32_imm32(f, GP_A, 0xFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_I16_TO_I8: {
-    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
-    x86_gen_cmp_imm32(f, X86_EAX, 0x7F);
+    gp_gen_movsx16(f, GP_A, GP_BP, off0);
+    gp_gen_cmp_w32_imm32(f, GP_A, 0x7F);
     gen_crash_jcc(f, h, X86_JCC_G);
-    x86_gen_cmp_imm32(f, X86_EAX, -0x80);
+    gp_gen_cmp_w32_imm32(f, GP_A, -0x80);
     gen_crash_jcc(f, h, X86_JCC_L);
   } break;
   case PRIMITIVE_OP_CONVERT_I16_TO_U16: {
-    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
-    x86_gen_test_regs32(f, X86_EAX, X86_EAX);
+    gp_gen_movsx16(f, GP_A, GP_BP, off0);
+    gp_gen_test_regs(f, GP_A, GP_A);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_I16_TO_I16: {
-    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movsx16(f, GP_A, GP_BP, off0);
   } break;
   case PRIMITIVE_OP_CONVERT_I16_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I16_TO_U32: {
-    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
-    x86_gen_test_regs32(f, X86_EAX, X86_EAX);
+    gp_gen_movsx16(f, GP_A, GP_BP, off0);
+    gp_gen_test_regs(f, GP_A, GP_A);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_I16_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I16_TO_I32: {
-    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movsx16(f, GP_A, GP_BP, off0);
   } break;
 
+  /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_SIZE_TO_U8: /* fallthrough */
     /* I think (without having thought hard) that converting _from_
     osize should fail if data is _lost_ but not if the osize variable,
