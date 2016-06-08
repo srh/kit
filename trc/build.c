@@ -1716,43 +1716,6 @@ void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
 void gp_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                     enum gp_reg src);
 
-void x86_gen_mov_mem_imm32(struct objfile *f,
-                           enum x86_reg dest,
-                           int32_t dest_disp,
-                           enum x86_reg aux,
-                           struct immediate imm) {
-  switch (imm.tag) {
-  case IMMEDIATE_FUNC: {
-    /* Doesn't just use an immediate because OS X 32-bit won't work
-    that way. */
-    x86_gen_mov_reg_stiptr(f, aux, imm.u.func_sti);
-    x86_gen_store32(f, dest, dest_disp, aux);
-  } break;
-  case IMMEDIATE_U64:
-    UNREACHABLE();
-  case IMMEDIATE_I64:
-    UNREACHABLE();
-  case IMMEDIATE_U32: {
-    char buf[4];
-    write_le_u32(buf, imm.u.u32);
-    x86_help_gen_mov_mem_imm32(f, dest, dest_disp, buf);
-  } break;
-  case IMMEDIATE_I32: {
-    char buf[4];
-    write_le_i32(buf, imm.u.i32);
-    x86_help_gen_mov_mem_imm32(f, dest, dest_disp, buf);
-  } break;
-  case IMMEDIATE_U8:
-    UNREACHABLE();
-  case IMMEDIATE_I8:
-    UNREACHABLE();
-  case IMMEDIATE_VOID:
-    UNREACHABLE();
-  default:
-    UNREACHABLE();
-  }
-}
-
 void x86_gen_mov_mem_imm8(struct objfile *f,
                           enum x86_reg dest,
                           int32_t dest_disp,
@@ -3012,27 +2975,38 @@ void gen_mov_mem_imm(struct objfile *f, enum gp_reg gp_dest_addr, int32_t dest_d
   /* TODO() */
   enum x86_reg dest_addr = map_x86_reg(gp_dest_addr);
   enum x86_reg aux = map_x86_reg(gp_aux);
-  switch (immediate_size(objfile_arch(f), src)) {
-  case 8:
+  switch (src.tag) {
+  case IMMEDIATE_FUNC: {
+    /* Doesn't just use an immediate because OS X 32-bit won't work
+    that way. */
+    x86_gen_mov_reg_stiptr(f, aux, src.u.func_sti);
+    x86_gen_store32(f, dest_addr, dest_disp, aux);
+  } break;
+  case IMMEDIATE_U64: {
     TODO_IMPLEMENT;
-  case 4:
-    x86_gen_mov_mem_imm32(f, dest_addr, dest_disp, aux, src);
-    break;
-  case 1:
-    switch (src.tag) {
-    case IMMEDIATE_U8:
-      x86_gen_mov_mem_imm8(f, dest_addr, dest_disp, (int8_t)src.u.u8);
-      break;
-    case IMMEDIATE_I8:
-      x86_gen_mov_mem_imm8(f, dest_addr, dest_disp, src.u.i8);
-      break;
-    default:
-      UNREACHABLE();
-    }
-    break;
-  case 0:
-    CHECK(src.tag == IMMEDIATE_VOID);
-    break;
+  } break;
+  case IMMEDIATE_I64: {
+    TODO_IMPLEMENT;
+  } break;
+  case IMMEDIATE_U32: {
+    char buf[4];
+    write_le_u32(buf, src.u.u32);
+    x86_help_gen_mov_mem_imm32(f, dest_addr, dest_disp, buf);
+  } break;
+  case IMMEDIATE_I32: {
+    char buf[4];
+    write_le_i32(buf, src.u.i32);
+    x86_help_gen_mov_mem_imm32(f, dest_addr, dest_disp, buf);
+  } break;
+  case IMMEDIATE_U8: {
+    x86_gen_mov_mem_imm8(f, dest_addr, dest_disp, (int8_t)src.u.u8);
+  } break;
+  case IMMEDIATE_I8: {
+    x86_gen_mov_mem_imm8(f, dest_addr, dest_disp, src.u.i8);
+  } break;
+  case IMMEDIATE_VOID: {
+    /* Do nothing. */
+  } break;
   default:
     UNREACHABLE();
   }
