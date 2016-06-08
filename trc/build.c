@@ -4795,7 +4795,7 @@ size_t frame_crash_target_number(struct frame *h) {
   return h->crash_target_number;
 }
 
-/* chase x86 */
+/* chase mark */
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code) {
   gen_placeholder_jcc(f, h, code, frame_crash_target_number(h));
 }
