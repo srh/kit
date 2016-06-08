@@ -419,6 +419,7 @@ struct immediate {
   } u;
 };
 
+/* chase mark */
 uint32_t immediate_size(enum target_arch arch, struct immediate imm) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC:
@@ -3004,9 +3005,13 @@ void x64_gen_store_biregister(struct objfile *f, struct loc dest,
   }
 }
 
-void gen_mov_mem_imm(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
-                     enum x86_reg aux,
+/* chase x86 */
+void gen_mov_mem_imm(struct objfile *f, enum gp_reg gp_dest_addr, int32_t dest_disp,
+                     enum gp_reg gp_aux,
                      struct immediate src) {
+  /* TODO() */
+  enum x86_reg dest_addr = map_x86_reg(gp_dest_addr);
+  enum x86_reg aux = map_x86_reg(gp_aux);
   switch (immediate_size(objfile_arch(f), src)) {
   case 8:
     TODO_IMPLEMENT;
@@ -3033,17 +3038,17 @@ void gen_mov_mem_imm(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
   }
 }
 
-/* chase x86 */
+/* chase mark */
 void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src) {
   CHECK(dest.size == immediate_size(objfile_arch(f), src));
 
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
-    gen_mov_mem_imm(f, X86_EBP, dest.u.ebp_offset, X86_EDX, src);
+    gen_mov_mem_imm(f, GP_BP, dest.u.ebp_offset, GP_D, src);
     break;
   case LOC_EBP_INDIRECT:
-    x86_gen_load32(f, X86_EAX, X86_EBP, dest.u.ebp_indirect);
-    gen_mov_mem_imm(f, X86_EAX, 0, X86_EDX, src);
+    gp_gen_loadPTR(f, GP_A, GP_BP, dest.u.ebp_indirect);
+    gen_mov_mem_imm(f, GP_A, 0, GP_D, src);
     break;
   case LOC_GLOBAL:
     CRASH("Global mutation should be impossible.");
