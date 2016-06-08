@@ -1765,8 +1765,23 @@ void x86_gen_load32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
+/* TODO(): Audit callers, did they mean a pointer? */
 void gp_gen_load32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                    int32_t src_disp) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_load32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void gp_gen_loadPTR(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                    int32_t src_disp) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
     x86_gen_load32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
@@ -1864,6 +1879,20 @@ void x86_gen_lea32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
+void gp_gen_lea(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                int32_t src_disp) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_lea32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 /* Used for OS X 32-bit position-independent code.  Assigns X+srcdest to srcdest. */
 size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest) {
   uint8_t b[10];
@@ -1895,8 +1924,23 @@ void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
+/* TODO(): Audit callers -- did they mean to write a pointer? */
 void gp_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                     enum gp_reg src) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86: {
+    x86_gen_store32(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg(src));
+  } break;
+  case TARGET_ARCH_X64: {
+    TODO_IMPLEMENT;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void gp_gen_storePTR(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                     enum gp_reg src) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86: {
     x86_gen_store32(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg(src));
@@ -2176,6 +2220,7 @@ struct loc x86_gen_subobject_loc(struct objfile *f,
                                  uint32_t size,
                                  uint32_t offset);
 
+/* chase x86 (fix callers) */
 struct loc make_enum_num_loc(struct objfile *f,
                              struct frame *h,
                              struct loc loc) {
@@ -2185,6 +2230,7 @@ struct loc make_enum_num_loc(struct objfile *f,
   return x86_gen_subobject_loc(f, h, loc, tag_size, 0);
 }
 
+/* chase x86 (fix callers) */
 struct loc make_enum_body_loc(struct objfile *f,
                               struct frame *h,
                               struct loc loc,
@@ -5123,6 +5169,7 @@ struct loc gen_array_element_loc(struct checkstate *cs,
   return retloc;
 }
 
+/* chase x86 (fix callers) */
 struct loc gen_field_loc(struct checkstate *cs,
                          struct objfile *f,
                          struct frame *h,
@@ -5140,7 +5187,8 @@ struct loc gen_field_loc(struct checkstate *cs,
   return x86_gen_subobject_loc(f, h, lhs_loc, size, offset);
 }
 
-/* chase x86 (fix callers) */
+/* chase mark */
+/* TODO(): Rename and chase callers */
 struct loc x86_gen_subobject_loc(struct objfile *f,
                                  struct frame *h,
                                  struct loc loc,
@@ -5158,17 +5206,17 @@ struct loc x86_gen_subobject_loc(struct objfile *f,
   case LOC_GLOBAL: {
     /* This could probably be implemented more smartly, with advanced
     symbol-making, but who cares. */
-    struct loc field_ptr_loc = frame_push_loc(h, DWORD_SIZE);
-    x86_gen_mov_reg_stiptr(f, X86_EAX, loc.u.global_sti);
-    x86_gen_lea32(f, X86_EAX, X86_EAX, uint32_to_int32(offset));
-    x86_gen_store32(f, X86_EBP, field_ptr_loc.u.ebp_offset, X86_EAX);
+    struct loc field_ptr_loc = frame_push_loc(h, ptr_size(h->arch));
+    gp_gen_mov_reg_stiptr(f, GP_A, loc.u.global_sti);
+    gp_gen_lea(f, GP_A, GP_A, uint32_to_int32(offset));
+    gp_gen_storePTR(f, GP_BP, field_ptr_loc.u.ebp_offset, GP_A);
     ret = ebp_indirect_loc(size, size, field_ptr_loc.u.ebp_offset);
   } break;
   case LOC_EBP_INDIRECT: {
-    struct loc field_ptr_loc = frame_push_loc(h, DWORD_SIZE);
-    x86_gen_load32(f, X86_EAX, X86_EBP, loc.u.ebp_indirect);
-    x86_gen_lea32(f, X86_EAX, X86_EAX, uint32_to_int32(offset));
-    x86_gen_store32(f, X86_EBP, field_ptr_loc.u.ebp_offset, X86_EAX);
+    struct loc field_ptr_loc = frame_push_loc(h, ptr_size(h->arch));
+    gp_gen_loadPTR(f, GP_A, GP_BP, loc.u.ebp_indirect);
+    gp_gen_lea(f, GP_A, GP_A, uint32_to_int32(offset));
+    gp_gen_storePTR(f, GP_BP, field_ptr_loc.u.ebp_offset, GP_A);
     ret = ebp_indirect_loc(size, size, field_ptr_loc.u.ebp_offset);
   } break;
   default:
