@@ -5266,7 +5266,7 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* Chase x86 */
+/* chase mark */
 int gen_deref_field_access(struct checkstate *cs, struct objfile *f,
                            struct frame *h, struct ast_expr *a,
                            struct expr_return *er) {
