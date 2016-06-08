@@ -5057,6 +5057,7 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
   }
 }
 
+/* chase mark */
 void expr_return_primitive_op(struct expr_return *er,
                               struct primitive_op primitive_op) {
   switch (er->tag) {
@@ -5299,7 +5300,7 @@ int gen_deref_field_access(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* chase x86 */
+/* chase mark */
 void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
                     struct def_instantiation *inst, struct expr_return *er) {
   if (inst->value_computed && di_value(inst)->tag == STATIC_VALUE_PRIMITIVE_OP) {
