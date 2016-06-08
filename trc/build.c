@@ -1156,6 +1156,11 @@ void x86_gen_test_regs8(struct objfile *f, enum x86_reg8 reg1, enum x86_reg8 reg
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void gp_gen_test_regs8(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
+  /* TODO() */
+  x86_gen_test_regs8(f, map_x86_reg8(reg1), map_x86_reg8(reg2));
+}
+
 void x86_gen_xor_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src);
 
 void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
@@ -3435,6 +3440,9 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     off1 = int32_add(callsite_base_offset, arglist_info->arg_infos[1].relative_disp);
   }
 
+  /* So, what's the game here?  On y86, put the return value in EAX,
+  or EAX:EDX.  On x64, put the return value in RAX, or RAX:RDX. */
+
   switch (prim_op.tag) {
   case PRIMITIVE_OP_ENUMCONSTRUCT: {
     UNREACHABLE();
@@ -3474,13 +3482,12 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
                 target);
   } break;
 
-    /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_U8_TO_U8: {
-    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movzx8(f, GP_A, GP_BP, off0);
   } break;
   case PRIMITIVE_OP_CONVERT_U8_TO_I8: {
-    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
-    x86_gen_test_regs8(f, X86_AL, X86_AL);
+    gp_gen_movzx8(f, GP_A, GP_BP, off0);
+    gp_gen_test_regs8(f, GP_A, GP_A);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_U8_TO_U16: /* fallthrough */
@@ -3489,9 +3496,10 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_CONVERT_U8_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U8_TO_U32: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U8_TO_I32: {
-    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movzx8(f, GP_A, GP_BP, off0);
   } break;
 
+    /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_I8_TO_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_test_regs8(f, X86_AL, X86_AL);
