@@ -423,6 +423,8 @@ uint32_t immediate_size(enum target_arch arch, struct immediate imm) {
   case IMMEDIATE_U64:
   case IMMEDIATE_I64:
     return 8;
+  /* TODO(): Check uses of IMMEDIATE_U32 and IMMEDIATE_I32 for
+  platform independence. */
   case IMMEDIATE_U32:
   case IMMEDIATE_I32:
     return 4;
@@ -2976,6 +2978,7 @@ void gen_mov_mem_imm(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
   }
 }
 
+/* chase x86 */
 void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src) {
   CHECK(dest.size == immediate_size(objfile_arch(f), src));
 
@@ -3043,22 +3046,26 @@ struct temp_return {
   int whole_thing;
 };
 
+/* chase mark */
 struct temp_return temp_none(void) {
   struct temp_return ret;
   ret.exists = 0;
   return ret;
 }
 
+/* chase mark */
 struct temp_return temp_exists_trivial(struct loc loc,
                                        int whole_thing) {
   (void)loc, (void)whole_thing;
   return temp_none();
 }
 
+/* chase mark */
 struct temp_return temp_immediate(void) {
   return temp_none();
 }
 
+/* chase mark */
 struct temp_return temp_primitive_op(void) {
   return temp_none();
 }
@@ -4975,7 +4982,7 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
-/* chase x86 */
+/* chase mark */
 void expr_return_immediate(struct objfile *f, struct frame *h,
                            struct expr_return *er,
                            struct immediate imm) {
