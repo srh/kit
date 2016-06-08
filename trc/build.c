@@ -2214,23 +2214,23 @@ int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct fr
   }
 }
 
-struct loc x86_gen_subobject_loc(struct objfile *f,
-                                 struct frame *h,
-                                 struct loc loc,
-                                 uint32_t size,
-                                 uint32_t offset);
+struct loc gen_subobject_loc(struct objfile *f,
+                             struct frame *h,
+                             struct loc loc,
+                             uint32_t size,
+                             uint32_t offset);
 
-/* chase x86 (fix callers) */
+/* chase mark */
 struct loc make_enum_num_loc(struct objfile *f,
                              struct frame *h,
                              struct loc loc) {
   uint32_t tag_size = enum_tag_size(h->arch);
   CHECK(loc.size >= tag_size);
   /* All enums start with a tag, in [0, tag_size). */
-  return x86_gen_subobject_loc(f, h, loc, tag_size, 0);
+  return gen_subobject_loc(f, h, loc, tag_size, 0);
 }
 
-/* chase x86 (fix callers) */
+/* chase mark */
 struct loc make_enum_body_loc(struct objfile *f,
                               struct frame *h,
                               struct loc loc,
@@ -2240,7 +2240,7 @@ struct loc make_enum_body_loc(struct objfile *f,
   uint32_t body_offset = uint32_max(tag_size, body_alignment);
   CHECK(loc.size >= uint32_add(body_offset, body_size));
   /* All enums start with a tag, in [0, tag_size). */
-  return x86_gen_subobject_loc(f, h, loc, body_size, body_offset);
+  return gen_subobject_loc(f, h, loc, body_size, body_offset);
 }
 
 void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
@@ -5184,16 +5184,15 @@ struct loc gen_field_loc(struct checkstate *cs,
   uint32_t offset;
   gp_field_sizeoffset(&cs->nt, type, fieldname, &size, &offset);
 
-  return x86_gen_subobject_loc(f, h, lhs_loc, size, offset);
+  return gen_subobject_loc(f, h, lhs_loc, size, offset);
 }
 
 /* chase mark */
-/* TODO(): Rename and chase callers */
-struct loc x86_gen_subobject_loc(struct objfile *f,
-                                 struct frame *h,
-                                 struct loc loc,
-                                 uint32_t size,
-                                 uint32_t offset) {
+struct loc gen_subobject_loc(struct objfile *f,
+                             struct frame *h,
+                             struct loc loc,
+                             uint32_t size,
+                             uint32_t offset) {
   CHECK(uint32_add(size, offset) <= loc.size);
   /* Note: This code needs to preserve lvalues (and it does so). */
 
