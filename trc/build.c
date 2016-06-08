@@ -5484,6 +5484,7 @@ struct swartch_facts {
   size_t num_constructors;
 };
 
+/* chase mark */
 int gen_swartch(struct checkstate *cs, struct objfile *f,
                 struct frame *h, struct ast_expr *swartch,
                 struct swartch_facts *out) {
@@ -5525,11 +5526,13 @@ int gen_swartch(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+/* chase mark */
 void ungen_swartch(struct checkstate *cs, struct objfile *f,
                    struct frame *h, struct swartch_facts *facts) {
   gen_destroy(cs, f, h, facts->loc, facts->type);
 }
 
+/* chase x86 */
 int gen_casebody(struct checkstate *cs, struct objfile *f,
                  struct frame *h, struct swartch_facts *facts,
                  struct ast_constructor_pattern *constructor,
@@ -5576,7 +5579,7 @@ struct condition_state {
   } u;
 };
 
-/* chase x86 */
+/* chase mark */
 int gen_condition(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_condition *a,
                   struct condition_state *out) {
@@ -5620,7 +5623,7 @@ void pop_cstate_vardata(struct frame *h, struct condition_state *cstate) {
   }
 }
 
-/* chase x86 */
+/* chase mark */
 int gen_successbody(struct checkstate *cs, struct objfile *f,
                     struct frame *h, struct condition_state *cstate,
                     struct ast_bracebody *body,
