@@ -3545,32 +3545,32 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movsx8(f, GP_A, GP_BP, off0);
   } break;
 
-  /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_U16_TO_U8: {
-    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
-    x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
+    gp_gen_movzx16(f, GP_A, GP_BP, off0);
+    gp_gen_cmp_w32_imm32(f, GP_A, 0xFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U16_TO_I8: {
-    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
-    x86_gen_cmp_imm32(f, X86_EAX, 0x7F);
+    gp_gen_movzx16(f, GP_A, GP_BP, off0);
+    gp_gen_cmp_w32_imm32(f, GP_A, 0x7F);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U16_TO_U16: {
-    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movzx16(f, GP_A, GP_BP, off0);
   } break;
   case PRIMITIVE_OP_CONVERT_U16_TO_I16: {
-    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
-    x86_gen_cmp_imm32(f, X86_EAX, 0x7FFF);
+    gp_gen_movzx16(f, GP_A, GP_BP, off0);
+    gp_gen_cmp_w32_imm32(f, GP_A, 0x7FFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U16_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U16_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U16_TO_U32: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U16_TO_I32: {
-    x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movzx16(f, GP_A, GP_BP, off0);
   } break;
 
+  /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_I16_TO_U8: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
