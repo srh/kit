@@ -48,6 +48,8 @@ int main(int argc, char **argv) {
       platform = TARGET_PLATFORM_LINUX_64BIT;
     } else if (0 == strcmp(argv[i], "--osx")) {
       platform = TARGET_PLATFORM_OSX_32BIT;
+    } else if (0 == strcmp(argv[i], "--osx64")) {
+      platform = TARGET_PLATFORM_OSX_64BIT;
     } else {
       module = argv[i];
     }
