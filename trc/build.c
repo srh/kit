@@ -5664,7 +5664,7 @@ int gen_successbody(struct checkstate *cs, struct objfile *f,
   }
 }
 
-/* chase x86 */
+/* chase mark */
 void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
                                      struct frame *h, struct condition_state *cstate) {
   switch (cstate->tag) {
@@ -5674,15 +5674,17 @@ void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
   case AST_CONDITION_PATTERN: {
     /* Check for zero-tag. */
     /* TODO: Check for other out-of-range cases. */
-    /* TODO(): Enum tag size presumption */
+    CHECK(4 == enum_tag_size(cs->arch));
     struct loc swartch_num_loc
       = make_enum_num_loc(f, h, cstate->u.pattern.facts.enum_loc);
     gp_gen_load_register(f, GP_A, swartch_num_loc);
     STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
-    x86_gen_test_regs32(f, X86_EAX, X86_EAX);
+    gp_gen_test_regs(f, GP_A, GP_A);
     gen_crash_jcc(f, h, X86_JCC_Z);
     ungen_swartch(cs, f, h, &cstate->u.pattern.facts);
   } break;
+  default:
+    UNREACHABLE();
   }
 }
 
