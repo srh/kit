@@ -3423,12 +3423,18 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
 
                                     /* is NULL if op has arity 0 */
                                     struct ast_typeexpr *arg0_type_or_null,
+                                    int32_t callsite_base_offset,
+                                    struct funcall_arglist_info *arglist_info) {
+  int32_t off0 = INT32_MIN;
+  int32_t off1 = INT32_MIN;
+  if (arglist_info->args_count > 0) {
+    off0 = int32_add(callsite_base_offset, arglist_info->arg_infos[0].relative_disp);
+  }
+  if (arglist_info->args_count > 1) {
+    CHECK(arglist_info->args_count == 2);
+    off1 = int32_add(callsite_base_offset, arglist_info->arg_infos[1].relative_disp);
+  }
 
-                                    /* displacements of operands, relative to ebp */
-                                    /* is meaningful if op has arity 1 or 2 */
-                                    int32_t off0,
-                                    /* is meaningful if op has arity 2 */
-                                    int32_t off1) {
   switch (prim_op.tag) {
   case PRIMITIVE_OP_ENUMCONSTRUCT: {
     UNREACHABLE();
@@ -4312,32 +4318,19 @@ void gen_primitive_op_behavior(struct checkstate *cs,
                                int32_t callsite_base_offset,
                                struct funcall_arglist_info *arglist_info,
                                struct loc return_loc) {
-  int32_t off0 = INT32_MIN;
-  int32_t off1 = INT32_MIN;
-  if (arglist_info->args_count > 0) {
-    off0 = int32_add(callsite_base_offset, arglist_info->arg_infos[0].relative_disp);
-  }
-  if (arglist_info->args_count > 1) {
-    CHECK(arglist_info->args_count == 2);
-    off1 = int32_add(callsite_base_offset, arglist_info->arg_infos[1].relative_disp);
-  }
-
   /* TODO(): x86: callsite_base_offset needs to be used for x64 -- on x86 assert that it equals stack offset. */
   switch (prim_op.tag) {
   case PRIMITIVE_OP_ENUMCONSTRUCT: {
     CHECK(arg0_type_or_null);
     struct loc arg0_loc = caller_arg_loc(callsite_base_offset, arglist_info, 0);
-    /* Unlike with other ops, our calling convention doesn't involve
-    one parameter at off0 and another at off1 (and a return value, if
-    any, in registers).  We actually have to figure out whether a
-    hidden return parameter is involved. */
     gen_enumconstruct_behavior(cs, f, h, prim_op.u.enumconstruct_number,
                                arg0_type_or_null,
                                return_loc,
                                arg0_loc);
   } break;
   default: {
-    gen_very_primitive_op_behavior(cs, f, h, prim_op, arg0_type_or_null, off0, off1);
+    gen_very_primitive_op_behavior(cs, f, h, prim_op, arg0_type_or_null,
+                                   callsite_base_offset, arglist_info);
     postcall_return_in_loc(cs, f, arglist_info, return_loc);
   } break;
   }
