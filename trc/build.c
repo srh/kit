@@ -5326,7 +5326,7 @@ void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
   }
 }
 
-/* chase x86 */
+/* chase mark */
 int gen_strinit_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
