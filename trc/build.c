@@ -1135,6 +1135,19 @@ void x86_gen_test_regs32(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void gp_gen_test_w32_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_test_regs32(f, map_x86_reg(reg1), map_x86_reg(reg2));
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 /* Tests the whole reg!!! */
 void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
   switch (objfile_arch(f)) {
@@ -3642,25 +3655,38 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_w32_imm32(f, GP_A, 0x7FFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
-  /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_SIZE_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_SIZE_TO_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_OSIZE: {
+    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+  } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_U32: /* fallthrough */
-  case PRIMITIVE_OP_CONVERT_OSIZE_TO_U32: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_U32: {
+    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    if (ptr_size(cs->arch) == 8) {
+      TODO_IMPLEMENT;
+    } else {
+      CHECK(ptr_size(cs->arch) == 4);
+    }
+  } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U32_TO_OSIZE: /* fallthrough */
-  case PRIMITIVE_OP_CONVERT_SIZE_TO_OSIZE: /* fallthrough */
-  case PRIMITIVE_OP_CONVERT_OSIZE_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_U32_TO_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
   } break;
-  case PRIMITIVE_OP_CONVERT_SIZE_TO_I32: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_SIZE_TO_I32: {
+    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_cmp_imm32(f, GP_A, 0x7FFFFFFF);
+    gen_crash_jcc(f, h, X86_JCC_A);
+  } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_test_regs32(f, X86_EAX, X86_EAX);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_test_w32_regs(f, GP_A, GP_A);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
 
+    /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_I32_TO_U8: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
