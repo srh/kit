@@ -1698,13 +1698,13 @@ size_t x86_encode_placeholder_reg_rm(uint8_t *b, enum x86_reg reg_and_rm_addr,
   }
 }
 
-void x86_help_gen_mov_mem_imm32(struct objfile *f,
-                                enum x86_reg dest,
-                                int32_t dest_disp,
-                                char buf[4]) {
+void y86x64_help_gen_mov_mem_imm32(struct objfile *f,
+                                   enum gp_reg dest,
+                                   int32_t dest_disp,
+                                   char buf[4]) {
   uint8_t b[10];
   b[0] = 0xC7;
-  size_t count = x86_encode_reg_rm(b + 1, 0, dest, dest_disp);
+  size_t count = x86_encode_reg_rm(b + 1, 0, map_x86_reg(dest), dest_disp);
   CHECK(count <= 9);
   objfile_section_append_raw(objfile_text(f), b, count + 1);
   objfile_section_append_raw(objfile_text(f), buf, 4);
@@ -1716,13 +1716,13 @@ void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
 void gp_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                     enum gp_reg src);
 
-void x86_gen_mov_mem_imm8(struct objfile *f,
-                          enum x86_reg dest,
-                          int32_t dest_disp,
-                          int8_t imm) {
+void y86x64_gen_mov_mem_imm8(struct objfile *f,
+                             enum gp_reg dest,
+                             int32_t dest_disp,
+                             int8_t imm) {
   uint8_t b[11];
   b[0] = 0xC6;
-  size_t count = x86_encode_reg_rm(b + 1, 0, dest, dest_disp);
+  size_t count = x86_encode_reg_rm(b + 1, 0, map_x86_reg(dest), dest_disp);
   CHECK(count <= 9);
   b[1 + count] = (uint8_t)imm;
   objfile_section_append_raw(objfile_text(f), b, 1 + count + 1);
@@ -2968,19 +2968,16 @@ void x64_gen_store_biregister(struct objfile *f, struct loc dest,
   }
 }
 
-/* chase x86 */
-void gen_mov_mem_imm(struct objfile *f, enum gp_reg gp_dest_addr, int32_t dest_disp,
-                     enum gp_reg gp_aux,
+/* chase mark */
+void gen_mov_mem_imm(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                     enum gp_reg aux,
                      struct immediate src) {
-  /* TODO() */
-  enum x86_reg dest_addr = map_x86_reg(gp_dest_addr);
-  enum x86_reg aux = map_x86_reg(gp_aux);
   switch (src.tag) {
   case IMMEDIATE_FUNC: {
     /* Doesn't just use an immediate because OS X 32-bit won't work
     that way. */
-    x86_gen_mov_reg_stiptr(f, aux, src.u.func_sti);
-    x86_gen_store32(f, dest_addr, dest_disp, aux);
+    gp_gen_mov_reg_stiptr(f, aux, src.u.func_sti);
+    gp_gen_storePTR(f, dest_addr, dest_disp, aux);
   } break;
   case IMMEDIATE_U64: {
     TODO_IMPLEMENT;
@@ -2991,18 +2988,18 @@ void gen_mov_mem_imm(struct objfile *f, enum gp_reg gp_dest_addr, int32_t dest_d
   case IMMEDIATE_U32: {
     char buf[4];
     write_le_u32(buf, src.u.u32);
-    x86_help_gen_mov_mem_imm32(f, dest_addr, dest_disp, buf);
+    y86x64_help_gen_mov_mem_imm32(f, dest_addr, dest_disp, buf);
   } break;
   case IMMEDIATE_I32: {
     char buf[4];
     write_le_i32(buf, src.u.i32);
-    x86_help_gen_mov_mem_imm32(f, dest_addr, dest_disp, buf);
+    y86x64_help_gen_mov_mem_imm32(f, dest_addr, dest_disp, buf);
   } break;
   case IMMEDIATE_U8: {
-    x86_gen_mov_mem_imm8(f, dest_addr, dest_disp, (int8_t)src.u.u8);
+    y86x64_gen_mov_mem_imm8(f, dest_addr, dest_disp, (int8_t)src.u.u8);
   } break;
   case IMMEDIATE_I8: {
-    x86_gen_mov_mem_imm8(f, dest_addr, dest_disp, src.u.i8);
+    y86x64_gen_mov_mem_imm8(f, dest_addr, dest_disp, src.u.i8);
   } break;
   case IMMEDIATE_VOID: {
     /* Do nothing. */
