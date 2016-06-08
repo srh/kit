@@ -1309,6 +1309,19 @@ void x86_gen_add_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void gp_gen_add_wPTR(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_add_w32(f, map_x86_reg(dest), map_x86_reg(src));
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void x86_gen_add_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
   uint8_t b[3];
   b[0] = 0x66;
@@ -1354,6 +1367,19 @@ void x86_gen_imul_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   b[1] = 0xAF;
   b[2] = mod_reg_rm(MOD11, dest, src);
   objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
+void gp_gen_imul_wPTR(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_imul_w32(f, map_x86_reg(dest), map_x86_reg(src));
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void x86_gen_imul_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
@@ -3034,6 +3060,7 @@ struct temp_return temp_exists(struct loc loc,
   return ret;
 }
 
+/* chase mark */
 struct temp_return temp_subobject(struct temp_return other) {
   struct temp_return ret = other;
   if (ret.exists) {
@@ -4658,7 +4685,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
-/* chase x86 */
+/* chase mark */
 int gen_index_expr(struct checkstate *cs, struct objfile *f,
                    struct frame *h, struct ast_expr *a,
                    struct expr_return *er) {
@@ -4697,8 +4724,8 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
     CHECK(ptr_target->tag == AST_TYPEEXPR_ARRAY);
     elem_size = gp_sizeof(&cs->nt, ptr_target->u.arraytype.param);
 
-    CHECK(lhs_loc.size == DWORD_SIZE);
-    CHECK(rhs_loc.size == DWORD_SIZE);
+    CHECK(lhs_loc.size == ptr_size(cs->arch));
+    CHECK(rhs_loc.size == size_size(cs->arch));
 
     gp_gen_load_register(f, GP_D, lhs_loc);
   } else {
@@ -4707,18 +4734,18 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
     elem_size = gp_sizeof(&cs->nt, lhs_type->u.arraytype.param);
 
     CHECK(lhs_loc.size == uint32_mul(elem_size, unsafe_numeric_literal_u32(&lhs_type->u.arraytype.number)));
-    CHECK(rhs_loc.size == DWORD_SIZE);
+    CHECK(rhs_loc.size == size_size(cs->arch));
 
-    x86_gen_load_addressof(f, X86_EDX, lhs_loc);
+    gp_gen_load_addressof(f, GP_D, lhs_loc);
   }
 
   gp_gen_load_register(f, GP_A, rhs_loc);
 
-  x86_gen_mov_reg_imm32(f, X86_ECX, elem_size);
-  x86_gen_imul_w32(f, X86_EAX, X86_ECX);
+  gp_gen_mov_reg_imm32(f, GP_C, elem_size);
+  gp_gen_imul_wPTR(f, GP_A, GP_C);
   gen_crash_jcc(f, h, X86_JCC_O);
 
-  x86_gen_add_w32(f, X86_EAX, X86_EDX);
+  gp_gen_add_wPTR(f, GP_A, GP_D);
 
   struct loc loc = frame_push_loc(h, DWORD_SIZE);
   gp_gen_store_register(f, loc, GP_A);
@@ -4753,6 +4780,7 @@ size_t frame_crash_target_number(struct frame *h) {
   return h->crash_target_number;
 }
 
+/* chase x86 */
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code) {
   gen_placeholder_jcc(f, h, code, frame_crash_target_number(h));
 }

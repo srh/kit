@@ -20,6 +20,10 @@ uint32_t ptr_size(enum target_arch arch) {
   }
 }
 
+uint32_t size_size(enum target_arch arch) {
+  return ptr_size(arch);
+}
+
 uint32_t max_possible_alignof(enum target_arch arch) {
   switch (arch) {
   case TARGET_ARCH_Y86:
