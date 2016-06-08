@@ -1490,6 +1490,19 @@ void x86_gen_cmp_w32(struct objfile *f, enum x86_reg lhs, enum x86_reg rhs) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void gp_gen_cmp_regs(struct objfile *f, enum gp_reg lhs, enum gp_reg rhs) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_cmp_w32(f, map_x86_reg(lhs), map_x86_reg(rhs));
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void x86_gen_cmp_w16(struct objfile *f, enum x86_reg16 lhs, enum x86_reg16 rhs) {
   uint8_t b[3];
   b[0] = 0x66;
@@ -4873,7 +4886,7 @@ void replace_placeholder_jump(struct objfile *f, size_t jmp_location,
                                 sizeof(buf));
 }
 
-/* chase x86 */
+/* chase mark */
 void gen_assignment(struct checkstate *cs, struct objfile *f,
                     struct frame *h, struct loc lhs_loc,
                     struct loc rhs_loc, struct ast_typeexpr *type,
@@ -4900,9 +4913,9 @@ void gen_assignment(struct checkstate *cs, struct objfile *f,
   }
 
   size_t target_number = frame_add_target(h);
-  x86_gen_load_addressof(f, X86_ECX, lhs_loc);
-  x86_gen_load_addressof(f, X86_EDX, rhs_loc);
-  x86_gen_cmp_w32(f, X86_EDX, X86_ECX);
+  gp_gen_load_addressof(f, GP_C, lhs_loc);
+  gp_gen_load_addressof(f, GP_D, rhs_loc);
+  gp_gen_cmp_regs(f, GP_D, GP_C);
   gen_placeholder_jcc(f, h, X86_JCC_Z, target_number);
 
   /* Okay, memory locations aren't equal. */
