@@ -1518,12 +1518,18 @@ void x86_gen_cmp_w8(struct objfile *f, enum x86_reg8 lhs, enum x86_reg8 rhs) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+/* TODO(): Rename to y86x64, check callers for if 32-bit cmp is right for them */
 void x86_gen_cmp_imm32(struct objfile *f, enum x86_reg lhs, int32_t imm32) {
   uint8_t b[6];
   b[0] = 0x81;
   b[1] = mod_reg_rm(MOD11, 7, lhs);
   write_le_i32(b + 2, imm32);
   objfile_section_append_raw(objfile_text(f), b, 6);
+}
+
+void gp_gen_cmp_w32_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
+  /* y86/x64 */
+  x86_gen_cmp_imm32(f, map_x86_reg(lhs), imm32);
 }
 
 void x86_gen_cmp_reg16_imm16(struct objfile *f, enum x86_reg16 lhs, int16_t imm16) {
@@ -5532,18 +5538,18 @@ void ungen_swartch(struct checkstate *cs, struct objfile *f,
   gen_destroy(cs, f, h, facts->loc, facts->type);
 }
 
-/* chase x86 */
+/* chase mark */
 int gen_casebody(struct checkstate *cs, struct objfile *f,
                  struct frame *h, struct swartch_facts *facts,
                  struct ast_constructor_pattern *constructor,
                  struct ast_bracebody *body,
                  size_t fail_target_number) {
-  /* TODO(): Enum tag logic? */
-  x86_gen_cmp_imm32(f, X86_EAX,
-                    int32_add(
-                        size_to_int32(
-                            ast_case_pattern_info_constructor_number(&constructor->info).value),
-                        FIRST_ENUM_TAG_NUMBER));
+  CHECK(4 == enum_tag_size(cs->arch));
+  gp_gen_cmp_w32_imm32(f, GP_A,
+                       int32_add(
+                           size_to_int32(
+                               ast_case_pattern_info_constructor_number(&constructor->info).value),
+                           FIRST_ENUM_TAG_NUMBER));
   gen_placeholder_jcc(f, h, X86_JCC_NE, fail_target_number);
 
   struct vardata vd;
