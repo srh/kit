@@ -183,9 +183,7 @@ void gen_primitive_op_behavior(struct checkstate *cs,
                                struct ast_typeexpr *arg0_type_or_null,
                                int32_t callsite_base_offset,
                                struct funcall_arglist_info *arglist_info,
-                               struct loc return_loc,
-                               int32_t off0,
-                               int32_t off1);
+                               struct loc return_loc);
 void postcall_return_in_loc(struct checkstate *cs,
                             struct objfile *f,
                             struct funcall_arglist_info *arglist_info,
@@ -4313,13 +4311,17 @@ void gen_primitive_op_behavior(struct checkstate *cs,
 
                                int32_t callsite_base_offset,
                                struct funcall_arglist_info *arglist_info,
-                               struct loc return_loc,
+                               struct loc return_loc) {
+  int32_t off0 = INT32_MIN;
+  int32_t off1 = INT32_MIN;
+  if (arglist_info->args_count > 0) {
+    off0 = int32_add(callsite_base_offset, arglist_info->arg_infos[0].relative_disp);
+  }
+  if (arglist_info->args_count > 1) {
+    CHECK(arglist_info->args_count == 2);
+    off1 = int32_add(callsite_base_offset, arglist_info->arg_infos[1].relative_disp);
+  }
 
-                               /* displacements of operands, relative to ebp */
-                               /* is meaningful if op has arity 1 or 2 */
-                               int32_t off0,
-                               /* is meaningful if op has arity 2 */
-                               int32_t off1) {
   /* TODO(): x86: callsite_base_offset needs to be used for x64 -- on x86 assert that it equals stack offset. */
   switch (prim_op.tag) {
   case PRIMITIVE_OP_ENUMCONSTRUCT: {
@@ -4631,20 +4633,11 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       y86_postcall_return_in_loc(cs, f, &arglist_info, return_loc);
     } break;
     case EXPR_RETURN_FREE_PRIMITIVE_OP: {
-      int32_t off0 = INT32_MIN;
-      int32_t off1 = INT32_MIN;
-      if (args_count > 0) {
-        off0 = int32_add(callsite_base_offset, arglist_info.arg_infos[0].relative_disp);
-      }
-      if (args_count > 1) {
-        off1 = int32_add(callsite_base_offset, arglist_info.arg_infos[1].relative_disp);
-      }
       gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
                                 (args_count == 0 ? NULL : &args[0]),
                                 callsite_base_offset,
                                 &arglist_info,
-                                return_loc,
-                                off0, off1);
+                                return_loc);
     } break;
     default:
       UNREACHABLE();
@@ -4673,22 +4666,11 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       x64_postcall_return_in_loc(f, &arglist_info, return_loc);
     } break;
     case EXPR_RETURN_FREE_PRIMITIVE_OP: {
-      /* off0 and off1 values don't matter if they aren't set. */
-      int32_t off0 = INT32_MIN;
-      int32_t off1 = INT32_MIN;
-      if (args_count > 0) {
-        off0 = int32_add(callsite_base_offset, arglist_info.arg_infos[0].relative_disp);
-      }
-      if (args_count > 1) {
-        CHECK(args_count == 2);
-        off1 = int32_add(callsite_base_offset, arglist_info.arg_infos[1].relative_disp);
-      }
       gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
                                 (args_count == 0 ? NULL : &args[0]),
                                 callsite_base_offset,
                                 &arglist_info,
-                                return_loc,
-                                off0, off1);
+                                return_loc);
     } break;
     default:
       UNREACHABLE();
