@@ -5169,7 +5169,7 @@ struct loc gen_array_element_loc(struct checkstate *cs,
   return retloc;
 }
 
-/* chase x86 (fix callers) */
+/* chase mark */
 struct loc gen_field_loc(struct checkstate *cs,
                          struct objfile *f,
                          struct frame *h,
@@ -5225,6 +5225,7 @@ struct loc gen_subobject_loc(struct objfile *f,
   return ret;
 }
 
+/* chase mark */
 void apply_field_access(struct checkstate *cs,
                         struct objfile *f,
                         struct frame *h,
@@ -5238,7 +5239,7 @@ void apply_field_access(struct checkstate *cs,
   expr_return_set(cs, f, h, er, field_loc, field_type, temp_subobject(lhs_tr));
 }
 
-/* chase x86 */
+/* chase mark */
 int gen_local_field_access(struct checkstate *cs, struct objfile *f,
                            struct frame *h, struct ast_expr *a,
                            struct expr_return *er) {
