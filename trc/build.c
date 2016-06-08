@@ -2671,10 +2671,23 @@ void x64_gen_load_addressof(struct objfile *f, enum x64_reg dest, struct loc loc
   TODO_IMPLEMENT;
 }
 
+void gp_gen_load_addressof(struct objfile *f, enum gp_reg dest, struct loc loc) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_load_addressof(f, map_x86_reg(dest), loc);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+/* chase mark */
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc) {
-  /* x86 */
-  CHECK(dest.size == DWORD_SIZE);
-  x86_gen_load_addressof(f, X86_EAX, loc);
+  CHECK(dest.size == ptr_size(objfile_arch(f)));
+  gp_gen_load_addressof(f, GP_A, loc);
   gp_gen_store_register(f, dest, GP_A);
 }
 
@@ -4584,6 +4597,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   return ret;
 }
 
+/* chase x86 */
 void apply_dereference(struct checkstate *cs, struct objfile *f,
                        struct frame *h, struct loc ptr_loc,
                        uint32_t pointee_size, struct expr_return *er,
@@ -4599,7 +4613,7 @@ void apply_dereference(struct checkstate *cs, struct objfile *f,
   expr_return_set(cs, f, h, er, ret, type, temp_none());
 }
 
-/* chase x86 */
+/* chase mark */
 int gen_unop_expr(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_expr *a,
                   struct expr_return *er) {
@@ -4629,7 +4643,7 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
     the address of a temporary. */
     CHECK(!er_tr(&rhs_er)->exists);
 
-    struct loc ret = frame_push_loc(h, DWORD_SIZE);
+    struct loc ret = frame_push_loc(h, ptr_size(cs->arch));
     gen_mov_addressof(f, ret, ero_loc(&rhs_er.u.open));
     expr_return_set(cs, f, h, er, ret, ast_expr_type(a),
                     temp_exists(ret, ast_expr_type(a), 1));
