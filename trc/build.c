@@ -1954,15 +1954,6 @@ size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest) {
   return ix;
 }
 
-void x86_gen_load8(struct objfile *f, enum x86_reg8 dest, enum x86_reg src_addr,
-                   int32_t src_disp) {
-  uint8_t b[10];
-  b[0] = 0x8A;
-  size_t count = x86_encode_reg_rm(b + 1, dest, src_addr, src_disp);
-  CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 1);
-}
-
 void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
                      enum x86_reg src) {
   uint8_t b[10];
