@@ -3261,7 +3261,7 @@ void gen_cmp8_behavior(struct objfile *f,
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
 
-/* chase x86 */
+/* chase mark */
 void gen_enumconstruct_behavior(struct checkstate *cs,
                                 struct objfile *f,
                                 struct frame *h,
@@ -3280,10 +3280,9 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   struct loc return_enum_body_loc
     = make_enum_body_loc(f, h, return_loc, arg_attrs.size, arg_attrs.align);
 
-  /* x86-specific enum tag size logic. */
   int32_t enum_num_i32
     = int32_add(FIRST_ENUM_TAG_NUMBER, size_to_int32(enumconstruct_number));
-  x86_gen_mov_reg_imm32(f, X86_EAX, enum_num_i32);
+  gp_gen_mov_reg_imm32(f, GP_A, enum_num_i32);
   gp_gen_store_register(f, return_enum_num_loc, GP_A);
 
   gen_move_or_copydestroy(cs, f, h, return_enum_body_loc, arg_loc, arg0_type);
