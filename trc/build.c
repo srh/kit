@@ -5103,7 +5103,7 @@ int gen_immediate_numeric_literal(struct checkstate *cs,
                                     numeric_literal_value, er);
 }
 
-/* chase x86 */
+/* chase mark */
 struct loc gen_array_element_loc(struct checkstate *cs,
                                  struct objfile *f,
                                  struct frame *h,
@@ -5113,10 +5113,10 @@ struct loc gen_array_element_loc(struct checkstate *cs,
   uint32_t elem_size = gp_sizeof(&cs->nt, elem_type);
   uint32_t elem_offset = uint32_mul(elem_size, index);
 
-  x86_gen_load_addressof(f, X86_EDX, src);
-  x86_gen_mov_reg_imm32(f, X86_ECX, elem_offset);
-  x86_gen_add_w32(f, X86_EDX, X86_ECX);
-  struct loc loc = frame_push_loc(h, DWORD_SIZE);
+  gp_gen_load_addressof(f, GP_D, src);
+  gp_gen_mov_reg_imm32(f, GP_C, elem_offset);
+  gp_gen_add_wPTR(f, GP_D, GP_C);
+  struct loc loc = frame_push_loc(h, ptr_size(cs->arch));
   gp_gen_store_register(f, loc, GP_D);
 
   struct loc retloc = ebp_indirect_loc(elem_size, elem_size, loc.u.ebp_offset);
