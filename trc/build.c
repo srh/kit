@@ -2753,6 +2753,7 @@ void put_ptr_in_reg(struct objfile *f, struct loc loc, enum gp_reg free_reg,
 ebp) are dest or loc.  It's safe to use this if dest and src point to
 the same _exact_ memory location, through different means (or through
 the same means). */
+/* chase mark */
 void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   CHECK(dest.size == src.size);
   if (loc_equal(dest, src)) {
@@ -4597,17 +4598,15 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   return ret;
 }
 
-/* chase x86 */
+/* chase mark */
 void apply_dereference(struct checkstate *cs, struct objfile *f,
                        struct frame *h, struct loc ptr_loc,
                        uint32_t pointee_size, struct expr_return *er,
                        struct ast_typeexpr *type) {
-  struct loc loc = frame_push_loc(h, DWORD_SIZE);
+  struct loc loc = frame_push_loc(h, ptr_size(cs->arch));
   gen_mov(f, loc, ptr_loc);
   CHECK(loc.tag == LOC_EBP_OFFSET);
 
-  /* When dereferencing a pointer, we have no info about padding, so
-  the padded size is the same as the size. */
   struct loc ret = ebp_indirect_loc(pointee_size, pointee_size,
                                     loc.u.ebp_offset);
   expr_return_set(cs, f, h, er, ret, type, temp_none());
