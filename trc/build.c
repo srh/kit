@@ -1176,39 +1176,27 @@ void gp_gen_test_regs8(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
   y86x64_gen_test_regs8(f, map_x86_reg8(reg1), map_x86_reg8(reg2));
 }
 
-void x86_gen_xor_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src);
+void y86x64_gen_xor_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src);
+void x64_gen_xor_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src);
 
-void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
-                           int32_t imm32) {
+void y86x64_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
+                              int32_t imm32) {
   if (imm32 == 0) {
-    x86_gen_xor_w32(f, dest, dest);
+    y86x64_gen_xor_w32(f, dest, dest);
   } else {
-    uint8_t b[5];
-    b[0] = 0xB8 + (uint8_t)dest;
-    write_le_i32(b + 1, imm32);
-    objfile_section_append_raw(objfile_text(f), b, 5);
+    uint8_t b[6];
+    size_t insnbase = place_rexw(b, objfile_arch(f));
+    CHECK(dest <= GP_DI);
+    b[insnbase] = 0xB8 + (uint8_t)dest;
+    write_le_i32(b + insnbase + 1, imm32);
+    objfile_section_append_raw(objfile_text(f), b, insnbase + 5);
   }
-}
-
-/* sign extends */
-void x64_gen_mov_reg_imm32(struct objfile *f, enum x64_reg dest,
-                           int32_t imm32) {
-  (void)f, (void)dest, (void)imm32;
-  TODO_IMPLEMENT;
 }
 
 void gp_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
                           int32_t imm32) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_mov_reg_imm32(f, map_x86_reg(dest), imm32);
-    break;
-  case TARGET_ARCH_X64:
-    x64_gen_mov_reg_imm32(f, map_x64_reg(dest), imm32);
-    break;
-  default:
-    UNREACHABLE();
-  }
+  check_y86x64(f);
+  y86x64_gen_mov_reg_imm32(f, dest, imm32);
 }
 
 
@@ -1618,11 +1606,19 @@ void gp_gen_cmp_w8_imm8(struct objfile *f, enum gp_reg lhs, int8_t imm8) {
   }
 }
 
-void x86_gen_xor_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
+void y86x64_gen_xor_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   uint8_t b[2];
   b[0] = 0x31;
   b[1] = mod_reg_rm(MOD11, src, dest);
   objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x64_gen_xor_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
+  uint8_t b[3];
+  b[0] = kREXW;
+  b[1] = 0x31;
+  b[2] = mod_reg_rm(MOD11, src, dest);
+  objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
 void x86_gen_or_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
@@ -2754,7 +2750,7 @@ void x86_gen_returnloc_funcreturn_convention(struct objfile *f,
     CHECK(return_loc.tag == LOC_EBP_INDIRECT);
     x86_gen_load32(f, X86_EAX, X86_EBP, return_loc.u.ebp_indirect);
   } else if (return_loc.size == 0) {
-    x86_gen_xor_w32(f, X86_EAX, X86_EAX);
+    y86x64_gen_xor_w32(f, GP_A, GP_A);
   } else if (return_loc.size <= DWORD_SIZE) {
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
     CHECK(return_loc.padded_size == DWORD_SIZE);
@@ -3751,7 +3747,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
       break;
     case TARGET_ARCH_X64: {
       y86x64_gen_mov_reg(f, GP_D, GP_A);
-      x64_gen_mov_reg_imm32(f, X64_RCX, 32);
+      gp_gen_mov_reg_imm32(f, GP_C, 32);
       x64_gen_shr_cl_w64(f, X64_RDX);
       gen_crash_jcc(f, h, X86_JCC_NE);
     } break;
@@ -3827,7 +3823,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     case TARGET_ARCH_X64: {
       gp_gen_mov_reg(f, GP_D, GP_A);
       x64_gen_sub_w64_imm32(f, X64_RDX, -0x8000000ll);
-      x64_gen_mov_reg_imm32(f, X64_RCX, 32);
+      gp_gen_mov_reg_imm32(f, GP_C, 32);
       x64_gen_shr_cl_w64(f, X64_RDX);
       gen_crash_jcc(f, h, X86_JCC_NE);
     } break;
@@ -3962,7 +3958,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_XOR_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+    y86x64_gen_xor_w32(f, GP_A, GP_C);
   } break;
   case PRIMITIVE_OP_BIT_OR_BOOL: /* fallthrough */
   case PRIMITIVE_OP_BIT_OR_U8: {
@@ -4052,7 +4048,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_XOR_I8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+    y86x64_gen_xor_w32(f, GP_A, GP_C);
   } break;
   case PRIMITIVE_OP_BIT_OR_I8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
@@ -4106,14 +4102,14 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_DIV_U16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
+    y86x64_gen_xor_w32(f, GP_D, GP_D);
     x86_gen_axdx_div_w16(f, X86_CX);
     /* Divide by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_MOD_U16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
+    y86x64_gen_xor_w32(f, GP_D, GP_D);
     x86_gen_axdx_div_w16(f, X86_CX);
     /* Divide by zero will produce #DE. (I guess.) */
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
@@ -4140,7 +4136,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_XOR_U16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+    y86x64_gen_xor_w32(f, GP_A, GP_C);
   } break;
   case PRIMITIVE_OP_BIT_OR_U16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
@@ -4226,7 +4222,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_XOR_I16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+    y86x64_gen_xor_w32(f, GP_A, GP_C);
   } break;
   case PRIMITIVE_OP_BIT_OR_I16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
@@ -4285,7 +4281,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_DIV_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
+    y86x64_gen_xor_w32(f, GP_D, GP_D);
     x86_gen_eaxedx_div_w32(f, X86_ECX);
     /* Divide by zero will produce #DE. (I guess.) */
   } break;
@@ -4294,7 +4290,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_MOD_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EDX, X86_EDX);
+    y86x64_gen_xor_w32(f, GP_D, GP_D);
     x86_gen_eaxedx_div_w32(f, X86_ECX);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
     /* Modulus by zero will produce #DE. (I guess.) */
@@ -4334,7 +4330,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_XOR_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+    y86x64_gen_xor_w32(f, GP_A, GP_C);
   } break;
   case PRIMITIVE_OP_BIT_OR_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_OR_OSIZE: /* fallthrough */
@@ -4429,7 +4425,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_XOR_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_xor_w32(f, X86_EAX, X86_ECX);
+    y86x64_gen_xor_w32(f, GP_A, GP_C);
   } break;
   case PRIMITIVE_OP_BIT_OR_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
