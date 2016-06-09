@@ -1179,7 +1179,7 @@ void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
   objfile_section_append_raw(objfile_text(f), b, insnbase + 2);
 }
 
-void x86_gen_test_regs8(struct objfile *f, enum x86_reg8 reg1, enum x86_reg8 reg2) {
+void y86x64_gen_test_regs8(struct objfile *f, enum x86_reg8 reg1, enum x86_reg8 reg2) {
   uint8_t b[2];
   b[0] = 0x84;
   b[1] = mod_reg_rm(MOD11, reg2, reg1);
@@ -1187,8 +1187,7 @@ void x86_gen_test_regs8(struct objfile *f, enum x86_reg8 reg1, enum x86_reg8 reg
 }
 
 void gp_gen_test_regs8(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
-  /* TODO() */
-  x86_gen_test_regs8(f, map_x86_reg8(reg1), map_x86_reg8(reg2));
+  y86x64_gen_test_regs8(f, map_x86_reg8(reg1), map_x86_reg8(reg2));
 }
 
 void x86_gen_xor_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src);
