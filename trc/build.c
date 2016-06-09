@@ -1699,7 +1699,7 @@ void x64_gen_neg_w64(struct objfile *f, enum x64_reg dest) {
   b[0] = kREXW;
   b[1] = 0xF7;
   b[2] = mod_reg_rm(MOD11, 3, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
 void gp_gen_neg(struct objfile *f, enum gp_reg dest) {
@@ -1715,20 +1715,30 @@ void gp_gen_neg(struct objfile *f, enum gp_reg dest) {
   }
 }
 
-void x86_gen_sub_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
+void y86x64_gen_sub_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
+  check_y86x64(f);
   uint8_t b[2];
   b[0] = 0x29;
   b[1] = mod_reg_rm(MOD11, src, dest);
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x64_gen_sub_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
+  check_y86x64(f);
+  uint8_t b[3];
+  b[0] = kREXW;
+  b[1] = 0x29;
+  b[2] = mod_reg_rm(MOD11, src, dest);
+  objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
 void gp_gen_sub(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    x86_gen_sub_w32(f, map_x86_reg(dest), map_x86_reg(src));
+    y86x64_gen_sub_w32(f, dest, src);
     break;
   case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
+    x64_gen_sub_w64(f, map_x64_reg(dest), map_x64_reg(src));
     break;
   default:
     UNREACHABLE();
@@ -4304,7 +4314,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_SUB_U32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_sub_w32(f, X86_EAX, X86_ECX);
+    y86x64_gen_sub_w32(f, GP_A, GP_C);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_MUL_SIZE: /* fallthrough */
@@ -4418,7 +4428,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_SUB_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_sub_w32(f, X86_EAX, X86_ECX);
+    y86x64_gen_sub_w32(f, GP_A, GP_C);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I32: {
@@ -4504,7 +4514,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_SUB_OSIZE: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_sub_w32(f, X86_EAX, X86_ECX);
+    y86x64_gen_sub_w32(f, GP_A, GP_C);
   } break;
   case PRIMITIVE_OP_MUL_OSIZE: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
