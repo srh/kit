@@ -1746,8 +1746,13 @@ void gp_gen_sub(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
 }
 
 void x64_gen_sub_w64_imm32(struct objfile *f, enum x64_reg dest, int32_t imm) {
-  (void)f, (void)dest, (void)imm;
-  TODO_IMPLEMENT;
+  CHECK(dest <= X64_RDI);
+  uint8_t b[7];
+  b[0] = kREXW;
+  b[1] = 0x81;
+  b[2] = mod_reg_rm(MOD11, 5, dest);
+  write_le_i32(b + 3, imm);
+  objfile_section_append_raw(objfile_text(f), b, 7);
 }
 
 void x86_gen_sub_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
