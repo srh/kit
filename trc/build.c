@@ -140,6 +140,11 @@ enum x86_jcc {
   X86_JCC_L = 0x8C,
 };
 
+void check_y86x64(struct objfile *f) {
+  (void)f;
+  /* A no-op -- f->arch must be one of TARGET_ARCH_Y86 or TARGET_ARCH_X64. */
+}
+
 /* Returns true if the reg has a lobyte (also, the register code
 happens to identify the lowbyte in a reg or modr/m field). */
 int x86_reg_has_lowbyte(enum x86_reg reg) {
@@ -236,13 +241,15 @@ int platform_prefix_underscore(enum target_platform platform) {
   }
 }
 
+/* REX.W */
+static const uint8_t kREXW = 0x48;
+
 size_t place_rexw(uint8_t *b, enum target_arch arch) {
   switch (arch) {
   case TARGET_ARCH_Y86:
     return 0;
   case TARGET_ARCH_X64:
-    /* REX.W */
-    b[0] = 0x48;
+    b[0] = kREXW;
     return 1;
   default:
     UNREACHABLE();
@@ -967,17 +974,8 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h,
   funcall_arglist_info_destroy(&arglist_info);
 }
 
-void x64_gen_load64(struct objfile *f, enum x64_reg dest, enum x64_reg src,
-                    int32_t src_disp) {
-  (void)f, (void)dest, (void)src, (void)src_disp;
-  TODO_IMPLEMENT;
-}
-
 void x64_gen_store64(struct objfile *f, enum x64_reg dest, int32_t dest_disp,
-                     enum x64_reg src) {
-  (void)f, (void)dest, (void)dest_disp, (void)src;
-  TODO_IMPLEMENT;
-}
+                     enum x64_reg src);
 
 static const enum x64_reg x64_param_regs[6] = {
   X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8, X64_R9,
@@ -1143,6 +1141,7 @@ void y86x64_gen_mov_reg(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
 }
 
 void gp_gen_mov_reg(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
+  check_y86x64(f);
   y86x64_gen_mov_reg(f, dest, src);
 }
 
@@ -1161,6 +1160,7 @@ void y86x64_gen_test_regs32(struct objfile *f, enum x86_reg reg1, enum x86_reg r
 }
 
 void gp_gen_test_w32_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
+  check_y86x64(f);
   y86x64_gen_test_regs32(f, map_x86_reg(reg1), map_x86_reg(reg2));
 }
 
@@ -1181,6 +1181,7 @@ void y86x64_gen_test_regs8(struct objfile *f, enum x86_reg8 reg1, enum x86_reg8 
 }
 
 void gp_gen_test_regs8(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
+  check_y86x64(f);
   y86x64_gen_test_regs8(f, map_x86_reg8(reg1), map_x86_reg8(reg2));
 }
 
@@ -1740,6 +1741,7 @@ void y86x64_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
 
 /* Either leaves upper bits unset or sets them to zero. */
 void gp_gen_setcc_b8(struct objfile *f, enum gp_reg dest, enum x86_setcc code) {
+  check_y86x64(f);
   y86x64_gen_setcc_b8(f, map_x86_reg8(dest), code);
 }
 
@@ -1788,7 +1790,7 @@ void replace_placeholder_stack_adjustment(struct objfile *f,
 }
 
 /* Check callers if max count returned increases. */
-size_t x86_encode_reg_rm(uint8_t *b, int reg, enum x86_reg rm_addr,
+size_t x86_encode_reg_rm(uint8_t *b, int reg, int rm_addr,
                          int32_t rm_addr_disp) {
   if (rm_addr_disp == 0 && rm_addr != X86_ESP && rm_addr != X86_EBP) {
     b[0] = mod_reg_rm(MOD00, reg, rm_addr);
@@ -1822,6 +1824,7 @@ void y86x64_help_gen_mov_mem_imm32(struct objfile *f,
                                    enum gp_reg dest,
                                    int32_t dest_disp,
                                    char buf[4]) {
+  check_y86x64(f);
   uint8_t b[10];
   b[0] = 0xC7;
   size_t count = x86_encode_reg_rm(b + 1, 0, map_x86_reg(dest), dest_disp);
@@ -1830,8 +1833,8 @@ void y86x64_help_gen_mov_mem_imm32(struct objfile *f,
   objfile_section_append_raw(objfile_text(f), buf, 4);
 }
 
-void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
-                     enum x86_reg src);
+void y86x64_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                        enum gp_reg src);
 
 void gp_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                     enum gp_reg src);
@@ -1840,6 +1843,7 @@ void y86x64_gen_mov_mem_imm8(struct objfile *f,
                              enum gp_reg dest,
                              int32_t dest_disp,
                              int8_t imm) {
+  check_y86x64(f);
   uint8_t b[11];
   b[0] = 0xC6;
   size_t count = x86_encode_reg_rm(b + 1, 0, map_x86_reg(dest), dest_disp);
@@ -1855,6 +1859,16 @@ void x86_gen_load32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   size_t count = x86_encode_reg_rm(b + 1, dest, src_addr, src_disp);
   CHECK(count <= 9);
   objfile_section_append_raw(objfile_text(f), b, count + 1);
+}
+
+void x64_gen_load64(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
+                    int32_t src_disp) {
+  uint8_t b[11];
+  b[0] = kREXW;
+  b[1] = 0x8B;
+  size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 2);
 }
 
 /* TODO(): Audit callers, did they mean a pointer? */
@@ -2040,8 +2054,9 @@ size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest) {
   return ix;
 }
 
-void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
-                     enum x86_reg src) {
+void y86x64_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                        enum gp_reg src) {
+  CHECK(dest_addr <= 7 && src <= 7);
   uint8_t b[10];
   b[0] = 0x89;
   size_t count = x86_encode_reg_rm(b + 1, src, dest_addr, dest_disp);
@@ -2049,26 +2064,28 @@ void x86_gen_store32(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
   objfile_section_append_raw(objfile_text(f), b, count + 1);
 }
 
+void x64_gen_store64(struct objfile *f, enum x64_reg dest_addr, int32_t dest_disp,
+                     enum x64_reg src) {
+  uint8_t b[11];
+  b[0] = kREXW;
+  b[1] = 0x89;
+  size_t count = x86_encode_reg_rm(b + 2, src, dest_addr, dest_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 2);
+}
+
 /* TODO(): Audit callers -- did they mean to write a pointer? */
 void gp_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                     enum gp_reg src) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86: {
-    x86_gen_store32(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg(src));
-  } break;
-  case TARGET_ARCH_X64: {
-    TODO_IMPLEMENT;
-  } break;
-  default:
-    UNREACHABLE();
-  }
+  check_y86x64(f);
+  y86x64_gen_store32(f, dest_addr, dest_disp, src);
 }
 
 void gp_gen_storePTR(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                      enum gp_reg src) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86: {
-    x86_gen_store32(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg(src));
+    y86x64_gen_store32(f, dest_addr, dest_disp, src);
   } break;
   case TARGET_ARCH_X64: {
     TODO_IMPLEMENT;
@@ -3082,8 +3099,9 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
   CHECK(dest.padded_size == 2 * DWORD_SIZE);
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
-    x86_gen_store32(f, X86_EBP, dest.u.ebp_offset, lo);
-    x86_gen_store32(f, X86_EBP, int32_add(dest.u.ebp_offset, DWORD_SIZE), hi);
+    y86x64_gen_store32(f, GP_BP, dest.u.ebp_offset, unmap_x86_reg(lo));
+    y86x64_gen_store32(f, GP_BP, int32_add(dest.u.ebp_offset, DWORD_SIZE),
+                       unmap_x86_reg(hi));
     break;
   case LOC_GLOBAL: {
     CRASH("Writing to globals is impossible.");
@@ -3091,8 +3109,8 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
   case LOC_EBP_INDIRECT: {
     enum x86_reg altreg = x86_choose_register_2(lo, hi);
     x86_gen_load32(f, altreg, X86_EBP, dest.u.ebp_indirect);
-    x86_gen_store32(f, altreg, 0, lo);
-    x86_gen_store32(f, altreg, DWORD_SIZE, hi);
+    y86x64_gen_store32(f, unmap_x86_reg(altreg), 0, unmap_x86_reg(lo));
+    y86x64_gen_store32(f, unmap_x86_reg(altreg), DWORD_SIZE, unmap_x86_reg(hi));
   } break;
   default:
     UNREACHABLE();
