@@ -1605,7 +1605,8 @@ void gp_gen_cmp_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
   }
 }
 
-void x86_gen_cmp_reg16_imm16(struct objfile *f, enum x86_reg16 lhs, int16_t imm16) {
+void y86x64_gen_cmp_reg16_imm16(struct objfile *f, enum x86_reg16 lhs, int16_t imm16) {
+  check_y86x64(f);
   uint8_t b[5];
   b[0] = 0x66;
   b[1] = 0x81;
@@ -1615,16 +1616,8 @@ void x86_gen_cmp_reg16_imm16(struct objfile *f, enum x86_reg16 lhs, int16_t imm1
 }
 
 void gp_gen_cmp_w16_imm16(struct objfile *f, enum gp_reg lhs, int16_t imm16) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_cmp_reg16_imm16(f, map_x86_reg16(lhs), imm16);
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
+  check_y86x64(f);
+  y86x64_gen_cmp_reg16_imm16(f, map_x86_reg16(lhs), imm16);
 }
 
 void x86_gen_cmp_reg8_imm8(struct objfile *f, enum x86_reg8 lhs, int8_t imm8) {
