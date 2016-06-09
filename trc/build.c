@@ -1578,8 +1578,18 @@ void x86_gen_cmp_imm32(struct objfile *f, enum x86_reg lhs, int32_t imm32) {
   objfile_section_append_raw(objfile_text(f), b, 6);
 }
 
+void x64_gen_cmp_w64_imm32(struct objfile *f, enum x64_reg lhs, int32_t imm32) {
+  uint8_t b[7];
+  b[0] = kREXW;
+  b[1] = 0x81;
+  b[2] = mod_reg_rm(MOD11, 7, lhs);
+  write_le_i32(b + 3, imm32);
+  objfile_section_append_raw(objfile_text(f), b, 7);
+}
+
 void gp_gen_cmp_w32_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
   /* y86/x64 */
+  check_y86x64(f);
   x86_gen_cmp_imm32(f, map_x86_reg(lhs), imm32);
 }
 
@@ -1589,7 +1599,7 @@ void gp_gen_cmp_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
     x86_gen_cmp_imm32(f, map_x86_reg(lhs), imm32);
     break;
   case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
+    x64_gen_cmp_w64_imm32(f, map_x64_reg(lhs), imm32);
     break;
   default:
     UNREACHABLE();
