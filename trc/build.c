@@ -1146,7 +1146,7 @@ void x86_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) 
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-void x86_gen_test_regs32(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2) {
+void y86x64_gen_test_regs32(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2) {
   uint8_t b[2];
   b[0] = 0x85;
   b[1] = mod_reg_rm(MOD11, reg2, reg1);
@@ -1154,23 +1154,14 @@ void x86_gen_test_regs32(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2
 }
 
 void gp_gen_test_w32_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_test_regs32(f, map_x86_reg(reg1), map_x86_reg(reg2));
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
+  y86x64_gen_test_regs32(f, map_x86_reg(reg1), map_x86_reg(reg2));
 }
 
 /* Tests the whole reg!!! */
 void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    x86_gen_test_regs32(f, map_x86_reg(reg1), map_x86_reg(reg2));
+    y86x64_gen_test_regs32(f, map_x86_reg(reg1), map_x86_reg(reg2));
     break;
   case TARGET_ARCH_X64:
     TODO_IMPLEMENT;
