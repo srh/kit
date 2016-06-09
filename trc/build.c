@@ -1569,8 +1569,8 @@ void x86_gen_cmp_w8(struct objfile *f, enum x86_reg8 lhs, enum x86_reg8 rhs) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-/* TODO(): Rename to y86x64, check callers for if 32-bit cmp is right for them */
-void x86_gen_cmp_imm32(struct objfile *f, enum x86_reg lhs, int32_t imm32) {
+void y86x64_gen_cmp_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
+  check_y86x64(f);
   uint8_t b[6];
   b[0] = 0x81;
   b[1] = mod_reg_rm(MOD11, 7, lhs);
@@ -1589,14 +1589,13 @@ void x64_gen_cmp_w64_imm32(struct objfile *f, enum x64_reg lhs, int32_t imm32) {
 
 void gp_gen_cmp_w32_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
   /* y86/x64 */
-  check_y86x64(f);
-  x86_gen_cmp_imm32(f, map_x86_reg(lhs), imm32);
+  y86x64_gen_cmp_imm32(f, lhs, imm32);
 }
 
 void gp_gen_cmp_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    x86_gen_cmp_imm32(f, map_x86_reg(lhs), imm32);
+    y86x64_gen_cmp_imm32(f, lhs, imm32);
     break;
   case TARGET_ARCH_X64:
     x64_gen_cmp_w64_imm32(f, map_x64_reg(lhs), imm32);
@@ -2452,7 +2451,7 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
     STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
     for (size_t tagnum = 0, e = size_add(1, rhs->u.enumspec.enumfields_count);
          tagnum < e; tagnum++) {
-      x86_gen_cmp_imm32(f, X86_EAX, size_to_int32(tagnum));
+      gp_gen_cmp_imm32(f, GP_A, size_to_int32(tagnum));
       gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
       switch (tf) {
       case TYPETRAV_FUNC_DESTROY:
@@ -4020,7 +4019,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 7);
+    gp_gen_cmp_imm32(f, GP_C, 7);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shl_cl_w8(f, X86_AL);
@@ -4030,7 +4029,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 7);
+    gp_gen_cmp_imm32(f, GP_C, 7);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shr_cl_w8(f, X86_AL);
@@ -4108,7 +4107,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 7);
+    gp_gen_cmp_imm32(f, GP_C, 7);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shl_cl_w8(f, X86_AL);
@@ -4118,7 +4117,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 7);
+    gp_gen_cmp_imm32(f, GP_C, 7);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_sar_cl_w8(f, X86_AL);
@@ -4196,7 +4195,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 15);
+    gp_gen_cmp_imm32(f, GP_C, 15);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shl_cl_w16(f, X86_AX);
@@ -4206,7 +4205,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 15);
+    gp_gen_cmp_imm32(f, GP_C, 15);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shr_cl_w16(f, X86_AX);
@@ -4282,7 +4281,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 15);
+    gp_gen_cmp_imm32(f, GP_C, 15);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shl_cl_w16(f, X86_AX);
@@ -4292,7 +4291,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 15);
+    gp_gen_cmp_imm32(f, GP_C, 15);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_sar_cl_w16(f, X86_AX);
@@ -4396,7 +4395,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gp_gen_cmp_imm32(f, GP_C, 31);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shl_cl_w32(f, X86_EAX);
@@ -4408,7 +4407,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gp_gen_cmp_imm32(f, GP_C, 31);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shr_cl_w32(f, X86_EAX);
@@ -4485,7 +4484,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gp_gen_cmp_imm32(f, GP_C, 31);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_shl_cl_w32(f, X86_EAX);
@@ -4495,7 +4494,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    x86_gen_cmp_imm32(f, X86_ECX, 31);
+    gp_gen_cmp_imm32(f, GP_C, 31);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     x86_gen_sar_cl_w32(f, X86_EAX);
