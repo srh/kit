@@ -1083,6 +1083,7 @@ int lookup_vardata_by_name(struct frame *h, ident_value name, size_t *index_out)
 }
 
 uint8_t mod_reg_rm(int mod, int reg, int rm) {
+  CHECK(reg <= 7 && mod <= 3 && rm <= 7);
   return (uint8_t)((mod << 6) | (reg << 3) | rm);
 }
 
@@ -1685,20 +1686,29 @@ void x86_gen_not_w32(struct objfile *f, enum x86_reg dest) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-void x86_gen_neg_w32(struct objfile *f, enum x86_reg dest) {
+void y86x64_gen_neg_w32(struct objfile *f, enum gp_reg dest) {
   uint8_t b[2];
   b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 3, dest);
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x64_gen_neg_w64(struct objfile *f, enum x64_reg dest) {
+  CHECK(dest <= X64_RDI);
+  uint8_t b[3];
+  b[0] = kREXW;
+  b[1] = 0xF7;
+  b[2] = mod_reg_rm(MOD11, 3, dest);
+  objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
 void gp_gen_neg(struct objfile *f, enum gp_reg dest) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    x86_gen_neg_w32(f, map_x86_reg(dest));
+    y86x64_gen_neg_w32(f, dest);
     break;
   case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
+    x64_gen_neg_w64(f, map_x64_reg(dest));
     break;
   default:
     UNREACHABLE();
