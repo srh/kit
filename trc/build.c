@@ -1892,8 +1892,8 @@ void y86x64_gen_mov_mem_imm8(struct objfile *f,
   objfile_section_append_raw(objfile_text(f), b, 1 + count + 1);
 }
 
-void x86_gen_load32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
-                    int32_t src_disp) {
+void y86x64_gen_movzx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                        int32_t src_disp) {
   uint8_t b[10];
   b[0] = 0x8B;
   size_t count = x86_encode_reg_rm(b + 1, dest, src_addr, src_disp);
@@ -1911,26 +1911,18 @@ void x64_gen_load64(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
   objfile_section_append_raw(objfile_text(f), b, count + 2);
 }
 
-/* TODO(): Audit callers, did they mean a pointer? */
+/* TODO(): Probably ought to double-check all uses of movzx32 for use with pointers and sizes */
 void gp_gen_movzx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                     int32_t src_disp) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_load32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
+  check_y86x64(f);
+  y86x64_gen_movzx32(f, dest, src_addr, src_disp);
 }
 
 void gp_gen_movsx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                     int32_t src_disp) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    x86_gen_load32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
+    y86x64_gen_movzx32(f, dest, src_addr, src_disp);
     break;
   case TARGET_ARCH_X64:
     TODO_IMPLEMENT;
@@ -1944,10 +1936,23 @@ void gp_gen_loadPTR(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                     int32_t src_disp) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    x86_gen_load32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
+    y86x64_gen_movzx32(f, dest, src_addr, src_disp);
     break;
   case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
+    x64_gen_load64(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp);
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void gp_gen_load64(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr, int32_t src_disp) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    CRASH("gp_gen_load64 on x86");
+    break;
+  case TARGET_ARCH_X64:
+    x64_gen_load64(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp);
     break;
   default:
     UNREACHABLE();
@@ -2801,21 +2806,21 @@ void x86_gen_returnloc_funcreturn_convention(struct objfile *f,
   DWORD_SIZE) or via a hidden return param. */
   if (hidden_return_param) {
     CHECK(return_loc.tag == LOC_EBP_INDIRECT);
-    x86_gen_load32(f, X86_EAX, X86_EBP, return_loc.u.ebp_indirect);
+    y86x64_gen_movzx32(f, GP_A, GP_BP, return_loc.u.ebp_indirect);
   } else if (return_loc.size == 0) {
     y86x64_gen_xor_w32(f, GP_A, GP_A);
   } else if (return_loc.size <= DWORD_SIZE) {
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
     CHECK(return_loc.padded_size == DWORD_SIZE);
-    x86_gen_load32(f, X86_EAX, X86_EBP, return_loc.u.ebp_offset);
+    y86x64_gen_movzx32(f, GP_A, GP_BP, return_loc.u.ebp_offset);
   } else {
     /* TODO: This should not even be theoretically reachable on (LINUX) linux32. */
     CHECK(return_loc.size == 2 * DWORD_SIZE);
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
     CHECK(return_loc.padded_size == 2 * DWORD_SIZE);
-    x86_gen_load32(f, X86_EAX, X86_EBP, return_loc.u.ebp_offset);
-    x86_gen_load32(f, X86_EDX, X86_EBP,
-                   int32_add(return_loc.u.ebp_offset, DWORD_SIZE));
+    y86x64_gen_movzx32(f, GP_A, GP_BP, return_loc.u.ebp_offset);
+    y86x64_gen_movzx32(f, GP_D, GP_BP,
+                       int32_add(return_loc.u.ebp_offset, DWORD_SIZE));
   }
 }
 
@@ -2931,7 +2936,7 @@ void x86_gen_load_addressof(struct objfile *f, enum x86_reg dest, struct loc loc
     x86_gen_mov_reg_stiptr(f, dest, loc.u.global_sti);
   } break;
   case LOC_EBP_INDIRECT: {
-    x86_gen_load32(f, dest, X86_EBP, loc.u.ebp_indirect);
+    y86x64_gen_movzx32(f, unmap_x86_reg(dest), GP_BP, loc.u.ebp_indirect);
   } break;
   default:
     UNREACHABLE();
@@ -2985,20 +2990,6 @@ void gp_gen_memmem_mov(struct objfile *f,
   }
 }
 
-void gp_gen_load_ptr(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                     int32_t src_disp) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_load32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
-}
-
 void put_ptr_in_reg(struct objfile *f, struct loc loc, enum gp_reg free_reg,
                     enum gp_reg *reg_out, int32_t *disp_out) {
   switch (loc.tag) {
@@ -3012,7 +3003,7 @@ void put_ptr_in_reg(struct objfile *f, struct loc loc, enum gp_reg free_reg,
     *disp_out = 0;
   } break;
   case LOC_EBP_INDIRECT: {
-    gp_gen_load_ptr(f, free_reg, GP_BP, loc.u.ebp_indirect);
+    gp_gen_loadPTR(f, free_reg, GP_BP, loc.u.ebp_indirect);
     *reg_out = free_reg;
     *disp_out = 0;
   } break;
@@ -3111,7 +3102,7 @@ void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src) {
 
   switch (src.size) {
   case 8:
-    TODO_IMPLEMENT;
+    gp_gen_load64(f, reg, src_addr, src_disp);
     break;
   case 4:
     gp_gen_movzx32(f, reg, src_addr, src_disp);
@@ -3148,7 +3139,7 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
   } break;
   case LOC_EBP_INDIRECT: {
     enum x86_reg altreg = x86_choose_register_2(lo, hi);
-    x86_gen_load32(f, altreg, X86_EBP, dest.u.ebp_indirect);
+    y86x64_gen_movzx32(f, unmap_x86_reg(altreg), GP_BP, dest.u.ebp_indirect);
     y86x64_gen_store32(f, unmap_x86_reg(altreg), 0, unmap_x86_reg(lo));
     y86x64_gen_store32(f, unmap_x86_reg(altreg), DWORD_SIZE, unmap_x86_reg(hi));
   } break;
@@ -3537,11 +3528,12 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *ret);
 
+/* TODO(): Check callers of this for use on pointers, where cmp64 might be what we want. */
 void gen_cmp32_behavior(struct objfile *f,
                         int32_t off0, int32_t off1,
                         enum x86_setcc setcc_code) {
-  x86_gen_load32(f, X86_EDX, X86_EBP, off0);
-  x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+  y86x64_gen_movzx32(f, GP_D, GP_BP, off0);
+  y86x64_gen_movzx32(f, GP_C, GP_BP, off1);
   y86x64_gen_cmp_w32(f, GP_D, GP_C);
   y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
@@ -3938,7 +3930,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_NOT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
     x86_gen_not_w32(f, X86_EAX);
   } break;
 
@@ -4310,30 +4302,30 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
 
   case PRIMITIVE_OP_ADD_SIZE: /* fallthrough */
   case PRIMITIVE_OP_ADD_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     y86x64_gen_add_w32(f, GP_A, GP_C);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_SUB_SIZE: /* fallthrough */
   case PRIMITIVE_OP_SUB_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     y86x64_gen_sub_w32(f, GP_A, GP_C);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_MUL_SIZE: /* fallthrough */
   case PRIMITIVE_OP_MUL_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     x86_gen_eaxedx_mul_w32(f, X86_ECX);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_DIV_SIZE: /* fallthrough */
   case PRIMITIVE_OP_DIV_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_DIV_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     y86x64_gen_xor_w32(f, GP_D, GP_D);
     x86_gen_eaxedx_div_w32(f, X86_ECX);
     /* Divide by zero will produce #DE. (I guess.) */
@@ -4341,8 +4333,8 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_MOD_SIZE: /* fallthrough */
   case PRIMITIVE_OP_MOD_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_MOD_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     y86x64_gen_xor_w32(f, GP_D, GP_D);
     x86_gen_eaxedx_div_w32(f, X86_ECX);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
@@ -4381,29 +4373,29 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_XOR_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_XOR_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_XOR_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     y86x64_gen_xor_w32(f, GP_A, GP_C);
   } break;
   case PRIMITIVE_OP_BIT_OR_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_OR_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_OR_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     x86_gen_or_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_AND_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_AND_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_AND_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     x86_gen_and_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_LEFTSHIFT_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
 
     /* We handle out-of-range rhs, that's all. */
     gp_gen_cmp_imm32(f, GP_C, 31);
@@ -4414,8 +4406,8 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
 
     /* We handle out-of-range rhs, that's all. */
     gp_gen_cmp_imm32(f, GP_C, 31);
@@ -4425,33 +4417,33 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
 
   case PRIMITIVE_OP_ADD_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     y86x64_gen_add_w32(f, GP_A, GP_C);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_SUB_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     y86x64_gen_sub_w32(f, GP_A, GP_C);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     y86x64_gen_imul_w32(f, GP_A, GP_C);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_DIV_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     x86_gen_cdq_w32(f);
     x86_gen_eaxedx_idiv_w32(f, X86_ECX);
     /* Divide by zero or INT32_MIN / -1 will produce #DE. */
   } break;
   case PRIMITIVE_OP_MOD_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     x86_gen_cdq_w32(f);
     x86_gen_eaxedx_idiv_w32(f, X86_ECX);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
@@ -4476,23 +4468,23 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
   } break;
   case PRIMITIVE_OP_BIT_XOR_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     y86x64_gen_xor_w32(f, GP_A, GP_C);
   } break;
   case PRIMITIVE_OP_BIT_OR_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     x86_gen_or_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_AND_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     x86_gen_and_w32(f, X86_EAX, X86_ECX);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
 
     /* We handle out-of-range rhs, that's all. */
     gp_gen_cmp_imm32(f, GP_C, 31);
@@ -4501,8 +4493,8 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_shl_cl_w32(f, X86_EAX);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
 
     /* We handle out-of-range rhs, that's all. */
     gp_gen_cmp_imm32(f, GP_C, 31);
@@ -4512,18 +4504,18 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
 
   case PRIMITIVE_OP_ADD_OSIZE: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     y86x64_gen_add_w32(f, GP_A, GP_C);
   } break;
   case PRIMITIVE_OP_SUB_OSIZE: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     y86x64_gen_sub_w32(f, GP_A, GP_C);
   } break;
   case PRIMITIVE_OP_MUL_OSIZE: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_load32(f, X86_ECX, X86_EBP, off1);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_movzx32(f, GP_C, GP_BP, off1);
     x86_gen_eaxedx_mul_w32(f, X86_ECX);
   } break;
 
