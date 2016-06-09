@@ -1096,24 +1096,15 @@ void x86_gen_push32(struct objfile *f, enum x86_reg reg) {
   objfile_section_append_raw(objfile_text(f), &b, 1);
 }
 
-void x86_gen_pop32(struct objfile *f, enum x86_reg reg) {
-  uint8_t b = 0x58 + (uint8_t)reg;
+void y86x64_gen_pop(struct objfile *f, enum gp_reg reg) {
+  CHECK(reg <= GP_DI);
+  uint8_t b = 0x58 + (uint8_t)map_x86_reg(reg);
   objfile_section_append_raw(objfile_text(f), &b, 1);
 }
 
-void x64_gen_pop64(struct objfile *f, enum x64_reg reg) {
-  (void)f, (void)reg;
-  TODO_IMPLEMENT;
-}
-
-void x86_gen_ret(struct objfile *f) {
+void y86x64_gen_ret(struct objfile *f) {
   uint8_t b = 0xC3;
   objfile_section_append_raw(objfile_text(f), &b, 1);
-}
-
-void x64_gen_ret(struct objfile *f) {
-  (void)f;
-  TODO_IMPLEMENT;
 }
 
 void x86_gen_retn(struct objfile *f, uint16_t imm16) {
@@ -1243,7 +1234,7 @@ void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
     uint8_t b[5] = { 0xE8, 0, 0, 0, 0 };
     objfile_section_append_raw(objfile_text(f), b, 5);
     size_t subtracted_offset = objfile_section_size(objfile_text(f));
-    x86_gen_pop32(f, dest);
+    y86x64_gen_pop(f, unmap_x86_reg(dest));
     size_t adjusted_offset = x86_gen_placeholder_lea32(f, dest);
     objfile_section_note_diff32(objfile_text(f), symbol_table_index,
                                 subtracted_offset, adjusted_offset);
@@ -2808,19 +2799,19 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
                                             h->return_loc);
 
     x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
-    x86_gen_pop32(f, X86_EBP);
+    y86x64_gen_pop(f, GP_BP);
     if (hidden_return_param && platform_ret4_hrp(cs)) {
       x86_gen_retn(f, 4);
     } else {
-      x86_gen_ret(f);
+      y86x64_gen_ret(f);
     }
   } break;
   case TARGET_ARCH_X64: {
     x64_gen_returnloc_funcreturn_convention(f, hidden_return_param,
                                             h->return_loc);
     y86x64_gen_mov_reg(f, GP_SP, GP_BP);
-    x64_gen_pop64(f, X64_RBP);
-    x64_gen_ret(f);
+    y86x64_gen_pop(f, GP_BP);
+    y86x64_gen_ret(f);
   } break;
   default:
     UNREACHABLE();
