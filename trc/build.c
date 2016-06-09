@@ -1620,7 +1620,8 @@ void gp_gen_cmp_w16_imm16(struct objfile *f, enum gp_reg lhs, int16_t imm16) {
   y86x64_gen_cmp_reg16_imm16(f, map_x86_reg16(lhs), imm16);
 }
 
-void x86_gen_cmp_reg8_imm8(struct objfile *f, enum x86_reg8 lhs, int8_t imm8) {
+void y86x64_gen_cmp_reg8_imm8(struct objfile *f, enum x86_reg8 lhs, int8_t imm8) {
+  check_y86x64(f);
   uint8_t b[3];
   b[0] = 0x80;
   b[1] = mod_reg_rm(MOD11, 7, lhs);
@@ -1629,16 +1630,8 @@ void x86_gen_cmp_reg8_imm8(struct objfile *f, enum x86_reg8 lhs, int8_t imm8) {
 }
 
 void gp_gen_cmp_w8_imm8(struct objfile *f, enum gp_reg lhs, int8_t imm8) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_cmp_reg8_imm8(f, map_x86_reg8(lhs), imm8);
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
+  check_y86x64(f);
+  y86x64_gen_cmp_reg8_imm8(f, map_x86_reg8(lhs), imm8);
 }
 
 void y86x64_gen_xor_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
