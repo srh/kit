@@ -1283,8 +1283,13 @@ void x86_gen_shl_cl_w8(struct objfile *f, enum x86_reg8 dest) {
 }
 
 void x64_gen_shr_cl_w64(struct objfile *f, enum x64_reg dest) {
-  (void)f, (void)dest;
-  TODO_IMPLEMENT;
+  CHECK(dest <= X64_RDI);
+  uint8_t b[3];
+  b[0] = kREXW;
+  /* SHL, SHR, SAR have different reg/opcode fields. */
+  b[1] = 0xD3;
+  b[2] = mod_reg_rm(MOD11, 5, dest);
+  objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
 void x86_gen_shr_cl_w32(struct objfile *f, enum x86_reg dest) {
