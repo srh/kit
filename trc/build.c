@@ -1417,7 +1417,7 @@ void x86_gen_alah_mul_w8(struct objfile *f, enum x86_reg8 src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-void x86_gen_imul_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
+void y86x64_gen_imul_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   uint8_t b[3];
   b[0] = 0x0F;
   b[1] = 0xAF;
@@ -1425,13 +1425,22 @@ void x86_gen_imul_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 3);
 }
 
+void x64_gen_imul_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
+  uint8_t b[4];
+  b[0] = kREXW;
+  b[1] = 0x0F;
+  b[2] = 0xAF;
+  b[3] = mod_reg_rm(MOD11, dest, src);
+  objfile_section_append_raw(objfile_text(f), b, 4);
+}
+
 void gp_gen_imul_wPTR(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    x86_gen_imul_w32(f, map_x86_reg(dest), map_x86_reg(src));
+    y86x64_gen_imul_w32(f, dest, src);
     break;
   case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
+    x64_gen_imul_w64(f, map_x64_reg(dest), map_x64_reg(src));
     break;
   default:
     UNREACHABLE();
@@ -4399,7 +4408,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_MUL_I32: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
     x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-    x86_gen_imul_w32(f, X86_EAX, X86_ECX);
+    y86x64_gen_imul_w32(f, GP_A, GP_C);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_DIV_I32: {
