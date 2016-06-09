@@ -1918,6 +1918,16 @@ void gp_gen_movzx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
   y86x64_gen_movzx32(f, dest, src_addr, src_disp);
 }
 
+void x64_gen_movsx32(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
+                     int32_t src_disp) {
+  uint8_t b[11];
+  b[0] = kREXW;
+  b[1] = 0x63;
+  size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
+  CHECK(count <= 9);
+  objfile_section_append_raw(objfile_text(f), b, count + 2);
+}
+
 void gp_gen_movsx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                     int32_t src_disp) {
   switch (objfile_arch(f)) {
@@ -1925,7 +1935,7 @@ void gp_gen_movsx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
     y86x64_gen_movzx32(f, dest, src_addr, src_disp);
     break;
   case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
+    x64_gen_movsx32(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp);
     break;
   default:
     UNREACHABLE();
