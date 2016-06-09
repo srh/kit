@@ -1678,6 +1678,11 @@ void gp_gen_sub(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   }
 }
 
+void x64_gen_sub_w64_imm32(struct objfile *f, enum x64_reg dest, int32_t imm) {
+  (void)f, (void)dest, (void)imm;
+  TODO_IMPLEMENT;
+}
+
 void x86_gen_sub_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
   uint8_t b[3];
   b[0] = 0x66;
@@ -1830,6 +1835,20 @@ void x86_gen_load32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
 
 /* TODO(): Audit callers, did they mean a pointer? */
 void gp_gen_movzx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                    int32_t src_disp) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_load32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void gp_gen_movsx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                     int32_t src_disp) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
@@ -3728,40 +3747,67 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_w32_imm32(f, GP_A, 0xFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
-    /* vvv chase x86 */
-  case PRIMITIVE_OP_CONVERT_OSIZE_TO_I8: /* fallthrough */
-  case PRIMITIVE_OP_CONVERT_I32_TO_I8: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_cmp_imm32(f, X86_EAX, 0x7F);
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_I8: {
+    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_cmp_imm32(f, GP_A, 0x7F);
     gen_crash_jcc(f, h, X86_JCC_G);
-    x86_gen_cmp_imm32(f, X86_EAX, -0x80);
+    gp_gen_cmp_imm32(f, GP_A, -0x80);
+    gen_crash_jcc(f, h, X86_JCC_L);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I32_TO_I8: {
+    gp_gen_movsx32(f, GP_A, GP_BP, off0);
+    gp_gen_cmp_imm32(f, GP_A, 0x7F);
+    gen_crash_jcc(f, h, X86_JCC_G);
+    gp_gen_cmp_imm32(f, GP_A, -0x80);
     gen_crash_jcc(f, h, X86_JCC_L);
   } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_U16: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_cmp_imm32(f, X86_EAX, 0xFFFF);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_cmp_imm32(f, GP_A, 0xFFFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
-  case PRIMITIVE_OP_CONVERT_OSIZE_TO_I16: /* fallthrough */
-  case PRIMITIVE_OP_CONVERT_I32_TO_I16: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_cmp_imm32(f, X86_EAX, 0x7FFF);
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_I16: {
+    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_cmp_imm32(f, GP_A, 0x7FFF);
     gen_crash_jcc(f, h, X86_JCC_G);
-    x86_gen_cmp_imm32(f, X86_EAX, -0x8000);
+    gp_gen_cmp_imm32(f, GP_A, -0x8000);
+    gen_crash_jcc(f, h, X86_JCC_L);
+  } break;
+  case PRIMITIVE_OP_CONVERT_I32_TO_I16: {
+    gp_gen_movsx32(f, GP_A, GP_BP, off0);
+    gp_gen_cmp_imm32(f, GP_A, 0x7FFF);
+    gen_crash_jcc(f, h, X86_JCC_G);
+    gp_gen_cmp_imm32(f, GP_A, -0x8000);
     gen_crash_jcc(f, h, X86_JCC_L);
   } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I32_TO_U32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_test_regs32(f, X86_EAX, X86_EAX);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_test_w32_regs(f, GP_A, GP_A);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
-  case PRIMITIVE_OP_CONVERT_OSIZE_TO_I32: /* fallthrough */
+  case PRIMITIVE_OP_CONVERT_OSIZE_TO_I32: {
+    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    switch (cs->arch) {
+    case TARGET_ARCH_Y86:
+      break;
+    case TARGET_ARCH_X64: {
+      x64_gen_mov_reg64(f, X64_RDX, X64_RAX);
+      x64_gen_sub_w64_imm32(f, X64_RDX, -0x8000000ll);
+      x64_gen_mov_reg_imm32(f, X64_RCX, 32);
+      x64_gen_shr_cl_w64(f, X64_RDX);
+      gen_crash_jcc(f, h, X86_JCC_NE);
+    } break;
+    default:
+      UNREACHABLE();
+    }
+  } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movsx32(f, GP_A, GP_BP, off0);
   } break;
 
+  /* vvv chase x86 */
   case PRIMITIVE_OP_NEGATE_I8: {
     x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
     /* TODO: (Also in s2.) For this and the other negations, can't we
