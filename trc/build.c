@@ -1134,22 +1134,16 @@ void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-void x64_gen_mov_reg64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
-  (void)f, (void)dest, (void)src;
-  TODO_IMPLEMENT;
+void y86x64_gen_mov_reg(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
+  uint8_t b[3];
+  size_t insnbase = place_rexw(b, objfile_arch(f));
+  b[insnbase] = 0x8B;
+  b[insnbase + 1] = mod_reg_rm(MOD11, dest, src);
+  objfile_section_append_raw(objfile_text(f), b, insnbase + 2);
 }
 
-void gp_gen_mov(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_mov_reg32(f, map_x86_reg(dest), map_x86_reg(src));
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
+void gp_gen_mov_reg(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
+  y86x64_gen_mov_reg(f, dest, src);
 }
 
 void x86_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
@@ -2807,7 +2801,7 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
   case TARGET_ARCH_X64: {
     x64_gen_returnloc_funcreturn_convention(f, hidden_return_param,
                                             h->return_loc);
-    x64_gen_mov_reg64(f, X64_RSP, X64_RBP);
+    y86x64_gen_mov_reg(f, GP_SP, GP_BP);
     x64_gen_pop64(f, X64_RBP);
     x64_gen_ret(f);
   } break;
@@ -3747,7 +3741,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     case TARGET_ARCH_Y86:
       break;
     case TARGET_ARCH_X64: {
-      x64_gen_mov_reg64(f, X64_RDX, X64_RAX);
+      y86x64_gen_mov_reg(f, GP_D, GP_A);
       x64_gen_mov_reg_imm32(f, X64_RCX, 32);
       x64_gen_shr_cl_w64(f, X64_RDX);
       gen_crash_jcc(f, h, X86_JCC_NE);
@@ -3822,7 +3816,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     case TARGET_ARCH_Y86:
       break;
     case TARGET_ARCH_X64: {
-      x64_gen_mov_reg64(f, X64_RDX, X64_RAX);
+      gp_gen_mov_reg(f, GP_D, GP_A);
       x64_gen_sub_w64_imm32(f, X64_RDX, -0x8000000ll);
       x64_gen_mov_reg_imm32(f, X64_RCX, 32);
       x64_gen_shr_cl_w64(f, X64_RDX);
