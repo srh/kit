@@ -76,6 +76,11 @@ enum x86_reg {
   X86_EDI,
 };
 
+/* TODO(): Double-check usage, some callee-save regs are different. */
+enum x64_reg map_x64_reg(enum gp_reg reg) {
+  return (enum x64_reg)reg;
+}
+
 enum x86_reg map_x86_reg(enum gp_reg reg) {
   return (enum x86_reg)reg;
 }
@@ -1121,6 +1126,19 @@ void x64_gen_mov_reg64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
   TODO_IMPLEMENT;
 }
 
+void gp_gen_mov(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_mov_reg32(f, map_x86_reg(dest), map_x86_reg(src));
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void x86_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
   uint8_t b[2];
   b[0] = 0x8A;
@@ -1188,6 +1206,13 @@ void x86_gen_mov_reg_imm32(struct objfile *f, enum x86_reg dest,
   }
 }
 
+/* sign extends */
+void x64_gen_mov_reg_imm32(struct objfile *f, enum x64_reg dest,
+                           int32_t imm32) {
+  (void)f, (void)dest, (void)imm32;
+  TODO_IMPLEMENT;
+}
+
 void gp_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
                           int32_t imm32) {
   switch (objfile_arch(f)) {
@@ -1195,7 +1220,7 @@ void gp_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
     x86_gen_mov_reg_imm32(f, map_x86_reg(dest), imm32);
     break;
   case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
+    x64_gen_mov_reg_imm32(f, map_x64_reg(dest), imm32);
     break;
   default:
     UNREACHABLE();
@@ -1283,6 +1308,11 @@ void x86_gen_shl_cl_w8(struct objfile *f, enum x86_reg8 dest) {
   b[0] = 0xD2;
   b[1] = mod_reg_rm(MOD11, 4, dest);
   objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void x64_gen_shr_cl_w64(struct objfile *f, enum x64_reg dest) {
+  (void)f, (void)dest;
+  TODO_IMPLEMENT;
 }
 
 void x86_gen_shr_cl_w32(struct objfile *f, enum x86_reg dest) {
@@ -3664,10 +3694,17 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_CONVERT_SIZE_TO_U32: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_U32: {
     gp_gen_loadPTR(f, GP_A, GP_BP, off0);
-    if (ptr_size(cs->arch) == 8) {
-      TODO_IMPLEMENT;
-    } else {
-      CHECK(ptr_size(cs->arch) == 4);
+    switch (cs->arch) {
+    case TARGET_ARCH_Y86:
+      break;
+    case TARGET_ARCH_X64: {
+      x64_gen_mov_reg64(f, X64_RDX, X64_RAX);
+      x64_gen_mov_reg_imm32(f, X64_RCX, 32);
+      x64_gen_shr_cl_w64(f, X64_RDX);
+      gen_crash_jcc(f, h, X86_JCC_NE);
+    } break;
+    default:
+      UNREACHABLE();
     }
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_SIZE: /* fallthrough */
@@ -3686,12 +3723,12 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
 
-    /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_I32_TO_U8: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
-    x86_gen_cmp_imm32(f, X86_EAX, 0xFF);
+    gp_gen_movzx32(f, GP_A, GP_BP, off0);
+    gp_gen_cmp_w32_imm32(f, GP_A, 0xFF);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
+    /* vvv chase x86 */
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_I8: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I32_TO_I8: {
     x86_gen_load32(f, X86_EAX, X86_EBP, off0);
