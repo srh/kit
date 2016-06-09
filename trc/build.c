@@ -1600,12 +1600,38 @@ void x86_gen_cmp_reg16_imm16(struct objfile *f, enum x86_reg16 lhs, int16_t imm1
   objfile_section_append_raw(objfile_text(f), b, 5);
 }
 
+void gp_gen_cmp_w16_imm16(struct objfile *f, enum gp_reg lhs, int16_t imm16) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_cmp_reg16_imm16(f, map_x86_reg16(lhs), imm16);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void x86_gen_cmp_reg8_imm8(struct objfile *f, enum x86_reg8 lhs, int8_t imm8) {
   uint8_t b[3];
   b[0] = 0x80;
   b[1] = mod_reg_rm(MOD11, 7, lhs);
   b[2] = (uint8_t)imm8;
   objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
+void gp_gen_cmp_w8_imm8(struct objfile *f, enum gp_reg lhs, int8_t imm8) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_cmp_reg8_imm8(f, map_x86_reg8(lhs), imm8);
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void x86_gen_xor_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
@@ -1656,6 +1682,19 @@ void x86_gen_neg_w32(struct objfile *f, enum x86_reg dest) {
   b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 3, dest);
   objfile_section_append_raw(objfile_text(f), b, 2);
+}
+
+void gp_gen_neg(struct objfile *f, enum gp_reg dest) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    x86_gen_neg_w32(f, map_x86_reg(dest));
+    break;
+  case TARGET_ARCH_X64:
+    TODO_IMPLEMENT;
+    break;
+  default:
+    UNREACHABLE();
+  }
 }
 
 void x86_gen_sub_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
@@ -3807,35 +3846,35 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movsx32(f, GP_A, GP_BP, off0);
   } break;
 
-  /* vvv chase x86 */
   case PRIMITIVE_OP_NEGATE_I8: {
-    x86_gen_movsx8(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movsx8(f, GP_A, GP_BP, off0);
     /* TODO: (Also in s2.) For this and the other negations, can't we
     just check OF after the fact?  I missed that in the docs on the
     first read? */
     /* Crashes if the value is INT8_MIN by subtracting 1 and
     overflowing. */
-    x86_gen_cmp_reg8_imm8(f, X86_AL, 1);
+    gp_gen_cmp_w8_imm8(f, GP_A, 1);
     gen_crash_jcc(f, h, X86_JCC_O);
-    x86_gen_neg_w32(f, X86_EAX);
+    gp_gen_neg(f, GP_A);
   } break;
   case PRIMITIVE_OP_NEGATE_I16: {
-    x86_gen_movsx16(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movsx16(f, GP_A, GP_BP, off0);
     /* Crashes if the value is INT16_MIN by subtracting 1 and
     overflowing. */
-    x86_gen_cmp_reg16_imm16(f, X86_AX, 1);
+    gp_gen_cmp_w16_imm16(f, GP_A, 1);
     gen_crash_jcc(f, h, X86_JCC_O);
-    x86_gen_neg_w32(f, X86_EAX);
+    gp_gen_neg(f, GP_A);
   } break;
   case PRIMITIVE_OP_NEGATE_I32: {
-    x86_gen_load32(f, X86_EAX, X86_EBP, off0);
+    gp_gen_movsx32(f, GP_A, GP_BP, off0);
     /* Crashes if the value is INT32_MIN by subtracting 1 and
     overflowing. */
-    x86_gen_cmp_imm32(f, X86_EAX, 1);
+    gp_gen_cmp_w32_imm32(f, GP_A, 1);
     gen_crash_jcc(f, h, X86_JCC_O);
-    x86_gen_neg_w32(f, X86_EAX);
+    gp_gen_neg(f, GP_A);
   } break;
 
+  /* vvv chase x86 */
   case PRIMITIVE_OP_LOGICAL_NOT: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_test_regs8(f, X86_AL, X86_AL);
