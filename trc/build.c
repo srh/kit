@@ -1737,12 +1737,18 @@ void x86_gen_sub_w8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
-void x86_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest, enum x86_setcc code) {
+void y86x64_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
+                         enum x86_setcc code) {
   uint8_t b[3];
   b[0] = 0x0F;
   b[1] = (uint8_t)code;
   b[2] = mod_reg_rm(MOD11, 0, dest);
   objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
+/* Either leaves upper bits unset or sets them to zero. */
+void gp_gen_setcc_b8(struct objfile *f, enum gp_reg dest, enum x86_setcc code) {
+  y86x64_gen_setcc_b8(f, map_x86_reg8(dest), code);
 }
 
 /* chase mark */
@@ -3500,7 +3506,7 @@ void gen_cmp32_behavior(struct objfile *f,
   x86_gen_load32(f, X86_EDX, X86_EBP, off0);
   x86_gen_load32(f, X86_ECX, X86_EBP, off1);
   x86_gen_cmp_w32(f, X86_EDX, X86_ECX);
-  x86_gen_setcc_b8(f, X86_AL, setcc_code);
+  y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
 
@@ -3510,7 +3516,7 @@ void gen_cmp16_behavior(struct objfile *f,
   x86_gen_movzx16(f, X86_EDX, X86_EBP, off0);
   x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
   x86_gen_cmp_w16(f, X86_DX, X86_CX);
-  x86_gen_setcc_b8(f, X86_AL, setcc_code);
+  y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
 
@@ -3520,7 +3526,7 @@ void gen_cmp8_behavior(struct objfile *f,
   x86_gen_movzx8(f, X86_EDX, X86_EBP, off0);
   x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
   x86_gen_cmp_w8(f, X86_DL, X86_CL);
-  x86_gen_setcc_b8(f, X86_AL, setcc_code);
+  y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
 
@@ -3874,13 +3880,13 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_neg(f, GP_A);
   } break;
 
-  /* vvv chase x86 */
   case PRIMITIVE_OP_LOGICAL_NOT: {
-    x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
-    x86_gen_test_regs8(f, X86_AL, X86_AL);
-    x86_gen_setcc_b8(f, X86_AL, X86_SETCC_Z);
+    gp_gen_movzx8(f, GP_A, GP_BP, off0);
+    gp_gen_test_regs(f, GP_A, GP_A);
+    gp_gen_setcc_b8(f, GP_A, X86_SETCC_Z);
   } break;
 
+  /* vvv chase x86 */
   case PRIMITIVE_OP_BIT_NOT_I8: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
