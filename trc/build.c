@@ -236,6 +236,19 @@ int platform_prefix_underscore(enum target_platform platform) {
   }
 }
 
+size_t place_rexw(uint8_t *b, enum target_arch arch) {
+  switch (arch) {
+  case TARGET_ARCH_Y86:
+    return 0;
+  case TARGET_ARCH_X64:
+    /* REX.W */
+    b[0] = 0x48;
+    return 1;
+  default:
+    UNREACHABLE();
+  }
+}
+
 /* Right now we don't worry about generating multiple objfiles, so we
 just blithely attach a serial number to each name to make them
 unique. */
@@ -1159,16 +1172,11 @@ void gp_gen_test_w32_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2)
 
 /* Tests the whole reg!!! */
 void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    y86x64_gen_test_regs32(f, map_x86_reg(reg1), map_x86_reg(reg2));
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
+  uint8_t b[3];
+  size_t insnbase = place_rexw(b, objfile_arch(f));
+  b[insnbase] = 0x85;
+  b[insnbase + 1] = mod_reg_rm(MOD11, reg2, reg1);
+  objfile_section_append_raw(objfile_text(f), b, insnbase + 2);
 }
 
 void x86_gen_test_regs8(struct objfile *f, enum x86_reg8 reg1, enum x86_reg8 reg2) {
@@ -1754,19 +1762,6 @@ void gen_placeholder_jcc(struct objfile *f, struct frame *h,
   uint8_t b[6] = { 0x0F, 0, 0, 0, 0, 0 };
   b[1] = code;
   objfile_section_append_raw(objfile_text(f), b, 6);
-}
-
-size_t place_rexw(uint8_t *b, enum target_arch arch) {
-  switch (arch) {
-  case TARGET_ARCH_Y86:
-    return 0;
-  case TARGET_ARCH_X64:
-    /* REX.W */
-    b[0] = 0x48;
-    return 1;
-  default:
-    UNREACHABLE();
-  }
 }
 
 /* chase mark */
