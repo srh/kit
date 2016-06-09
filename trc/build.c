@@ -1351,6 +1351,7 @@ void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
 }
 
 void y86x64_gen_add_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
+  check_y86x64(f);
   uint8_t b[2];
   b[0] = 0x01;
   b[1] = mod_reg_rm(MOD11, src, dest);
@@ -1418,6 +1419,7 @@ void x86_gen_alah_mul_w8(struct objfile *f, enum x86_reg8 src) {
 }
 
 void y86x64_gen_imul_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
+  check_y86x64(f);
   uint8_t b[3];
   b[0] = 0x0F;
   b[1] = 0xAF;
@@ -1523,20 +1525,29 @@ void x86_gen_cdq_w32(struct objfile *f) {
   objfile_section_append_raw(objfile_text(f), &b, 1);
 }
 
-void x86_gen_cmp_w32(struct objfile *f, enum x86_reg lhs, enum x86_reg rhs) {
+void y86x64_gen_cmp_w32(struct objfile *f, enum gp_reg lhs, enum gp_reg rhs) {
+  check_y86x64(f);
   uint8_t b[2];
   b[0] = 0x39;
   b[1] = mod_reg_rm(MOD11, rhs, lhs);
   objfile_section_append_raw(objfile_text(f), b, 2);
 }
 
+void x64_gen_cmp_w64(struct objfile *f, enum x64_reg lhs, enum x64_reg rhs) {
+  uint8_t b[3];
+  b[0] = kREXW;
+  b[1] = 0x39;
+  b[2] = mod_reg_rm(MOD11, rhs, lhs);
+  objfile_section_append_raw(objfile_text(f), b, 3);
+}
+
 void gp_gen_cmp_regs(struct objfile *f, enum gp_reg lhs, enum gp_reg rhs) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    x86_gen_cmp_w32(f, map_x86_reg(lhs), map_x86_reg(rhs));
+    y86x64_gen_cmp_w32(f, lhs, rhs);
     break;
   case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
+    x64_gen_cmp_w64(f, map_x64_reg(lhs), map_x64_reg(rhs));
     break;
   default:
     UNREACHABLE();
@@ -3511,7 +3522,7 @@ void gen_cmp32_behavior(struct objfile *f,
                         enum x86_setcc setcc_code) {
   x86_gen_load32(f, X86_EDX, X86_EBP, off0);
   x86_gen_load32(f, X86_ECX, X86_EBP, off1);
-  x86_gen_cmp_w32(f, X86_EDX, X86_ECX);
+  y86x64_gen_cmp_w32(f, GP_D, GP_C);
   y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
