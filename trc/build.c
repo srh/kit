@@ -1999,6 +1999,7 @@ void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
   frame_restore_offset(h, stack_offset);
 }
 
+/* chase x86 */
 int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct frame *h,
                              enum typetrav_func tf, struct loc dest, struct loc src,
                              struct typeexpr_traits *traits,
@@ -2107,6 +2108,7 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
                        enum typetrav_func tf, struct loc dest, int has_src,
                        struct loc src, struct ast_typeexpr *type);
 
+/* chase x86 */
 void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                            enum typetrav_func tf, struct loc dest, int has_src,
                            struct loc src, struct ast_deftype_rhs *rhs) {
@@ -2232,7 +2234,7 @@ int try_gen_trivial_typetrav_func(struct checkstate *cs, struct objfile *f,
   return 0;
 }
 
-/* chase x86 */
+/* chase mark */
 void really_gen_typetrav_behavior(struct checkstate *cs, struct objfile *f,
                                   struct frame *h, enum typetrav_func tf,
                                   struct loc dest, int has_src,
@@ -6066,8 +6068,7 @@ void build_typetrav_defs(struct checkstate *cs,
         x64_gen_store_register(f, srcptr, x64_param_regs[1], X64_RAX);
         src = ebp_indirect_loc(sz, sz, srcptr.u.ebp_offset);
       } else {
-        /* Initialize with a garbage value to appease the compiler. */
-        memset(&src, 0, sizeof(src));
+        src.tag = (enum loc_tag)-1;
       }
       really_gen_typetrav_behavior(cs, f, &h, info->func, dest, has_src, src,
                                    &info->type);
