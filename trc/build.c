@@ -1374,6 +1374,12 @@ void ia_gen_alah_div_w8(struct objfile *f, enum x86_reg8 denom) {
   apptext(f, b, 2);
 }
 
+void ia_gen_azdz_idiv(struct objfile *f, enum gp_reg denom, enum oz oz) {
+  CHECK(oz != OZ_8);
+  ia_prefix(f, 0xF7, oz);
+  pushtext(f, mod_reg_rm(MOD11, 7, denom));
+}
+
 void x86_gen_eaxedx_idiv_w32(struct objfile *f, enum x86_reg denom) {
   uint8_t b[2];
   /* MUL, DIV, IDIV have different modr/m opcode. */
@@ -3959,14 +3965,14 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
     gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     x86_gen_cwd_w16(f);
-    ia_gen_axdx_idiv_w16(f, X86_CX);
+    ia_gen_azdz_idiv(f, GP_C, OZ_16);
     /* Divide by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_MOD_I16: {
     gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
     gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     x86_gen_cwd_w16(f);
-    ia_gen_axdx_idiv_w16(f, X86_CX);
+    ia_gen_azdz_idiv(f, GP_C, OZ_16);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
   } break;
   case PRIMITIVE_OP_LT_I16: {
@@ -4161,14 +4167,14 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
     x86_gen_cdq_w32(f);
-    x86_gen_eaxedx_idiv_w32(f, X86_ECX);
+    ia_gen_azdz_idiv(f, GP_C, OZ_32);
     /* Divide by zero or INT32_MIN / -1 will produce #DE. */
   } break;
   case PRIMITIVE_OP_MOD_I32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
     x86_gen_cdq_w32(f);
-    x86_gen_eaxedx_idiv_w32(f, X86_ECX);
+    ia_gen_azdz_idiv(f, GP_C, OZ_32);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
     /* Divide by zero or INT32_MIN / -1 will produce #DE. */
   } break;
