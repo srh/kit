@@ -1428,48 +1428,9 @@ void x86_gen_cdq_w32(struct objfile *f) {
   pushtext(f, 0x99);
 }
 
-void y86x64_gen_cmp_w32(struct objfile *f, enum gp_reg lhs, enum gp_reg rhs) {
-  check_y86x64(f);
-  uint8_t b[2];
-  b[0] = 0x39;
-  b[1] = mod_reg_rm(MOD11, rhs, lhs);
-  apptext(f, b, 2);
-}
-
-void x64_gen_cmp_w64(struct objfile *f, enum x64_reg lhs, enum x64_reg rhs) {
-  uint8_t b[3];
-  b[0] = kREXW;
-  b[1] = 0x39;
-  b[2] = mod_reg_rm(MOD11, rhs, lhs);
-  apptext(f, b, 3);
-}
-
-void gp_gen_cmp_regs(struct objfile *f, enum gp_reg lhs, enum gp_reg rhs) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    y86x64_gen_cmp_w32(f, lhs, rhs);
-    break;
-  case TARGET_ARCH_X64:
-    x64_gen_cmp_w64(f, map_x64_reg(lhs), map_x64_reg(rhs));
-    break;
-  default:
-    UNREACHABLE();
-  }
-}
-
-void x86_gen_cmp_w16(struct objfile *f, enum x86_reg16 lhs, enum x86_reg16 rhs) {
-  uint8_t b[3];
-  b[0] = 0x66;
-  b[1] = 0x39;
-  b[2] = mod_reg_rm(MOD11, rhs, lhs);
-  apptext(f, b, 3);
-}
-
-void x86_gen_cmp_w8(struct objfile *f, enum x86_reg8 lhs, enum x86_reg8 rhs) {
-  uint8_t b[2];
-  b[0] = 0x38;
-  b[1] = mod_reg_rm(MOD11, rhs, lhs);
-  apptext(f, b, 2);
+void ia_gen_cmp(struct objfile *f, enum gp_reg lhs, enum gp_reg rhs, enum oz oz) {
+  ia_prefix(f, 0x39, oz);
+  pushtext(f, mod_reg_rm(MOD11, rhs, lhs));
 }
 
 void y86x64_gen_cmp_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
@@ -3446,7 +3407,7 @@ void gen_cmp32_behavior(struct objfile *f,
                         enum x86_setcc setcc_code) {
   y86x64_gen_movzx32(f, GP_D, GP_BP, off0);
   y86x64_gen_movzx32(f, GP_C, GP_BP, off1);
-  y86x64_gen_cmp_w32(f, GP_D, GP_C);
+  ia_gen_cmp(f, GP_D, GP_C, OZ_32);
   y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
@@ -3456,7 +3417,7 @@ void gen_cmp16_behavior(struct objfile *f,
                         enum x86_setcc setcc_code) {
   x86_gen_movzx16(f, X86_EDX, X86_EBP, off0);
   x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-  x86_gen_cmp_w16(f, X86_DX, X86_CX);
+  ia_gen_cmp(f, GP_D, GP_C, OZ_16);
   y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
@@ -3466,7 +3427,7 @@ void gen_cmp8_behavior(struct objfile *f,
                        enum x86_setcc setcc_code) {
   x86_gen_movzx8(f, X86_EDX, X86_EBP, off0);
   x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-  x86_gen_cmp_w8(f, X86_DL, X86_CL);
+  ia_gen_cmp(f, GP_D, GP_C, OZ_8);
   y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
   x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
 }
@@ -5038,7 +4999,7 @@ void gen_assignment(struct checkstate *cs, struct objfile *f,
   size_t target_number = frame_add_target(h);
   gp_gen_load_addressof(f, GP_C, lhs_loc);
   gp_gen_load_addressof(f, GP_D, rhs_loc);
-  gp_gen_cmp_regs(f, GP_D, GP_C);
+  ia_gen_cmp(f, GP_D, GP_C, ptr_oz(f));
   gen_placeholder_jcc(f, h, X86_JCC_Z, target_number);
 
   /* Okay, memory locations aren't equal. */
