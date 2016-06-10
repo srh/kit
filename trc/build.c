@@ -153,6 +153,10 @@ enum oz ptr_oz(struct objfile *f) {
   }
 }
 
+int ptr_size_bits(struct objfile *f) {
+  return 8 << ptr_oz(f);
+}
+
 void check_y86x64(struct objfile *f) {
   (void)f;
   /* A no-op -- f->arch must be one of TARGET_ARCH_Y86 or TARGET_ARCH_X64. */
@@ -3655,22 +3659,19 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_sub_primop(f, h, off0, off1, OZ_8, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_MUL_U8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
     ia_gen_alah_mul_w8(f, X86_CL);
     gen_crash_jcc(f, h, X86_JCC_C);
     ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
   case PRIMITIVE_OP_DIV_U8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
     ia_gen_alah_div_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
     ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
   case PRIMITIVE_OP_MOD_U8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
     ia_gen_alah_div_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
     ia_gen_mov_reg8(f, X86_AL, X86_AH);
@@ -3966,15 +3967,22 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_SUB_U32: {
     gen_sub_primop(f, h, off0, off1, OZ_32, X86_JCC_C);
   } break;
-  /* vvv chase x86 */
-  case PRIMITIVE_OP_MUL_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_MUL_SIZE: {
+    gen_movzx_ac(f, off0, off1, ptr_oz(f));
+    ia_gen_azdz_mul(f, GP_C, ptr_oz(f));
+    gen_crash_jcc(f, h, X86_JCC_C);
+  } break;
   case PRIMITIVE_OP_MUL_U32: {
     gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_azdz_mul(f, GP_C, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_DIV_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_DIV_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_DIV_OSIZE: {
+    gen_movzx_ac(f, off0, off1, ptr_oz(f));
+    ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
+    ia_gen_azdz_div(f, GP_C, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_DIV_U32: {
     gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
@@ -3982,64 +3990,98 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     /* Divide by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_MOD_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_MOD_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_MOD_OSIZE: {
+    gen_movzx_ac(f, off0, off1, ptr_oz(f));
+    ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
+    ia_gen_azdz_div(f, GP_C, ptr_oz(f));
+    gp_gen_mov_reg(f, GP_A, GP_D);
+  } break;
   case PRIMITIVE_OP_MOD_U32: {
     gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
     ia_gen_azdz_div(f, GP_C, OZ_32);
-    x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
+    gp_gen_mov_reg(f, GP_A, GP_D);
     /* Modulus by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_LT_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_LT_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_LT_OSIZE: {
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_B, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_LT_U32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_B);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_B, OZ_32);
   } break;
   case PRIMITIVE_OP_LE_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_LE_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_LE_OSIZE: {
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_BE, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_LE_U32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_BE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_BE, OZ_32);
   } break;
   case PRIMITIVE_OP_GT_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_GT_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_GT_OSIZE: {
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_A, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_GT_U32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_A);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_A, OZ_32);
   } break;
   case PRIMITIVE_OP_GE_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_GE_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_GE_OSIZE: {
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_AE, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_GE_U32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_AE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_AE, OZ_32);
   } break;
   case PRIMITIVE_OP_EQ_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_EQ_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_EQ_OSIZE: {
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_E, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_EQ_U32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_E, OZ_32);
   } break;
   case PRIMITIVE_OP_NE_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_NE_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_NE_OSIZE: {
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_NE, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_NE_U32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_NE, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_XOR_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_BIT_XOR_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_BIT_XOR_OSIZE: {
+    gen_movzx_ac(f, off0, off1, ptr_oz(f));
+    ia_gen_xor(f, GP_A, GP_C, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_BIT_XOR_U32: {
     gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_xor(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_OR_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_BIT_OR_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_BIT_OR_OSIZE: {
+    gen_movzx_ac(f, off0, off1, ptr_oz(f));
+    ia_gen_or(f, GP_A, GP_C, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_BIT_OR_U32: {
     gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_or(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_AND_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_BIT_AND_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_BIT_AND_OSIZE: {
+    gen_movzx_ac(f, off0, off1, ptr_oz(f));
+    ia_gen_and(f, GP_A, GP_C, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_BIT_AND_U32: {
     gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_and(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_BIT_LEFTSHIFT_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_BIT_LEFTSHIFT_OSIZE: {
+    gen_movzx_ac(f, off0, off1, ptr_oz(f));
+
+    /* We handle out-of-range rhs, that's all. */
+    ia_gen_cmp_imm(f, GP_C, ptr_size_bits(f) - 1, ptr_oz(f));
+    gen_crash_jcc(f, h, X86_JCC_A);
+
+    ia_gen_shl_cl(f, GP_A, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U32: {
     gen_movzx_ac(f, off0, off1, OZ_32);
 
@@ -4050,7 +4092,15 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_shl_cl(f, GP_A, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_BIT_RIGHTSHIFT_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_BIT_RIGHTSHIFT_OSIZE: {
+    gen_movzx_ac(f, off0, off1, ptr_oz(f));
+
+    /* We handle out-of-range rhs, that's all. */
+    ia_gen_cmp_imm(f, GP_C, ptr_size_bits(f) - 1, ptr_oz(f));
+    gen_crash_jcc(f, h, X86_JCC_A);
+
+    ia_gen_shr_cl(f, GP_A, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32: {
     gen_movzx_ac(f, off0, off1, OZ_32);
 
@@ -4082,26 +4132,26 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_cwdqo(f, OZ_32);
     ia_gen_azdz_idiv(f, GP_C, OZ_32);
-    x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
+    gp_gen_mov_reg(f, GP_A, GP_D);
     /* Divide by zero or INT32_MIN / -1 will produce #DE. */
   } break;
   case PRIMITIVE_OP_LT_I32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_L);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_L, OZ_32);
   } break;
   case PRIMITIVE_OP_LE_I32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_LE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_LE, OZ_32);
   } break;
   case PRIMITIVE_OP_GT_I32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_G);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_G, OZ_32);
   } break;
   case PRIMITIVE_OP_GE_I32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_GE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_GE, OZ_32);
   } break;
   case PRIMITIVE_OP_EQ_I32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_E, OZ_32);
   } break;
   case PRIMITIVE_OP_NE_I32: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_NE, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_XOR_I32: {
     gen_movzx_ac(f, off0, off1, OZ_32);
@@ -4142,7 +4192,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_MUL_OSIZE: {
     gen_movzx_ac(f, off0, off1, ptr_oz(f));
-    ia_gen_azdz_mul(f, GP_C, OZ_32);
+    ia_gen_azdz_mul(f, GP_C, ptr_oz(f));
   } break;
 
   default:
