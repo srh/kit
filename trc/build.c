@@ -3741,25 +3741,21 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_BIT_XOR_BOOL: /* fallthrough */
   case PRIMITIVE_OP_BIT_XOR_U8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
     ia_gen_xor(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_OR_BOOL: /* fallthrough */
   case PRIMITIVE_OP_BIT_OR_U8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
     ia_gen_or(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_AND_BOOL: /* fallthrough */
   case PRIMITIVE_OP_BIT_AND_U8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
     ia_gen_and(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 7, OZ_8);
@@ -3768,8 +3764,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_shl_cl(f, GP_A, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 7, OZ_8);
@@ -3785,22 +3780,19 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_sub_primop(f, h, off0, off1, OZ_8, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
     ia_gen_alah_imul_w8(f, X86_CL);
     gen_crash_jcc(f, h, X86_JCC_O);
     ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
   case PRIMITIVE_OP_DIV_I8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
     ia_gen_alah_idiv_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
     ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
   case PRIMITIVE_OP_MOD_I8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
     ia_gen_alah_idiv_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
     ia_gen_mov_reg8(f, X86_AL, X86_AH);
@@ -3825,23 +3817,19 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_cmp_behavior(f, off0, off1, X86_SETCC_NE, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_XOR_I8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
     ia_gen_xor(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_OR_I8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
     ia_gen_or(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_AND_I8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
     ia_gen_and(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_I8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 7, OZ_8);
@@ -3850,8 +3838,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_shl_cl(f, GP_A, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_I8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    gen_movzx_ac(f, off0, off1, OZ_8);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 7, OZ_8);
@@ -3867,21 +3854,18 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_sub_primop(f, h, off0, off1, OZ_16, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_MUL_U16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_axdx_mul_w16(f, X86_CX);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_DIV_U16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
     ia_gen_axdx_div_w16(f, X86_CX);
     /* Divide by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_MOD_U16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
     ia_gen_axdx_div_w16(f, X86_CX);
     /* Divide by zero will produce #DE. (I guess.) */
@@ -3907,23 +3891,19 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_cmp_behavior(f, off0, off1, X86_SETCC_NE, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_XOR_U16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_xor(f, GP_A, GP_C, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_OR_U16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_or(f, GP_A, GP_C, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_AND_U16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_and(f, GP_A, GP_C, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 15, OZ_16);
@@ -3932,8 +3912,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_shl_cl(f, GP_A, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 15, OZ_16);
@@ -3949,21 +3928,18 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_sub_primop(f, h, off0, off1, OZ_16, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_imul(f, GP_A, GP_C, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_DIV_I16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_cwdqo(f, OZ_16);
     ia_gen_azdz_idiv(f, GP_C, OZ_16);
     /* Divide by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_MOD_I16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_cwdqo(f, OZ_16);
     ia_gen_azdz_idiv(f, GP_C, OZ_16);
     ia_gen_mov(f, GP_A, GP_D, ptr_oz(f));
@@ -3987,23 +3963,19 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_cmp_behavior(f, off0, off1, X86_SETCC_NE, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_XOR_I16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_xor(f, GP_A, GP_C, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_OR_I16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_or(f, GP_A, GP_C, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_AND_I16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_and(f, GP_A, GP_C, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_I16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 15, OZ_16);
@@ -4012,8 +3984,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_shl_cl(f, GP_A, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_I16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    gen_movzx_ac(f, off0, off1, OZ_16);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 15, OZ_16);
@@ -4037,16 +4008,14 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   /* vvv chase x86 */
   case PRIMITIVE_OP_MUL_SIZE: /* fallthrough */
   case PRIMITIVE_OP_MUL_U32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
     x86_gen_eaxedx_mul_w32(f, X86_ECX);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_DIV_SIZE: /* fallthrough */
   case PRIMITIVE_OP_DIV_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_DIV_U32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
     x86_gen_eaxedx_div_w32(f, X86_ECX);
     /* Divide by zero will produce #DE. (I guess.) */
@@ -4054,8 +4023,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_MOD_SIZE: /* fallthrough */
   case PRIMITIVE_OP_MOD_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_MOD_U32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
     x86_gen_eaxedx_div_w32(f, X86_ECX);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
@@ -4094,29 +4062,25 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_XOR_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_XOR_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_XOR_U32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_xor(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_OR_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_OR_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_OR_U32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_or(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_AND_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_AND_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_AND_U32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_and(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_LEFTSHIFT_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 31, OZ_32);
@@ -4127,8 +4091,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 31, OZ_32);
@@ -4144,21 +4107,18 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_sub_primop(f, h, off0, off1, OZ_32, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_imul(f, GP_A, GP_C, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_DIV_I32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_cwdqo(f, OZ_32);
     ia_gen_azdz_idiv(f, GP_C, OZ_32);
     /* Divide by zero or INT32_MIN / -1 will produce #DE. */
   } break;
   case PRIMITIVE_OP_MOD_I32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_cwdqo(f, OZ_32);
     ia_gen_azdz_idiv(f, GP_C, OZ_32);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
@@ -4183,23 +4143,19 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
   } break;
   case PRIMITIVE_OP_BIT_XOR_I32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_xor(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_OR_I32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_or(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_AND_I32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_and(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_I32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 31, OZ_32);
@@ -4208,8 +4164,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_shl_cl(f, GP_A, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_I32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, OZ_32);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 31, OZ_32);
@@ -4225,8 +4180,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_sub_primop(f, h, off0, off1, ptr_oz(f), 0);
   } break;
   case PRIMITIVE_OP_MUL_OSIZE: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
+    gen_movzx_ac(f, off0, off1, ptr_oz(f));
     x86_gen_eaxedx_mul_w32(f, X86_ECX);
   } break;
 
