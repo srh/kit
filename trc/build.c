@@ -1478,34 +1478,9 @@ void ia_gen_neg(struct objfile *f, enum gp_reg dest, enum oz oz) {
   pushtext(f, mod_reg_rm(MOD11, 3, dest));
 }
 
-void y86x64_gen_sub_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
-  check_y86x64(f);
-  uint8_t b[2];
-  b[0] = 0x29;
-  b[1] = mod_reg_rm(MOD11, src, dest);
-  apptext(f, b, 2);
-}
-
-void x64_gen_sub_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
-  check_y86x64(f);
-  uint8_t b[3];
-  b[0] = kREXW;
-  b[1] = 0x29;
-  b[2] = mod_reg_rm(MOD11, src, dest);
-  apptext(f, b, 3);
-}
-
-void gp_gen_sub(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    y86x64_gen_sub_w32(f, dest, src);
-    break;
-  case TARGET_ARCH_X64:
-    x64_gen_sub_w64(f, map_x64_reg(dest), map_x64_reg(src));
-    break;
-  default:
-    UNREACHABLE();
-  }
+void ia_gen_sub(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
+  ia_prefix(f, 0x29, oz);
+  pushtext(f, mod_reg_rm(MOD11, src, dest));
 }
 
 void x64_gen_sub_w64_imm32(struct objfile *f, enum x64_reg dest, int32_t imm) {
@@ -1516,21 +1491,6 @@ void x64_gen_sub_w64_imm32(struct objfile *f, enum x64_reg dest, int32_t imm) {
   b[2] = mod_reg_rm(MOD11, 5, dest);
   write_le_i32(b + 3, imm);
   apptext(f, b, 7);
-}
-
-void x86_gen_sub_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
-  uint8_t b[3];
-  b[0] = 0x66;
-  b[1] = 0x29;
-  b[2] = mod_reg_rm(MOD11, src, dest);
-  apptext(f, b, 3);
-}
-
-void x86_gen_sub_w8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
-  uint8_t b[2];
-  b[0] = 0x28;
-  b[1] = mod_reg_rm(MOD11, src, dest);
-  apptext(f, b, 2);
 }
 
 void y86x64_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
@@ -3723,7 +3683,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_SUB_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-    x86_gen_sub_w8(f, X86_AL, X86_CL);
+    ia_gen_sub(f, GP_A, GP_C, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_MUL_U8: {
@@ -3820,7 +3780,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_SUB_I8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-    x86_gen_sub_w8(f, X86_AL, X86_CL);
+    ia_gen_sub(f, GP_A, GP_C, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I8: {
@@ -3908,7 +3868,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_SUB_U16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-    x86_gen_sub_w16(f, X86_AX, X86_CX);
+    ia_gen_sub(f, GP_A, GP_C, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_MUL_U16: {
@@ -3996,7 +3956,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_SUB_I16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-    x86_gen_sub_w16(f, X86_AX, X86_CX);
+    ia_gen_sub(f, GP_A, GP_C, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I16: {
@@ -4084,7 +4044,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_SUB_U32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    y86x64_gen_sub_w32(f, GP_A, GP_C);
+    ia_gen_sub(f, GP_A, GP_C, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_MUL_SIZE: /* fallthrough */
@@ -4198,7 +4158,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_SUB_I32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    y86x64_gen_sub_w32(f, GP_A, GP_C);
+    ia_gen_sub(f, GP_A, GP_C, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I32: {
@@ -4284,7 +4244,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_SUB_OSIZE: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    y86x64_gen_sub_w32(f, GP_A, GP_C);
+    ia_gen_sub(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_MUL_OSIZE: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
@@ -5907,7 +5867,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       /* We carefully make the 0 tag and nonsense tag values redirect
       to the crash branch. */
       gp_gen_mov_reg_imm32(f, GP_C, FIRST_ENUM_TAG_NUMBER);
-      gp_gen_sub(f, GP_A, GP_C);
+      ia_gen_sub(f, GP_A, GP_C, OZ_32);
       CHECK(4 == enum_tag_size(cs->arch));
       ia_gen_cmp_imm(f, GP_A,
                      size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.u.default_pattern.info).value),
