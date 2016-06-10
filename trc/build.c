@@ -1320,7 +1320,7 @@ void x86_gen_eaxedx_mul_w32(struct objfile *f, enum x86_reg src) {
   apptext(f, b, 2);
 }
 
-void x86_gen_axdx_mul_w16(struct objfile *f, enum x86_reg16 src) {
+void ia_gen_axdx_mul_w16(struct objfile *f, enum x86_reg16 src) {
   uint8_t b[3];
   /* MUL, DIV, IDIV have different modr/m opcode. */
   b[0] = 0x66;
@@ -1336,44 +1336,11 @@ void ia_gen_alah_mul_w8(struct objfile *f, enum x86_reg8 src) {
   apptext(f, b, 2);
 }
 
-void y86x64_gen_imul_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
-  check_y86x64(f);
-  uint8_t b[3];
-  b[0] = 0x0F;
-  b[1] = 0xAF;
-  b[2] = mod_reg_rm(MOD11, dest, src);
-  apptext(f, b, 3);
-}
-
-void x64_gen_imul_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
-  uint8_t b[4];
-  b[0] = kREXW;
-  b[1] = 0x0F;
-  b[2] = 0xAF;
-  b[3] = mod_reg_rm(MOD11, dest, src);
-  apptext(f, b, 4);
-}
-
-void gp_gen_imul_wPTR(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    y86x64_gen_imul_w32(f, dest, src);
-    break;
-  case TARGET_ARCH_X64:
-    x64_gen_imul_w64(f, map_x64_reg(dest), map_x64_reg(src));
-    break;
-  default:
-    UNREACHABLE();
-  }
-}
-
-void x86_gen_imul_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
-  uint8_t b[4];
-  b[0] = 0x66;
-  b[1] = 0x0F;
-  b[2] = 0xAF;
-  b[3] = mod_reg_rm(MOD11, dest, src);
-  apptext(f, b, 4);
+void ia_gen_imul(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
+  CHECK(oz != OZ_8);
+  ia_prefix(f, 0x0F, oz);
+  pushtext(f, 0xAF);
+  pushtext(f, mod_reg_rm(MOD11, dest, src));
 }
 
 void ia_gen_alah_imul_w8(struct objfile *f, enum x86_reg8 src) {
@@ -1391,7 +1358,7 @@ void x86_gen_eaxedx_div_w32(struct objfile *f, enum x86_reg denom) {
   apptext(f, b, 2);
 }
 
-void x86_gen_axdx_div_w16(struct objfile *f, enum x86_reg16 denom) {
+void ia_gen_axdx_div_w16(struct objfile *f, enum x86_reg16 denom) {
   uint8_t b[3];
   /* MUL, DIV, IDIV have different modr/m opcode. */
   b[0] = 0x66;
@@ -1415,7 +1382,7 @@ void x86_gen_eaxedx_idiv_w32(struct objfile *f, enum x86_reg denom) {
   apptext(f, b, 2);
 }
 
-void x86_gen_axdx_idiv_w16(struct objfile *f, enum x86_reg16 denom) {
+void ia_gen_axdx_idiv_w16(struct objfile *f, enum x86_reg16 denom) {
   uint8_t b[3];
   /* MUL, DIV, IDIV have different modr/m opcode. */
   b[0] = 0x66;
@@ -3730,7 +3697,6 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_mov_reg8(f, X86_AL, X86_AH);
     ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
-  /* vvv chase x86 */
   case PRIMITIVE_OP_LT_BOOL: /* fallthrough */
   case PRIMITIVE_OP_LT_U8: {
     gen_cmp_behavior(f, off0, off1, X86_SETCC_B, OZ_8);
@@ -3883,75 +3849,75 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
 
   case PRIMITIVE_OP_ADD_U16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     ia_gen_add(f, GP_A, GP_C, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_SUB_U16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     ia_gen_sub(f, GP_A, GP_C, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_MUL_U16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
-    x86_gen_axdx_mul_w16(f, X86_CX);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    ia_gen_axdx_mul_w16(f, X86_CX);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_DIV_U16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
-    x86_gen_axdx_div_w16(f, X86_CX);
+    ia_gen_axdx_div_w16(f, X86_CX);
     /* Divide by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_MOD_U16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
-    x86_gen_axdx_div_w16(f, X86_CX);
+    ia_gen_axdx_div_w16(f, X86_CX);
     /* Divide by zero will produce #DE. (I guess.) */
-    x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
+    ia_gen_mov(f, GP_A, GP_D, ptr_oz(f));
   } break;
   case PRIMITIVE_OP_LT_U16: {
-    gen_cmp16_behavior(f, off0, off1, X86_SETCC_B);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_B, OZ_16);
   } break;
   case PRIMITIVE_OP_LE_U16: {
-    gen_cmp16_behavior(f, off0, off1, X86_SETCC_BE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_BE, OZ_16);
   } break;
   case PRIMITIVE_OP_GT_U16: {
-    gen_cmp16_behavior(f, off0, off1, X86_SETCC_A);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_A, OZ_16);
   } break;
   case PRIMITIVE_OP_GE_U16: {
-    gen_cmp16_behavior(f, off0, off1, X86_SETCC_AE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_AE, OZ_16);
   } break;
   case PRIMITIVE_OP_EQ_U16: {
-    gen_cmp16_behavior(f, off0, off1, X86_SETCC_E);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_E, OZ_16);
 
   } break;
   case PRIMITIVE_OP_NE_U16: {
-    gen_cmp16_behavior(f, off0, off1, X86_SETCC_NE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_NE, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_XOR_U16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
-    ia_gen_xor(f, GP_A, GP_C, OZ_32);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    ia_gen_xor(f, GP_A, GP_C, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_OR_U16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
-    ia_gen_or(f, GP_A, GP_C, OZ_32);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    ia_gen_or(f, GP_A, GP_C, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_AND_U16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
-    ia_gen_and(f, GP_A, GP_C, OZ_32);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    ia_gen_and(f, GP_A, GP_C, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 15, OZ_16);
@@ -3960,8 +3926,8 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_shl_cl(f, GP_A, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 15, OZ_16);
@@ -3971,35 +3937,36 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
 
   case PRIMITIVE_OP_ADD_I16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     ia_gen_add(f, GP_A, GP_C, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_SUB_I16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     ia_gen_sub(f, GP_A, GP_C, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
-    x86_gen_imul_w16(f, X86_AX, X86_CX);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
+    ia_gen_imul(f, GP_A, GP_C, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
+  /* vvv chase x86 */
   case PRIMITIVE_OP_DIV_I16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     x86_gen_cwd_w16(f);
-    x86_gen_axdx_idiv_w16(f, X86_CX);
+    ia_gen_axdx_idiv_w16(f, X86_CX);
     /* Divide by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_MOD_I16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     x86_gen_cwd_w16(f);
-    x86_gen_axdx_idiv_w16(f, X86_CX);
+    ia_gen_axdx_idiv_w16(f, X86_CX);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
   } break;
   case PRIMITIVE_OP_LT_I16: {
@@ -4021,23 +3988,23 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_cmp16_behavior(f, off0, off1, X86_SETCC_NE);
   } break;
   case PRIMITIVE_OP_BIT_XOR_I16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     ia_gen_xor(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_OR_I16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     ia_gen_or(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_AND_I16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
     ia_gen_and(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_I16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 15, OZ_16);
@@ -4046,8 +4013,8 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_shl_cl(f, GP_A, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_I16: {
-    gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_movzx16(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 15, OZ_16);
@@ -4187,7 +4154,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_MUL_I32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    y86x64_gen_imul_w32(f, GP_A, GP_C);
+    ia_gen_imul(f, GP_A, GP_C, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_DIV_I32: {
@@ -4780,7 +4747,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   gp_gen_load_register(f, GP_A, rhs_loc);
 
   gp_gen_mov_reg_imm32(f, GP_C, elem_size);
-  gp_gen_imul_wPTR(f, GP_A, GP_C);
+  ia_gen_imul(f, GP_A, GP_C, ptr_oz(f));
   gen_crash_jcc(f, h, X86_JCC_O);
 
   ia_gen_add(f, GP_A, GP_D, ptr_oz(f));
