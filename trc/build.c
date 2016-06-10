@@ -1183,7 +1183,7 @@ void gp_gen_mov_reg(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   ia_gen_mov(f, dest, src, ptr_oz(f));
 }
 
-void x86_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
+void ia_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
   uint8_t b[2];
   b[0] = 0x8A;
   b[1] = mod_reg_rm(MOD11, dest, src);
@@ -1329,7 +1329,7 @@ void x86_gen_axdx_mul_w16(struct objfile *f, enum x86_reg16 src) {
   apptext(f, b, 3);
 }
 
-void x86_gen_alah_mul_w8(struct objfile *f, enum x86_reg8 src) {
+void ia_gen_alah_mul_w8(struct objfile *f, enum x86_reg8 src) {
   uint8_t b[2];
   b[0] = 0xF6;
   b[1] = mod_reg_rm(MOD11, 4, src);
@@ -1376,7 +1376,7 @@ void x86_gen_imul_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src
   apptext(f, b, 4);
 }
 
-void x86_gen_alah_imul_w8(struct objfile *f, enum x86_reg8 src) {
+void ia_gen_alah_imul_w8(struct objfile *f, enum x86_reg8 src) {
   uint8_t b[2];
   b[0] = 0xF6;
   b[1] = mod_reg_rm(MOD11, 5, src);
@@ -1400,7 +1400,7 @@ void x86_gen_axdx_div_w16(struct objfile *f, enum x86_reg16 denom) {
   apptext(f, b, 3);
 }
 
-void x86_gen_alah_div_w8(struct objfile *f, enum x86_reg8 denom) {
+void ia_gen_alah_div_w8(struct objfile *f, enum x86_reg8 denom) {
   uint8_t b[2];
   b[0] = 0xF6;
   b[1] = mod_reg_rm(MOD11, 6, denom);
@@ -1424,7 +1424,7 @@ void x86_gen_axdx_idiv_w16(struct objfile *f, enum x86_reg16 denom) {
   apptext(f, b, 3);
 }
 
-void x86_gen_alah_idiv_w8(struct objfile *f, enum x86_reg8 denom) {
+void ia_gen_alah_idiv_w8(struct objfile *f, enum x86_reg8 denom) {
   uint8_t b[2];
   b[0] = 0xF6;
   b[1] = mod_reg_rm(MOD11, 7, denom);
@@ -1796,7 +1796,7 @@ void gp_gen_movsx16(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
   }
 }
 
-void x86_gen_movzx8_reg8(struct objfile *f, enum x86_reg dest, enum x86_reg8 src) {
+void ia_gen_movzx8_reg8(struct objfile *f, enum gp_reg dest, enum x86_reg8 src) {
   uint8_t b[3];
   b[0] = 0x0F;
   b[1] = 0xB6;
@@ -3277,7 +3277,7 @@ void gen_cmp_behavior(struct objfile *f,
   gp_gen_movzx(f, GP_C, GP_BP, off1, oz);
   ia_gen_cmp(f, GP_D, GP_C, oz);
   y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
-  x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+  ia_gen_movzx8_reg8(f, GP_A, X86_AL);
 }
 
 /* TODO(): Check callers of this for use on pointers, where cmp64 might be what we want. */
@@ -3289,7 +3289,7 @@ void gen_cmp32_behavior(struct objfile *f,
   gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_32);
   ia_gen_cmp(f, GP_D, GP_C, OZ_32);
   y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
-  x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+  ia_gen_movzx8_reg8(f, GP_A, X86_AL);
 }
 
 void gen_cmp16_behavior(struct objfile *f,
@@ -3299,7 +3299,7 @@ void gen_cmp16_behavior(struct objfile *f,
   gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
   ia_gen_cmp(f, GP_D, GP_C, OZ_16);
   y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
-  x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+  ia_gen_movzx8_reg8(f, GP_A, X86_AL);
 }
 
 void gen_cmp8_behavior(struct objfile *f,
@@ -3309,7 +3309,7 @@ void gen_cmp8_behavior(struct objfile *f,
   gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
   ia_gen_cmp(f, GP_D, GP_C, OZ_8);
   y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
-  x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+  ia_gen_movzx8_reg8(f, GP_A, X86_AL);
 }
 
 /* chase mark */
@@ -3708,29 +3708,29 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_sub(f, GP_A, GP_C, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
-  /* vvv chase x86 */
   case PRIMITIVE_OP_MUL_U8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
-    x86_gen_alah_mul_w8(f, X86_CL);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    ia_gen_alah_mul_w8(f, X86_CL);
     gen_crash_jcc(f, h, X86_JCC_C);
-    x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+    ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
   case PRIMITIVE_OP_DIV_U8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
-    x86_gen_alah_div_w8(f, X86_CL);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    ia_gen_alah_div_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
-    x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+    ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
   case PRIMITIVE_OP_MOD_U8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
-    x86_gen_alah_div_w8(f, X86_CL);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
+    ia_gen_alah_div_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
-    x86_gen_mov_reg8(f, X86_AL, X86_AH);
-    x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+    ia_gen_mov_reg8(f, X86_AL, X86_AH);
+    ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
+  /* vvv chase x86 */
   case PRIMITIVE_OP_LT_BOOL: /* fallthrough */
   case PRIMITIVE_OP_LT_U8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_B);
@@ -3809,24 +3809,24 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_MUL_I8: {
     gp_gen_movzx8(f, GP_A, GP_BP, off0);
     gp_gen_movzx8(f, GP_C, GP_BP, off1);
-    x86_gen_alah_imul_w8(f, X86_CL);
+    ia_gen_alah_imul_w8(f, X86_CL);
     gen_crash_jcc(f, h, X86_JCC_O);
-    x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+    ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
   case PRIMITIVE_OP_DIV_I8: {
     gp_gen_movzx8(f, GP_A, GP_BP, off0);
     gp_gen_movzx8(f, GP_C, GP_BP, off1);
-    x86_gen_alah_idiv_w8(f, X86_CL);
+    ia_gen_alah_idiv_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
-    x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+    ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
   case PRIMITIVE_OP_MOD_I8: {
     gp_gen_movzx8(f, GP_A, GP_BP, off0);
     gp_gen_movzx8(f, GP_C, GP_BP, off1);
-    x86_gen_alah_idiv_w8(f, X86_CL);
+    ia_gen_alah_idiv_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
-    x86_gen_mov_reg8(f, X86_AL, X86_AH);
-    x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+    ia_gen_mov_reg8(f, X86_AL, X86_AH);
+    ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
   case PRIMITIVE_OP_LT_I8: {
     gen_cmp8_behavior(f, off0, off1, X86_SETCC_L);
