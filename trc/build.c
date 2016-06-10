@@ -1144,14 +1144,14 @@ uint8_t mod_reg_rm(int mod, int reg, int rm) {
 #define MOD10 2
 #define MOD11 3
 
-void x86_gen_push32(struct objfile *f, enum x86_reg reg) {
-  pushtext(f, 0x50 + (uint8_t)reg);
+void ia_gen_push(struct objfile *f, enum gp_reg reg) {
+  CHECK(reg <= GP_DI);
+  pushtext(f, 0x50 + (uint8_t)map_x86_reg(reg));
 }
 
 void ia_gen_pop(struct objfile *f, enum gp_reg reg) {
   CHECK(reg <= GP_DI);
-  uint8_t b = 0x58 + (uint8_t)map_x86_reg(reg);
-  pushtext(f, b);
+  pushtext(f, 0x58 + (uint8_t)map_x86_reg(reg));
 }
 
 void ia_gen_ret(struct objfile *f) {
@@ -1861,13 +1861,14 @@ void gp_gen_store8(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
 void gen_function_intro(struct objfile *f, struct frame *h) {
   switch (h->arch) {
   case TARGET_ARCH_Y86:
-    x86_gen_push32(f, X86_EBP);
-    x86_gen_mov_reg32(f, X86_EBP, X86_ESP);
+    ia_gen_push(f, GP_BP);
+    gp_gen_mov_reg(f, GP_BP, GP_SP);
     gen_placeholder_stack_adjustment(f, h, 1);
     break;
   case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    /* TODO(): We should just push EBP like before. */
+    ia_gen_push(f, GP_BP);
+    gp_gen_mov_reg(f, GP_BP, GP_SP);
+    gen_placeholder_stack_adjustment(f, h, 1);
     break;
   default:
     UNREACHABLE();
@@ -2231,6 +2232,7 @@ int try_gen_trivial_typetrav_func(struct checkstate *cs, struct objfile *f,
   return 0;
 }
 
+/* chase x86 */
 void really_gen_typetrav_behavior(struct checkstate *cs, struct objfile *f,
                                   struct frame *h, enum typetrav_func tf,
                                   struct loc dest, int has_src,
@@ -6015,7 +6017,7 @@ int build_def(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* chase x86 */
+/* chase mark */
 void build_typetrav_defs(struct checkstate *cs,
                          struct objfile *f) {
   /* cs.typetrav_symbol_infos_count is a moving target -- we see more
@@ -6039,22 +6041,37 @@ void build_typetrav_defs(struct checkstate *cs,
       frame_specify_calling_info(&h, 0, dummy_void_return_loc, 0);
     }
 
+    int has_src = info->func == TYPETRAV_FUNC_COPY || info->func == TYPETRAV_FUNC_MOVE_OR_COPYDESTROY;
+    uint32_t sz = gp_sizeof(&cs->nt, &info->type);
+
     switch (cs->arch) {
     case TARGET_ARCH_Y86: {
-      uint32_t sz = gp_sizeof(&cs->nt, &info->type);
-
       /* TODO: This duplicates calling-convention-specific logic of
       note_param_locations. */
-      int has_src = info->func == TYPETRAV_FUNC_COPY || info->func == TYPETRAV_FUNC_MOVE_OR_COPYDESTROY;
-      struct loc src = ebp_indirect_loc(sz, sz, 3 * DWORD_SIZE);
-      struct loc dest = ebp_indirect_loc(sz, sz, 2 * DWORD_SIZE);
+      /* src is a garbage value if has_src is false. */
+      struct loc src = ebp_indirect_loc(sz, sz, 3 * DWORD_Y86_SIZE);
+      struct loc dest = ebp_indirect_loc(sz, sz, 2 * DWORD_Y86_SIZE);
 
       really_gen_typetrav_behavior(cs, f, &h, info->func, dest, has_src, src,
                                    &info->type);
     } break;
-    case TARGET_ARCH_X64:
-      TODO_IMPLEMENT;
-      break;
+    case TARGET_ARCH_X64: {
+      struct loc destptr = frame_push_loc(&h, X64_EIGHTBYTE_SIZE);
+      x64_gen_store_register(f, destptr, x64_param_regs[0], X64_RAX);
+      struct loc dest = ebp_indirect_loc(sz, sz, destptr.u.ebp_offset);
+
+      struct loc src;
+      if (has_src) {
+        struct loc srcptr = frame_push_loc(&h, X64_EIGHTBYTE_SIZE);
+        x64_gen_store_register(f, srcptr, x64_param_regs[1], X64_RAX);
+        src = ebp_indirect_loc(sz, sz, srcptr.u.ebp_offset);
+      } else {
+        /* Initialize with a garbage value to appease the compiler. */
+        memset(&src, 0, sizeof(src));
+      }
+      really_gen_typetrav_behavior(cs, f, &h, info->func, dest, has_src, src,
+                                   &info->type);
+    } break;
     default:
       UNREACHABLE();
     }
