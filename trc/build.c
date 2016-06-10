@@ -140,6 +140,19 @@ enum x86_jcc {
   X86_JCC_L = 0x8C,
 };
 
+enum oz { OZ_8, OZ_16, OZ_32, OZ_64, };
+
+enum oz ptr_oz(struct objfile *f) {
+  switch (objfile_arch(f)) {
+  case TARGET_ARCH_Y86:
+    return OZ_32;
+  case TARGET_ARCH_X64:
+    return OZ_64;
+  default:
+    UNREACHABLE();
+  }
+}
+
 void check_y86x64(struct objfile *f) {
   (void)f;
   /* A no-op -- f->arch must be one of TARGET_ARCH_Y86 or TARGET_ARCH_X64. */
@@ -227,7 +240,7 @@ void apptext(struct objfile *f, const void *buf, size_t count) {
   objfile_section_append_raw(objfile_text(f), buf, count);
 }
 
-void apptext1(struct objfile *f, uint8_t byte) {
+void pushtext(struct objfile *f, uint8_t byte) {
   apptext(f, &byte, 1);
 }
 
@@ -262,6 +275,22 @@ size_t place_rexw(uint8_t *b, enum target_arch arch) {
   default:
     UNREACHABLE();
   }
+}
+
+void ia_prefix(struct objfile *f, uint8_t opnum, enum oz oz) {
+  /* y86/x64 */
+  CHECK(opnum & 1);
+  if (oz == OZ_8) {
+    pushtext(f, opnum ^ 1);
+    return;
+  }
+  if (oz == OZ_16) {
+    pushtext(f, 0x66);
+  } else if (oz == OZ_64) {
+    CHECK(objfile_arch(f) == TARGET_ARCH_X64);
+    pushtext(f, kREXW);
+  }
+  pushtext(f, opnum);
 }
 
 /* Right now we don't worry about generating multiple objfiles, so we
@@ -1101,19 +1130,17 @@ uint8_t mod_reg_rm(int mod, int reg, int rm) {
 #define MOD11 3
 
 void x86_gen_push32(struct objfile *f, enum x86_reg reg) {
-  uint8_t b = 0x50 + (uint8_t)reg;
-  apptext(f, &b, 1);
+  pushtext(f, 0x50 + (uint8_t)reg);
 }
 
 void y86x64_gen_pop(struct objfile *f, enum gp_reg reg) {
   CHECK(reg <= GP_DI);
   uint8_t b = 0x58 + (uint8_t)map_x86_reg(reg);
-  apptext(f, &b, 1);
+  pushtext(f, b);
 }
 
 void y86x64_gen_ret(struct objfile *f) {
-  uint8_t b = 0xC3;
-  apptext(f, &b, 1);
+  pushtext(f, 0xC3);
 }
 
 void x86_gen_retn(struct objfile *f, uint16_t imm16) {
@@ -1132,17 +1159,14 @@ void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   apptext(f, b, 2);
 }
 
-void y86x64_gen_mov_reg(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
-  uint8_t b[3];
-  size_t insnbase = place_rexw(b, objfile_arch(f));
-  b[insnbase] = 0x8B;
-  b[insnbase + 1] = mod_reg_rm(MOD11, dest, src);
-  apptext(f, b, insnbase + 2);
+void ia_gen_mov(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
+  ia_prefix(f, 0x8B, oz);
+  pushtext(f, mod_reg_rm(MOD11, dest, src));
 }
 
 void gp_gen_mov_reg(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   check_y86x64(f);
-  y86x64_gen_mov_reg(f, dest, src);
+  ia_gen_mov(f, dest, src, ptr_oz(f));
 }
 
 void x86_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
@@ -1152,37 +1176,15 @@ void x86_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) 
   apptext(f, b, 2);
 }
 
-void y86x64_gen_test_regs32(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2) {
-  uint8_t b[2];
-  b[0] = 0x85;
-  b[1] = mod_reg_rm(MOD11, reg2, reg1);
-  apptext(f, b, 2);
-}
-
-void gp_gen_test_w32_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
-  check_y86x64(f);
-  y86x64_gen_test_regs32(f, map_x86_reg(reg1), map_x86_reg(reg2));
+void ia_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2, enum oz oz) {
+  ia_prefix(f, 0x85, oz);
+  pushtext(f, mod_reg_rm(MOD11, reg2, reg1));
 }
 
 /* Tests the whole reg!!! */
-void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
-  uint8_t b[3];
-  size_t insnbase = place_rexw(b, objfile_arch(f));
-  b[insnbase] = 0x85;
-  b[insnbase + 1] = mod_reg_rm(MOD11, reg2, reg1);
-  apptext(f, b, insnbase + 2);
-}
-
-void y86x64_gen_test_regs8(struct objfile *f, enum x86_reg8 reg1, enum x86_reg8 reg2) {
-  uint8_t b[2];
-  b[0] = 0x84;
-  b[1] = mod_reg_rm(MOD11, reg2, reg1);
-  apptext(f, b, 2);
-}
-
-void gp_gen_test_regs8(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
+void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2, enum oz oz) {
   check_y86x64(f);
-  y86x64_gen_test_regs8(f, map_x86_reg8(reg1), map_x86_reg8(reg2));
+  ia_gen_test_regs(f, reg1, reg2, oz);
 }
 
 void y86x64_gen_xor_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src);
@@ -1262,93 +1264,25 @@ void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_reg dest,
 }
 
 void x86_gen_int_3(struct objfile *f) {
-  uint8_t b = 0xCC;
-  apptext(f, &b, 1);
+  pushtext(f, 0xCC);
 }
 
-void x86_gen_shl_cl_w32(struct objfile *f, enum x86_reg dest) {
-  uint8_t b[2];
+void ia_gen_shl_cl(struct objfile *f, enum gp_reg dest, enum oz oz) {
+  ia_prefix(f, 0xD3, oz);
   /* SHL, SHR, SAR have different reg/opcode fields. */
-  b[0] = 0xD3;
-  b[1] = mod_reg_rm(MOD11, 4, dest);
-  apptext(f, b, 2);
+  pushtext(f, mod_reg_rm(MOD11, 4, dest));
 }
 
-void x86_gen_shl_cl_w16(struct objfile *f, enum x86_reg16 dest) {
-  uint8_t b[3];
+void ia_gen_shr_cl(struct objfile *f, enum gp_reg dest, enum oz oz) {
+  ia_prefix(f, 0xD3, oz);
   /* SHL, SHR, SAR have different reg/opcode fields. */
-  b[0] = 0x66;
-  b[1] = 0xD3;
-  b[2] = mod_reg_rm(MOD11, 4, dest);
-  apptext(f, b, 3);
+  pushtext(f, mod_reg_rm(MOD11, 5, dest));
 }
 
-void x86_gen_shl_cl_w8(struct objfile *f, enum x86_reg8 dest) {
-  uint8_t b[2];
+void ia_gen_sar_cl(struct objfile *f, enum gp_reg dest, enum oz oz) {
+  ia_prefix(f, 0xD3, oz);
   /* SHL, SHR, SAR have different reg/opcode fields. */
-  b[0] = 0xD2;
-  b[1] = mod_reg_rm(MOD11, 4, dest);
-  apptext(f, b, 2);
-}
-
-void x64_gen_shr_cl_w64(struct objfile *f, enum x64_reg dest) {
-  CHECK(dest <= X64_RDI);
-  uint8_t b[3];
-  b[0] = kREXW;
-  /* SHL, SHR, SAR have different reg/opcode fields. */
-  b[1] = 0xD3;
-  b[2] = mod_reg_rm(MOD11, 5, dest);
-  apptext(f, b, 3);
-}
-
-void x86_gen_shr_cl_w32(struct objfile *f, enum x86_reg dest) {
-  uint8_t b[2];
-  /* SHL, SHR, SAR have different reg/opcode fields. */
-  b[0] = 0xD3;
-  b[1] = mod_reg_rm(MOD11, 5, dest);
-  apptext(f, b, 2);
-}
-
-void x86_gen_shr_cl_w16(struct objfile *f, enum x86_reg16 dest) {
-  uint8_t b[3];
-  /* SHL, SHR, SAR have different reg/opcode fields. */
-  b[0] = 0x66;
-  b[1] = 0xD3;
-  b[2] = mod_reg_rm(MOD11, 5, dest);
-  apptext(f, b, 3);
-}
-
-void x86_gen_shr_cl_w8(struct objfile *f, enum x86_reg8 dest) {
-  uint8_t b[2];
-  /* SHL, SHR, SAR have different reg/opcode fields. */
-  b[0] = 0xD2;
-  b[1] = mod_reg_rm(MOD11, 5, dest);
-  apptext(f, b, 2);
-}
-
-void x86_gen_sar_cl_w32(struct objfile *f, enum x86_reg dest) {
-  uint8_t b[2];
-  /* SHL, SHR, SAR have different reg/opcode fields. */
-  b[0] = 0xD3;
-  b[1] = mod_reg_rm(MOD11, 7, dest);
-  apptext(f, b, 2);
-}
-
-void x86_gen_sar_cl_w16(struct objfile *f, enum x86_reg16 dest) {
-  uint8_t b[3];
-  /* SHL, SHR, SAR have different reg/opcode fields. */
-  b[0] = 0x66;
-  b[1] = 0xD3;
-  b[2] = mod_reg_rm(MOD11, 7, dest);
-  apptext(f, b, 3);
-}
-
-void x86_gen_sar_cl_w8(struct objfile *f, enum x86_reg8 dest) {
-  uint8_t b[2];
-  /* SHL, SHR, SAR have different reg/opcode fields. */
-  b[0] = 0xD2;
-  b[1] = mod_reg_rm(MOD11, 7, dest);
-  apptext(f, b, 2);
+  pushtext(f, mod_reg_rm(MOD11, 7, dest));
 }
 
 void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
@@ -2881,7 +2815,7 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
   case TARGET_ARCH_X64: {
     x64_gen_returnloc_funcreturn_convention(f, hidden_return_param,
                                             h->return_loc);
-    y86x64_gen_mov_reg(f, GP_SP, GP_BP);
+    gp_gen_mov_reg(f, GP_SP, GP_BP);
     y86x64_gen_pop(f, GP_BP);
     y86x64_gen_ret(f);
   } break;
@@ -3670,7 +3604,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
 
   case PRIMITIVE_OP_CONVERT_U8_TO_I8: {
     gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_test_regs8(f, GP_A, GP_A);
+    gp_gen_test_regs(f, GP_A, GP_A, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_U8_TO_U8: /* fallthrough */
@@ -3699,7 +3633,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_CONVERT_I8_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I8_TO_U32: {
     gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_test_regs8(f, GP_A, GP_A);
+    gp_gen_test_regs(f, GP_A, GP_A, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
 
@@ -3742,7 +3676,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_CONVERT_I16_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I16_TO_U32: {
     gp_gen_movsx16(f, GP_A, GP_BP, off0);
-    gp_gen_test_regs(f, GP_A, GP_A);
+    gp_gen_test_regs(f, GP_A, GP_A, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_I16_TO_I16: /* fallthrough */
@@ -3809,9 +3743,9 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     case TARGET_ARCH_Y86:
       break;
     case TARGET_ARCH_X64: {
-      y86x64_gen_mov_reg(f, GP_D, GP_A);
+      gp_gen_mov_reg(f, GP_D, GP_A);
       gp_gen_mov_reg_imm32(f, GP_C, 32);
-      x64_gen_shr_cl_w64(f, X64_RDX);
+      ia_gen_shr_cl(f, GP_D, OZ_64);
       gen_crash_jcc(f, h, X86_JCC_NE);
     } break;
     default:
@@ -3830,7 +3764,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_test_w32_regs(f, GP_A, GP_A);
+    gp_gen_test_regs(f, GP_A, GP_A, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
 
@@ -3875,7 +3809,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_CONVERT_I32_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I32_TO_U32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_test_w32_regs(f, GP_A, GP_A);
+    gp_gen_test_regs(f, GP_A, GP_A, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_I32: {
@@ -3887,7 +3821,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
       gp_gen_mov_reg(f, GP_D, GP_A);
       x64_gen_sub_w64_imm32(f, X64_RDX, -0x8000000ll);
       gp_gen_mov_reg_imm32(f, GP_C, 32);
-      x64_gen_shr_cl_w64(f, X64_RDX);
+      ia_gen_shr_cl(f, GP_D, OZ_64);
       gen_crash_jcc(f, h, X86_JCC_NE);
     } break;
     default:
@@ -3929,7 +3863,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
 
   case PRIMITIVE_OP_LOGICAL_NOT: {
     gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_test_regs(f, GP_A, GP_A);
+    gp_gen_test_regs(f, GP_A, GP_A, OZ_8);
     gp_gen_setcc_b8(f, GP_A, X86_SETCC_Z);
   } break;
 
@@ -4043,7 +3977,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_imm32(f, GP_C, 7);
     gen_crash_jcc(f, h, X86_JCC_A);
 
-    x86_gen_shl_cl_w8(f, X86_AL);
+    ia_gen_shl_cl(f, GP_A, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
@@ -4053,7 +3987,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_imm32(f, GP_C, 7);
     gen_crash_jcc(f, h, X86_JCC_A);
 
-    x86_gen_shr_cl_w8(f, X86_AL);
+    ia_gen_shr_cl(f, GP_A, OZ_8);
   } break;
 
   case PRIMITIVE_OP_ADD_I8: {
@@ -4131,7 +4065,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_imm32(f, GP_C, 7);
     gen_crash_jcc(f, h, X86_JCC_A);
 
-    x86_gen_shl_cl_w8(f, X86_AL);
+    ia_gen_shl_cl(f, GP_A, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_I8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
@@ -4141,7 +4075,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_imm32(f, GP_C, 7);
     gen_crash_jcc(f, h, X86_JCC_A);
 
-    x86_gen_sar_cl_w8(f, X86_AL);
+    ia_gen_sar_cl(f, GP_A, OZ_8);
   } break;
 
   case PRIMITIVE_OP_ADD_U16: {
@@ -4219,7 +4153,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_imm32(f, GP_C, 15);
     gen_crash_jcc(f, h, X86_JCC_A);
 
-    x86_gen_shl_cl_w16(f, X86_AX);
+    ia_gen_shl_cl(f, GP_A, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
@@ -4229,7 +4163,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_imm32(f, GP_C, 15);
     gen_crash_jcc(f, h, X86_JCC_A);
 
-    x86_gen_shr_cl_w16(f, X86_AX);
+    ia_gen_shr_cl(f, GP_A, OZ_16);
   } break;
 
   case PRIMITIVE_OP_ADD_I16: {
@@ -4305,7 +4239,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_imm32(f, GP_C, 15);
     gen_crash_jcc(f, h, X86_JCC_A);
 
-    x86_gen_shl_cl_w16(f, X86_AX);
+    ia_gen_shl_cl(f, GP_A, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_I16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
@@ -4315,7 +4249,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_imm32(f, GP_C, 15);
     gen_crash_jcc(f, h, X86_JCC_A);
 
-    x86_gen_sar_cl_w16(f, X86_AX);
+    ia_gen_sar_cl(f, GP_A, OZ_16);
   } break;
 
   case PRIMITIVE_OP_ADD_SIZE: /* fallthrough */
@@ -4419,7 +4353,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_imm32(f, GP_C, 31);
     gen_crash_jcc(f, h, X86_JCC_A);
 
-    x86_gen_shl_cl_w32(f, X86_EAX);
+    ia_gen_shl_cl(f, GP_A, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_OSIZE: /* fallthrough */
@@ -4431,7 +4365,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_imm32(f, GP_C, 31);
     gen_crash_jcc(f, h, X86_JCC_A);
 
-    x86_gen_shr_cl_w32(f, X86_EAX);
+    ia_gen_shr_cl(f, GP_A, OZ_32);
   } break;
 
   case PRIMITIVE_OP_ADD_I32: {
@@ -4508,7 +4442,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_imm32(f, GP_C, 31);
     gen_crash_jcc(f, h, X86_JCC_A);
 
-    x86_gen_shl_cl_w32(f, X86_EAX);
+    ia_gen_shl_cl(f, GP_A, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_I32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
@@ -4518,7 +4452,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_cmp_imm32(f, GP_C, 31);
     gen_crash_jcc(f, h, X86_JCC_A);
 
-    x86_gen_sar_cl_w32(f, X86_EAX);
+    ia_gen_sar_cl(f, GP_A, OZ_32);
   } break;
 
   case PRIMITIVE_OP_ADD_OSIZE: {
@@ -5066,7 +5000,7 @@ void gen_placeholder_jmp_if_false(struct objfile *f, struct frame *h,
   CHECK(loc.size == KIT_BOOL_SIZE);
 
   gp_gen_load_register(f, GP_A, loc);
-  gp_gen_test_regs(f, GP_A, GP_A);
+  gp_gen_test_regs(f, GP_A, GP_A, OZ_8);
   gen_placeholder_jcc(f, h, X86_JCC_Z, target_number);
 }
 
@@ -5902,7 +5836,7 @@ void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
       = make_enum_num_loc(f, h, cstate->u.pattern.facts.enum_loc);
     gp_gen_load_register(f, GP_A, swartch_num_loc);
     STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
-    gp_gen_test_regs(f, GP_A, GP_A);
+    gp_gen_test_regs(f, GP_A, GP_A, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_Z);
     ungen_swartch(cs, f, h, &cstate->u.pattern.facts);
   } break;
