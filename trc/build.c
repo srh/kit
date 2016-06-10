@@ -223,6 +223,14 @@ void x64_gen_load_addressof(struct objfile *f, enum x64_reg dest, struct loc loc
 void x64_gen_store_biregister(struct objfile *f, struct loc dest,
                               enum x64_reg lo, enum x64_reg hi, enum x64_reg spare);
 
+void apptext(struct objfile *f, const void *buf, size_t count) {
+  objfile_section_append_raw(objfile_text(f), buf, count);
+}
+
+void apptext1(struct objfile *f, uint8_t byte) {
+  apptext(f, &byte, 1);
+}
+
 int platform_prefix_underscore(enum target_platform platform) {
   switch (platform) {
   case TARGET_PLATFORM_WIN_32BIT:
@@ -1094,18 +1102,18 @@ uint8_t mod_reg_rm(int mod, int reg, int rm) {
 
 void x86_gen_push32(struct objfile *f, enum x86_reg reg) {
   uint8_t b = 0x50 + (uint8_t)reg;
-  objfile_section_append_raw(objfile_text(f), &b, 1);
+  apptext(f, &b, 1);
 }
 
 void y86x64_gen_pop(struct objfile *f, enum gp_reg reg) {
   CHECK(reg <= GP_DI);
   uint8_t b = 0x58 + (uint8_t)map_x86_reg(reg);
-  objfile_section_append_raw(objfile_text(f), &b, 1);
+  apptext(f, &b, 1);
 }
 
 void y86x64_gen_ret(struct objfile *f) {
   uint8_t b = 0xC3;
-  objfile_section_append_raw(objfile_text(f), &b, 1);
+  apptext(f, &b, 1);
 }
 
 void x86_gen_retn(struct objfile *f, uint16_t imm16) {
@@ -1114,14 +1122,14 @@ void x86_gen_retn(struct objfile *f, uint16_t imm16) {
   uint8_t b[3];
   b[0] = 0xC2;
   write_le_u16(b + 1, imm16);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   uint8_t b[2];
   b[0] = 0x8B;
   b[1] = mod_reg_rm(MOD11, dest, src);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void y86x64_gen_mov_reg(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
@@ -1129,7 +1137,7 @@ void y86x64_gen_mov_reg(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   size_t insnbase = place_rexw(b, objfile_arch(f));
   b[insnbase] = 0x8B;
   b[insnbase + 1] = mod_reg_rm(MOD11, dest, src);
-  objfile_section_append_raw(objfile_text(f), b, insnbase + 2);
+  apptext(f, b, insnbase + 2);
 }
 
 void gp_gen_mov_reg(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
@@ -1141,14 +1149,14 @@ void x86_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) 
   uint8_t b[2];
   b[0] = 0x8A;
   b[1] = mod_reg_rm(MOD11, dest, src);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void y86x64_gen_test_regs32(struct objfile *f, enum x86_reg reg1, enum x86_reg reg2) {
   uint8_t b[2];
   b[0] = 0x85;
   b[1] = mod_reg_rm(MOD11, reg2, reg1);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void gp_gen_test_w32_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
@@ -1162,14 +1170,14 @@ void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
   size_t insnbase = place_rexw(b, objfile_arch(f));
   b[insnbase] = 0x85;
   b[insnbase + 1] = mod_reg_rm(MOD11, reg2, reg1);
-  objfile_section_append_raw(objfile_text(f), b, insnbase + 2);
+  apptext(f, b, insnbase + 2);
 }
 
 void y86x64_gen_test_regs8(struct objfile *f, enum x86_reg8 reg1, enum x86_reg8 reg2) {
   uint8_t b[2];
   b[0] = 0x84;
   b[1] = mod_reg_rm(MOD11, reg2, reg1);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void gp_gen_test_regs8(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2) {
@@ -1190,7 +1198,7 @@ void y86x64_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
     CHECK(dest <= GP_DI);
     b[insnbase] = 0xB8 + (uint8_t)dest;
     write_le_i32(b + insnbase + 1, imm32);
-    objfile_section_append_raw(objfile_text(f), b, insnbase + 5);
+    apptext(f, b, insnbase + 5);
   }
 }
 
@@ -1210,7 +1218,7 @@ void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
   case TARGET_PLATFORM_WIN_32BIT: /* fallthrough */
   case TARGET_PLATFORM_LINUX_32BIT: {
     uint8_t b = 0xB8 + (uint8_t)dest;
-    objfile_section_append_raw(objfile_text(f), &b, 1);
+    apptext(f, &b, 1);
     objfile_section_append_dir32(objfile_text(f), symbol_table_index);
   } break;
   case TARGET_PLATFORM_OSX_32BIT: {
@@ -1221,7 +1229,7 @@ void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
     /* Fortunately we don't have "extern" data decls, that'd be even
     more complicated. */
     uint8_t b[5] = { 0xE8, 0, 0, 0, 0 };
-    objfile_section_append_raw(objfile_text(f), b, 5);
+    apptext(f, b, 5);
     size_t subtracted_offset = objfile_section_size(objfile_text(f));
     y86x64_gen_pop(f, unmap_x86_reg(dest));
     size_t adjusted_offset = x86_gen_placeholder_lea32(f, dest);
@@ -1255,7 +1263,7 @@ void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_reg dest,
 
 void x86_gen_int_3(struct objfile *f) {
   uint8_t b = 0xCC;
-  objfile_section_append_raw(objfile_text(f), &b, 1);
+  apptext(f, &b, 1);
 }
 
 void x86_gen_shl_cl_w32(struct objfile *f, enum x86_reg dest) {
@@ -1263,7 +1271,7 @@ void x86_gen_shl_cl_w32(struct objfile *f, enum x86_reg dest) {
   /* SHL, SHR, SAR have different reg/opcode fields. */
   b[0] = 0xD3;
   b[1] = mod_reg_rm(MOD11, 4, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_shl_cl_w16(struct objfile *f, enum x86_reg16 dest) {
@@ -1272,7 +1280,7 @@ void x86_gen_shl_cl_w16(struct objfile *f, enum x86_reg16 dest) {
   b[0] = 0x66;
   b[1] = 0xD3;
   b[2] = mod_reg_rm(MOD11, 4, dest);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_shl_cl_w8(struct objfile *f, enum x86_reg8 dest) {
@@ -1280,7 +1288,7 @@ void x86_gen_shl_cl_w8(struct objfile *f, enum x86_reg8 dest) {
   /* SHL, SHR, SAR have different reg/opcode fields. */
   b[0] = 0xD2;
   b[1] = mod_reg_rm(MOD11, 4, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x64_gen_shr_cl_w64(struct objfile *f, enum x64_reg dest) {
@@ -1290,7 +1298,7 @@ void x64_gen_shr_cl_w64(struct objfile *f, enum x64_reg dest) {
   /* SHL, SHR, SAR have different reg/opcode fields. */
   b[1] = 0xD3;
   b[2] = mod_reg_rm(MOD11, 5, dest);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_shr_cl_w32(struct objfile *f, enum x86_reg dest) {
@@ -1298,7 +1306,7 @@ void x86_gen_shr_cl_w32(struct objfile *f, enum x86_reg dest) {
   /* SHL, SHR, SAR have different reg/opcode fields. */
   b[0] = 0xD3;
   b[1] = mod_reg_rm(MOD11, 5, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_shr_cl_w16(struct objfile *f, enum x86_reg16 dest) {
@@ -1307,7 +1315,7 @@ void x86_gen_shr_cl_w16(struct objfile *f, enum x86_reg16 dest) {
   b[0] = 0x66;
   b[1] = 0xD3;
   b[2] = mod_reg_rm(MOD11, 5, dest);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_shr_cl_w8(struct objfile *f, enum x86_reg8 dest) {
@@ -1315,7 +1323,7 @@ void x86_gen_shr_cl_w8(struct objfile *f, enum x86_reg8 dest) {
   /* SHL, SHR, SAR have different reg/opcode fields. */
   b[0] = 0xD2;
   b[1] = mod_reg_rm(MOD11, 5, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_sar_cl_w32(struct objfile *f, enum x86_reg dest) {
@@ -1323,7 +1331,7 @@ void x86_gen_sar_cl_w32(struct objfile *f, enum x86_reg dest) {
   /* SHL, SHR, SAR have different reg/opcode fields. */
   b[0] = 0xD3;
   b[1] = mod_reg_rm(MOD11, 7, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_sar_cl_w16(struct objfile *f, enum x86_reg16 dest) {
@@ -1332,7 +1340,7 @@ void x86_gen_sar_cl_w16(struct objfile *f, enum x86_reg16 dest) {
   b[0] = 0x66;
   b[1] = 0xD3;
   b[2] = mod_reg_rm(MOD11, 7, dest);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_sar_cl_w8(struct objfile *f, enum x86_reg8 dest) {
@@ -1340,7 +1348,7 @@ void x86_gen_sar_cl_w8(struct objfile *f, enum x86_reg8 dest) {
   /* SHL, SHR, SAR have different reg/opcode fields. */
   b[0] = 0xD2;
   b[1] = mod_reg_rm(MOD11, 7, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
@@ -1348,7 +1356,7 @@ void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
   b[0] = 0x81;
   b[1] = mod_reg_rm(MOD11, 0, X86_ESP);
   write_le_i32(b + 2, x);
-  objfile_section_append_raw(objfile_text(f), b, 6);
+  apptext(f, b, 6);
 }
 
 void y86x64_gen_add_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
@@ -1356,7 +1364,7 @@ void y86x64_gen_add_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   uint8_t b[2];
   b[0] = 0x01;
   b[1] = mod_reg_rm(MOD11, src, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x64_gen_add_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
@@ -1364,7 +1372,7 @@ void x64_gen_add_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
   b[0] = kREXW;
   b[1] = 0x01;
   b[2] = mod_reg_rm(MOD11, src, dest);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void gp_gen_add_wPTR(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
@@ -1385,14 +1393,14 @@ void x86_gen_add_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src)
   b[0] = 0x66;
   b[1] = 0x01;
   b[2] = mod_reg_rm(MOD11, src, dest);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_add_w8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
   uint8_t b[2];
   b[0] = 0x00;
   b[1] = mod_reg_rm(MOD11, src, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_eaxedx_mul_w32(struct objfile *f, enum x86_reg src) {
@@ -1400,7 +1408,7 @@ void x86_gen_eaxedx_mul_w32(struct objfile *f, enum x86_reg src) {
   /* MUL, DIV, IDIV have different modr/m opcode. */
   b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 4, src);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_axdx_mul_w16(struct objfile *f, enum x86_reg16 src) {
@@ -1409,14 +1417,14 @@ void x86_gen_axdx_mul_w16(struct objfile *f, enum x86_reg16 src) {
   b[0] = 0x66;
   b[1] = 0xF7;
   b[2] = mod_reg_rm(MOD11, 4, src);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_alah_mul_w8(struct objfile *f, enum x86_reg8 src) {
   uint8_t b[2];
   b[0] = 0xF6;
   b[1] = mod_reg_rm(MOD11, 4, src);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void y86x64_gen_imul_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
@@ -1425,7 +1433,7 @@ void y86x64_gen_imul_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   b[0] = 0x0F;
   b[1] = 0xAF;
   b[2] = mod_reg_rm(MOD11, dest, src);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x64_gen_imul_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
@@ -1434,7 +1442,7 @@ void x64_gen_imul_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
   b[1] = 0x0F;
   b[2] = 0xAF;
   b[3] = mod_reg_rm(MOD11, dest, src);
-  objfile_section_append_raw(objfile_text(f), b, 4);
+  apptext(f, b, 4);
 }
 
 void gp_gen_imul_wPTR(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
@@ -1456,14 +1464,14 @@ void x86_gen_imul_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src
   b[1] = 0x0F;
   b[2] = 0xAF;
   b[3] = mod_reg_rm(MOD11, dest, src);
-  objfile_section_append_raw(objfile_text(f), b, 4);
+  apptext(f, b, 4);
 }
 
 void x86_gen_alah_imul_w8(struct objfile *f, enum x86_reg8 src) {
   uint8_t b[2];
   b[0] = 0xF6;
   b[1] = mod_reg_rm(MOD11, 5, src);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_eaxedx_div_w32(struct objfile *f, enum x86_reg denom) {
@@ -1471,7 +1479,7 @@ void x86_gen_eaxedx_div_w32(struct objfile *f, enum x86_reg denom) {
   /* MUL, DIV, IDIV have different modr/m opcode. */
   b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 6, denom);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_axdx_div_w16(struct objfile *f, enum x86_reg16 denom) {
@@ -1480,14 +1488,14 @@ void x86_gen_axdx_div_w16(struct objfile *f, enum x86_reg16 denom) {
   b[0] = 0x66;
   b[1] = 0xF7;
   b[2] = mod_reg_rm(MOD11, 6, denom);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_alah_div_w8(struct objfile *f, enum x86_reg8 denom) {
   uint8_t b[2];
   b[0] = 0xF6;
   b[1] = mod_reg_rm(MOD11, 6, denom);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_eaxedx_idiv_w32(struct objfile *f, enum x86_reg denom) {
@@ -1495,7 +1503,7 @@ void x86_gen_eaxedx_idiv_w32(struct objfile *f, enum x86_reg denom) {
   /* MUL, DIV, IDIV have different modr/m opcode. */
   b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 7, denom);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_axdx_idiv_w16(struct objfile *f, enum x86_reg16 denom) {
@@ -1504,26 +1512,26 @@ void x86_gen_axdx_idiv_w16(struct objfile *f, enum x86_reg16 denom) {
   b[0] = 0x66;
   b[1] = 0xF7;
   b[2] = mod_reg_rm(MOD11, 7, denom);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_alah_idiv_w8(struct objfile *f, enum x86_reg8 denom) {
   uint8_t b[2];
   b[0] = 0xF6;
   b[1] = mod_reg_rm(MOD11, 7, denom);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_cwd_w16(struct objfile *f) {
   uint8_t b[2];
   b[0] = 0x66;
   b[1] = 0x99;
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_cdq_w32(struct objfile *f) {
   uint8_t b = 0x99;
-  objfile_section_append_raw(objfile_text(f), &b, 1);
+  apptext(f, &b, 1);
 }
 
 void y86x64_gen_cmp_w32(struct objfile *f, enum gp_reg lhs, enum gp_reg rhs) {
@@ -1531,7 +1539,7 @@ void y86x64_gen_cmp_w32(struct objfile *f, enum gp_reg lhs, enum gp_reg rhs) {
   uint8_t b[2];
   b[0] = 0x39;
   b[1] = mod_reg_rm(MOD11, rhs, lhs);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x64_gen_cmp_w64(struct objfile *f, enum x64_reg lhs, enum x64_reg rhs) {
@@ -1539,7 +1547,7 @@ void x64_gen_cmp_w64(struct objfile *f, enum x64_reg lhs, enum x64_reg rhs) {
   b[0] = kREXW;
   b[1] = 0x39;
   b[2] = mod_reg_rm(MOD11, rhs, lhs);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void gp_gen_cmp_regs(struct objfile *f, enum gp_reg lhs, enum gp_reg rhs) {
@@ -1560,14 +1568,14 @@ void x86_gen_cmp_w16(struct objfile *f, enum x86_reg16 lhs, enum x86_reg16 rhs) 
   b[0] = 0x66;
   b[1] = 0x39;
   b[2] = mod_reg_rm(MOD11, rhs, lhs);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_cmp_w8(struct objfile *f, enum x86_reg8 lhs, enum x86_reg8 rhs) {
   uint8_t b[2];
   b[0] = 0x38;
   b[1] = mod_reg_rm(MOD11, rhs, lhs);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void y86x64_gen_cmp_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
@@ -1576,7 +1584,7 @@ void y86x64_gen_cmp_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
   b[0] = 0x81;
   b[1] = mod_reg_rm(MOD11, 7, lhs);
   write_le_i32(b + 2, imm32);
-  objfile_section_append_raw(objfile_text(f), b, 6);
+  apptext(f, b, 6);
 }
 
 void x64_gen_cmp_w64_imm32(struct objfile *f, enum x64_reg lhs, int32_t imm32) {
@@ -1585,7 +1593,7 @@ void x64_gen_cmp_w64_imm32(struct objfile *f, enum x64_reg lhs, int32_t imm32) {
   b[1] = 0x81;
   b[2] = mod_reg_rm(MOD11, 7, lhs);
   write_le_i32(b + 3, imm32);
-  objfile_section_append_raw(objfile_text(f), b, 7);
+  apptext(f, b, 7);
 }
 
 void gp_gen_cmp_w32_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
@@ -1613,7 +1621,7 @@ void y86x64_gen_cmp_reg16_imm16(struct objfile *f, enum x86_reg16 lhs, int16_t i
   b[1] = 0x81;
   b[2] = mod_reg_rm(MOD11, 7, lhs);
   write_le_i16(b + 3, imm16);
-  objfile_section_append_raw(objfile_text(f), b, 5);
+  apptext(f, b, 5);
 }
 
 void gp_gen_cmp_w16_imm16(struct objfile *f, enum gp_reg lhs, int16_t imm16) {
@@ -1627,7 +1635,7 @@ void y86x64_gen_cmp_reg8_imm8(struct objfile *f, enum x86_reg8 lhs, int8_t imm8)
   b[0] = 0x80;
   b[1] = mod_reg_rm(MOD11, 7, lhs);
   b[2] = (uint8_t)imm8;
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void gp_gen_cmp_w8_imm8(struct objfile *f, enum gp_reg lhs, int8_t imm8) {
@@ -1639,7 +1647,7 @@ void y86x64_gen_xor_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   uint8_t b[2];
   b[0] = 0x31;
   b[1] = mod_reg_rm(MOD11, src, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x64_gen_xor_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
@@ -1647,28 +1655,28 @@ void x64_gen_xor_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
   b[0] = kREXW;
   b[1] = 0x31;
   b[2] = mod_reg_rm(MOD11, src, dest);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_or_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   uint8_t b[2];
   b[0] = 0x09;
   b[1] = mod_reg_rm(MOD11, src, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_and_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
   uint8_t b[2];
   b[0] = 0x21;
   b[1] = mod_reg_rm(MOD11, src, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_not_w8(struct objfile *f, enum x86_reg8 dest) {
   uint8_t b[2];
   b[0] = 0xF6;
   b[1] = mod_reg_rm(MOD11, 2, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x86_gen_not_w16(struct objfile *f, enum x86_reg16 dest) {
@@ -1676,21 +1684,21 @@ void x86_gen_not_w16(struct objfile *f, enum x86_reg16 dest) {
   b[0] = 0x66;
   b[1] = 0xF7;
   b[2] = mod_reg_rm(MOD11, 2, dest);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_not_w32(struct objfile *f, enum x86_reg dest) {
   uint8_t b[2];
   b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 2, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void y86x64_gen_neg_w32(struct objfile *f, enum gp_reg dest) {
   uint8_t b[2];
   b[0] = 0xF7;
   b[1] = mod_reg_rm(MOD11, 3, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x64_gen_neg_w64(struct objfile *f, enum x64_reg dest) {
@@ -1699,7 +1707,7 @@ void x64_gen_neg_w64(struct objfile *f, enum x64_reg dest) {
   b[0] = kREXW;
   b[1] = 0xF7;
   b[2] = mod_reg_rm(MOD11, 3, dest);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void gp_gen_neg(struct objfile *f, enum gp_reg dest) {
@@ -1720,7 +1728,7 @@ void y86x64_gen_sub_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   uint8_t b[2];
   b[0] = 0x29;
   b[1] = mod_reg_rm(MOD11, src, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x64_gen_sub_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
@@ -1729,7 +1737,7 @@ void x64_gen_sub_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
   b[0] = kREXW;
   b[1] = 0x29;
   b[2] = mod_reg_rm(MOD11, src, dest);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void gp_gen_sub(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
@@ -1752,7 +1760,7 @@ void x64_gen_sub_w64_imm32(struct objfile *f, enum x64_reg dest, int32_t imm) {
   b[1] = 0x81;
   b[2] = mod_reg_rm(MOD11, 5, dest);
   write_le_i32(b + 3, imm);
-  objfile_section_append_raw(objfile_text(f), b, 7);
+  apptext(f, b, 7);
 }
 
 void x86_gen_sub_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
@@ -1760,14 +1768,14 @@ void x86_gen_sub_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src)
   b[0] = 0x66;
   b[1] = 0x29;
   b[2] = mod_reg_rm(MOD11, src, dest);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_sub_w8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
   uint8_t b[2];
   b[0] = 0x28;
   b[1] = mod_reg_rm(MOD11, src, dest);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void y86x64_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
@@ -1776,7 +1784,7 @@ void y86x64_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
   b[0] = 0x0F;
   b[1] = (uint8_t)code;
   b[2] = mod_reg_rm(MOD11, 0, dest);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 /* Either leaves upper bits unset or sets them to zero. */
@@ -1796,7 +1804,7 @@ void gen_placeholder_jcc(struct objfile *f, struct frame *h,
 
   uint8_t b[6] = { 0x0F, 0, 0, 0, 0, 0 };
   b[1] = code;
-  objfile_section_append_raw(objfile_text(f), b, 6);
+  apptext(f, b, 6);
 }
 
 /* chase mark */
@@ -1815,7 +1823,7 @@ void gen_placeholder_stack_adjustment(struct objfile *f,
   red.downward = downward;
   SLICE_PUSH(h->espdata, h->espdata_count, h->espdata_limit, red);
 
-  objfile_section_append_raw(objfile_text(f), b, insnbase + 6);
+  apptext(f, b, insnbase + 6);
 }
 
 void replace_placeholder_stack_adjustment(struct objfile *f,
@@ -1869,8 +1877,8 @@ void y86x64_help_gen_mov_mem_imm32(struct objfile *f,
   b[0] = 0xC7;
   size_t count = x86_encode_reg_rm(b + 1, 0, map_x86_reg(dest), dest_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 1);
-  objfile_section_append_raw(objfile_text(f), buf, 4);
+  apptext(f, b, count + 1);
+  apptext(f, buf, 4);
 }
 
 void y86x64_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
@@ -1889,7 +1897,7 @@ void y86x64_gen_mov_mem_imm8(struct objfile *f,
   size_t count = x86_encode_reg_rm(b + 1, 0, map_x86_reg(dest), dest_disp);
   CHECK(count <= 9);
   b[1 + count] = (uint8_t)imm;
-  objfile_section_append_raw(objfile_text(f), b, 1 + count + 1);
+  apptext(f, b, 1 + count + 1);
 }
 
 void y86x64_gen_movzx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
@@ -1898,7 +1906,7 @@ void y86x64_gen_movzx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_add
   b[0] = 0x8B;
   size_t count = x86_encode_reg_rm(b + 1, dest, src_addr, src_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 1);
+  apptext(f, b, count + 1);
 }
 
 void x64_gen_load64(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
@@ -1908,7 +1916,7 @@ void x64_gen_load64(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
   b[1] = 0x8B;
   size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 2);
+  apptext(f, b, count + 2);
 }
 
 /* TODO(): Probably ought to double-check all uses of movzx32 for use with pointers and sizes */
@@ -1925,7 +1933,7 @@ void x64_gen_movsx32(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr
   b[1] = 0x63;
   size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 2);
+  apptext(f, b, count + 2);
 }
 
 void gp_gen_movsx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
@@ -1976,7 +1984,7 @@ void x86_gen_movzx8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   b[1] = 0xB6;
   size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 2);
+  apptext(f, b, count + 2);
 }
 
 void gp_gen_movzx8(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
@@ -2000,7 +2008,7 @@ void x86_gen_movzx16(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr
   b[1] = 0xB7;
   size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 2);
+  apptext(f, b, count + 2);
 }
 
 void gp_gen_movzx16(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
@@ -2024,7 +2032,7 @@ void x86_gen_movsx8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   b[1] = 0xBE;
   size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 2);
+  apptext(f, b, count + 2);
 }
 
 void gp_gen_movsx8(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
@@ -2048,7 +2056,7 @@ void x86_gen_movsx16(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr
   b[1] = 0xBF;
   size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 2);
+  apptext(f, b, count + 2);
 }
 
 void gp_gen_movsx16(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
@@ -2070,7 +2078,7 @@ void x86_gen_movzx8_reg8(struct objfile *f, enum x86_reg dest, enum x86_reg8 src
   b[0] = 0x0F;
   b[1] = 0xB6;
   b[2] = mod_reg_rm(MOD11, dest, src);
-  objfile_section_append_raw(objfile_text(f), b, 3);
+  apptext(f, b, 3);
 }
 
 void x86_gen_lea32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
@@ -2079,7 +2087,7 @@ void x86_gen_lea32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
   b[0] = 0x8D;
   size_t count = x86_encode_reg_rm(b + 1, dest, src_addr, src_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 1);
+  apptext(f, b, count + 1);
 }
 
 void gp_gen_lea(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
@@ -2105,7 +2113,7 @@ size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest) {
   CHECK(count <= 9);
   /* The index into objfile_text() of the relocatable dword. */
   size_t ix = objfile_section_size(objfile_text(f)) + 1 + reg_rm_reloc;
-  objfile_section_append_raw(objfile_text(f), b, count + 1);
+  apptext(f, b, count + 1);
   return ix;
 }
 
@@ -2116,7 +2124,7 @@ void y86x64_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_d
   b[0] = 0x89;
   size_t count = x86_encode_reg_rm(b + 1, src, dest_addr, dest_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 1);
+  apptext(f, b, count + 1);
 }
 
 void x64_gen_store64(struct objfile *f, enum x64_reg dest_addr, int32_t dest_disp,
@@ -2126,7 +2134,7 @@ void x64_gen_store64(struct objfile *f, enum x64_reg dest_addr, int32_t dest_dis
   b[1] = 0x89;
   size_t count = x86_encode_reg_rm(b + 2, src, dest_addr, dest_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 2);
+  apptext(f, b, count + 2);
 }
 
 /* TODO(): Audit callers -- did they mean to write a pointer? */
@@ -2157,7 +2165,7 @@ void x86_gen_store16(struct objfile *f, enum x86_reg dest_addr, int32_t dest_dis
   b[1] = 0x89;
   size_t count = x86_encode_reg_rm(b + 2, src, dest_addr, dest_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 2);
+  apptext(f, b, count + 2);
 }
 
 void gp_gen_store16(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
@@ -2180,7 +2188,7 @@ void x86_gen_store8(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp
   b[0] = 0x88;
   size_t count = x86_encode_reg_rm(b + 1, src, dest_addr, dest_disp);
   CHECK(count <= 9);
-  objfile_section_append_raw(objfile_text(f), b, count + 1);
+  apptext(f, b, count + 1);
 }
 
 void gp_gen_store8(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
@@ -3243,7 +3251,7 @@ void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src)
 
 void y86x64_gen_call(struct objfile *f, struct sti func_sti) {
   uint8_t b = 0xE8;
-  objfile_section_append_raw(objfile_text(f), &b, 1);
+  apptext(f, &b, 1);
   /* TODO(): x64 needs rel32 as the relocation type too, right? */
   objfile_section_append_rel32(objfile_text(f), func_sti);
 }
@@ -3252,7 +3260,7 @@ void x86_gen_indirect_call_reg(struct objfile *f, enum x86_reg reg) {
   uint8_t b[2];
   b[0] = 0xFF;
   b[1] = mod_reg_rm(MOD11, 2, reg);
-  objfile_section_append_raw(objfile_text(f), b, 2);
+  apptext(f, b, 2);
 }
 
 void x64_gen_indirect_call_reg(struct objfile *f, enum x64_reg reg) {
@@ -5090,7 +5098,7 @@ void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_numbe
   /* y86/x64 */
   /* E9 jmp instruction */
   uint8_t b[5] = { 0xE9, 0, 0, 0, 0 };
-  objfile_section_append_raw(objfile_text(f), b, 5);
+  apptext(f, b, 5);
 }
 
 void replace_placeholder_jump(struct objfile *f, size_t jmp_location,
