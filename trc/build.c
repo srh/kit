@@ -3733,49 +3733,49 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   /* vvv chase x86 */
   case PRIMITIVE_OP_LT_BOOL: /* fallthrough */
   case PRIMITIVE_OP_LT_U8: {
-    gen_cmp8_behavior(f, off0, off1, X86_SETCC_B);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_B, OZ_8);
   } break;
   case PRIMITIVE_OP_LE_BOOL: /* fallthrough */
   case PRIMITIVE_OP_LE_U8: {
-    gen_cmp8_behavior(f, off0, off1, X86_SETCC_BE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_BE, OZ_8);
   } break;
   case PRIMITIVE_OP_GT_BOOL: /* fallthrough */
   case PRIMITIVE_OP_GT_U8: {
-    gen_cmp8_behavior(f, off0, off1, X86_SETCC_A);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_A, OZ_8);
   } break;
   case PRIMITIVE_OP_GE_BOOL: /* fallthrough */
   case PRIMITIVE_OP_GE_U8: {
-    gen_cmp8_behavior(f, off0, off1, X86_SETCC_AE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_AE, OZ_8);
   } break;
   case PRIMITIVE_OP_EQ_BOOL: /* fallthrough */
   case PRIMITIVE_OP_EQ_U8: {
-    gen_cmp8_behavior(f, off0, off1, X86_SETCC_E);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_E, OZ_8);
   } break;
   case PRIMITIVE_OP_NE_BOOL: /* fallthrough */
   case PRIMITIVE_OP_NE_U8: {
-    gen_cmp8_behavior(f, off0, off1, X86_SETCC_NE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_NE, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_XOR_BOOL: /* fallthrough */
   case PRIMITIVE_OP_BIT_XOR_U8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_xor(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_OR_BOOL: /* fallthrough */
   case PRIMITIVE_OP_BIT_OR_U8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_or(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_AND_BOOL: /* fallthrough */
   case PRIMITIVE_OP_BIT_AND_U8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_and(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 7, OZ_8);
@@ -3784,8 +3784,8 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_shl_cl(f, GP_A, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_U8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 7, OZ_8);
@@ -3795,75 +3795,75 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
 
   case PRIMITIVE_OP_ADD_I8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_add(f, GP_A, GP_C, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_SUB_I8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_sub(f, GP_A, GP_C, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_alah_imul_w8(f, X86_CL);
     gen_crash_jcc(f, h, X86_JCC_O);
     ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
   case PRIMITIVE_OP_DIV_I8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_alah_idiv_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
     ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
   case PRIMITIVE_OP_MOD_I8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_alah_idiv_w8(f, X86_CL);
     /* Divide by zero will produce #DE. (I guess.) */
     ia_gen_mov_reg8(f, X86_AL, X86_AH);
     ia_gen_movzx8_reg8(f, GP_A, X86_AL);
   } break;
   case PRIMITIVE_OP_LT_I8: {
-    gen_cmp8_behavior(f, off0, off1, X86_SETCC_L);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_L, OZ_8);
   } break;
   case PRIMITIVE_OP_LE_I8: {
-    gen_cmp8_behavior(f, off0, off1, X86_SETCC_LE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_LE, OZ_8);
   } break;
   case PRIMITIVE_OP_GT_I8: {
-    gen_cmp8_behavior(f, off0, off1, X86_SETCC_G);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_G, OZ_8);
   } break;
   case PRIMITIVE_OP_GE_I8: {
-    gen_cmp8_behavior(f, off0, off1, X86_SETCC_GE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_GE, OZ_8);
   } break;
   case PRIMITIVE_OP_EQ_I8: {
-    gen_cmp8_behavior(f, off0, off1, X86_SETCC_E);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_E, OZ_8);
   } break;
   case PRIMITIVE_OP_NE_I8: {
-    gen_cmp8_behavior(f, off0, off1, X86_SETCC_NE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_NE, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_XOR_I8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_xor(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_OR_I8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_or(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_AND_I8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_and(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_I8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 7, OZ_8);
@@ -3872,8 +3872,8 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_shl_cl(f, GP_A, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_RIGHTSHIFT_I8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
 
     /* We handle out-of-range rhs, that's all. */
     ia_gen_cmp_imm(f, GP_C, 7, OZ_8);
