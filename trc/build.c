@@ -1473,33 +1473,9 @@ void ia_gen_not(struct objfile *f, enum gp_reg dest, enum oz oz) {
   pushtext(f, mod_reg_rm(MOD11, 2, dest));
 }
 
-void y86x64_gen_neg_w32(struct objfile *f, enum gp_reg dest) {
-  uint8_t b[2];
-  b[0] = 0xF7;
-  b[1] = mod_reg_rm(MOD11, 3, dest);
-  apptext(f, b, 2);
-}
-
-void x64_gen_neg_w64(struct objfile *f, enum x64_reg dest) {
-  CHECK(dest <= X64_RDI);
-  uint8_t b[3];
-  b[0] = kREXW;
-  b[1] = 0xF7;
-  b[2] = mod_reg_rm(MOD11, 3, dest);
-  apptext(f, b, 3);
-}
-
-void gp_gen_neg(struct objfile *f, enum gp_reg dest) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    y86x64_gen_neg_w32(f, dest);
-    break;
-  case TARGET_ARCH_X64:
-    x64_gen_neg_w64(f, map_x64_reg(dest));
-    break;
-  default:
-    UNREACHABLE();
-  }
+void ia_gen_neg(struct objfile *f, enum gp_reg dest, enum oz oz) {
+  ia_prefix(f, 0xF7, oz);
+  pushtext(f, mod_reg_rm(MOD11, 3, dest));
 }
 
 void y86x64_gen_sub_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
@@ -3687,7 +3663,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     overflowing. */
     ia_gen_cmp_imm(f, GP_A, 1, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_O);
-    gp_gen_neg(f, GP_A);
+    ia_gen_neg(f, GP_A, OZ_8);
   } break;
   case PRIMITIVE_OP_NEGATE_I16: {
     gp_gen_movsx16(f, GP_A, GP_BP, off0);
@@ -3695,7 +3671,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     overflowing. */
     ia_gen_cmp_imm(f, GP_A, 1, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_O);
-    gp_gen_neg(f, GP_A);
+    ia_gen_neg(f, GP_A, OZ_16);
   } break;
   case PRIMITIVE_OP_NEGATE_I32: {
     gp_gen_movsx32(f, GP_A, GP_BP, off0);
@@ -3703,7 +3679,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     overflowing. */
     ia_gen_cmp_imm(f, GP_A, 1, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_O);
-    gp_gen_neg(f, GP_A);
+    ia_gen_neg(f, GP_A, OZ_32);
   } break;
 
   case PRIMITIVE_OP_LOGICAL_NOT: {
