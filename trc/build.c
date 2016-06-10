@@ -6015,6 +6015,7 @@ int build_def(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
+/* chase x86 */
 void build_typetrav_defs(struct checkstate *cs,
                          struct objfile *f) {
   /* cs.typetrav_symbol_infos_count is a moving target -- we see more
