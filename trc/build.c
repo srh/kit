@@ -1458,18 +1458,14 @@ void ia_gen_xor(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz
   pushtext(f, mod_reg_rm(MOD11, src, dest));
 }
 
-void x86_gen_or_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
-  uint8_t b[2];
-  b[0] = 0x09;
-  b[1] = mod_reg_rm(MOD11, src, dest);
-  apptext(f, b, 2);
+void ia_gen_or(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
+  ia_prefix(f, 0x09, oz);
+  pushtext(f, mod_reg_rm(MOD11, src, dest));
 }
 
-void x86_gen_and_w32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
-  uint8_t b[2];
-  b[0] = 0x21;
-  b[1] = mod_reg_rm(MOD11, src, dest);
-  apptext(f, b, 2);
+void ia_gen_and(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
+  ia_prefix(f, 0x21, oz);
+  pushtext(f, mod_reg_rm(MOD11, src, dest));
 }
 
 void x86_gen_not_w8(struct objfile *f, enum x86_reg8 dest) {
@@ -3827,13 +3823,13 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_OR_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+    ia_gen_or(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_AND_BOOL: /* fallthrough */
   case PRIMITIVE_OP_BIT_AND_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+    ia_gen_and(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
@@ -3916,12 +3912,12 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_OR_I8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+    ia_gen_or(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_AND_I8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+    ia_gen_and(f, GP_A, GP_C, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_I8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
@@ -4004,12 +4000,12 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_OR_U16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+    ia_gen_or(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_AND_U16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+    ia_gen_and(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_U16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
@@ -4090,12 +4086,12 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_OR_I16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+    ia_gen_or(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_AND_I16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+    ia_gen_and(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_I16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
@@ -4200,14 +4196,14 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_OR_U32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+    ia_gen_or(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_AND_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_AND_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_AND_U32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+    ia_gen_and(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_LEFTSHIFT_OSIZE: /* fallthrough */
@@ -4293,12 +4289,12 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_OR_I32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    x86_gen_or_w32(f, X86_EAX, X86_ECX);
+    ia_gen_or(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_AND_I32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    x86_gen_and_w32(f, X86_EAX, X86_ECX);
+    ia_gen_and(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_BIT_LEFTSHIFT_I32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
