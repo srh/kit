@@ -1425,8 +1425,7 @@ void x86_gen_cwd_w16(struct objfile *f) {
 }
 
 void x86_gen_cdq_w32(struct objfile *f) {
-  uint8_t b = 0x99;
-  apptext(f, &b, 1);
+  pushtext(f, 0x99);
 }
 
 void y86x64_gen_cmp_w32(struct objfile *f, enum gp_reg lhs, enum gp_reg rhs) {
