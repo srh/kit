@@ -1293,48 +1293,9 @@ void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
   apptext(f, b, 6);
 }
 
-void y86x64_gen_add_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
-  check_y86x64(f);
-  uint8_t b[2];
-  b[0] = 0x01;
-  b[1] = mod_reg_rm(MOD11, src, dest);
-  apptext(f, b, 2);
-}
-
-void x64_gen_add_w64(struct objfile *f, enum x64_reg dest, enum x64_reg src) {
-  uint8_t b[3];
-  b[0] = kREXW;
-  b[1] = 0x01;
-  b[2] = mod_reg_rm(MOD11, src, dest);
-  apptext(f, b, 3);
-}
-
-void gp_gen_add_wPTR(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    y86x64_gen_add_w32(f, dest, src);
-    break;
-  case TARGET_ARCH_X64:
-    x64_gen_add_w64(f, map_x64_reg(dest), map_x64_reg(src));
-    break;
-  default:
-    UNREACHABLE();
-  }
-}
-
-void x86_gen_add_w16(struct objfile *f, enum x86_reg16 dest, enum x86_reg16 src) {
-  uint8_t b[3];
-  b[0] = 0x66;
-  b[1] = 0x01;
-  b[2] = mod_reg_rm(MOD11, src, dest);
-  apptext(f, b, 3);
-}
-
-void x86_gen_add_w8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
-  uint8_t b[2];
-  b[0] = 0x00;
-  b[1] = mod_reg_rm(MOD11, src, dest);
-  apptext(f, b, 2);
+void ia_gen_add(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
+  ia_prefix(f, 0x01, oz);
+  pushtext(f, mod_reg_rm(MOD11, src, dest));
 }
 
 void x86_gen_eaxedx_mul_w32(struct objfile *f, enum x86_reg src) {
@@ -3896,7 +3857,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_ADD_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-    x86_gen_add_w8(f, X86_AL, X86_CL);
+    ia_gen_add(f, GP_A, GP_C, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_SUB_U8: {
@@ -3993,7 +3954,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_ADD_I8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
-    x86_gen_add_w8(f, X86_AL, X86_CL);
+    ia_gen_add(f, GP_A, GP_C, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_SUB_I8: {
@@ -4081,7 +4042,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_ADD_U16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-    x86_gen_add_w16(f, X86_AX, X86_CX);
+    ia_gen_add(f, GP_A, GP_C, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_SUB_U16: {
@@ -4169,7 +4130,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_ADD_I16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
-    x86_gen_add_w16(f, X86_AX, X86_CX);
+    ia_gen_add(f, GP_A, GP_C, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_SUB_I16: {
@@ -4256,7 +4217,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_ADD_U32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    y86x64_gen_add_w32(f, GP_A, GP_C);
+    ia_gen_add(f, GP_A, GP_C, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_SUB_SIZE: /* fallthrough */
@@ -4371,7 +4332,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_ADD_I32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    y86x64_gen_add_w32(f, GP_A, GP_C);
+    ia_gen_add(f, GP_A, GP_C, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_SUB_I32: {
@@ -4458,7 +4419,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_ADD_OSIZE: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    y86x64_gen_add_w32(f, GP_A, GP_C);
+    ia_gen_add(f, GP_A, GP_C, OZ_32);
   } break;
   case PRIMITIVE_OP_SUB_OSIZE: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
@@ -4979,7 +4940,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   gp_gen_imul_wPTR(f, GP_A, GP_C);
   gen_crash_jcc(f, h, X86_JCC_O);
 
-  gp_gen_add_wPTR(f, GP_A, GP_D);
+  ia_gen_add(f, GP_A, GP_D, ptr_oz(f));
 
   struct loc loc = frame_push_loc(h, DWORD_SIZE);
   gp_gen_store_register(f, loc, GP_A);
@@ -5327,7 +5288,7 @@ struct loc gen_array_element_loc(struct checkstate *cs,
 
   gp_gen_load_addressof(f, GP_D, src);
   gp_gen_mov_reg_imm32(f, GP_C, elem_offset);
-  gp_gen_add_wPTR(f, GP_D, GP_C);
+  ia_gen_add(f, GP_D, GP_C, ptr_oz(f));
   struct loc loc = frame_push_loc(h, ptr_size(cs->arch));
   gp_gen_store_register(f, loc, GP_D);
 
