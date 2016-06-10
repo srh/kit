@@ -1468,26 +1468,9 @@ void ia_gen_and(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz
   pushtext(f, mod_reg_rm(MOD11, src, dest));
 }
 
-void x86_gen_not_w8(struct objfile *f, enum x86_reg8 dest) {
-  uint8_t b[2];
-  b[0] = 0xF6;
-  b[1] = mod_reg_rm(MOD11, 2, dest);
-  apptext(f, b, 2);
-}
-
-void x86_gen_not_w16(struct objfile *f, enum x86_reg16 dest) {
-  uint8_t b[3];
-  b[0] = 0x66;
-  b[1] = 0xF7;
-  b[2] = mod_reg_rm(MOD11, 2, dest);
-  apptext(f, b, 3);
-}
-
-void x86_gen_not_w32(struct objfile *f, enum x86_reg dest) {
-  uint8_t b[2];
-  b[0] = 0xF7;
-  b[1] = mod_reg_rm(MOD11, 2, dest);
-  apptext(f, b, 2);
+void ia_gen_not(struct objfile *f, enum gp_reg dest, enum oz oz) {
+  ia_prefix(f, 0xF7, oz);
+  pushtext(f, mod_reg_rm(MOD11, 2, dest));
 }
 
 void y86x64_gen_neg_w32(struct objfile *f, enum gp_reg dest) {
@@ -3733,19 +3716,19 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_BIT_NOT_I8: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_U8: {
     x86_gen_movzx8(f, X86_EAX, X86_EBP, off0);
-    x86_gen_not_w8(f, X86_AL);
+    ia_gen_not(f, GP_A, OZ_8);
   } break;
   case PRIMITIVE_OP_BIT_NOT_I16: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_U16: {
     x86_gen_movzx16(f, X86_EAX, X86_EBP, off0);
-    x86_gen_not_w16(f, X86_AX);
+    ia_gen_not(f, GP_A, OZ_16);
   } break;
   case PRIMITIVE_OP_BIT_NOT_I32: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_SIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_U32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    x86_gen_not_w32(f, X86_EAX);
+    ia_gen_not(f, GP_A, OZ_32);
   } break;
 
   case PRIMITIVE_OP_EQ_PTR: {
