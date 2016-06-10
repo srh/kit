@@ -1975,6 +1975,7 @@ void adjust_frame_for_callsite_alignment(struct frame *h, uint32_t arglist_size)
 void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                         struct def_instantiation *inst);
 
+/* chase x86 */
 void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f,
                               struct frame *h,
                               struct loc loc, struct def_instantiation *inst) {
@@ -1986,6 +1987,7 @@ void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f,
   frame_restore_offset(h, stack_offset);
 }
 
+/* chase x86 */
 void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
                               struct frame *h,
                               struct loc dest, struct loc src,
@@ -1999,7 +2001,7 @@ void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
   frame_restore_offset(h, stack_offset);
 }
 
-/* chase x86 */
+/* chase mark */
 int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct frame *h,
                              enum typetrav_func tf, struct loc dest, struct loc src,
                              struct typeexpr_traits *traits,
