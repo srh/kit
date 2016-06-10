@@ -3696,19 +3696,19 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_cmp_behavior(f, off0, off1, X86_SETCC_NE, ptr_oz(f));
   } break;
 
-  /* vvv chase x86 */
   case PRIMITIVE_OP_ADD_U8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_add(f, GP_A, GP_C, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_SUB_U8: {
-    gp_gen_movzx8(f, GP_A, GP_BP, off0);
-    gp_gen_movzx8(f, GP_C, GP_BP, off1);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
+    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
     ia_gen_sub(f, GP_A, GP_C, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
+  /* vvv chase x86 */
   case PRIMITIVE_OP_MUL_U8: {
     gp_gen_movzx8(f, GP_A, GP_BP, off0);
     gp_gen_movzx8(f, GP_C, GP_BP, off1);
