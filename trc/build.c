@@ -3269,7 +3269,19 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *ret);
 
+void gen_cmp_behavior(struct objfile *f,
+                      int32_t off0, int32_t off1,
+                      enum x86_setcc setcc_code,
+                      enum oz oz) {
+  gp_gen_movzx(f, GP_D, GP_BP, off0, oz);
+  gp_gen_movzx(f, GP_C, GP_BP, off1, oz);
+  ia_gen_cmp(f, GP_D, GP_C, oz);
+  y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
+  x86_gen_movzx8_reg8(f, X86_EAX, X86_AL);
+}
+
 /* TODO(): Check callers of this for use on pointers, where cmp64 might be what we want. */
+/* TODO(): Replace with gen_cmp_behavior usage. */
 void gen_cmp32_behavior(struct objfile *f,
                         int32_t off0, int32_t off1,
                         enum x86_setcc setcc_code) {
@@ -3677,14 +3689,14 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_not(f, GP_A, OZ_32);
   } break;
 
-  /* vvv chase x86 */
   case PRIMITIVE_OP_EQ_PTR: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_E, ptr_oz(f));
   } break;
   case PRIMITIVE_OP_NE_PTR: {
-    gen_cmp32_behavior(f, off0, off1, X86_SETCC_NE);
+    gen_cmp_behavior(f, off0, off1, X86_SETCC_NE, ptr_oz(f));
   } break;
 
+  /* vvv chase x86 */
   case PRIMITIVE_OP_ADD_U8: {
     gp_gen_movzx8(f, GP_A, GP_BP, off0);
     gp_gen_movzx8(f, GP_C, GP_BP, off1);
