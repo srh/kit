@@ -232,6 +232,7 @@ void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg);
 void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src);
 void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg,
                             enum x64_reg spare);
+void x64_gen_load_register(struct objfile *f, enum x64_reg reg, struct loc src);
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum x86_jcc code);
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number);
 void gen_crash_jmp(struct objfile *f, struct frame *h);
@@ -1975,28 +1976,51 @@ void adjust_frame_for_callsite_alignment(struct frame *h, uint32_t arglist_size)
 void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                         struct def_instantiation *inst);
 
-/* chase x86 */
+/* chase mark */
 void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f,
                               struct frame *h,
                               struct loc loc, struct def_instantiation *inst) {
   int32_t stack_offset = frame_save_offset(h);
-  /* X86 - assumes pointer is dword-sized, passed on stack */
-  adjust_frame_for_callsite_alignment(h, DWORD_SIZE);
-  y86_push_address(f, h, loc);
+  switch (cs->arch) {
+  case TARGET_ARCH_Y86:
+    /* pointer passed on stack */
+    adjust_frame_for_callsite_alignment(h, DWORD_Y86_SIZE);
+    y86_push_address(f, h, loc);
+    break;
+  case TARGET_ARCH_X64:
+    /* pointer passed in register */
+    adjust_frame_for_callsite_alignment(h, 0);
+    x64_gen_load_register(f, x64_param_regs[0], loc);
+    break;
+  default:
+    UNREACHABLE();
+  }
   typetrav_call_func(cs, f, h, inst);
   frame_restore_offset(h, stack_offset);
 }
 
-/* chase x86 */
+/* chase mark */
 void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
                               struct frame *h,
                               struct loc dest, struct loc src,
                               struct def_instantiation *inst) {
   int32_t stack_offset = frame_save_offset(h);
-  /* X86 - assumes pointer is dword-sized, passed on stack */
-  adjust_frame_for_callsite_alignment(h, 2 * DWORD_SIZE);
-  y86_push_address(f, h, src);
-  y86_push_address(f, h, dest);
+  switch (cs->arch) {
+  case TARGET_ARCH_Y86:
+    /* pointer passed on stack */
+    adjust_frame_for_callsite_alignment(h, 2 * DWORD_Y86_SIZE);
+    y86_push_address(f, h, src);
+    y86_push_address(f, h, dest);
+    break;
+  case TARGET_ARCH_X64:
+    /* pointer passed in registers */
+    adjust_frame_for_callsite_alignment(h, 0);
+    x64_gen_load_register(f, x64_param_regs[1], src);
+    x64_gen_load_register(f, x64_param_regs[0], dest);
+    break;
+  default:
+    UNREACHABLE();
+  }
   typetrav_call_func(cs, f, h, inst);
   frame_restore_offset(h, stack_offset);
 }
