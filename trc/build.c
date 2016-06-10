@@ -293,6 +293,20 @@ void ia_prefix(struct objfile *f, uint8_t opnum, enum oz oz) {
   pushtext(f, opnum);
 }
 
+void ia_imm(struct objfile *f, int32_t imm, enum oz oz) {
+  uint8_t b[4];
+  write_le_i32(b, imm);
+  if (oz == OZ_8) {
+    CHECK(imm >= -0x80 && imm <= 0xFF);
+    apptext(f, b, 1);
+  } else if (oz == OZ_16) {
+    CHECK(imm >= -0x8000 && imm <= 0xFFFF);
+    apptext(f, b, 2);
+  } else {
+    apptext(f, b, 4);
+  }
+}
+
 /* Right now we don't worry about generating multiple objfiles, so we
 just blithely attach a serial number to each name to make them
 unique. */
@@ -1433,69 +1447,10 @@ void ia_gen_cmp(struct objfile *f, enum gp_reg lhs, enum gp_reg rhs, enum oz oz)
   pushtext(f, mod_reg_rm(MOD11, rhs, lhs));
 }
 
-void y86x64_gen_cmp_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
-  check_y86x64(f);
-  uint8_t b[6];
-  b[0] = 0x81;
-  b[1] = mod_reg_rm(MOD11, 7, lhs);
-  write_le_i32(b + 2, imm32);
-  apptext(f, b, 6);
-}
-
-void x64_gen_cmp_w64_imm32(struct objfile *f, enum x64_reg lhs, int32_t imm32) {
-  uint8_t b[7];
-  b[0] = kREXW;
-  b[1] = 0x81;
-  b[2] = mod_reg_rm(MOD11, 7, lhs);
-  write_le_i32(b + 3, imm32);
-  apptext(f, b, 7);
-}
-
-void gp_gen_cmp_w32_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
-  /* y86/x64 */
-  y86x64_gen_cmp_imm32(f, lhs, imm32);
-}
-
-void gp_gen_cmp_imm32(struct objfile *f, enum gp_reg lhs, int32_t imm32) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    y86x64_gen_cmp_imm32(f, lhs, imm32);
-    break;
-  case TARGET_ARCH_X64:
-    x64_gen_cmp_w64_imm32(f, map_x64_reg(lhs), imm32);
-    break;
-  default:
-    UNREACHABLE();
-  }
-}
-
-void y86x64_gen_cmp_reg16_imm16(struct objfile *f, enum x86_reg16 lhs, int16_t imm16) {
-  check_y86x64(f);
-  uint8_t b[5];
-  b[0] = 0x66;
-  b[1] = 0x81;
-  b[2] = mod_reg_rm(MOD11, 7, lhs);
-  write_le_i16(b + 3, imm16);
-  apptext(f, b, 5);
-}
-
-void gp_gen_cmp_w16_imm16(struct objfile *f, enum gp_reg lhs, int16_t imm16) {
-  check_y86x64(f);
-  y86x64_gen_cmp_reg16_imm16(f, map_x86_reg16(lhs), imm16);
-}
-
-void y86x64_gen_cmp_reg8_imm8(struct objfile *f, enum x86_reg8 lhs, int8_t imm8) {
-  check_y86x64(f);
-  uint8_t b[3];
-  b[0] = 0x80;
-  b[1] = mod_reg_rm(MOD11, 7, lhs);
-  b[2] = (uint8_t)imm8;
-  apptext(f, b, 3);
-}
-
-void gp_gen_cmp_w8_imm8(struct objfile *f, enum gp_reg lhs, int8_t imm8) {
-  check_y86x64(f);
-  y86x64_gen_cmp_reg8_imm8(f, map_x86_reg8(lhs), imm8);
+void ia_gen_cmp_imm(struct objfile *f, enum gp_reg lhs, int32_t imm, enum oz oz) {
+  ia_prefix(f, 0x81, oz);
+  pushtext(f, mod_reg_rm(MOD11, 7, lhs));
+  ia_imm(f, imm, oz);
 }
 
 void y86x64_gen_xor_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
@@ -2340,7 +2295,7 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
     STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
     for (size_t tagnum = 0, e = size_add(1, rhs->u.enumspec.enumfields_count);
          tagnum < e; tagnum++) {
-      gp_gen_cmp_imm32(f, GP_A, size_to_int32(tagnum));
+      ia_gen_cmp_imm(f, GP_A, size_to_int32(tagnum), ptr_oz(f));
       gen_placeholder_jcc(f, h, X86_JCC_NE, next_target);
       switch (tf) {
       case TYPETRAV_FUNC_DESTROY:
@@ -3560,17 +3515,17 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
 
   case PRIMITIVE_OP_CONVERT_U16_TO_U8: {
     gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_w32_imm32(f, GP_A, 0xFF);
+    ia_gen_cmp_imm(f, GP_A, 0xFF, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U16_TO_I8: {
     gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_w32_imm32(f, GP_A, 0x7F);
+    ia_gen_cmp_imm(f, GP_A, 0x7F, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U16_TO_I16: {
     gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_w32_imm32(f, GP_A, 0x7FFF);
+    ia_gen_cmp_imm(f, GP_A, 0x7FFF, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U16_TO_U16: /* fallthrough */
@@ -3583,14 +3538,14 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
 
   case PRIMITIVE_OP_CONVERT_I16_TO_U8: {
     gp_gen_movzx16(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_w32_imm32(f, GP_A, 0xFF);
+    ia_gen_cmp_imm(f, GP_A, 0xFF, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_I16_TO_I8: {
     gp_gen_movsx16(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_w32_imm32(f, GP_A, 0x7F);
+    ia_gen_cmp_imm(f, GP_A, 0x7F, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_G);
-    gp_gen_cmp_w32_imm32(f, GP_A, -0x80);
+    ia_gen_cmp_imm(f, GP_A, -0x80, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_L);
   } break;
   case PRIMITIVE_OP_CONVERT_I16_TO_U16: /* fallthrough */
@@ -3612,43 +3567,43 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     intepreted with the same signedness, has the same value. */
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_U8: {
     gp_gen_loadPTR(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_imm32(f, GP_A, 0xFF);
+    ia_gen_cmp_imm(f, GP_A, 0xFF, ptr_oz(f));
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_U8: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_w32_imm32(f, GP_A, 0xFF);
+    ia_gen_cmp_imm(f, GP_A, 0xFF, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_I8: {
     gp_gen_loadPTR(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_imm32(f, GP_A, 0x7F);
+    ia_gen_cmp_imm(f, GP_A, 0x7F, ptr_oz(f));
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_I8: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_w32_imm32(f, GP_A, 0x7F);
+    ia_gen_cmp_imm(f, GP_A, 0x7F, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_U16: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_U16: {
     gp_gen_loadPTR(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_imm32(f, GP_A, 0xFFFF);
+    ia_gen_cmp_imm(f, GP_A, 0xFFFF, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_U16: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_w32_imm32(f, GP_A, 0xFFFF);
+    ia_gen_cmp_imm(f, GP_A, 0xFFFF, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_I16: {
     gp_gen_loadPTR(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_imm32(f, GP_A, 0x7FFF);
+    ia_gen_cmp_imm(f, GP_A, 0x7FFF, ptr_oz(f));
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_I16: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_w32_imm32(f, GP_A, 0x7FFF);
+    ia_gen_cmp_imm(f, GP_A, 0x7FFF, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_SIZE: /* fallthrough */
@@ -3680,7 +3635,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_I32: {
     gp_gen_loadPTR(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_imm32(f, GP_A, 0x7FFFFFFF);
+    ia_gen_cmp_imm(f, GP_A, 0x7FFFFFFF, ptr_oz(f));
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_U32_TO_I32: {
@@ -3691,40 +3646,40 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
 
   case PRIMITIVE_OP_CONVERT_I32_TO_U8: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_w32_imm32(f, GP_A, 0xFF);
+    ia_gen_cmp_imm(f, GP_A, 0xFF, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_I8: {
     gp_gen_loadPTR(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_imm32(f, GP_A, 0x7F);
+    ia_gen_cmp_imm(f, GP_A, 0x7F, ptr_oz(f));
     gen_crash_jcc(f, h, X86_JCC_G);
-    gp_gen_cmp_imm32(f, GP_A, -0x80);
+    ia_gen_cmp_imm(f, GP_A, -0x80, ptr_oz(f));
     gen_crash_jcc(f, h, X86_JCC_L);
   } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_I8: {
     gp_gen_movsx32(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_imm32(f, GP_A, 0x7F);
+    ia_gen_cmp_imm(f, GP_A, 0x7F, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_G);
-    gp_gen_cmp_imm32(f, GP_A, -0x80);
+    ia_gen_cmp_imm(f, GP_A, -0x80, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_L);
   } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_U16: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_imm32(f, GP_A, 0xFFFF);
+    ia_gen_cmp_imm(f, GP_A, 0xFFFF, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_I16: {
     gp_gen_loadPTR(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_imm32(f, GP_A, 0x7FFF);
+    ia_gen_cmp_imm(f, GP_A, 0x7FFF, ptr_oz(f));
     gen_crash_jcc(f, h, X86_JCC_G);
-    gp_gen_cmp_imm32(f, GP_A, -0x8000);
+    ia_gen_cmp_imm(f, GP_A, -0x8000, ptr_oz(f));
     gen_crash_jcc(f, h, X86_JCC_L);
   } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_I16: {
     gp_gen_movsx32(f, GP_A, GP_BP, off0);
-    gp_gen_cmp_imm32(f, GP_A, 0x7FFF);
+    ia_gen_cmp_imm(f, GP_A, 0x7FFF, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_G);
-    gp_gen_cmp_imm32(f, GP_A, -0x8000);
+    ia_gen_cmp_imm(f, GP_A, -0x8000, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_L);
   } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_SIZE: /* fallthrough */
@@ -3761,7 +3716,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     first read? */
     /* Crashes if the value is INT8_MIN by subtracting 1 and
     overflowing. */
-    gp_gen_cmp_w8_imm8(f, GP_A, 1);
+    ia_gen_cmp_imm(f, GP_A, 1, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_O);
     gp_gen_neg(f, GP_A);
   } break;
@@ -3769,7 +3724,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movsx16(f, GP_A, GP_BP, off0);
     /* Crashes if the value is INT16_MIN by subtracting 1 and
     overflowing. */
-    gp_gen_cmp_w16_imm16(f, GP_A, 1);
+    ia_gen_cmp_imm(f, GP_A, 1, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_O);
     gp_gen_neg(f, GP_A);
   } break;
@@ -3777,7 +3732,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movsx32(f, GP_A, GP_BP, off0);
     /* Crashes if the value is INT32_MIN by subtracting 1 and
     overflowing. */
-    gp_gen_cmp_w32_imm32(f, GP_A, 1);
+    ia_gen_cmp_imm(f, GP_A, 1, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_O);
     gp_gen_neg(f, GP_A);
   } break;
@@ -3895,7 +3850,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    gp_gen_cmp_imm32(f, GP_C, 7);
+    ia_gen_cmp_imm(f, GP_C, 7, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     ia_gen_shl_cl(f, GP_A, OZ_8);
@@ -3905,7 +3860,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    gp_gen_cmp_imm32(f, GP_C, 7);
+    ia_gen_cmp_imm(f, GP_C, 7, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     ia_gen_shr_cl(f, GP_A, OZ_8);
@@ -3983,7 +3938,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    gp_gen_cmp_imm32(f, GP_C, 7);
+    ia_gen_cmp_imm(f, GP_C, 7, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     ia_gen_shl_cl(f, GP_A, OZ_8);
@@ -3993,7 +3948,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx8(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    gp_gen_cmp_imm32(f, GP_C, 7);
+    ia_gen_cmp_imm(f, GP_C, 7, OZ_8);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     ia_gen_sar_cl(f, GP_A, OZ_8);
@@ -4071,7 +4026,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    gp_gen_cmp_imm32(f, GP_C, 15);
+    ia_gen_cmp_imm(f, GP_C, 15, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     ia_gen_shl_cl(f, GP_A, OZ_16);
@@ -4081,7 +4036,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    gp_gen_cmp_imm32(f, GP_C, 15);
+    ia_gen_cmp_imm(f, GP_C, 15, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     ia_gen_shr_cl(f, GP_A, OZ_16);
@@ -4157,7 +4112,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    gp_gen_cmp_imm32(f, GP_C, 15);
+    ia_gen_cmp_imm(f, GP_C, 15, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     ia_gen_shl_cl(f, GP_A, OZ_16);
@@ -4167,7 +4122,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     x86_gen_movzx16(f, X86_ECX, X86_EBP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    gp_gen_cmp_imm32(f, GP_C, 15);
+    ia_gen_cmp_imm(f, GP_C, 15, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     ia_gen_sar_cl(f, GP_A, OZ_16);
@@ -4271,7 +4226,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    gp_gen_cmp_imm32(f, GP_C, 31);
+    ia_gen_cmp_imm(f, GP_C, 31, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     ia_gen_shl_cl(f, GP_A, OZ_32);
@@ -4283,7 +4238,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    gp_gen_cmp_imm32(f, GP_C, 31);
+    ia_gen_cmp_imm(f, GP_C, 31, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     ia_gen_shr_cl(f, GP_A, OZ_32);
@@ -4360,7 +4315,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    gp_gen_cmp_imm32(f, GP_C, 31);
+    ia_gen_cmp_imm(f, GP_C, 31, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     ia_gen_shl_cl(f, GP_A, OZ_32);
@@ -4370,7 +4325,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movzx32(f, GP_C, GP_BP, off1);
 
     /* We handle out-of-range rhs, that's all. */
-    gp_gen_cmp_imm32(f, GP_C, 31);
+    ia_gen_cmp_imm(f, GP_C, 31, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_A);
 
     ia_gen_sar_cl(f, GP_A, OZ_32);
@@ -5623,11 +5578,12 @@ int gen_casebody(struct checkstate *cs, struct objfile *f,
                  struct ast_bracebody *body,
                  size_t fail_target_number) {
   CHECK(4 == enum_tag_size(cs->arch));
-  gp_gen_cmp_w32_imm32(f, GP_A,
-                       int32_add(
-                           size_to_int32(
-                               ast_case_pattern_info_constructor_number(&constructor->info).value),
-                           FIRST_ENUM_TAG_NUMBER));
+  ia_gen_cmp_imm(f, GP_A,
+                 int32_add(
+                     size_to_int32(
+                         ast_case_pattern_info_constructor_number(&constructor->info).value),
+                     FIRST_ENUM_TAG_NUMBER),
+                 OZ_32);
   gen_placeholder_jcc(f, h, X86_JCC_NE, fail_target_number);
 
   struct vardata vd;
@@ -6008,8 +5964,9 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       gp_gen_mov_reg_imm32(f, GP_C, FIRST_ENUM_TAG_NUMBER);
       gp_gen_sub(f, GP_A, GP_C);
       CHECK(4 == enum_tag_size(cs->arch));
-      gp_gen_cmp_w32_imm32(f, GP_A,
-                           size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.u.default_pattern.info).value));
+      ia_gen_cmp_imm(f, GP_A,
+                     size_to_int32(ast_case_pattern_info_constructor_number(&cas->pattern.u.default_pattern.info).value),
+                     OZ_32);
       gen_placeholder_jcc(f, h, X86_JCC_AE, next_target);
 
       if (!gen_bracebody(cs, f, h,
