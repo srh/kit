@@ -76,7 +76,6 @@ enum x86_reg {
   X86_EDI,
 };
 
-/* TODO(): Double-check usage, some callee-save regs are different. */
 enum x64_reg map_x64_reg(enum gp_reg reg) {
   return (enum x64_reg)reg;
 }
@@ -215,7 +214,7 @@ void postcall_return_in_loc(struct checkstate *cs,
                             struct objfile *f,
                             struct funcall_arglist_info *arglist_info,
                             struct loc return_loc);
-void y86x64_gen_call(struct objfile *f, struct sti func_sti);
+void ia_gen_call(struct objfile *f, struct sti func_sti);
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc);
 void gen_mov(struct objfile *f, struct loc dest, struct loc src);
 void gen_bzero(struct objfile *f, struct loc dest);
@@ -505,8 +504,6 @@ uint32_t immediate_size(enum target_arch arch, struct immediate imm) {
   case IMMEDIATE_U64:
   case IMMEDIATE_I64:
     return 8;
-  /* TODO(): Check uses of IMMEDIATE_U32 and IMMEDIATE_I32 for
-  platform independence. */
   case IMMEDIATE_U32:
   case IMMEDIATE_I32:
     return 4;
@@ -851,8 +848,8 @@ int x64_sysv_memory_param(struct checkstate *cs, struct ast_typeexpr *type,
 
 int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *return_type,
                                uint32_t *return_type_size_out) {
-  /* TODO(): The calling paths for this are probably x86/x64-specific,
-  so it can/should be broken into two functions. */
+  /* The notion of "hidden return param" is platform-specific
+  but... all platforms so far have this notion. */
   struct type_attrs return_type_attrs = gp_attrsof(&cs->nt, return_type);
   switch (cs->platform) {
     /* TODO: OSX isn't quite like Windows -- see the b3sb3 case. */
@@ -1151,13 +1148,13 @@ void x86_gen_push32(struct objfile *f, enum x86_reg reg) {
   pushtext(f, 0x50 + (uint8_t)reg);
 }
 
-void y86x64_gen_pop(struct objfile *f, enum gp_reg reg) {
+void ia_gen_pop(struct objfile *f, enum gp_reg reg) {
   CHECK(reg <= GP_DI);
   uint8_t b = 0x58 + (uint8_t)map_x86_reg(reg);
   pushtext(f, b);
 }
 
-void y86x64_gen_ret(struct objfile *f) {
+void ia_gen_ret(struct objfile *f) {
   pushtext(f, 0xC3);
 }
 
@@ -1205,10 +1202,10 @@ void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2, enu
   ia_gen_test_regs(f, reg1, reg2, oz);
 }
 
-void y86x64_gen_xor_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src);
+void ia_gen_xor_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src);
 void ia_gen_xor(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz);
 
-void y86x64_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
+void ia_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
                               int32_t imm32) {
   if (imm32 == 0) {
     ia_gen_xor(f, dest, dest, ptr_oz(f));
@@ -1225,7 +1222,7 @@ void y86x64_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
 void gp_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
                           int32_t imm32) {
   check_y86x64(f);
-  y86x64_gen_mov_reg_imm32(f, dest, imm32);
+  ia_gen_mov_reg_imm32(f, dest, imm32);
 }
 
 
@@ -1251,7 +1248,7 @@ void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
     uint8_t b[5] = { 0xE8, 0, 0, 0, 0 };
     apptext(f, b, 5);
     size_t subtracted_offset = objfile_section_size(objfile_text(f));
-    y86x64_gen_pop(f, unmap_x86_reg(dest));
+    ia_gen_pop(f, unmap_x86_reg(dest));
     size_t adjusted_offset = x86_gen_placeholder_lea32(f, dest);
     objfile_section_note_diff32(objfile_text(f), symbol_table_index,
                                 subtracted_offset, adjusted_offset);
@@ -1426,7 +1423,7 @@ void x64_gen_sub_w64_imm32(struct objfile *f, enum x64_reg dest, int32_t imm) {
   apptext(f, b, 7);
 }
 
-void y86x64_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
+void ia_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
                          enum x86_setcc code) {
   uint8_t b[3];
   b[0] = 0x0F;
@@ -1438,7 +1435,7 @@ void y86x64_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
 /* Either leaves upper bits unset or sets them to zero. */
 void gp_gen_setcc_b8(struct objfile *f, enum gp_reg dest, enum x86_setcc code) {
   check_y86x64(f);
-  y86x64_gen_setcc_b8(f, map_x86_reg8(dest), code);
+  ia_gen_setcc_b8(f, map_x86_reg8(dest), code);
 }
 
 /* chase mark */
@@ -1516,10 +1513,10 @@ size_t x86_encode_placeholder_reg_rm(uint8_t *b, enum x86_reg reg_and_rm_addr,
   }
 }
 
-void y86x64_help_gen_mov_mem_imm32(struct objfile *f,
-                                   enum gp_reg dest,
-                                   int32_t dest_disp,
-                                   char buf[4]) {
+void ia_help_gen_mov_mem_imm32(struct objfile *f,
+                               enum gp_reg dest,
+                               int32_t dest_disp,
+                               char buf[4]) {
   check_y86x64(f);
   uint8_t b[10];
   b[0] = 0xC7;
@@ -1529,16 +1526,16 @@ void y86x64_help_gen_mov_mem_imm32(struct objfile *f,
   apptext(f, buf, 4);
 }
 
-void y86x64_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
-                        enum gp_reg src);
+void ia_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                    enum gp_reg src);
 
 void gp_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                     enum gp_reg src);
 
-void y86x64_gen_mov_mem_imm8(struct objfile *f,
-                             enum gp_reg dest,
-                             int32_t dest_disp,
-                             int8_t imm) {
+void ia_gen_mov_mem_imm8(struct objfile *f,
+                         enum gp_reg dest,
+                         int32_t dest_disp,
+                         int8_t imm) {
   check_y86x64(f);
   uint8_t b[11];
   b[0] = 0xC6;
@@ -1551,8 +1548,8 @@ void y86x64_gen_mov_mem_imm8(struct objfile *f,
 void ia_gen_movzx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                   int32_t src_disp, enum oz src_oz);
 
-void y86x64_gen_movzx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                        int32_t src_disp) {
+void ia_gen_movzx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                    int32_t src_disp) {
   ia_gen_movzx(f, dest, src_addr, src_disp, OZ_32);
 }
 
@@ -1587,7 +1584,7 @@ void gp_gen_movsx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                     int32_t src_disp) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    y86x64_gen_movzx32(f, dest, src_addr, src_disp);
+    ia_gen_movzx32(f, dest, src_addr, src_disp);
     break;
   case TARGET_ARCH_X64:
     x64_gen_movsx32(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp);
@@ -1601,7 +1598,7 @@ void gp_gen_loadPTR(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                     int32_t src_disp) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86:
-    y86x64_gen_movzx32(f, dest, src_addr, src_disp);
+    ia_gen_movzx32(f, dest, src_addr, src_disp);
     break;
   case TARGET_ARCH_X64:
     x64_gen_load64(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp);
@@ -1773,8 +1770,8 @@ size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest) {
   return ix;
 }
 
-void y86x64_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
-                        enum gp_reg src) {
+void ia_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                    enum gp_reg src) {
   CHECK(dest_addr <= 7 && src <= 7);
   uint8_t b[10];
   b[0] = 0x89;
@@ -1797,14 +1794,14 @@ void x64_gen_store64(struct objfile *f, enum x64_reg dest_addr, int32_t dest_dis
 void gp_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                     enum gp_reg src) {
   check_y86x64(f);
-  y86x64_gen_store32(f, dest_addr, dest_disp, src);
+  ia_gen_store32(f, dest_addr, dest_disp, src);
 }
 
 void gp_gen_storePTR(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                      enum gp_reg src) {
   switch (objfile_arch(f)) {
   case TARGET_ARCH_Y86: {
-    y86x64_gen_store32(f, dest_addr, dest_disp, src);
+    ia_gen_store32(f, dest_addr, dest_disp, src);
   } break;
   case TARGET_ARCH_X64: {
     TODO_IMPLEMENT;
@@ -1905,7 +1902,7 @@ void gen_call_imm_func(struct checkstate *cs, struct objfile *f, struct frame *h
   /* Dupes code with typetrav_call_func. */
   gen_placeholder_stack_adjustment(f, h, 0);
   /* y86/x64 */
-  y86x64_gen_call(f, func_sti);
+  ia_gen_call(f, func_sti);
   switch (cs->arch) {
   case TARGET_ARCH_Y86: {
     if (hidden_return_param && platform_ret4_hrp(cs)) {
@@ -2527,19 +2524,19 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
                                             h->return_loc);
 
     x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
-    y86x64_gen_pop(f, GP_BP);
+    ia_gen_pop(f, GP_BP);
     if (hidden_return_param && platform_ret4_hrp(cs)) {
       x86_gen_retn(f, 4);
     } else {
-      y86x64_gen_ret(f);
+      ia_gen_ret(f);
     }
   } break;
   case TARGET_ARCH_X64: {
     x64_gen_returnloc_funcreturn_convention(f, hidden_return_param,
                                             h->return_loc);
     gp_gen_mov_reg(f, GP_SP, GP_BP);
-    y86x64_gen_pop(f, GP_BP);
-    y86x64_gen_ret(f);
+    ia_gen_pop(f, GP_BP);
+    ia_gen_ret(f);
   } break;
   default:
     UNREACHABLE();
@@ -2804,9 +2801,9 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
   CHECK(dest.padded_size == 2 * DWORD_SIZE);
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
-    y86x64_gen_store32(f, GP_BP, dest.u.ebp_offset, unmap_x86_reg(lo));
-    y86x64_gen_store32(f, GP_BP, int32_add(dest.u.ebp_offset, DWORD_SIZE),
-                       unmap_x86_reg(hi));
+    ia_gen_store32(f, GP_BP, dest.u.ebp_offset, unmap_x86_reg(lo));
+    ia_gen_store32(f, GP_BP, int32_add(dest.u.ebp_offset, DWORD_SIZE),
+                   unmap_x86_reg(hi));
     break;
   case LOC_GLOBAL: {
     CRASH("Writing to globals is impossible.");
@@ -2814,8 +2811,8 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
   case LOC_EBP_INDIRECT: {
     enum x86_reg altreg = x86_choose_register_2(lo, hi);
     gp_gen_movzx(f, unmap_x86_reg(altreg), GP_BP, dest.u.ebp_indirect, OZ_32);
-    y86x64_gen_store32(f, unmap_x86_reg(altreg), 0, unmap_x86_reg(lo));
-    y86x64_gen_store32(f, unmap_x86_reg(altreg), DWORD_SIZE, unmap_x86_reg(hi));
+    ia_gen_store32(f, unmap_x86_reg(altreg), 0, unmap_x86_reg(lo));
+    ia_gen_store32(f, unmap_x86_reg(altreg), DWORD_SIZE, unmap_x86_reg(hi));
   } break;
   default:
     UNREACHABLE();
@@ -2864,18 +2861,18 @@ void gen_mov_mem_imm(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp
   case IMMEDIATE_U32: {
     char buf[4];
     write_le_u32(buf, src.u.u32);
-    y86x64_help_gen_mov_mem_imm32(f, dest_addr, dest_disp, buf);
+    ia_help_gen_mov_mem_imm32(f, dest_addr, dest_disp, buf);
   } break;
   case IMMEDIATE_I32: {
     char buf[4];
     write_le_i32(buf, src.u.i32);
-    y86x64_help_gen_mov_mem_imm32(f, dest_addr, dest_disp, buf);
+    ia_help_gen_mov_mem_imm32(f, dest_addr, dest_disp, buf);
   } break;
   case IMMEDIATE_U8: {
-    y86x64_gen_mov_mem_imm8(f, dest_addr, dest_disp, (int8_t)src.u.u8);
+    ia_gen_mov_mem_imm8(f, dest_addr, dest_disp, (int8_t)src.u.u8);
   } break;
   case IMMEDIATE_I8: {
-    y86x64_gen_mov_mem_imm8(f, dest_addr, dest_disp, src.u.i8);
+    ia_gen_mov_mem_imm8(f, dest_addr, dest_disp, src.u.i8);
   } break;
   case IMMEDIATE_VOID: {
     /* Do nothing. */
@@ -2905,7 +2902,7 @@ void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src)
 }
 
 
-void y86x64_gen_call(struct objfile *f, struct sti func_sti) {
+void ia_gen_call(struct objfile *f, struct sti func_sti) {
   uint8_t b = 0xE8;
   apptext(f, &b, 1);
   /* TODO(): x64 needs rel32 as the relocation type too, right? */
@@ -3193,7 +3190,7 @@ void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *
   /* Dupes code with gen_call_imm. */
   gen_placeholder_stack_adjustment(f, h, 0);
   /* y86/x64 */
-  y86x64_gen_call(f, di_symbol_table_index(inst));
+  ia_gen_call(f, di_symbol_table_index(inst));
   gen_placeholder_stack_adjustment(f, h, 1);
 }
 
@@ -3209,7 +3206,7 @@ void gen_cmp_behavior(struct objfile *f,
   gp_gen_movzx(f, GP_D, GP_BP, off0, oz);
   gp_gen_movzx(f, GP_C, GP_BP, off1, oz);
   ia_gen_cmp(f, GP_D, GP_C, oz);
-  y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
+  ia_gen_setcc_b8(f, X86_AL, setcc_code);
   ia_gen_movzx8_reg8(f, GP_A, X86_AL);
 }
 
@@ -3221,7 +3218,7 @@ void gen_cmp32_behavior(struct objfile *f,
   gp_gen_movzx(f, GP_D, GP_BP, off0, OZ_32);
   gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_32);
   ia_gen_cmp(f, GP_D, GP_C, OZ_32);
-  y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
+  ia_gen_setcc_b8(f, X86_AL, setcc_code);
   ia_gen_movzx8_reg8(f, GP_A, X86_AL);
 }
 
@@ -3231,7 +3228,7 @@ void gen_cmp16_behavior(struct objfile *f,
   gp_gen_movzx(f, GP_D, GP_BP, off0, OZ_16);
   gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
   ia_gen_cmp(f, GP_D, GP_C, OZ_16);
-  y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
+  ia_gen_setcc_b8(f, X86_AL, setcc_code);
   ia_gen_movzx8_reg8(f, GP_A, X86_AL);
 }
 
@@ -3241,7 +3238,7 @@ void gen_cmp8_behavior(struct objfile *f,
   gp_gen_movzx(f, GP_D, GP_BP, off0, OZ_8);
   gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
   ia_gen_cmp(f, GP_D, GP_C, OZ_8);
-  y86x64_gen_setcc_b8(f, X86_AL, setcc_code);
+  ia_gen_setcc_b8(f, X86_AL, setcc_code);
   ia_gen_movzx8_reg8(f, GP_A, X86_AL);
 }
 
