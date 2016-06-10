@@ -3309,6 +3309,29 @@ void gen_enumconstruct_behavior(struct checkstate *cs,
   frame_restore_offset(h, saved_stack_offset);
 }
 
+void gen_movzx_ac(struct objfile *f, int32_t off0, int32_t off1, enum oz oz) {
+  gp_gen_movzx(f, GP_A, GP_BP, off0, oz);
+  gp_gen_movzx(f, GP_C, GP_BP, off1, oz);
+}
+
+void gen_add_primop(struct objfile *f, struct frame *h, int32_t off0, int32_t off1,
+                    enum oz oz, enum x86_jcc crash_case) {
+  gen_movzx_ac(f, off0, off1, oz);
+  ia_gen_add(f, GP_A, GP_C, oz);
+  if (0 < (int)crash_case) {
+    gen_crash_jcc(f, h, crash_case);
+  }
+}
+
+void gen_sub_primop(struct objfile *f, struct frame *h, int32_t off0, int32_t off1,
+                    enum oz oz, enum x86_jcc crash_case) {
+  gen_movzx_ac(f, off0, off1, oz);
+  ia_gen_sub(f, GP_A, GP_C, oz);
+  if (0 < (int)crash_case) {
+    gen_crash_jcc(f, h, crash_case);
+  }
+}
+
 /* chase mark */
 void gen_very_primitive_op_behavior(struct checkstate *cs,
                                     struct objfile *f,
@@ -3665,16 +3688,10 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
 
   case PRIMITIVE_OP_ADD_U8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
-    ia_gen_add(f, GP_A, GP_C, OZ_8);
-    gen_crash_jcc(f, h, X86_JCC_C);
+    gen_add_primop(f, h, off0, off1, OZ_8, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_SUB_U8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
-    ia_gen_sub(f, GP_A, GP_C, OZ_8);
-    gen_crash_jcc(f, h, X86_JCC_C);
+    gen_sub_primop(f, h, off0, off1, OZ_8, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_MUL_U8: {
     gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
@@ -3762,16 +3779,10 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
 
   case PRIMITIVE_OP_ADD_I8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
-    ia_gen_add(f, GP_A, GP_C, OZ_8);
-    gen_crash_jcc(f, h, X86_JCC_O);
+    gen_add_primop(f, h, off0, off1, OZ_8, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_SUB_I8: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
-    ia_gen_sub(f, GP_A, GP_C, OZ_8);
-    gen_crash_jcc(f, h, X86_JCC_O);
+    gen_sub_primop(f, h, off0, off1, OZ_8, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I8: {
     gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_8);
@@ -3850,16 +3861,10 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
 
   case PRIMITIVE_OP_ADD_U16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
-    ia_gen_add(f, GP_A, GP_C, OZ_16);
-    gen_crash_jcc(f, h, X86_JCC_C);
+    gen_add_primop(f, h, off0, off1, OZ_16, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_SUB_U16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
-    ia_gen_sub(f, GP_A, GP_C, OZ_16);
-    gen_crash_jcc(f, h, X86_JCC_C);
+    gen_sub_primop(f, h, off0, off1, OZ_16, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_MUL_U16: {
     gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
@@ -3938,16 +3943,10 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
 
   case PRIMITIVE_OP_ADD_I16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
-    ia_gen_add(f, GP_A, GP_C, OZ_16);
-    gen_crash_jcc(f, h, X86_JCC_O);
+    gen_add_primop(f, h, off0, off1, OZ_16, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_SUB_I16: {
-    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
-    gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
-    ia_gen_sub(f, GP_A, GP_C, OZ_16);
-    gen_crash_jcc(f, h, X86_JCC_O);
+    gen_sub_primop(f, h, off0, off1, OZ_16, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I16: {
     gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
@@ -4023,21 +4022,19 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_sar_cl(f, GP_A, OZ_16);
   } break;
 
-  /* vvv chase x86 */
-  case PRIMITIVE_OP_ADD_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_ADD_SIZE: {
+    gen_add_primop(f, h, off0, off1, ptr_oz(f), X86_JCC_C);
+  } break;
   case PRIMITIVE_OP_ADD_U32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    ia_gen_add(f, GP_A, GP_C, OZ_32);
-    gen_crash_jcc(f, h, X86_JCC_C);
+    gen_add_primop(f, h, off0, off1, OZ_32, X86_JCC_C);
   } break;
-  case PRIMITIVE_OP_SUB_SIZE: /* fallthrough */
+  case PRIMITIVE_OP_SUB_SIZE: {
+    gen_sub_primop(f, h, off0, off1, ptr_oz(f), X86_JCC_C);
+  } break;
   case PRIMITIVE_OP_SUB_U32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    ia_gen_sub(f, GP_A, GP_C, OZ_32);
-    gen_crash_jcc(f, h, X86_JCC_C);
+    gen_sub_primop(f, h, off0, off1, OZ_32, X86_JCC_C);
   } break;
+  /* vvv chase x86 */
   case PRIMITIVE_OP_MUL_SIZE: /* fallthrough */
   case PRIMITIVE_OP_MUL_U32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
@@ -4141,16 +4138,10 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
 
   case PRIMITIVE_OP_ADD_I32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    ia_gen_add(f, GP_A, GP_C, OZ_32);
-    gen_crash_jcc(f, h, X86_JCC_O);
+    gen_add_primop(f, h, off0, off1, OZ_32, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_SUB_I32: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    ia_gen_sub(f, GP_A, GP_C, OZ_32);
-    gen_crash_jcc(f, h, X86_JCC_O);
+    gen_sub_primop(f, h, off0, off1, OZ_32, X86_JCC_O);
   } break;
   case PRIMITIVE_OP_MUL_I32: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
@@ -4228,14 +4219,10 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
 
   case PRIMITIVE_OP_ADD_OSIZE: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    ia_gen_add(f, GP_A, GP_C, OZ_32);
+    gen_add_primop(f, h, off0, off1, ptr_oz(f), 0);
   } break;
   case PRIMITIVE_OP_SUB_OSIZE: {
-    gp_gen_movzx32(f, GP_A, GP_BP, off0);
-    gp_gen_movzx32(f, GP_C, GP_BP, off1);
-    ia_gen_sub(f, GP_A, GP_C, OZ_32);
+    gen_sub_primop(f, h, off0, off1, ptr_oz(f), 0);
   } break;
   case PRIMITIVE_OP_MUL_OSIZE: {
     gp_gen_movzx32(f, GP_A, GP_BP, off0);
