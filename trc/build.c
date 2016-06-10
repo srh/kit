@@ -1691,6 +1691,7 @@ void gp_gen_load64(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr, in
   }
 }
 
+/* TODO(): Remove all the misc. movzx8 etc functions. */
 /* oz depicts the source operand -- the dest is always the full
 register, which gets zero-extended. */
 void ia_gen_movzx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
@@ -3665,15 +3666,18 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_16);
     ia_gen_not(f, GP_A, OZ_16);
   } break;
-  /* vvv chase x86 */
   case PRIMITIVE_OP_BIT_NOT_SIZE: /* fallthrough */
-  case PRIMITIVE_OP_BIT_NOT_OSIZE: /* fallthrough */
+  case PRIMITIVE_OP_BIT_NOT_OSIZE: {
+    gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
+    ia_gen_not(f, GP_A, ptr_oz(f));
+  } break;
   case PRIMITIVE_OP_BIT_NOT_I32: /* fallthrough */
   case PRIMITIVE_OP_BIT_NOT_U32: {
     gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_32);
     ia_gen_not(f, GP_A, OZ_32);
   } break;
 
+  /* vvv chase x86 */
   case PRIMITIVE_OP_EQ_PTR: {
     gen_cmp32_behavior(f, off0, off1, X86_SETCC_E);
   } break;
