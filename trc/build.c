@@ -1312,21 +1312,10 @@ void ia_gen_add(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz
   pushtext(f, mod_reg_rm(MOD11, src, dest));
 }
 
-void x86_gen_eaxedx_mul_w32(struct objfile *f, enum x86_reg src) {
-  uint8_t b[2];
-  /* MUL, DIV, IDIV have different modr/m opcode. */
-  b[0] = 0xF7;
-  b[1] = mod_reg_rm(MOD11, 4, src);
-  apptext(f, b, 2);
-}
-
-void ia_gen_axdx_mul_w16(struct objfile *f, enum x86_reg16 src) {
-  uint8_t b[3];
-  /* MUL, DIV, IDIV have different modr/m opcode. */
-  b[0] = 0x66;
-  b[1] = 0xF7;
-  b[2] = mod_reg_rm(MOD11, 4, src);
-  apptext(f, b, 3);
+void ia_gen_azdz_mul(struct objfile *f, enum gp_reg src, enum oz oz) {
+  CHECK(oz != OZ_8);
+  ia_prefix(f, 0xF7, oz);
+  pushtext(f, mod_reg_rm(MOD11, 4, src));
 }
 
 void ia_gen_alah_mul_w8(struct objfile *f, enum x86_reg8 src) {
@@ -1350,21 +1339,10 @@ void ia_gen_alah_imul_w8(struct objfile *f, enum x86_reg8 src) {
   apptext(f, b, 2);
 }
 
-void x86_gen_eaxedx_div_w32(struct objfile *f, enum x86_reg denom) {
-  uint8_t b[2];
-  /* MUL, DIV, IDIV have different modr/m opcode. */
-  b[0] = 0xF7;
-  b[1] = mod_reg_rm(MOD11, 6, denom);
-  apptext(f, b, 2);
-}
-
-void ia_gen_axdx_div_w16(struct objfile *f, enum x86_reg16 denom) {
-  uint8_t b[3];
-  /* MUL, DIV, IDIV have different modr/m opcode. */
-  b[0] = 0x66;
-  b[1] = 0xF7;
-  b[2] = mod_reg_rm(MOD11, 6, denom);
-  apptext(f, b, 3);
+void ia_gen_azdz_div(struct objfile *f, enum gp_reg denom, enum oz oz) {
+  CHECK(oz != OZ_8);
+  ia_prefix(f, 0xF7, oz);
+  pushtext(f, mod_reg_rm(MOD11, 6, denom));
 }
 
 void ia_gen_alah_div_w8(struct objfile *f, enum x86_reg8 denom) {
@@ -1378,23 +1356,6 @@ void ia_gen_azdz_idiv(struct objfile *f, enum gp_reg denom, enum oz oz) {
   CHECK(oz != OZ_8);
   ia_prefix(f, 0xF7, oz);
   pushtext(f, mod_reg_rm(MOD11, 7, denom));
-}
-
-void x86_gen_eaxedx_idiv_w32(struct objfile *f, enum x86_reg denom) {
-  uint8_t b[2];
-  /* MUL, DIV, IDIV have different modr/m opcode. */
-  b[0] = 0xF7;
-  b[1] = mod_reg_rm(MOD11, 7, denom);
-  apptext(f, b, 2);
-}
-
-void ia_gen_axdx_idiv_w16(struct objfile *f, enum x86_reg16 denom) {
-  uint8_t b[3];
-  /* MUL, DIV, IDIV have different modr/m opcode. */
-  b[0] = 0x66;
-  b[1] = 0xF7;
-  b[2] = mod_reg_rm(MOD11, 7, denom);
-  apptext(f, b, 3);
 }
 
 void ia_gen_alah_idiv_w8(struct objfile *f, enum x86_reg8 denom) {
@@ -3855,19 +3816,19 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_MUL_U16: {
     gen_movzx_ac(f, off0, off1, OZ_16);
-    ia_gen_axdx_mul_w16(f, X86_CX);
+    ia_gen_azdz_mul(f, GP_C, OZ_16);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_DIV_U16: {
     gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
-    ia_gen_axdx_div_w16(f, X86_CX);
+    ia_gen_azdz_idiv(f, GP_C, OZ_16);
     /* Divide by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_MOD_U16: {
     gen_movzx_ac(f, off0, off1, OZ_16);
     ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
-    ia_gen_axdx_div_w16(f, X86_CX);
+    ia_gen_azdz_div(f, GP_C, OZ_16);
     /* Divide by zero will produce #DE. (I guess.) */
     ia_gen_mov(f, GP_A, GP_D, ptr_oz(f));
   } break;
@@ -4009,7 +3970,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_MUL_SIZE: /* fallthrough */
   case PRIMITIVE_OP_MUL_U32: {
     gen_movzx_ac(f, off0, off1, OZ_32);
-    x86_gen_eaxedx_mul_w32(f, X86_ECX);
+    ia_gen_azdz_mul(f, GP_C, OZ_32);
     gen_crash_jcc(f, h, X86_JCC_C);
   } break;
   case PRIMITIVE_OP_DIV_SIZE: /* fallthrough */
@@ -4017,7 +3978,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_DIV_U32: {
     gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
-    x86_gen_eaxedx_div_w32(f, X86_ECX);
+    ia_gen_azdz_div(f, GP_C, OZ_32);
     /* Divide by zero will produce #DE. (I guess.) */
   } break;
   case PRIMITIVE_OP_MOD_SIZE: /* fallthrough */
@@ -4025,7 +3986,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_MOD_U32: {
     gen_movzx_ac(f, off0, off1, OZ_32);
     ia_gen_xor(f, GP_D, GP_D, ptr_oz(f));
-    x86_gen_eaxedx_div_w32(f, X86_ECX);
+    ia_gen_azdz_div(f, GP_C, OZ_32);
     x86_gen_mov_reg32(f, X86_EAX, X86_EDX);
     /* Modulus by zero will produce #DE. (I guess.) */
   } break;
@@ -4181,7 +4142,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_MUL_OSIZE: {
     gen_movzx_ac(f, off0, off1, ptr_oz(f));
-    x86_gen_eaxedx_mul_w32(f, X86_ECX);
+    ia_gen_azdz_mul(f, GP_C, OZ_32);
   } break;
 
   default:
