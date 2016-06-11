@@ -2134,7 +2134,7 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
                        enum typetrav_func tf, struct loc dest, int has_src,
                        struct loc src, struct ast_typeexpr *type);
 
-/* chase x86 */
+/* chase mark */
 void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                            enum typetrav_func tf, struct loc dest, int has_src,
                            struct loc src, struct ast_deftype_rhs *rhs) {
@@ -2158,7 +2158,6 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
       dest_num_loc.tag = (enum loc_tag)-1;
     }
 
-    /* TODO(): Enum tag size presumption, and such. */
     gp_gen_load_register(f, GP_A, enum_num_loc);
 
     size_t end_target = frame_add_target(h);
