@@ -1629,8 +1629,8 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
 }
 
 /* Put this right beneath where you save the stack offset. */
-/* TODO() -- uh, this is complete nonsense for all callers of this?
-On x86 things are passed in registers, so the arglist types matter. */
+/* arglist_size is the size of the on-stack arglist, which you'll need
+special logic to compute, if params are passed in registers. */
 void adjust_frame_for_callsite_alignment(struct frame *h, uint32_t arglist_size) {
   /* y86/x64 - particularly for 32-bit OS X's 16-byte alignment. */
   int32_t unadjusted_callsite_offset
@@ -2145,9 +2145,6 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
     y86_push_address(f, h, dest);
   } break;
   case TARGET_ARCH_X64: {
-    /* TODO(): Generally the "callsite alignment" logic will need to
-    be tweaked for x64, in the more general case.  We pass parameters
-    in registers here. */
     adjust_frame_for_callsite_alignment(h, 0);
     if (has_src) {
       gp_gen_load_addressof(f, GP_SI, src);
@@ -2618,7 +2615,6 @@ void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src)
 void ia_gen_call(struct objfile *f, struct sti func_sti) {
   uint8_t b = 0xE8;
   apptext(f, &b, 1);
-  /* TODO(): x64 needs rel32 as the relocation type too, right? */
   objfile_section_append_rel32(objfile_text(f), func_sti);
 }
 
@@ -2914,38 +2910,6 @@ void gen_cmp_behavior(struct objfile *f,
   gp_gen_movzx(f, GP_D, GP_BP, off0, oz);
   gp_gen_movzx(f, GP_C, GP_BP, off1, oz);
   ia_gen_cmp(f, GP_D, GP_C, oz);
-  ia_gen_setcc_b8(f, X86_AL, setcc_code);
-  ia_gen_movzx8_reg8(f, GP_A, X86_AL);
-}
-
-/* TODO(): Check callers of this for use on pointers, where cmp64 might be what we want. */
-/* TODO(): Replace with gen_cmp_behavior usage. */
-void gen_cmp32_behavior(struct objfile *f,
-                        int32_t off0, int32_t off1,
-                        enum ia_setcc setcc_code) {
-  gp_gen_movzx(f, GP_D, GP_BP, off0, OZ_32);
-  gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_32);
-  ia_gen_cmp(f, GP_D, GP_C, OZ_32);
-  ia_gen_setcc_b8(f, X86_AL, setcc_code);
-  ia_gen_movzx8_reg8(f, GP_A, X86_AL);
-}
-
-void gen_cmp16_behavior(struct objfile *f,
-                        int32_t off0, int32_t off1,
-                        enum ia_setcc setcc_code) {
-  gp_gen_movzx(f, GP_D, GP_BP, off0, OZ_16);
-  gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_16);
-  ia_gen_cmp(f, GP_D, GP_C, OZ_16);
-  ia_gen_setcc_b8(f, X86_AL, setcc_code);
-  ia_gen_movzx8_reg8(f, GP_A, X86_AL);
-}
-
-void gen_cmp8_behavior(struct objfile *f,
-                       int32_t off0, int32_t off1,
-                       enum ia_setcc setcc_code) {
-  gp_gen_movzx(f, GP_D, GP_BP, off0, OZ_8);
-  gp_gen_movzx(f, GP_C, GP_BP, off1, OZ_8);
-  ia_gen_cmp(f, GP_D, GP_C, OZ_8);
   ia_gen_setcc_b8(f, X86_AL, setcc_code);
   ia_gen_movzx8_reg8(f, GP_A, X86_AL);
 }
