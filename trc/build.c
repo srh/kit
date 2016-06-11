@@ -2449,11 +2449,11 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
   case TARGET_ARCH_Y86: {
     if (has_src) {
       /* X86 - pointer size */
-      adjust_frame_for_callsite_alignment(h, 2 * DWORD_SIZE);
+      adjust_frame_for_callsite_alignment(h, 2 * DWORD_Y86_SIZE);
       y86_push_address(f, h, src);
     } else {
       /* X86 - pointer size */
-      adjust_frame_for_callsite_alignment(h, DWORD_SIZE);
+      adjust_frame_for_callsite_alignment(h, DWORD_Y86_SIZE);
     }
     y86_push_address(f, h, dest);
   } break;
@@ -2503,24 +2503,24 @@ void x86_gen_returnloc_funcreturn_convention(struct objfile *f,
                                              int hidden_return_param,
                                              struct loc return_loc) {
   /* return_loc is always in the stack frame (and padded to
-  DWORD_SIZE) or via a hidden return param. */
+  DWORD_Y86_SIZE) or via a hidden return param. */
   if (hidden_return_param) {
     CHECK(return_loc.tag == LOC_EBP_INDIRECT);
     ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_indirect, OZ_32);
   } else if (return_loc.size == 0) {
     ia_gen_xor(f, GP_A, GP_A, OZ_32);
-  } else if (return_loc.size <= DWORD_SIZE) {
+  } else if (return_loc.size <= DWORD_Y86_SIZE) {
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
-    CHECK(return_loc.padded_size == DWORD_SIZE);
+    CHECK(return_loc.padded_size == DWORD_Y86_SIZE);
     ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_offset, OZ_32);
   } else {
     /* TODO: This should not even be theoretically reachable on (LINUX) linux32. */
-    CHECK(return_loc.size == 2 * DWORD_SIZE);
+    CHECK(return_loc.size == 2 * DWORD_Y86_SIZE);
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
-    CHECK(return_loc.padded_size == 2 * DWORD_SIZE);
+    CHECK(return_loc.padded_size == 2 * DWORD_Y86_SIZE);
     ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_offset, OZ_32);
     ia_gen_movzx(f, GP_D, GP_BP,
-                 int32_add(return_loc.u.ebp_offset, DWORD_SIZE), OZ_32);
+                 int32_add(return_loc.u.ebp_offset, DWORD_Y86_SIZE), OZ_32);
   }
 }
 
@@ -2826,12 +2826,12 @@ void x64_gen_load_register(struct objfile *f, enum x64_reg reg, struct loc src) 
 
 void x86_gen_store_biregister(struct objfile *f, struct loc dest,
                               enum x86_reg lo, enum x86_reg hi) {
-  CHECK(DWORD_SIZE < dest.size && dest.size <= 2 * DWORD_SIZE);
-  CHECK(dest.padded_size == 2 * DWORD_SIZE);
+  CHECK(DWORD_Y86_SIZE < dest.size && dest.size <= 2 * DWORD_Y86_SIZE);
+  CHECK(dest.padded_size == 2 * DWORD_Y86_SIZE);
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
     ia_gen_store32(f, GP_BP, dest.u.ebp_offset, unmap_x86_reg(lo));
-    ia_gen_store32(f, GP_BP, int32_add(dest.u.ebp_offset, DWORD_SIZE),
+    ia_gen_store32(f, GP_BP, int32_add(dest.u.ebp_offset, DWORD_Y86_SIZE),
                    unmap_x86_reg(hi));
     break;
   case LOC_GLOBAL: {
@@ -2841,7 +2841,7 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
     enum x86_reg altreg = x86_choose_register_2(lo, hi);
     gp_gen_movzx(f, unmap_x86_reg(altreg), GP_BP, dest.u.ebp_indirect, OZ_32);
     ia_gen_store32(f, unmap_x86_reg(altreg), 0, unmap_x86_reg(lo));
-    ia_gen_store32(f, unmap_x86_reg(altreg), DWORD_SIZE, unmap_x86_reg(hi));
+    ia_gen_store32(f, unmap_x86_reg(altreg), DWORD_Y86_SIZE, unmap_x86_reg(hi));
   } break;
   default:
     UNREACHABLE();
@@ -4289,7 +4289,7 @@ void y86_get_funcall_arglist_info(struct checkstate *cs,
 
   struct funcall_arg_info *infos = malloc_mul(sizeof(*infos), args_count);
 
-  uint32_t total_size = (hidden_return_param ? DWORD_SIZE : 0);
+  uint32_t total_size = (hidden_return_param ? DWORD_Y86_SIZE : 0);
   for (size_t i = 0; i < args_count; i++) {
     uint32_t arg_size = gp_sizeof(&cs->nt, &args[i]);
     uint32_t padded_size = frame_padded_push_size(cs->arch, arg_size);
@@ -4409,12 +4409,12 @@ void y86_postcall_return_in_loc(struct checkstate *cs,
   if (!arglist_info->hidden_return_param) {
     if (arglist_info->return_type_size == 0) {
       /* nothing */
-    } else if (arglist_info->return_type_size <= DWORD_SIZE) {
+    } else if (arglist_info->return_type_size <= DWORD_Y86_SIZE) {
       /* Return value in eax. */
       gp_gen_store_register(f, return_loc, GP_A);
     } else {
       CHECK(platform_can_return_in_eaxedx(cs));
-      CHECK(arglist_info->return_type_size == 2 * DWORD_SIZE);
+      CHECK(arglist_info->return_type_size == 2 * DWORD_Y86_SIZE);
       x86_gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
     }
   }
@@ -4519,7 +4519,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   switch (cs->arch) {
   case TARGET_ARCH_Y86: {
     if (arglist_info.hidden_return_param) {
-      struct loc ptr_loc = ebp_loc(DWORD_SIZE, DWORD_SIZE, callsite_base_offset);
+      struct loc ptr_loc = ebp_loc(DWORD_Y86_SIZE, DWORD_Y86_SIZE, callsite_base_offset);
       gen_mov_addressof(f, ptr_loc, return_loc);
     }
 
@@ -4731,7 +4731,7 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
 
   ia_gen_add(f, GP_A, GP_D, ptr_oz(f));
 
-  struct loc loc = frame_push_loc(h, DWORD_SIZE);
+  struct loc loc = frame_push_loc(h, ptr_size(h->arch));
   gp_gen_store_register(f, loc, GP_A);
 
   struct loc retloc = ebp_indirect_loc(elem_size, elem_size, loc.u.ebp_offset);
