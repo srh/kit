@@ -1476,20 +1476,6 @@ void gp_gen_movsx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
   }
 }
 
-void gp_gen_loadPTR(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                    int32_t src_disp) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    ia_gen_movzx32(f, dest, src_addr, src_disp);
-    break;
-  case TARGET_ARCH_X64:
-    x64_gen_load64(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp);
-    break;
-  default:
-    UNREACHABLE();
-  }
-}
-
 /* TODO(): Remove all the misc. movzx8 etc functions. */
 /* oz depicts the source operand -- the dest is always the full
 register, which gets zero-extended. */
@@ -2571,7 +2557,7 @@ void put_ptr_in_reg(struct objfile *f, struct loc loc, enum gp_reg free_reg,
     *disp_out = 0;
   } break;
   case LOC_EBP_INDIRECT: {
-    gp_gen_loadPTR(f, free_reg, GP_BP, loc.u.ebp_indirect);
+    gp_gen_movzx(f, free_reg, GP_BP, loc.u.ebp_indirect, ptr_oz(f));
     *reg_out = free_reg;
     *disp_out = 0;
   } break;
@@ -2788,7 +2774,7 @@ void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src)
     gen_mov_mem_imm(f, GP_BP, dest.u.ebp_offset, GP_D, src);
     break;
   case LOC_EBP_INDIRECT:
-    gp_gen_loadPTR(f, GP_A, GP_BP, dest.u.ebp_indirect);
+    gp_gen_movzx(f, GP_A, GP_BP, dest.u.ebp_indirect, ptr_oz(f));
     gen_mov_mem_imm(f, GP_A, 0, GP_D, src);
     break;
   case LOC_GLOBAL:
@@ -3341,7 +3327,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     osize should fail if data is _lost_ but not if the osize variable,
     intepreted with the same signedness, has the same value. */
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_U8: {
-    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
     ia_gen_cmp_imm(f, GP_A, 0xFF, ptr_oz(f));
     gen_crash_jcc(f, h, IA_JCC_A);
   } break;
@@ -3351,7 +3337,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, IA_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_I8: {
-    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
     ia_gen_cmp_imm(f, GP_A, 0x7F, ptr_oz(f));
     gen_crash_jcc(f, h, IA_JCC_A);
   } break;
@@ -3362,7 +3348,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_U16: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_U16: {
-    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
     ia_gen_cmp_imm(f, GP_A, 0xFFFF, OZ_16);
     gen_crash_jcc(f, h, IA_JCC_A);
   } break;
@@ -3372,7 +3358,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, IA_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_I16: {
-    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
     ia_gen_cmp_imm(f, GP_A, 0x7FFF, ptr_oz(f));
     gen_crash_jcc(f, h, IA_JCC_A);
   } break;
@@ -3385,11 +3371,11 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_SIZE_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_OSIZE: {
-    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
   } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_U32: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_U32: {
-    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
     switch (cs->arch) {
     case TARGET_ARCH_Y86:
       break;
@@ -3409,7 +3395,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_32);
   } break;
   case PRIMITIVE_OP_CONVERT_SIZE_TO_I32: {
-    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
     ia_gen_cmp_imm(f, GP_A, 0x7FFFFFFF, ptr_oz(f));
     gen_crash_jcc(f, h, IA_JCC_A);
   } break;
@@ -3425,7 +3411,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, IA_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_I8: {
-    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
     ia_gen_cmp_imm(f, GP_A, 0x7F, ptr_oz(f));
     gen_crash_jcc(f, h, IA_JCC_G);
     ia_gen_cmp_imm(f, GP_A, -0x80, ptr_oz(f));
@@ -3444,7 +3430,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, IA_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_I16: {
-    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
     ia_gen_cmp_imm(f, GP_A, 0x7FFF, ptr_oz(f));
     gen_crash_jcc(f, h, IA_JCC_G);
     ia_gen_cmp_imm(f, GP_A, -0x8000, ptr_oz(f));
@@ -3464,7 +3450,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, IA_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_I32: {
-    gp_gen_loadPTR(f, GP_A, GP_BP, off0);
+    gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
     switch (cs->arch) {
     case TARGET_ARCH_Y86:
       break;
@@ -4997,7 +4983,7 @@ struct loc gen_subobject_loc(struct objfile *f,
   } break;
   case LOC_EBP_INDIRECT: {
     struct loc field_ptr_loc = frame_push_loc(h, ptr_size(h->arch));
-    gp_gen_loadPTR(f, GP_A, GP_BP, loc.u.ebp_indirect);
+    gp_gen_movzx(f, GP_A, GP_BP, loc.u.ebp_indirect, ptr_oz(f));
     gp_gen_lea(f, GP_A, GP_A, uint32_to_int32(offset));
     gp_gen_storePTR(f, GP_BP, field_ptr_loc.u.ebp_offset, GP_A);
     ret = ebp_indirect_loc(size, size, field_ptr_loc.u.ebp_offset);
