@@ -1490,19 +1490,6 @@ void gp_gen_loadPTR(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
   }
 }
 
-void gp_gen_load64(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr, int32_t src_disp) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    CRASH("gp_gen_load64 on x86");
-    break;
-  case TARGET_ARCH_X64:
-    x64_gen_load64(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp);
-    break;
-  default:
-    UNREACHABLE();
-  }
-}
-
 /* TODO(): Remove all the misc. movzx8 etc functions. */
 /* oz depicts the source operand -- the dest is always the full
 register, which gets zero-extended. */
