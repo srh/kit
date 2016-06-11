@@ -2201,7 +2201,8 @@ void x86_gen_returnloc_funcreturn_convention(struct objfile *f,
     CHECK(return_loc.padded_size == Y86_DWORD_SIZE);
     ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_offset, OZ_32);
   } else {
-    /* TODO: This should not even be theoretically reachable on (LINUX) linux32. */
+    /* Linux32 only returns in eax, we enforce this elsewhere. */
+    CHECK(objfile_platform(f) != TARGET_PLATFORM_LINUX_32BIT);
     CHECK(return_loc.size == 2 * Y86_DWORD_SIZE);
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
     CHECK(return_loc.padded_size == 2 * Y86_DWORD_SIZE);
@@ -2214,8 +2215,24 @@ void x86_gen_returnloc_funcreturn_convention(struct objfile *f,
 void x64_gen_returnloc_funcreturn_convention(struct objfile *f,
                                              int hidden_return_param,
                                              struct loc return_loc) {
-  (void)f, (void)hidden_return_param, (void)return_loc;
-  TODO_IMPLEMENT;
+  if (hidden_return_param) {
+    CHECK(return_loc.tag == LOC_EBP_INDIRECT);
+    ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_indirect, ptr_oz(f));
+  } else if (return_loc.size == 0) {
+    ia_gen_xor(f, GP_A, GP_A, ptr_oz(f));
+  } else if (return_loc.size <= X64_EIGHTBYTE_SIZE) {
+    CHECK(return_loc.tag == LOC_EBP_OFFSET);
+    CHECK(return_loc.padded_size == X64_EIGHTBYTE_SIZE);
+    ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_offset, OZ_64);
+  } else {
+    CHECK(return_loc.tag == LOC_EBP_OFFSET);
+    CHECK(return_loc.padded_size == 2 * X64_EIGHTBYTE_SIZE);
+    ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_offset, OZ_64);
+    /* Yeah, we load some padding. */
+    ia_gen_movzx(f, GP_D, GP_BP,
+                 int32_add(return_loc.u.ebp_offset, X64_EIGHTBYTE_SIZE),
+                 OZ_64);
+  }
 }
 
 void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h) {
