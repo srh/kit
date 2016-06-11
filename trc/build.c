@@ -3880,7 +3880,6 @@ void gen_primitive_op_behavior(struct checkstate *cs,
                                int32_t callsite_base_offset,
                                struct funcall_arglist_info *arglist_info,
                                struct loc return_loc) {
-  /* TODO(): x86: callsite_base_offset needs to be used for x64 -- on x86 assert that it equals stack offset. */
   switch (prim_op.tag) {
   case PRIMITIVE_OP_ENUMCONSTRUCT: {
     CHECK(arg0_type_or_null);
@@ -5196,7 +5195,6 @@ int gen_successbody(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case AST_CONDITION_PATTERN: {
-    /* TODO(): Enum tag size presumption? */
     struct loc swartch_num_loc = make_enum_num_loc(f, h, cstate->u.pattern.facts.enum_loc);
     gp_gen_load_register(f, GP_A, swartch_num_loc);
     if (!gen_casebody(cs, f, h, &cstate->u.pattern.facts,
@@ -5472,7 +5470,6 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
     if (has_default) {
       struct ast_cased_statement *cas = &ss->cased_statements[default_case_num];
-      /* TODO(): Enum tag size presumption. */
       STATIC_CHECK(FIRST_ENUM_TAG_NUMBER == 1);
       /* We carefully make the 0 tag and nonsense tag values redirect
       to the crash branch. */
