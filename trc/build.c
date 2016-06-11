@@ -1471,7 +1471,6 @@ void gp_gen_movsx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
   ia_gen_movsx(f, dest, src_addr, src_disp, src_oz);
 }
 
-/* TODO(): Remove all the misc. movzx8 etc functions. */
 /* oz depicts the source operand -- the dest is always the full
 register, which gets zero-extended. */
 void ia_gen_movzx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
@@ -1494,38 +1493,6 @@ void gp_gen_movzx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                   int32_t src_disp, enum oz src_oz) {
   check_y86x64(f);
   ia_gen_movzx(f, dest, src_addr, src_disp, src_oz);
-}
-
-void ia_gen_movzx8(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                   int32_t src_disp) {
-  uint8_t b[11];
-  b[0] = 0x0F;
-  b[1] = 0xB6;
-  size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
-  CHECK(count <= 9);
-  apptext(f, b, count + 2);
-}
-
-void gp_gen_movzx8(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                   int32_t src_disp) {
-  check_y86x64(f);
-  ia_gen_movzx(f, dest, src_addr, src_disp, OZ_8);
-}
-
-void ia_gen_movzx16(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                    int32_t src_disp) {
-  uint8_t b[11];
-  b[0] = 0x0F;
-  b[1] = 0xB7;
-  size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
-  CHECK(count <= 9);
-  apptext(f, b, count + 2);
-}
-
-void gp_gen_movzx16(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                    int32_t src_disp) {
-  check_y86x64(f);
-  ia_gen_movzx(f, dest, src_addr, src_disp, OZ_16);
 }
 
 void ia_gen_movzx8_reg8(struct objfile *f, enum gp_reg dest, enum x86_reg8 src) {
