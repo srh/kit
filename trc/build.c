@@ -2433,7 +2433,7 @@ void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg) 
 
   switch (dest.size) {
   case 8:
-    TODO_IMPLEMENT;
+    gp_gen_store(f, dest_addr, dest_disp, reg, OZ_64);
     break;
   case 4:
     gp_gen_store(f, dest_addr, dest_disp, reg, OZ_32);
