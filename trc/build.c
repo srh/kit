@@ -1445,13 +1445,6 @@ void x64_gen_load64(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
   apptext(f, b, count + 2);
 }
 
-/* TODO(): Probably ought to double-check all uses of movzx32 for use with pointers and sizes */
-void gp_gen_movzx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                    int32_t src_disp) {
-  check_y86x64(f);
-  ia_gen_movzx(f, dest, src_addr, src_disp, OZ_32);
-}
-
 void x64_gen_movsx32(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
                      int32_t src_disp) {
   uint8_t b[11];
