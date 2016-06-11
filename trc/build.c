@@ -1465,6 +1465,12 @@ void ia_gen_movsx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
   }
 }
 
+void gp_gen_movsx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                  int32_t src_disp, enum oz src_oz) {
+  check_y86x64(f);
+  ia_gen_movsx(f, dest, src_addr, src_disp, src_oz);
+}
+
 /* TODO(): Remove all the misc. movzx8 etc functions. */
 /* oz depicts the source operand -- the dest is always the full
 register, which gets zero-extended. */
@@ -1520,54 +1526,6 @@ void gp_gen_movzx16(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                     int32_t src_disp) {
   check_y86x64(f);
   ia_gen_movzx(f, dest, src_addr, src_disp, OZ_16);
-}
-
-void x86_gen_movsx8(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
-                    int32_t src_disp) {
-  uint8_t b[11];
-  b[0] = 0x0F;
-  b[1] = 0xBE;
-  size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
-  CHECK(count <= 9);
-  apptext(f, b, count + 2);
-}
-
-void gp_gen_movsx8(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                   int32_t src_disp) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_movsx8(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
-}
-
-void x86_gen_movsx16(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
-                     int32_t src_disp) {
-  uint8_t b[11];
-  b[0] = 0x0F;
-  b[1] = 0xBF;
-  size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
-  CHECK(count <= 9);
-  apptext(f, b, count + 2);
-}
-
-void gp_gen_movsx16(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                    int32_t src_disp) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_movsx16(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
 }
 
 void ia_gen_movzx8_reg8(struct objfile *f, enum gp_reg dest, enum x86_reg8 src) {
@@ -3192,7 +3150,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     conversion (but isn't that gross). */
   case PRIMITIVE_OP_CONVERT_I8_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I8_TO_I32: {
-    gp_gen_movsx8(f, GP_A, GP_BP, off0);
+    gp_gen_movsx(f, GP_A, GP_BP, off0, OZ_8);
   } break;
   case PRIMITIVE_OP_CONVERT_I8_TO_U8: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I8_TO_U16: /* fallthrough */
@@ -3232,7 +3190,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, IA_JCC_A);
   } break;
   case PRIMITIVE_OP_CONVERT_I16_TO_I8: {
-    gp_gen_movsx16(f, GP_A, GP_BP, off0);
+    gp_gen_movsx(f, GP_A, GP_BP, off0, OZ_16);
     ia_gen_cmp_imm(f, GP_A, 0x7F, OZ_16);
     gen_crash_jcc(f, h, IA_JCC_G);
     ia_gen_cmp_imm(f, GP_A, -0x80, OZ_16);
@@ -3241,14 +3199,14 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_CONVERT_I16_TO_U16: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I16_TO_SIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I16_TO_U32: {
-    gp_gen_movsx16(f, GP_A, GP_BP, off0);
+    gp_gen_movsx(f, GP_A, GP_BP, off0, OZ_16);
     gp_gen_test_regs(f, GP_A, GP_A, OZ_16);
     gen_crash_jcc(f, h, IA_JCC_S);
   } break;
   case PRIMITIVE_OP_CONVERT_I16_TO_I16: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I16_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I16_TO_I32: {
-    gp_gen_movsx16(f, GP_A, GP_BP, off0);
+    gp_gen_movsx(f, GP_A, GP_BP, off0, OZ_16);
   } break;
 
   case PRIMITIVE_OP_CONVERT_SIZE_TO_U8: /* fallthrough */
@@ -3400,7 +3358,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
 
   case PRIMITIVE_OP_NEGATE_I8: {
-    gp_gen_movsx8(f, GP_A, GP_BP, off0);
+    gp_gen_movsx(f, GP_A, GP_BP, off0, OZ_8);
     /* TODO: (Also in s2.) For this and the other negations, can't we
     just check OF after the fact?  I missed that in the docs on the
     first read? */
@@ -3411,7 +3369,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_neg(f, GP_A, OZ_8);
   } break;
   case PRIMITIVE_OP_NEGATE_I16: {
-    gp_gen_movsx16(f, GP_A, GP_BP, off0);
+    gp_gen_movsx(f, GP_A, GP_BP, off0, OZ_16);
     /* Crashes if the value is INT16_MIN by subtracting 1 and
     overflowing. */
     ia_gen_cmp_imm(f, GP_A, 1, OZ_16);
