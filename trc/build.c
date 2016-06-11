@@ -1139,7 +1139,9 @@ void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_reg dest,
   }
 }
 
-void x86_gen_int_3(struct objfile *f) {
+void gen_debug_trap(struct objfile *f) {
+  check_y86x64(f);
+  /* INT 3 instruction */
   pushtext(f, 0xCC);
 }
 
@@ -2259,16 +2261,7 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
   if (h->crash_target_exists) {
     frame_define_target(h, h->crash_target_number,
                         objfile_section_size(objfile_text(f)));
-    switch (h->arch) {
-    case TARGET_ARCH_Y86: {
-      x86_gen_int_3(f);
-    } break;
-    case TARGET_ARCH_X64:
-      TODO_IMPLEMENT;
-      break;
-    default:
-      UNREACHABLE();
-    }
+    gen_debug_trap(f);
   }
 }
 
