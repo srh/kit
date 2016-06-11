@@ -1,4 +1,4 @@
-#include "x86.h"
+#include "sizeattr.h"
 
 #include <stdlib.h>
 

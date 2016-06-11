@@ -1,5 +1,5 @@
-#ifndef KIT_X86_H_
-#define KIT_X86_H_
+#ifndef KIT_SIZEATTR_H_
+#define KIT_SIZEATTR_H_
 
 #include <stdint.h>
 
@@ -33,5 +33,5 @@ void gp_field_sizeoffset(struct name_table *nt, struct ast_typeexpr *type,
                          ident_value field_name, uint32_t *sizeof_out,
                          uint32_t *offsetof_out);
 
-#endif /* KIT_X86_H_ */
+#endif /* KIT_SIZEATTR_H_ */
 

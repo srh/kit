@@ -11,10 +11,10 @@
 #include "io.h"
 #include "parse.h"
 #include "print.h"
+#include "sizeattr.h"
 #include "slice.h"
 #include "table.h"
 #include "util.h"
-#include "x86.h"
 
 #define CHECK_DBG(...) do { } while (0)
 
