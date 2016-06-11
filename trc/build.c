@@ -2265,31 +2265,11 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
   }
 }
 
-enum x86_reg x86_choose_altreg(enum x86_reg used) {
-  if (used == X86_EAX) {
-    return X86_ECX;
-  } else {
-    return X86_EAX;
-  }
-}
-
 enum gp_reg gp_choose_altreg(enum gp_reg used) {
   if (used == GP_A) {
     return GP_C;
   } else {
     return GP_A;
-  }
-}
-
-enum x86_reg x86_choose_register_2(enum x86_reg used1, enum x86_reg used2) {
-  if (used1 == X86_EAX || used2 == X86_EAX) {
-    if (used1 == X86_ECX || used2 == X86_ECX) {
-      return X86_EDX;
-    } else {
-      return X86_ECX;
-    }
-  } else {
-    return X86_EAX;
   }
 }
 
@@ -2503,10 +2483,10 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
     CRASH("Writing to globals is impossible.");
   } break;
   case LOC_EBP_INDIRECT: {
-    enum x86_reg altreg = x86_choose_register_2(lo, hi);
-    gp_gen_movzx(f, unmap_x86_reg(altreg), GP_BP, dest.u.ebp_indirect, OZ_32);
-    ia_gen_store(f, unmap_x86_reg(altreg), 0, unmap_x86_reg(lo), OZ_32);
-    ia_gen_store(f, unmap_x86_reg(altreg), Y86_DWORD_SIZE, unmap_x86_reg(hi), OZ_32);
+    enum gp_reg altreg = gp_choose_register_2(unmap_x86_reg(lo), unmap_x86_reg(hi));
+    gp_gen_movzx(f, altreg, GP_BP, dest.u.ebp_indirect, OZ_32);
+    ia_gen_store(f, altreg, 0, unmap_x86_reg(lo), OZ_32);
+    ia_gen_store(f, altreg, Y86_DWORD_SIZE, unmap_x86_reg(hi), OZ_32);
   } break;
   default:
     UNREACHABLE();
@@ -2515,6 +2495,7 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
 
 void x64_gen_store_biregister(struct objfile *f, struct loc dest,
                               enum x64_reg lo, enum x64_reg hi, enum x64_reg spare) {
+  /* Notably this is very x64-specific because we could be storing r8 and r9. */
   CHECK(X64_EIGHTBYTE_SIZE < dest.size && dest.size <= 2 * X64_EIGHTBYTE_SIZE);
   CHECK(dest.padded_size == 2 * X64_EIGHTBYTE_SIZE);
   switch (dest.tag) {
