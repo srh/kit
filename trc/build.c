@@ -1104,13 +1104,12 @@ void gp_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
 
 size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest);
 
-/* TODO(): Move callers to gp_gen_mov_reg_stiptr */
-void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
-                            struct sti symbol_table_index) {
+void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_reg dest,
+                           struct sti symbol_table_index) {
   switch (objfile_platform(f)) {
   case TARGET_PLATFORM_WIN_32BIT: /* fallthrough */
   case TARGET_PLATFORM_LINUX_32BIT: {
-    uint8_t b = 0xB8 + (uint8_t)dest;
+    uint8_t b = 0xB8 + (uint8_t)map_x86_reg(dest);
     apptext(f, &b, 1);
     objfile_section_append_dir32(objfile_text(f), symbol_table_index);
   } break;
@@ -1124,8 +1123,8 @@ void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
     uint8_t b[5] = { 0xE8, 0, 0, 0, 0 };
     apptext(f, b, 5);
     size_t subtracted_offset = objfile_section_size(objfile_text(f));
-    ia_gen_pop(f, unmap_x86_reg(dest));
-    size_t adjusted_offset = x86_gen_placeholder_lea32(f, dest);
+    ia_gen_pop(f, dest);
+    size_t adjusted_offset = x86_gen_placeholder_lea32(f, map_x86_reg(dest));
     objfile_section_note_diff32(objfile_text(f), symbol_table_index,
                                 subtracted_offset, adjusted_offset);
   } break;
@@ -1135,20 +1134,6 @@ void x86_gen_mov_reg_stiptr(struct objfile *f, enum x86_reg dest,
   case TARGET_PLATFORM_OSX_64BIT: {
     TODO_IMPLEMENT;
   } break;
-  default:
-    UNREACHABLE();
-  }
-}
-
-void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_reg dest,
-                           struct sti symbol_table_index) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_mov_reg_stiptr(f, map_x86_reg(dest), symbol_table_index);
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
   default:
     UNREACHABLE();
   }
