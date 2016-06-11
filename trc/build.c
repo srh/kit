@@ -1439,7 +1439,7 @@ void ia_gen_movsx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
   if (src_oz <= OZ_16) {
     uint8_t b[11];
     b[0] = 0x0F;
-    b[1] = 0xB7 ^ (src_oz == OZ_8);
+    b[1] = 0xBF ^ (src_oz == OZ_8);
     size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
     CHECK(count <= 9);
     apptext(f, b, count + 2);
