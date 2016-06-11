@@ -2427,6 +2427,7 @@ void gen_bzero(struct objfile *f, struct loc dest) {
 }
 
 void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg) {
+  /* TODO(): Honestly handle all sizes. */
   enum gp_reg dest_addr;
   int32_t dest_disp;
   put_ptr_in_reg(f, dest, gp_choose_altreg(reg), &dest_addr, &dest_disp);
@@ -2453,11 +2454,13 @@ void x64_gen_store_register(struct objfile *f, struct loc dest,
                             enum x64_reg reg, enum x64_reg spare) {
   /* We actually do have to implement this, because reg can be a
   calling convention register like r8 or r9, not named by gp_reg. */
+  /* Size might not be padded. */
   (void)f, (void)dest, (void)reg, (void)spare;
   TODO_IMPLEMENT;
 }
 
 void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src) {
+  /* TODO(): Honestly handle all sizes. */
   enum gp_reg src_addr;
   int32_t src_disp;
   put_ptr_in_reg(f, src, reg, &src_addr, &src_disp);
@@ -2481,6 +2484,7 @@ void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src) {
 }
 
 void x64_gen_load_register(struct objfile *f, enum x64_reg reg, struct loc src) {
+  /* Size might not be padded. */
   (void)f, (void)reg, (void)src;
   TODO_IMPLEMENT;
 }
