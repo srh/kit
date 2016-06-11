@@ -130,7 +130,7 @@ void x64_gen_load_register(struct objfile *f, enum x64_reg reg, struct loc src);
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum ia_jcc code);
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number);
 void gen_crash_jmp(struct objfile *f, struct frame *h);
-void x64_gen_load_addressof(struct objfile *f, enum x64_reg dest, struct loc loc);
+void gp_gen_load_addressof(struct objfile *f, enum gp_reg dest, struct loc loc);
 void x64_gen_store_biregister(struct objfile *f, struct loc dest,
                               enum x64_reg lo, enum x64_reg hi, enum x64_reg spare);
 
@@ -2163,9 +2163,9 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
     in registers here. */
     adjust_frame_for_callsite_alignment(h, 0);
     if (has_src) {
-      x64_gen_load_addressof(f, X64_RSI, src);
+      gp_gen_load_addressof(f, GP_SI, src);
     }
-    x64_gen_load_addressof(f, X64_RDI, dest);
+    gp_gen_load_addressof(f, GP_DI, dest);
   } break;
   }
   gen_call_imm_func(cs, f, h, sti, 0);
@@ -2327,38 +2327,25 @@ enum gp_reg gp_choose_register_2(enum gp_reg used1, enum gp_reg used2) {
   }
 }
 
-void x86_gen_load_addressof(struct objfile *f, enum x86_reg dest, struct loc loc) {
+void ia_gen_load_addressof(struct objfile *f, enum gp_reg dest, struct loc loc) {
   switch (loc.tag) {
   case LOC_EBP_OFFSET: {
-    ia_gen_lea(f, unmap_x86_reg(dest), GP_BP, loc.u.ebp_offset);
+    ia_gen_lea(f, dest, GP_BP, loc.u.ebp_offset);
   } break;
   case LOC_GLOBAL: {
-    x86_gen_mov_reg_stiptr(f, dest, loc.u.global_sti);
+    gp_gen_mov_reg_stiptr(f, dest, loc.u.global_sti);
   } break;
   case LOC_EBP_INDIRECT: {
-    ia_gen_movzx(f, unmap_x86_reg(dest), GP_BP, loc.u.ebp_indirect, OZ_32);
+    ia_gen_movzx(f, dest, GP_BP, loc.u.ebp_indirect, ptr_oz(f));
   } break;
   default:
     UNREACHABLE();
   }
-}
-
-void x64_gen_load_addressof(struct objfile *f, enum x64_reg dest, struct loc loc) {
-  (void)f, (void)dest, (void)loc;
-  TODO_IMPLEMENT;
 }
 
 void gp_gen_load_addressof(struct objfile *f, enum gp_reg dest, struct loc loc) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_load_addressof(f, map_x86_reg(dest), loc);
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
+  check_y86x64(f);
+  ia_gen_load_addressof(f, dest, loc);
 }
 
 /* chase mark */
@@ -4098,7 +4085,7 @@ void x64_load_register_params(struct objfile *f, struct funcall_arglist_info *ar
   }
 
   if (arglist_info->hidden_return_param) {
-    x64_gen_load_addressof(f, X64_RDI, return_loc);
+    gp_gen_load_addressof(f, GP_DI, return_loc);
   }
 }
 
