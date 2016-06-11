@@ -1455,17 +1455,30 @@ void x64_gen_movsx32(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr
   apptext(f, b, count + 2);
 }
 
-void gp_gen_movsx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                    int32_t src_disp) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    ia_gen_movzx32(f, dest, src_addr, src_disp);
-    break;
-  case TARGET_ARCH_X64:
-    x64_gen_movsx32(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp);
-    break;
-  default:
-    UNREACHABLE();
+void ia_gen_movsx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                  int32_t src_disp, enum oz src_oz) {
+  check_y86x64(f);
+  if (src_oz <= OZ_16) {
+    uint8_t b[11];
+    b[0] = 0x0F;
+    b[1] = 0xB7 ^ (src_oz == OZ_8);
+    size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
+    CHECK(count <= 9);
+    apptext(f, b, count + 2);
+  } else if (src_oz == OZ_32) {
+    switch (objfile_arch(f)) {
+    case TARGET_ARCH_Y86:
+      ia_gen_movzx32(f, dest, src_addr, src_disp);
+      break;
+    case TARGET_ARCH_X64:
+      x64_gen_movsx32(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp);
+      break;
+    default:
+      UNREACHABLE();
+    }
+  } else {
+    CHECK(objfile_arch(f) == TARGET_ARCH_X64);
+    x64_gen_load64(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp);
   }
 }
 
@@ -3411,7 +3424,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, IA_JCC_L);
   } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_I8: {
-    gp_gen_movsx32(f, GP_A, GP_BP, off0);
+    ia_gen_movsx(f, GP_A, GP_BP, off0, OZ_32);
     ia_gen_cmp_imm(f, GP_A, 0x7F, OZ_32);
     gen_crash_jcc(f, h, IA_JCC_G);
     ia_gen_cmp_imm(f, GP_A, -0x80, OZ_32);
@@ -3430,7 +3443,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     gen_crash_jcc(f, h, IA_JCC_L);
   } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_I16: {
-    gp_gen_movsx32(f, GP_A, GP_BP, off0);
+    ia_gen_movsx(f, GP_A, GP_BP, off0, OZ_32);
     ia_gen_cmp_imm(f, GP_A, 0x7FFF, OZ_32);
     gen_crash_jcc(f, h, IA_JCC_G);
     ia_gen_cmp_imm(f, GP_A, -0x8000, OZ_32);
@@ -3460,7 +3473,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   } break;
   case PRIMITIVE_OP_CONVERT_I32_TO_OSIZE: /* fallthrough */
   case PRIMITIVE_OP_CONVERT_I32_TO_I32: {
-    gp_gen_movsx32(f, GP_A, GP_BP, off0);
+    ia_gen_movsx(f, GP_A, GP_BP, off0, OZ_32);
   } break;
 
   case PRIMITIVE_OP_NEGATE_I8: {
@@ -3483,7 +3496,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     ia_gen_neg(f, GP_A, OZ_16);
   } break;
   case PRIMITIVE_OP_NEGATE_I32: {
-    gp_gen_movsx32(f, GP_A, GP_BP, off0);
+    ia_gen_movsx(f, GP_A, GP_BP, off0, OZ_32);
     /* Crashes if the value is INT32_MIN by subtracting 1 and
     overflowing. */
     ia_gen_cmp_imm(f, GP_A, 1, OZ_32);
