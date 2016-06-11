@@ -2621,18 +2621,13 @@ void ia_gen_call(struct objfile *f, struct sti func_sti) {
   objfile_section_append_rel32(objfile_text(f), func_sti);
 }
 
-void x86_gen_indirect_call_reg(struct objfile *f, enum x86_reg reg) {
+void ia_gen_indirect_call_reg(struct objfile *f, enum gp_reg reg) {
+  check_y86x64(f);
   uint8_t b[2];
   b[0] = 0xFF;
   b[1] = mod_reg_rm(MOD11, 2, reg);
   apptext(f, b, 2);
 }
-
-void x64_gen_indirect_call_reg(struct objfile *f, enum x64_reg reg) {
-  (void)f, (void)reg;
-  TODO_IMPLEMENT;
-}
-
 
 enum expr_return_free_tag {
   EXPR_RETURN_FREE_LOC,
@@ -4218,7 +4213,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       wipe_temporaries(cs, f, h, &func_er, func_type, &func_loc);
       gp_gen_load_register(f, GP_A, func_loc);
       gen_placeholder_stack_adjustment(f, h, 0);
-      x86_gen_indirect_call_reg(f, X86_EAX);
+      ia_gen_indirect_call_reg(f, GP_A);
       if (arglist_info.hidden_return_param && platform_ret4_hrp(cs)) {
         /* TODO: We could do this more elegantly, but right now undo the
         callee's pop of esp. */
@@ -4256,7 +4251,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
 
       gp_gen_load_register(f, GP_A, func_loc);
       gen_placeholder_stack_adjustment(f, h, 0);
-      x64_gen_indirect_call_reg(f, X64_RAX);
+      ia_gen_indirect_call_reg(f, GP_A);
       gen_placeholder_stack_adjustment(f, h, 1);
       x64_postcall_return_in_loc(f, &arglist_info, return_loc);
     } break;
