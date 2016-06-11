@@ -2186,6 +2186,8 @@ void gen_default_construct(struct checkstate *cs, struct objfile *f, struct fram
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_DEFAULT_CONSTRUCT, loc, 0, ignore, type);
 }
 
+int platform_can_return_in_eaxedx(enum target_platform plat);
+
 void x86_gen_returnloc_funcreturn_convention(struct objfile *f,
                                              int hidden_return_param,
                                              struct loc return_loc) {
@@ -2201,8 +2203,7 @@ void x86_gen_returnloc_funcreturn_convention(struct objfile *f,
     CHECK(return_loc.padded_size == Y86_DWORD_SIZE);
     ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_offset, OZ_32);
   } else {
-    /* Linux32 only returns in eax, we enforce this elsewhere. */
-    CHECK(objfile_platform(f) != TARGET_PLATFORM_LINUX_32BIT);
+    CHECK(platform_can_return_in_eaxedx(objfile_platform(f)));
     CHECK(return_loc.size == 2 * Y86_DWORD_SIZE);
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
     CHECK(return_loc.padded_size == 2 * Y86_DWORD_SIZE);
@@ -3933,18 +3934,16 @@ void gen_primitive_op_behavior(struct checkstate *cs,
   }
 }
 
-int platform_can_return_in_eaxedx(struct checkstate *cs) {
-  switch (cs->platform) {
+int platform_can_return_in_eaxedx(enum target_platform plat) {
+  switch (plat) {
   case TARGET_PLATFORM_OSX_32BIT: /* fallthrough */
   case TARGET_PLATFORM_WIN_32BIT:
     return 1;
   case TARGET_PLATFORM_LINUX_32BIT:
     return 0;
-  case TARGET_PLATFORM_LINUX_64BIT:
-    TODO_IMPLEMENT;
-    break;
+  case TARGET_PLATFORM_LINUX_64BIT: /* fallthrough */
   case TARGET_PLATFORM_OSX_64BIT:
-    TODO_IMPLEMENT;
+    CRASH("64-bit platform asked if return in eaxedx");
     break;
   default:
     UNREACHABLE();
@@ -4091,7 +4090,7 @@ void y86_postcall_return_in_loc(struct checkstate *cs,
       /* Return value in eax. */
       gp_gen_store_register(f, return_loc, GP_A);
     } else {
-      CHECK(platform_can_return_in_eaxedx(cs));
+      CHECK(platform_can_return_in_eaxedx(cs->platform));
       CHECK(arglist_info->return_type_size == 2 * Y86_DWORD_SIZE);
       x86_gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
     }
