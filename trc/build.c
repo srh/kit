@@ -160,21 +160,6 @@ int platform_prefix_underscore(enum target_platform platform) {
   }
 }
 
-/* REX.W */
-static const uint8_t kREXW = 0x48;
-
-size_t place_rexw(uint8_t *b, enum target_arch arch) {
-  switch (arch) {
-  case TARGET_ARCH_Y86:
-    return 0;
-  case TARGET_ARCH_X64:
-    b[0] = kREXW;
-    return 1;
-  default:
-    UNREACHABLE();
-  }
-}
-
 void ia_prefix_no_oz8(struct objfile *f, uint8_t opnum, enum oz oz) {
   CHECK(oz != OZ_8);
   if (oz == OZ_16) {

@@ -7,6 +7,9 @@
 
 #define X64_EIGHTBYTE_SIZE 8
 
+/* REX.W */
+#define kREXW 0x48
+
 
 enum x64_reg {
   X64_RAX,
