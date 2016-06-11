@@ -1355,18 +1355,17 @@ void gen_placeholder_stack_adjustment(struct objfile *f,
                                       struct frame *h,
                                       int downward) {
   struct reset_esp_data red;
-  uint8_t b[7] = { 0 };
   /* y86/x64 ADD instruction */
-  size_t insnbase = place_rexw(b, h->arch);
-  b[insnbase] = 0x81;
-  b[insnbase + 1] = mod_reg_rm(MOD11, 0, X86_ESP);
+  ia_prefix_no_oz8(f, 0x81, ptr_oz(f));
+  uint8_t b[5] = { 0 };
+  b[0] = mod_reg_rm(MOD11, 0, X86_ESP);
 
-  red.reset_esp_offset = size_add(objfile_section_size(objfile_text(f)), insnbase + 2);
+  red.reset_esp_offset = size_add(objfile_section_size(objfile_text(f)), 1);
   red.ebp_offset = h->stack_offset;
   red.downward = downward;
   SLICE_PUSH(h->espdata, h->espdata_count, h->espdata_limit, red);
 
-  apptext(f, b, insnbase + 6);
+  apptext(f, b, 5);
 }
 
 void replace_placeholder_stack_adjustment(struct objfile *f,
