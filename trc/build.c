@@ -16,6 +16,7 @@
 #include "sizeattr.h"
 #include "slice.h"
 #include "print.h"
+#include "x86.h"
 
 /* TODO(): Change x86 to y86 as code gets ported. */
 /* TODO(): Change y86 back to x86 when done. */
@@ -26,90 +27,6 @@ struct loc;
 struct frame;
 
 #define FIRST_ENUM_TAG_NUMBER 1
-
-/* These "general purpose" register names mimic the y86 mnemonics (for
-now) because they stomp on registers of the same name, and legacy code
-uses y86-specific names. */
-enum gp_reg {
-  /* 3 caller-save registers */
-  GP_A,
-  GP_C,
-  GP_D,
-
-  /* 5 callee-save registers, we don't use any but SP and BP */
-  GP_B,
-  /* stack pointer */
-  GP_SP,
-  /* frame pointer */
-  GP_BP,
-  GP_SI,
-  GP_DI,
-};
-
-enum x64_reg {
-  X64_RAX,
-  X64_RCX,
-  X64_RDX,
-  X64_RBX,
-  X64_RSP,
-  X64_RBP,
-  X64_RSI,
-  X64_RDI,
-  X64_R8,
-  X64_R9,
-  X64_R10,
-  X64_R11,
-  X64_R12,
-  X64_R13,
-  X64_R14,
-  X64_R15,
-};
-
-enum x86_reg {
-  X86_EAX,
-  X86_ECX,
-  X86_EDX,
-  X86_EBX,
-  X86_ESP,
-  X86_EBP,
-  X86_ESI,
-  X86_EDI,
-};
-
-enum x64_reg map_x64_reg(enum gp_reg reg) {
-  return (enum x64_reg)reg;
-}
-
-enum x86_reg map_x86_reg(enum gp_reg reg) {
-  return (enum x86_reg)reg;
-}
-
-/* TODO(): Remove this?  Possibly. */
-enum gp_reg unmap_x86_reg(enum x86_reg reg) {
-  return (enum gp_reg)reg;
-}
-
-enum x86_reg8 {
-  X86_AL,
-  X86_CL,
-  X86_DL,
-  X86_BL,
-  X86_AH,
-  X86_CH,
-  X86_DH,
-  X86_BH,
-};
-
-enum x86_reg16 {
-  X86_AX,
-  X86_CX,
-  X86_DX,
-  X86_BX,
-  X86_SP,
-  X86_BP,
-  X86_SI,
-  X86_DI,
-};
 
 /* Only applicable for 0F-prefixed off32 instructions (I think). */
 enum ia_setcc {
@@ -159,29 +76,6 @@ int ptr_size_bits(struct objfile *f) {
 void check_y86x64(struct objfile *f) {
   (void)f;
   /* A no-op -- f->arch must be one of TARGET_ARCH_Y86 or TARGET_ARCH_X64. */
-}
-
-/* Returns true if the reg has a lobyte (also, the register code
-happens to identify the lowbyte in a reg or modr/m field). */
-int x86_reg_has_lowbyte(enum x86_reg reg) {
-  return reg == X86_EAX || reg == X86_ECX || reg == X86_EDX || reg == X86_EBX;
-}
-
-int x86_reg8_is_lowbyte(enum x86_reg8 reg) {
-  return reg == X86_AL || reg == X86_CL || reg == X86_DL || reg == X86_BL;
-}
-
-enum x86_reg8 lowbytereg(enum x86_reg reg) {
-  CHECK(x86_reg_has_lowbyte(reg));
-  return (enum x86_reg8)reg;
-}
-
-enum x86_reg16 map_x86_reg16(enum gp_reg reg) {
-  return (enum x86_reg16)reg;
-}
-
-enum x86_reg8 map_x86_reg8(enum gp_reg reg) {
-  return lowbytereg(map_x86_reg(reg));
 }
 
 void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
@@ -1206,8 +1100,7 @@ void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2, enu
 void ia_gen_xor_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src);
 void ia_gen_xor(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz);
 
-void ia_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
-                              int32_t imm32) {
+void ia_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest, int32_t imm32) {
   if (imm32 == 0) {
     ia_gen_xor(f, dest, dest, ptr_oz(f));
   } else {

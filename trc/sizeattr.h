@@ -9,11 +9,6 @@
 struct ast_typeexpr;
 struct name_table;
 
-#define Y86_DWORD_SIZE 4
-
-#define X64_EIGHTBYTE_SIZE 8
-
-
 uint32_t ptr_size(enum target_arch arch);
 uint32_t size_size(enum target_arch arch);
 uint32_t max_possible_alignof(enum target_arch arch);
