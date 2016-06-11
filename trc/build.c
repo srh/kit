@@ -1052,13 +1052,6 @@ void x86_gen_retn(struct objfile *f, uint16_t imm16) {
   apptext(f, b, 3);
 }
 
-void x86_gen_mov_reg32(struct objfile *f, enum x86_reg dest, enum x86_reg src) {
-  uint8_t b[2];
-  b[0] = 0x8B;
-  b[1] = mod_reg_rm(MOD11, dest, src);
-  apptext(f, b, 2);
-}
-
 void ia_gen_mov(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
   ia_prefix(f, 0x8B, oz);
   pushtext(f, mod_reg_rm(MOD11, dest, src));
@@ -1408,11 +1401,11 @@ void ia_help_gen_mov_mem_imm32(struct objfile *f,
   apptext(f, buf, 4);
 }
 
-void ia_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
-                    enum gp_reg src);
+void ia_gen_store(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                  enum gp_reg src, enum oz oz);
 
-void gp_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
-                    enum gp_reg src);
+void gp_gen_store(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                  enum gp_reg src, enum oz oz);
 
 void ia_gen_mov_mem_imm8(struct objfile *f,
                          enum gp_reg dest,
@@ -1430,26 +1423,11 @@ void ia_gen_mov_mem_imm8(struct objfile *f,
 void ia_gen_movzx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                   int32_t src_disp, enum oz src_oz);
 
-void ia_gen_movzx32(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
-                    int32_t src_disp) {
-  ia_gen_movzx(f, dest, src_addr, src_disp, OZ_32);
-}
-
 void x64_gen_load64(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
                     int32_t src_disp) {
   uint8_t b[11];
   b[0] = kREXW;
   b[1] = 0x8B;
-  size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
-  CHECK(count <= 9);
-  apptext(f, b, count + 2);
-}
-
-void x64_gen_movsx32(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
-                     int32_t src_disp) {
-  uint8_t b[11];
-  b[0] = kREXW;
-  b[1] = 0x63;
   size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
   CHECK(count <= 9);
   apptext(f, b, count + 2);
@@ -1468,11 +1446,16 @@ void ia_gen_movsx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
   } else if (src_oz == OZ_32) {
     switch (objfile_arch(f)) {
     case TARGET_ARCH_Y86:
-      ia_gen_movzx32(f, dest, src_addr, src_disp);
+      ia_gen_movzx(f, dest, src_addr, src_disp, OZ_32);
       break;
-    case TARGET_ARCH_X64:
-      x64_gen_movsx32(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp);
-      break;
+    case TARGET_ARCH_X64: {
+      uint8_t b[11];
+      b[0] = kREXW;
+      b[1] = 0x63;
+      size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
+      CHECK(count <= 9);
+      apptext(f, b, count + 2);
+    } break;
     default:
       UNREACHABLE();
     }
@@ -1631,92 +1614,32 @@ size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest) {
   return ix;
 }
 
-void ia_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
-                    enum gp_reg src) {
-  CHECK(dest_addr <= 7 && src <= 7);
-  uint8_t b[10];
-  b[0] = 0x89;
-  size_t count = x86_encode_reg_rm(b + 1, src, dest_addr, dest_disp);
+void ia_gen_store(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                  enum gp_reg src, enum oz oz) {
+  ia_prefix(f, 0x89, oz);
+  uint8_t b[9];
+  size_t count = x86_encode_reg_rm(b, src, dest_addr, dest_disp);
   CHECK(count <= 9);
-  apptext(f, b, count + 1);
+  apptext(f, b, count);
 }
+
+void gp_gen_store(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
+                  enum gp_reg src, enum oz oz) {
+  check_y86x64(f);
+  ia_gen_store(f, dest_addr, dest_disp, src, oz);
+}
+
 
 void x64_gen_store64(struct objfile *f, enum x64_reg dest_addr, int32_t dest_disp,
                      enum x64_reg src) {
+  /* TODO(): I think this needs to support upper registers. */
+  CHECK(dest_addr <= X64_RDI && src <= X64_RDI);
   uint8_t b[11];
   b[0] = kREXW;
   b[1] = 0x89;
   size_t count = x86_encode_reg_rm(b + 2, src, dest_addr, dest_disp);
   CHECK(count <= 9);
   apptext(f, b, count + 2);
-}
-
-/* TODO(): Audit callers -- did they mean to write a pointer? */
-void gp_gen_store32(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
-                    enum gp_reg src) {
-  check_y86x64(f);
-  ia_gen_store32(f, dest_addr, dest_disp, src);
-}
-
-void gp_gen_storePTR(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
-                     enum gp_reg src) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86: {
-    ia_gen_store32(f, dest_addr, dest_disp, src);
-  } break;
-  case TARGET_ARCH_X64: {
-    TODO_IMPLEMENT;
-  } break;
-  default:
-    UNREACHABLE();
-  }
-}
-
-void x86_gen_store16(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
-                     enum x86_reg16 src) {
-  uint8_t b[11];
-  b[0] = 0x66;
-  b[1] = 0x89;
-  size_t count = x86_encode_reg_rm(b + 2, src, dest_addr, dest_disp);
-  CHECK(count <= 9);
-  apptext(f, b, count + 2);
-}
-
-void gp_gen_store16(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
-                    enum gp_reg src) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86: {
-    x86_gen_store16(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg16(src));
-  } break;
-  case TARGET_ARCH_X64: {
-    TODO_IMPLEMENT;
-  } break;
-  default:
-    UNREACHABLE();
-  }
-}
-
-void x86_gen_store8(struct objfile *f, enum x86_reg dest_addr, int32_t dest_disp,
-                    enum x86_reg8 src) {
-  uint8_t b[10];
-  b[0] = 0x88;
-  size_t count = x86_encode_reg_rm(b + 1, src, dest_addr, dest_disp);
-  CHECK(count <= 9);
-  apptext(f, b, count + 1);
-}
-
-void gp_gen_store8(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
-                   enum gp_reg src) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86: {
-    x86_gen_store8(f, map_x86_reg(dest_addr), dest_disp, map_x86_reg8(src));
-  } break;
-  case TARGET_ARCH_X64: {
-    TODO_IMPLEMENT;
-  } break;
-  default:
-    UNREACHABLE();
-  }
 }
 
 void gen_function_intro(struct objfile *f, struct frame *h) {
@@ -2412,7 +2335,7 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
     x86_gen_returnloc_funcreturn_convention(f, hidden_return_param,
                                             h->return_loc);
 
-    x86_gen_mov_reg32(f, X86_ESP, X86_EBP);
+    gp_gen_mov_reg(f, GP_SP, GP_BP);
     ia_gen_pop(f, GP_BP);
     if (hidden_return_param && platform_ret4_hrp(cs)) {
       x86_gen_retn(f, 4);
@@ -2540,11 +2463,11 @@ void gp_gen_memmem_mov(struct objfile *f,
   while (n < padded_size) {
     if (padded_size - n >= 4) {
       gp_gen_movzx(f, reg, src_reg, int32_add(n, src_disp), OZ_32);
-      gp_gen_store32(f, dest_reg, int32_add(n, dest_disp), reg);
+      gp_gen_store(f, dest_reg, int32_add(n, dest_disp), reg, OZ_32);
       n += 4;
     } else {
       gp_gen_movzx(f, reg, src_reg, int32_add(n, src_disp), OZ_8);
-      gp_gen_store8(f, dest_reg, int32_add(n, dest_disp), reg);
+      gp_gen_store(f, dest_reg, int32_add(n, dest_disp), reg, OZ_8);
       n += 1;
     }
   }
@@ -2606,10 +2529,10 @@ void gp_gen_mem_bzero(struct objfile *f, enum gp_reg reg, int32_t disp,
   int32_t n = 0;
   while (n < padded_size) {
     if (padded_size - n >= 4) {
-      gp_gen_store32(f, reg, int32_add(n, disp), zreg);
+      gp_gen_store(f, reg, int32_add(n, disp), zreg, OZ_32);
       n += 4;
     } else {
-      gp_gen_store8(f, reg, int32_add(n, disp), zreg);
+      gp_gen_store(f, reg, int32_add(n, disp), zreg, OZ_8);
       n += 1;
     }
   }
@@ -2634,13 +2557,13 @@ void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg) 
     TODO_IMPLEMENT;
     break;
   case 4:
-    gp_gen_store32(f, dest_addr, dest_disp, reg);
+    gp_gen_store(f, dest_addr, dest_disp, reg, OZ_32);
     break;
   case 2:
-    gp_gen_store16(f, dest_addr, dest_disp, reg);
+    gp_gen_store(f, dest_addr, dest_disp, reg, OZ_16);
     break;
   case 1:
-    gp_gen_store8(f, dest_addr, dest_disp, reg);
+    gp_gen_store(f, dest_addr, dest_disp, reg, OZ_8);
     break;
   default:
     CRASH("not implemented or unreachable.");
@@ -2690,9 +2613,9 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
   CHECK(dest.padded_size == 2 * Y86_DWORD_SIZE);
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
-    ia_gen_store32(f, GP_BP, dest.u.ebp_offset, unmap_x86_reg(lo));
-    ia_gen_store32(f, GP_BP, int32_add(dest.u.ebp_offset, Y86_DWORD_SIZE),
-                   unmap_x86_reg(hi));
+    ia_gen_store(f, GP_BP, dest.u.ebp_offset, unmap_x86_reg(lo), OZ_32);
+    ia_gen_store(f, GP_BP, int32_add(dest.u.ebp_offset, Y86_DWORD_SIZE),
+                 unmap_x86_reg(hi), OZ_32);
     break;
   case LOC_GLOBAL: {
     CRASH("Writing to globals is impossible.");
@@ -2700,8 +2623,8 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
   case LOC_EBP_INDIRECT: {
     enum x86_reg altreg = x86_choose_register_2(lo, hi);
     gp_gen_movzx(f, unmap_x86_reg(altreg), GP_BP, dest.u.ebp_indirect, OZ_32);
-    ia_gen_store32(f, unmap_x86_reg(altreg), 0, unmap_x86_reg(lo));
-    ia_gen_store32(f, unmap_x86_reg(altreg), Y86_DWORD_SIZE, unmap_x86_reg(hi));
+    ia_gen_store(f, unmap_x86_reg(altreg), 0, unmap_x86_reg(lo), OZ_32);
+    ia_gen_store(f, unmap_x86_reg(altreg), Y86_DWORD_SIZE, unmap_x86_reg(hi), OZ_32);
   } break;
   default:
     UNREACHABLE();
@@ -2739,7 +2662,7 @@ void gen_mov_mem_imm(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp
     /* Doesn't just use an immediate because OS X 32-bit won't work
     that way. */
     gp_gen_mov_reg_stiptr(f, aux, src.u.func_sti);
-    gp_gen_storePTR(f, dest_addr, dest_disp, aux);
+    gp_gen_store(f, dest_addr, dest_disp, aux, ptr_oz(f));
   } break;
   case IMMEDIATE_U64: {
     TODO_IMPLEMENT;
@@ -4984,14 +4907,14 @@ struct loc gen_subobject_loc(struct objfile *f,
     struct loc field_ptr_loc = frame_push_loc(h, ptr_size(h->arch));
     gp_gen_mov_reg_stiptr(f, GP_A, loc.u.global_sti);
     gp_gen_lea(f, GP_A, GP_A, uint32_to_int32(offset));
-    gp_gen_storePTR(f, GP_BP, field_ptr_loc.u.ebp_offset, GP_A);
+    gp_gen_store(f, GP_BP, field_ptr_loc.u.ebp_offset, GP_A, ptr_oz(f));
     ret = ebp_indirect_loc(size, size, field_ptr_loc.u.ebp_offset);
   } break;
   case LOC_EBP_INDIRECT: {
     struct loc field_ptr_loc = frame_push_loc(h, ptr_size(h->arch));
     gp_gen_movzx(f, GP_A, GP_BP, loc.u.ebp_indirect, ptr_oz(f));
     gp_gen_lea(f, GP_A, GP_A, uint32_to_int32(offset));
-    gp_gen_storePTR(f, GP_BP, field_ptr_loc.u.ebp_offset, GP_A);
+    gp_gen_store(f, GP_BP, field_ptr_loc.u.ebp_offset, GP_A, ptr_oz(f));
     ret = ebp_indirect_loc(size, size, field_ptr_loc.u.ebp_offset);
   } break;
   default:
