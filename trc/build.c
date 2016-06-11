@@ -2537,6 +2537,16 @@ void x64_gen_store_biregister(struct objfile *f, struct loc dest,
   }
 }
 
+void x64_mov_imm64(struct objfile *f, enum x64_reg dest, int64_t imm64) {
+  CHECK(dest <= X64_RDI);
+  uint8_t b[10];
+  b[0] = kREXW;
+  b[1] = 0xB8 + dest;
+  write_le_i64(b + 2, imm64);
+  apptext(f, b, 10);
+}
+
+
 /* chase mark */
 void gen_mov_mem_imm(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                      enum gp_reg aux,
@@ -2549,10 +2559,16 @@ void gen_mov_mem_imm(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp
     gp_gen_store(f, dest_addr, dest_disp, aux, ptr_oz(f));
   } break;
   case IMMEDIATE_U64: {
-    TODO_IMPLEMENT;
+    check_y86x64(f);
+    CHECK(objfile_arch(f) == TARGET_ARCH_X64);
+    x64_mov_imm64(f, map_x64_reg(aux), (int64_t)src.u.u64);
+    gp_gen_store(f, dest_addr, dest_disp, aux, OZ_64);
   } break;
   case IMMEDIATE_I64: {
-    TODO_IMPLEMENT;
+    check_y86x64(f);
+    CHECK(objfile_arch(f) == TARGET_ARCH_X64);
+    x64_mov_imm64(f, map_x64_reg(aux), src.u.i64);
+    gp_gen_store(f, dest_addr, dest_disp, aux, OZ_64);
   } break;
   case IMMEDIATE_U32: {
     char buf[4];
