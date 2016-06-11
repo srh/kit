@@ -175,13 +175,8 @@ size_t place_rexw(uint8_t *b, enum target_arch arch) {
   }
 }
 
-void ia_prefix(struct objfile *f, uint8_t opnum, enum oz oz) {
-  /* y86/x64 */
-  CHECK(opnum & 1);
-  if (oz == OZ_8) {
-    pushtext(f, opnum ^ 1);
-    return;
-  }
+void ia_prefix_no_oz8(struct objfile *f, uint8_t opnum, enum oz oz) {
+  CHECK(oz != OZ_8);
   if (oz == OZ_16) {
     pushtext(f, 0x66);
   } else if (oz == OZ_64) {
@@ -189,6 +184,16 @@ void ia_prefix(struct objfile *f, uint8_t opnum, enum oz oz) {
     pushtext(f, kREXW);
   }
   pushtext(f, opnum);
+}
+
+void ia_prefix(struct objfile *f, uint8_t opnum, enum oz oz) {
+  /* y86/x64 */
+  CHECK(opnum & 1);
+  if (oz == OZ_8) {
+    pushtext(f, opnum ^ 1);
+    return;
+  }
+  ia_prefix_no_oz8(f, opnum, oz);
 }
 
 void ia_imm(struct objfile *f, int32_t imm, enum oz oz) {
@@ -1104,12 +1109,11 @@ void ia_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest, int32_t imm32) {
   if (imm32 == 0) {
     ia_gen_xor(f, dest, dest, ptr_oz(f));
   } else {
-    uint8_t b[6];
-    size_t insnbase = place_rexw(b, objfile_arch(f));
     CHECK(dest <= GP_DI);
-    b[insnbase] = 0xB8 + (uint8_t)dest;
-    write_le_i32(b + insnbase + 1, imm32);
-    apptext(f, b, insnbase + 5);
+    ia_prefix_no_oz8(f, 0xB8 + (uint8_t)dest, ptr_oz(f));
+    uint8_t b[4];
+    write_le_i32(b, imm32);
+    apptext(f, b, 4);
   }
 }
 
