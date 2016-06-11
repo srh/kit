@@ -858,8 +858,8 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
   case TARGET_PLATFORM_WIN_32BIT: {
     uint32_t return_type_size = return_type_attrs.size;
     *return_type_size_out = return_type_size;
-    if (!(return_type_size <= 2 || return_type_size == DWORD_Y86_SIZE
-          || return_type_size == 2 * DWORD_Y86_SIZE)) {
+    if (!(return_type_size <= 2 || return_type_size == Y86_DWORD_SIZE
+          || return_type_size == 2 * Y86_DWORD_SIZE)) {
       return 1;
     } else {
       struct typeexpr_traits traits;
@@ -883,7 +883,7 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
   }
 }
 
-const int32_t Y86_HRP_EBP_DISP = 2 * DWORD_Y86_SIZE;
+const int32_t Y86_HRP_EBP_DISP = 2 * Y86_DWORD_SIZE;
 const int32_t X64_HRP_EBP_DISP = -X64_EIGHTBYTE_SIZE;
 
 /* Returns the ebp_indirect location of the hidden return pointer --
@@ -993,7 +993,7 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h,
   y86_get_funcall_arglist_info(cs, return_type, params, params_count,
                                &arglist_info);
 
-  int32_t ebp_callsite_offset = 2 * DWORD_Y86_SIZE;
+  int32_t ebp_callsite_offset = 2 * Y86_DWORD_SIZE;
 
   size_t vars_pushed = 0;
 
@@ -1958,7 +1958,7 @@ void adjust_frame_for_callsite_alignment(struct frame *h, uint32_t arglist_size)
     /* We specifically _don't_ want overflow checking on this addition
     -- unadjusted_callsite_offset could easily be -4, or -8. */
     callsite_adjustment = (8 + (uint32_t)unadjusted_callsite_offset) % 16;
-    CHECK(callsite_adjustment % DWORD_Y86_SIZE == 0);
+    CHECK(callsite_adjustment % Y86_DWORD_SIZE == 0);
   } break;
   case TARGET_ARCH_X64: {
     /* We want to lower the stack so that the callsite will be
@@ -1984,7 +1984,7 @@ void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f,
   switch (cs->arch) {
   case TARGET_ARCH_Y86:
     /* pointer passed on stack */
-    adjust_frame_for_callsite_alignment(h, DWORD_Y86_SIZE);
+    adjust_frame_for_callsite_alignment(h, Y86_DWORD_SIZE);
     y86_push_address(f, h, loc);
     break;
   case TARGET_ARCH_X64:
@@ -2008,7 +2008,7 @@ void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
   switch (cs->arch) {
   case TARGET_ARCH_Y86:
     /* pointer passed on stack */
-    adjust_frame_for_callsite_alignment(h, 2 * DWORD_Y86_SIZE);
+    adjust_frame_for_callsite_alignment(h, 2 * Y86_DWORD_SIZE);
     y86_push_address(f, h, src);
     y86_push_address(f, h, dest);
     break;
@@ -2449,11 +2449,11 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
   case TARGET_ARCH_Y86: {
     if (has_src) {
       /* X86 - pointer size */
-      adjust_frame_for_callsite_alignment(h, 2 * DWORD_Y86_SIZE);
+      adjust_frame_for_callsite_alignment(h, 2 * Y86_DWORD_SIZE);
       y86_push_address(f, h, src);
     } else {
       /* X86 - pointer size */
-      adjust_frame_for_callsite_alignment(h, DWORD_Y86_SIZE);
+      adjust_frame_for_callsite_alignment(h, Y86_DWORD_SIZE);
     }
     y86_push_address(f, h, dest);
   } break;
@@ -2503,24 +2503,24 @@ void x86_gen_returnloc_funcreturn_convention(struct objfile *f,
                                              int hidden_return_param,
                                              struct loc return_loc) {
   /* return_loc is always in the stack frame (and padded to
-  DWORD_Y86_SIZE) or via a hidden return param. */
+  Y86_DWORD_SIZE) or via a hidden return param. */
   if (hidden_return_param) {
     CHECK(return_loc.tag == LOC_EBP_INDIRECT);
     ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_indirect, OZ_32);
   } else if (return_loc.size == 0) {
     ia_gen_xor(f, GP_A, GP_A, OZ_32);
-  } else if (return_loc.size <= DWORD_Y86_SIZE) {
+  } else if (return_loc.size <= Y86_DWORD_SIZE) {
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
-    CHECK(return_loc.padded_size == DWORD_Y86_SIZE);
+    CHECK(return_loc.padded_size == Y86_DWORD_SIZE);
     ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_offset, OZ_32);
   } else {
     /* TODO: This should not even be theoretically reachable on (LINUX) linux32. */
-    CHECK(return_loc.size == 2 * DWORD_Y86_SIZE);
+    CHECK(return_loc.size == 2 * Y86_DWORD_SIZE);
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
-    CHECK(return_loc.padded_size == 2 * DWORD_Y86_SIZE);
+    CHECK(return_loc.padded_size == 2 * Y86_DWORD_SIZE);
     ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_offset, OZ_32);
     ia_gen_movzx(f, GP_D, GP_BP,
-                 int32_add(return_loc.u.ebp_offset, DWORD_Y86_SIZE), OZ_32);
+                 int32_add(return_loc.u.ebp_offset, Y86_DWORD_SIZE), OZ_32);
   }
 }
 
@@ -2826,12 +2826,12 @@ void x64_gen_load_register(struct objfile *f, enum x64_reg reg, struct loc src) 
 
 void x86_gen_store_biregister(struct objfile *f, struct loc dest,
                               enum x86_reg lo, enum x86_reg hi) {
-  CHECK(DWORD_Y86_SIZE < dest.size && dest.size <= 2 * DWORD_Y86_SIZE);
-  CHECK(dest.padded_size == 2 * DWORD_Y86_SIZE);
+  CHECK(Y86_DWORD_SIZE < dest.size && dest.size <= 2 * Y86_DWORD_SIZE);
+  CHECK(dest.padded_size == 2 * Y86_DWORD_SIZE);
   switch (dest.tag) {
   case LOC_EBP_OFFSET:
     ia_gen_store32(f, GP_BP, dest.u.ebp_offset, unmap_x86_reg(lo));
-    ia_gen_store32(f, GP_BP, int32_add(dest.u.ebp_offset, DWORD_Y86_SIZE),
+    ia_gen_store32(f, GP_BP, int32_add(dest.u.ebp_offset, Y86_DWORD_SIZE),
                    unmap_x86_reg(hi));
     break;
   case LOC_GLOBAL: {
@@ -2841,7 +2841,7 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
     enum x86_reg altreg = x86_choose_register_2(lo, hi);
     gp_gen_movzx(f, unmap_x86_reg(altreg), GP_BP, dest.u.ebp_indirect, OZ_32);
     ia_gen_store32(f, unmap_x86_reg(altreg), 0, unmap_x86_reg(lo));
-    ia_gen_store32(f, unmap_x86_reg(altreg), DWORD_Y86_SIZE, unmap_x86_reg(hi));
+    ia_gen_store32(f, unmap_x86_reg(altreg), Y86_DWORD_SIZE, unmap_x86_reg(hi));
   } break;
   default:
     UNREACHABLE();
@@ -4289,7 +4289,7 @@ void y86_get_funcall_arglist_info(struct checkstate *cs,
 
   struct funcall_arg_info *infos = malloc_mul(sizeof(*infos), args_count);
 
-  uint32_t total_size = (hidden_return_param ? DWORD_Y86_SIZE : 0);
+  uint32_t total_size = (hidden_return_param ? Y86_DWORD_SIZE : 0);
   for (size_t i = 0; i < args_count; i++) {
     uint32_t arg_size = gp_sizeof(&cs->nt, &args[i]);
     uint32_t padded_size = frame_padded_push_size(cs->arch, arg_size);
@@ -4409,12 +4409,12 @@ void y86_postcall_return_in_loc(struct checkstate *cs,
   if (!arglist_info->hidden_return_param) {
     if (arglist_info->return_type_size == 0) {
       /* nothing */
-    } else if (arglist_info->return_type_size <= DWORD_Y86_SIZE) {
+    } else if (arglist_info->return_type_size <= Y86_DWORD_SIZE) {
       /* Return value in eax. */
       gp_gen_store_register(f, return_loc, GP_A);
     } else {
       CHECK(platform_can_return_in_eaxedx(cs));
-      CHECK(arglist_info->return_type_size == 2 * DWORD_Y86_SIZE);
+      CHECK(arglist_info->return_type_size == 2 * Y86_DWORD_SIZE);
       x86_gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
     }
   }
@@ -4519,7 +4519,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   switch (cs->arch) {
   case TARGET_ARCH_Y86: {
     if (arglist_info.hidden_return_param) {
-      struct loc ptr_loc = ebp_loc(DWORD_Y86_SIZE, DWORD_Y86_SIZE, callsite_base_offset);
+      struct loc ptr_loc = ebp_loc(Y86_DWORD_SIZE, Y86_DWORD_SIZE, callsite_base_offset);
       gen_mov_addressof(f, ptr_loc, return_loc);
     }
 
@@ -6076,8 +6076,8 @@ void build_typetrav_defs(struct checkstate *cs,
       /* TODO: This duplicates calling-convention-specific logic of
       note_param_locations. */
       /* src is a garbage value if has_src is false. */
-      struct loc src = ebp_indirect_loc(sz, sz, 3 * DWORD_Y86_SIZE);
-      struct loc dest = ebp_indirect_loc(sz, sz, 2 * DWORD_Y86_SIZE);
+      struct loc src = ebp_indirect_loc(sz, sz, 3 * Y86_DWORD_SIZE);
+      struct loc dest = ebp_indirect_loc(sz, sz, 2 * Y86_DWORD_SIZE);
 
       really_gen_typetrav_behavior(cs, f, &h, info->func, dest, has_src, src,
                                    &info->type);
