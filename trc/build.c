@@ -1503,27 +1503,19 @@ void ia_gen_movzx8_reg8(struct objfile *f, enum gp_reg dest, enum x86_reg8 src) 
   apptext(f, b, 3);
 }
 
-void x86_gen_lea32(struct objfile *f, enum x86_reg dest, enum x86_reg src_addr,
-                   int32_t src_disp) {
-  uint8_t b[10];
-  b[0] = 0x8D;
-  size_t count = x86_encode_reg_rm(b + 1, dest, src_addr, src_disp);
+void ia_gen_lea(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                int32_t src_disp) {
+  ia_prefix(f, 0x8D, ptr_oz(f));
+  uint8_t b[9];
+  size_t count = x86_encode_reg_rm(b, dest, src_addr, src_disp);
   CHECK(count <= 9);
-  apptext(f, b, count + 1);
+  apptext(f, b, count);
 }
 
 void gp_gen_lea(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                 int32_t src_disp) {
-  switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
-    x86_gen_lea32(f, map_x86_reg(dest), map_x86_reg(src_addr), src_disp);
-    break;
-  case TARGET_ARCH_X64:
-    TODO_IMPLEMENT;
-    break;
-  default:
-    UNREACHABLE();
-  }
+  check_y86x64(f);
+  ia_gen_lea(f, dest, src_addr, src_disp);
 }
 
 /* Used for OS X 32-bit position-independent code.  Assigns X+srcdest to srcdest. */
@@ -2338,7 +2330,7 @@ enum gp_reg gp_choose_register_2(enum gp_reg used1, enum gp_reg used2) {
 void x86_gen_load_addressof(struct objfile *f, enum x86_reg dest, struct loc loc) {
   switch (loc.tag) {
   case LOC_EBP_OFFSET: {
-    x86_gen_lea32(f, dest, X86_EBP, loc.u.ebp_offset);
+    ia_gen_lea(f, unmap_x86_reg(dest), GP_BP, loc.u.ebp_offset);
   } break;
   case LOC_GLOBAL: {
     x86_gen_mov_reg_stiptr(f, dest, loc.u.global_sti);
