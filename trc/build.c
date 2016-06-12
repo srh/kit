@@ -18,10 +18,6 @@
 #include "plat_ia.h"
 #include "print.h"
 
-/* TODO(): Change x86 to y86 as code gets ported. */
-/* TODO(): Change y86 back to x86 when done. */
-/* TODO(): Get rid of "chase mark" comments. */
-
 struct expr_return;
 struct loc;
 struct frame;
@@ -109,7 +105,6 @@ int platform_prefix_underscore(enum target_platform platform) {
 /* Right now we don't worry about generating multiple objfiles, so we
 just blithely attach a serial number to each name to make them
 unique. */
-/* chase mark */
 void generate_kit_name(struct checkstate *cs,
                        const void *name, size_t name_count,
                        int is_export,
@@ -163,7 +158,6 @@ int is_primitive_but_not_sizeof_alignof(struct def_entry *ent) {
 }
 
 /* TODO: Put string literals in rdata (add section number to loc_global). */
-/* chase mark */
 struct sti add_data_string(struct checkstate *cs, struct objfile *f,
                            const void *data, uint32_t length) {
   ident_value index = identmap_intern(&cs->sli_values, data, length);
@@ -292,7 +286,6 @@ struct immediate {
   } u;
 };
 
-/* chase mark */
 uint32_t immediate_size(enum target_arch arch, struct immediate imm) {
   switch (imm.tag) {
   case IMMEDIATE_FUNC:
@@ -568,7 +561,6 @@ size_t frame_arg_count(struct frame *h) {
   return h->arg_count;
 }
 
-/* chase mark */
 size_t frame_add_target(struct frame *h) {
   size_t ret = h->targetdata_count;
   struct targetdata td;
@@ -577,7 +569,6 @@ size_t frame_add_target(struct frame *h) {
   return ret;
 }
 
-/* chase mark */
 void frame_define_target(struct frame *h, size_t target_number,
                          uint32_t target_offset) {
   struct targetdata *td = &h->targetdata[target_number];
@@ -599,7 +590,6 @@ void frame_push_exact_amount(struct frame *h, uint32_t size) {
   }
 }
 
-/* chase mark */
 struct loc frame_push_loc(struct frame *h, uint32_t size) {
   /* X86: Make sure new generic padding logic is right for callers on X64. */
   uint32_t padded_size = frame_padded_push_size(h->arch, size);
@@ -607,7 +597,6 @@ struct loc frame_push_loc(struct frame *h, uint32_t size) {
   return ebp_loc(size, padded_size, h->stack_offset);
 }
 
-/* chase mark */
 int32_t frame_save_offset(struct frame *h) {
   return h->stack_offset;
 }
@@ -995,7 +984,6 @@ void gp_gen_setcc_b8(struct objfile *f, enum gp_reg dest, enum ia_setcc code) {
   ia_gen_setcc_b8(f, map_x86_reg8(dest), code);
 }
 
-/* chase mark */
 void gen_placeholder_jcc(struct objfile *f, struct frame *h,
                          enum ia_jcc code, size_t target_number) {
   struct jmpdata jd;
@@ -1009,7 +997,6 @@ void gen_placeholder_jcc(struct objfile *f, struct frame *h,
   apptext(f, b, 6);
 }
 
-/* chase mark */
 void gen_placeholder_stack_adjustment(struct objfile *f,
                                       struct frame *h,
                                       int downward) {
@@ -1131,7 +1118,6 @@ int platform_ret4_hrp(struct checkstate *cs) {
   }
 }
 
-/* chase mark */
 void gen_call_imm_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                        struct sti func_sti,
                        int hidden_return_param) {
@@ -1155,7 +1141,6 @@ void gen_call_imm_func(struct checkstate *cs, struct objfile *f, struct frame *h
   gen_placeholder_stack_adjustment(f, h, 1);
 }
 
-/* chase mark */
 void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
                   struct immediate imm,
                   int hidden_return_param) {
@@ -1210,7 +1195,6 @@ void adjust_frame_for_callsite_alignment(struct frame *h, uint32_t arglist_size)
 void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                         struct def_instantiation *inst);
 
-/* chase mark */
 void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f,
                               struct frame *h,
                               struct loc loc, struct def_instantiation *inst) {
@@ -1233,7 +1217,6 @@ void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f,
   frame_restore_offset(h, stack_offset);
 }
 
-/* chase mark */
 void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
                               struct frame *h,
                               struct loc dest, struct loc src,
@@ -1259,7 +1242,6 @@ void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
   frame_restore_offset(h, stack_offset);
 }
 
-/* chase mark */
 int gen_typetrav_name_direct(struct checkstate *cs, struct objfile *f, struct frame *h,
                              enum typetrav_func tf, struct loc dest, struct loc src,
                              struct typeexpr_traits *traits,
@@ -1344,7 +1326,6 @@ struct loc gen_subobject_loc(struct objfile *f,
 /* All enum tags have offset 0. */
 static const uint32_t kENUM_TAG_OFFSET = 0;
 
-/* chase mark */
 struct loc make_enum_num_loc(struct objfile *f,
                              struct frame *h,
                              struct loc loc) {
@@ -1354,7 +1335,6 @@ struct loc make_enum_num_loc(struct objfile *f,
   return gen_subobject_loc(f, h, loc, tag_size, kENUM_TAG_OFFSET);
 }
 
-/* chase mark */
 struct loc make_enum_body_loc(struct objfile *f,
                               struct frame *h,
                               struct loc loc,
@@ -1372,7 +1352,6 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
                        enum typetrav_func tf, struct loc dest, int has_src,
                        struct loc src, struct ast_typeexpr *type);
 
-/* chase mark */
 void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                            enum typetrav_func tf, struct loc dest, int has_src,
                            struct loc src, struct ast_deftype_rhs *rhs) {
@@ -1454,7 +1433,6 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
   }
 }
 
-/* chase mark */
 int try_gen_trivial_typetrav_func(struct checkstate *cs, struct objfile *f,
                                   enum typetrav_func tf,
                                   struct loc dest, struct loc src,
@@ -1497,7 +1475,6 @@ int try_gen_trivial_typetrav_func(struct checkstate *cs, struct objfile *f,
   return 0;
 }
 
-/* chase mark */
 void really_gen_typetrav_behavior(struct checkstate *cs, struct objfile *f,
                                   struct frame *h, enum typetrav_func tf,
                                   struct loc dest, int has_src,
@@ -1672,7 +1649,6 @@ struct sti lookup_or_make_typetrav_sti(
   return cs->typetrav_symbol_infos[id]->symbol_table_index;
 }
 
-/* chase mark */
 void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
                        enum typetrav_func tf, struct loc dest, int has_src,
                        struct loc src, struct ast_typeexpr *type) {
@@ -1707,7 +1683,6 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
   frame_restore_offset(h, saved_offset);
 }
 
-/* chase mark */
 void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
                  struct loc loc, struct ast_typeexpr *type) {
   struct loc ignore;
@@ -1715,18 +1690,15 @@ void gen_destroy(struct checkstate *cs, struct objfile *f, struct frame *h,
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_DESTROY, loc, 0, ignore, type);
 }
 
-/* chase mark */
 void gen_copy(struct checkstate *cs, struct objfile *f, struct frame *h,
               struct loc dest, struct loc src, struct ast_typeexpr *type) {
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_COPY, dest, 1, src, type);
 }
-/* chase mark */
 void gen_move_or_copydestroy(struct checkstate *cs, struct objfile *f, struct frame *h,
                              struct loc dest, struct loc src,
                              struct ast_typeexpr *type) {
   gen_typetrav_func(cs, f, h, TYPETRAV_FUNC_MOVE_OR_COPYDESTROY, dest, 1, src, type);
 }
-/* chase mark */
 void gen_default_construct(struct checkstate *cs, struct objfile *f, struct frame *h,
                            struct loc loc, struct ast_typeexpr *type) {
   struct loc ignore;
@@ -1872,7 +1844,6 @@ void gp_gen_load_addressof(struct objfile *f, enum gp_reg dest, struct loc loc) 
   ia_gen_load_addressof(f, dest, loc);
 }
 
-/* chase mark */
 void gen_mov_addressof(struct objfile *f, struct loc dest, struct loc loc) {
   CHECK(dest.size == ptr_size(objfile_arch(f)));
   gp_gen_load_addressof(f, GP_A, loc);
@@ -1927,7 +1898,6 @@ void put_ptr_in_reg(struct objfile *f, struct loc loc, enum gp_reg free_reg,
 ebp) are dest or loc.  It's safe to use this if dest and src point to
 the same _exact_ memory location, through different means (or through
 the same means). */
-/* chase mark */
 void gen_mov(struct objfile *f, struct loc dest, struct loc src) {
   CHECK(dest.size == src.size);
   if (loc_equal(dest, src)) {
@@ -1966,7 +1936,6 @@ void gp_gen_mem_bzero(struct objfile *f, enum gp_reg reg, int32_t disp,
   }
 }
 
-/* chase mark */
 void gen_bzero(struct objfile *f, struct loc dest) {
   enum gp_reg reg;
   int32_t disp;
@@ -2009,7 +1978,7 @@ void x64_gen_store_register(struct objfile *f, struct loc dest,
 }
 
 void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src) {
-  /* TODO(): Honestly handle all sizes. */
+  /* TODO: Honestly handle all sizes. */
   enum gp_reg src_addr;
   int32_t src_disp;
   put_ptr_in_reg(f, src, reg, &src_addr, &src_disp);
@@ -2067,7 +2036,6 @@ void x64_gen_store_biregister(struct objfile *f, struct loc dest,
 }
 
 
-/* chase mark */
 void gen_mov_mem_imm(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                      enum gp_reg aux,
                      struct immediate src) {
@@ -2114,7 +2082,6 @@ void gen_mov_mem_imm(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp
   }
 }
 
-/* chase mark */
 void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src) {
   CHECK(dest.size == immediate_size(objfile_arch(f), src));
 
@@ -2162,31 +2129,26 @@ struct temp_return {
   int whole_thing;
 };
 
-/* chase mark */
 struct temp_return temp_none(void) {
   struct temp_return ret;
   ret.exists = 0;
   return ret;
 }
 
-/* chase mark */
 struct temp_return temp_exists_trivial(struct loc loc,
                                        int whole_thing) {
   (void)loc, (void)whole_thing;
   return temp_none();
 }
 
-/* chase mark */
 struct temp_return temp_immediate(void) {
   return temp_none();
 }
 
-/* chase mark */
 struct temp_return temp_primitive_op(void) {
   return temp_none();
 }
 
-/* chase mark */
 struct temp_return temp_exists(struct loc loc,
                                struct ast_typeexpr *temporary_type,
                                int whole_thing) {
@@ -2198,7 +2160,6 @@ struct temp_return temp_exists(struct loc loc,
   return ret;
 }
 
-/* chase mark */
 struct temp_return temp_subobject(struct temp_return other) {
   struct temp_return ret = other;
   if (ret.exists) {
@@ -2225,7 +2186,6 @@ struct loc ero_loc(struct expr_return_open *ero) {
   return ero->loc_;
 }
 
-/* chase mark */
 void ero_set_loc(struct expr_return_open *ero, struct loc loc) {
   CHECK(!ero->has_loc);
   ero->has_loc = 1;
@@ -2255,20 +2215,17 @@ struct expr_return {
   struct temp_return tr_;
 };
 
-/* chase mark */
 void er_set_tr(struct expr_return *er, struct temp_return tr) {
   CHECK(!er->has_tr);
   er->has_tr = 1;
   er->tr_ = tr;
 }
 
-/* chase mark */
 struct temp_return *er_tr(struct expr_return *er) {
   CHECK(er->has_tr);
   return &er->tr_;
 }
 
-/* chase mark */
 void gen_destroy_temp(struct checkstate *cs, struct objfile *f, struct frame *h,
                       struct temp_return tr) {
   if (tr.exists) {
@@ -2276,7 +2233,6 @@ void gen_destroy_temp(struct checkstate *cs, struct objfile *f, struct frame *h,
   }
 }
 
-/* chase mark */
 void move_or_copy_temporary_into_loc(struct checkstate *cs, struct objfile *f,
                                      struct frame *h, struct loc dest, struct loc src,
                                      struct ast_typeexpr *type, struct temp_return tr) {
@@ -2293,7 +2249,6 @@ void move_or_copy_temporary_into_loc(struct checkstate *cs, struct objfile *f,
 
 /* The tr argument applies to the temporary in _loc_, the parameter,
 and it's not the same as the tr value that ends up in er. */
-/* chase mark */
 void expr_return_set(struct checkstate *cs, struct objfile *f, struct frame *h,
                      struct expr_return *er, struct loc loc, struct ast_typeexpr *type,
                      struct temp_return tr) {
@@ -2316,7 +2271,6 @@ void expr_return_set(struct checkstate *cs, struct objfile *f, struct frame *h,
   }
 }
 
-/* chase mark */
 void wipe_temporaries(struct checkstate *cs, struct objfile *f, struct frame *h,
                       struct expr_return *src, struct ast_typeexpr *value_type,
                       struct loc *dest_out) {
@@ -2372,7 +2326,6 @@ struct expr_return free_expr_return(void) {
   return ret;
 }
 
-/* chase mark */
 struct expr_return open_expr_return(void) {
   struct expr_return ret;
   ret.tag = EXPR_RETURN_OPEN;
@@ -2381,7 +2334,6 @@ struct expr_return open_expr_return(void) {
   return ret;
 }
 
-/* chase mark */
 struct expr_return demand_expr_return(struct loc loc) {
   struct expr_return ret;
   ret.tag = EXPR_RETURN_DEMANDED;
@@ -2422,7 +2374,6 @@ void gen_cmp_behavior(struct objfile *f,
   ia_gen_movzx8_reg8(f, GP_A, X86_AL);
 }
 
-/* chase mark */
 void gen_enumconstruct_behavior(struct checkstate *cs,
                                 struct objfile *f,
                                 struct frame *h,
@@ -2474,7 +2425,6 @@ void gen_sub_primop(struct objfile *f, struct frame *h, int32_t off0, int32_t of
   }
 }
 
-/* chase mark */
 void gen_very_primitive_op_behavior(struct checkstate *cs,
                                     struct objfile *f,
                                     struct frame *h,
@@ -3423,7 +3373,6 @@ int platform_can_return_in_eaxedx(enum target_platform plat) {
 
 /* Used to precompute arglist size, so that we can align the stack to
 16-byte boundary at the function call. */
-/* chase mark */
 void y86_get_funcall_arglist_info(struct checkstate *cs,
                                   struct ast_typeexpr *return_type,
                                   struct ast_typeexpr *args,
@@ -3503,7 +3452,6 @@ void x64_get_funcall_arglist_info(struct checkstate *cs,
 }
 
 /* y86/x64 */
-/* chase mark */
 void get_funcall_arglist_info(struct checkstate *cs,
                               struct ast_typeexpr *return_type,
                               struct ast_typeexpr *args,
@@ -3601,7 +3549,6 @@ void postcall_return_in_loc(struct checkstate *cs,
   }
 }
 
-/* chase mark */
 int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
@@ -3757,7 +3704,6 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   return ret;
 }
 
-/* chase mark */
 void apply_dereference(struct checkstate *cs, struct objfile *f,
                        struct frame *h, struct loc ptr_loc,
                        uint32_t pointee_size, struct expr_return *er,
@@ -3771,7 +3717,6 @@ void apply_dereference(struct checkstate *cs, struct objfile *f,
   expr_return_set(cs, f, h, er, ret, type, temp_none());
 }
 
-/* chase mark */
 int gen_unop_expr(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_expr *a,
                   struct expr_return *er) {
@@ -3817,7 +3762,6 @@ int gen_unop_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
-/* chase mark */
 int gen_index_expr(struct checkstate *cs, struct objfile *f,
                    struct frame *h, struct ast_expr *a,
                    struct expr_return *er) {
@@ -3892,7 +3836,6 @@ int gen_index_expr(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* chase mark */
 void gen_placeholder_jmp_if_false(struct objfile *f, struct frame *h,
                                   struct loc loc, size_t target_number) {
   CHECK(loc.size == KIT_BOOL_SIZE);
@@ -3912,7 +3855,6 @@ size_t frame_crash_target_number(struct frame *h) {
   return h->crash_target_number;
 }
 
-/* chase mark */
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum ia_jcc code) {
   gen_placeholder_jcc(f, h, code, frame_crash_target_number(h));
 }
@@ -3921,7 +3863,6 @@ void gen_crash_jmp(struct objfile *f, struct frame *h) {
   gen_placeholder_jmp(f, h, frame_crash_target_number(h));
 }
 
-/* chase mark */
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number) {
   struct jmpdata jd;
   jd.target_number = target_number;
@@ -3947,7 +3888,6 @@ void replace_placeholder_jump(struct objfile *f, size_t jmp_location,
                                 sizeof(buf));
 }
 
-/* chase mark */
 void gen_assignment(struct checkstate *cs, struct objfile *f,
                     struct frame *h, struct loc lhs_loc,
                     struct loc rhs_loc, struct ast_typeexpr *type,
@@ -3994,7 +3934,6 @@ void gen_assignment(struct checkstate *cs, struct objfile *f,
   frame_define_target(h, target_number, objfile_section_size(objfile_text(f)));
 }
 
-/* chase mark */
 int gen_binop_expr(struct checkstate *cs, struct objfile *f,
                    struct frame *h, struct ast_expr *a,
                    struct expr_return *er) {
@@ -4091,7 +4030,6 @@ int gen_binop_expr(struct checkstate *cs, struct objfile *f,
   }
 }
 
-/* chase mark */
 void expr_return_immediate(struct objfile *f, struct frame *h,
                            struct expr_return *er,
                            struct immediate imm) {
@@ -4118,7 +4056,6 @@ void expr_return_immediate(struct objfile *f, struct frame *h,
   }
 }
 
-/* chase mark */
 void expr_return_primitive_op(struct expr_return *er,
                               struct primitive_op primitive_op) {
   switch (er->tag) {
@@ -4138,7 +4075,6 @@ void expr_return_primitive_op(struct expr_return *er,
   }
 }
 
-/* chase mark */
 int help_gen_immediate_numeric(struct checkstate *cs,
                                struct objfile *f,
                                struct frame *h,
@@ -4193,7 +4129,6 @@ int help_gen_immediate_numeric(struct checkstate *cs,
   }
 }
 
-/* chase mark */
 int gen_immediate_numeric_literal(struct checkstate *cs,
                                   struct objfile *f,
                                   struct frame *h,
@@ -4213,7 +4148,6 @@ int gen_immediate_numeric_literal(struct checkstate *cs,
                                     numeric_literal_value, er);
 }
 
-/* chase mark */
 struct loc gen_array_element_loc(struct checkstate *cs,
                                  struct objfile *f,
                                  struct frame *h,
@@ -4233,7 +4167,6 @@ struct loc gen_array_element_loc(struct checkstate *cs,
   return retloc;
 }
 
-/* chase mark */
 struct loc gen_field_loc(struct checkstate *cs,
                          struct objfile *f,
                          struct frame *h,
@@ -4251,7 +4184,6 @@ struct loc gen_field_loc(struct checkstate *cs,
   return gen_subobject_loc(f, h, lhs_loc, size, offset);
 }
 
-/* chase mark */
 struct loc gen_subobject_loc(struct objfile *f,
                              struct frame *h,
                              struct loc loc,
@@ -4289,7 +4221,6 @@ struct loc gen_subobject_loc(struct objfile *f,
   return ret;
 }
 
-/* chase mark */
 void apply_field_access(struct checkstate *cs,
                         struct objfile *f,
                         struct frame *h,
@@ -4303,7 +4234,6 @@ void apply_field_access(struct checkstate *cs,
   expr_return_set(cs, f, h, er, field_loc, field_type, temp_subobject(lhs_tr));
 }
 
-/* chase mark */
 int gen_local_field_access(struct checkstate *cs, struct objfile *f,
                            struct frame *h, struct ast_expr *a,
                            struct expr_return *er) {
@@ -4328,7 +4258,6 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* chase mark */
 int gen_deref_field_access(struct checkstate *cs, struct objfile *f,
                            struct frame *h, struct ast_expr *a,
                            struct expr_return *er) {
@@ -4361,7 +4290,6 @@ int gen_deref_field_access(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* chase mark */
 void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
                     struct def_instantiation *inst, struct expr_return *er) {
   if (inst->value_computed && di_value(inst)->tag == STATIC_VALUE_PRIMITIVE_OP) {
@@ -4387,7 +4315,6 @@ void gen_inst_value(struct checkstate *cs, struct objfile *f, struct frame *h,
   }
 }
 
-/* chase mark */
 int gen_strinit_expr(struct checkstate *cs, struct objfile *f,
                      struct frame *h, struct ast_expr *a,
                      struct expr_return *er) {
@@ -4419,7 +4346,6 @@ int gen_strinit_expr(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* chase mark */
 int gen_string_literal(struct checkstate *cs, struct objfile *f,
                        struct frame *h, struct ast_expr *a,
                        struct expr_return *er) {
@@ -4432,7 +4358,6 @@ int gen_string_literal(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* chase mark */
 int gen_expr(struct checkstate *cs, struct objfile *f,
              struct frame *h, struct ast_expr *a,
              struct expr_return *er) {
@@ -4545,7 +4470,6 @@ struct swartch_facts {
   size_t num_constructors;
 };
 
-/* chase mark */
 int gen_swartch(struct checkstate *cs, struct objfile *f,
                 struct frame *h, struct ast_expr *swartch,
                 struct swartch_facts *out) {
@@ -4587,13 +4511,11 @@ int gen_swartch(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* chase mark */
 void ungen_swartch(struct checkstate *cs, struct objfile *f,
                    struct frame *h, struct swartch_facts *facts) {
   gen_destroy(cs, f, h, facts->loc, facts->type);
 }
 
-/* chase mark */
 int gen_casebody(struct checkstate *cs, struct objfile *f,
                  struct frame *h, struct swartch_facts *facts,
                  struct ast_constructor_pattern *constructor,
@@ -4641,7 +4563,6 @@ struct condition_state {
   } u;
 };
 
-/* chase mark */
 int gen_condition(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_condition *a,
                   struct condition_state *out) {
@@ -4673,7 +4594,6 @@ int gen_condition(struct checkstate *cs, struct objfile *f,
   }
 }
 
-/* chase mark */
 void pop_cstate_vardata(struct frame *h, struct condition_state *cstate) {
   switch (cstate->tag) {
   case AST_CONDITION_EXPR: {
@@ -4685,7 +4605,6 @@ void pop_cstate_vardata(struct frame *h, struct condition_state *cstate) {
   }
 }
 
-/* chase mark */
 int gen_successbody(struct checkstate *cs, struct objfile *f,
                     struct frame *h, struct condition_state *cstate,
                     struct ast_bracebody *body,
@@ -4719,7 +4638,6 @@ int gen_successbody(struct checkstate *cs, struct objfile *f,
   }
 }
 
-/* chase mark */
 void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
                                      struct frame *h, struct condition_state *cstate) {
   switch (cstate->tag) {
@@ -4743,7 +4661,6 @@ void gen_afterfail_condition_cleanup(struct checkstate *cs, struct objfile *f,
   }
 }
 
-/* chase mark */
 int gen_statement(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_statement *s,
                   size_t *vars_pushed_ref) {
@@ -5014,7 +4931,6 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* chase mark */
 int gen_bracebody(struct checkstate *cs, struct objfile *f,
                   struct frame *h, struct ast_bracebody *a) {
   size_t vars_pushed = 0;
@@ -5059,7 +4975,6 @@ void tie_stack_adjustments(struct objfile *f, struct frame *h) {
   }
 }
 
-/* chase mark */
 int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
                     struct ast_expr *a) {
   CHECK(a->tag == AST_EXPR_LAMBDA);
@@ -5082,7 +4997,6 @@ int gen_lambda_expr(struct checkstate *cs, struct objfile *f,
   return res;
 }
 
-/* chase mark */
 int build_instantiation(struct checkstate *cs, struct objfile *f,
                         struct def_instantiation *inst) {
   struct static_value *value = di_value(inst);
@@ -5159,7 +5073,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
   } break;
   case STATIC_VALUE_LAMBDA: {
     /* y86/x64: 16 byte function pointer alignment. */
-    /* TODO(): Verify this on Linux, Windows. */
+    /* TODO: Verify this on Linux, Windows. */
     objfile_fillercode_align_double_quadword(f);
     objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_text(f)));
@@ -5190,7 +5104,6 @@ int build_def(struct checkstate *cs, struct objfile *f,
   return 1;
 }
 
-/* chase mark */
 void build_typetrav_defs(struct checkstate *cs,
                          struct objfile *f) {
   /* cs.typetrav_symbol_infos_count is a moving target -- we see more
