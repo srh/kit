@@ -40,8 +40,6 @@ uint32_t enum_tag_size(enum target_arch arch) {
   case TARGET_ARCH_Y86:
     return 4;
   case TARGET_ARCH_X64:
-    /* TODO(): Chase through all uses of enums (sigh) and make sure
-    that its tag use is generic w.r.t. enum tag size and platform. */
     return 4;
   default:
     UNREACHABLE();
@@ -248,8 +246,6 @@ void help_rhs_sizealignof(struct name_table *nt,
                             &body_offset_discard,
                             &body_attrs);
 
-    /* Other code expects enum nums to be dword-sized, the body offset
-    likewise.  TODO(): What other code?  Remove this comment. */
     uint32_t alignment = uint32_max(body_attrs.align, enum_tag_size(nt->arch));
     *offsetof_out = 0;
     attrs_out->size = uint32_add(body_attrs.size, alignment);
