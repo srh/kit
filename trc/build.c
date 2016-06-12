@@ -2039,24 +2039,14 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
                               enum x86_reg lo, enum x86_reg hi) {
   CHECK(Y86_DWORD_SIZE < dest.size && dest.size <= 2 * Y86_DWORD_SIZE);
   CHECK(dest.padded_size == 2 * Y86_DWORD_SIZE);
-  switch (dest.tag) {
-  case LOC_EBP_OFFSET:
-    ia_gen_store(f, GP_BP, dest.u.ebp_offset, unmap_x86_reg(lo), OZ_32);
-    ia_gen_store(f, GP_BP, int32_add(dest.u.ebp_offset, Y86_DWORD_SIZE),
-                 unmap_x86_reg(hi), OZ_32);
-    break;
-  case LOC_GLOBAL: {
-    CRASH("Writing to globals is impossible.");
-  } break;
-  case LOC_EBP_INDIRECT: {
-    enum gp_reg altreg = gp_choose_register_2(unmap_x86_reg(lo), unmap_x86_reg(hi));
-    gp_gen_movzx(f, altreg, GP_BP, dest.u.ebp_indirect, OZ_32);
-    ia_gen_store(f, altreg, 0, unmap_x86_reg(lo), OZ_32);
-    ia_gen_store(f, altreg, Y86_DWORD_SIZE, unmap_x86_reg(hi), OZ_32);
-  } break;
-  default:
-    UNREACHABLE();
-  }
+  enum gp_reg dest_addr;
+  int32_t dest_disp;
+  put_ptr_in_reg(f, dest, gp_choose_register_2(unmap_x86_reg(lo), unmap_x86_reg(hi)),
+                 &dest_addr, &dest_disp);
+
+  ia_gen_store(f, dest_addr, dest_disp, unmap_x86_reg(lo), OZ_32);
+  ia_gen_store(f, dest_addr, int32_add(dest_disp, Y86_DWORD_SIZE),
+               unmap_x86_reg(hi), OZ_32);
 }
 
 void x64_gen_store_biregister(struct objfile *f, struct loc dest,
