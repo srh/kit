@@ -1976,7 +1976,7 @@ void gen_bzero(struct objfile *f, struct loc dest) {
 }
 
 void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg) {
-  /* TODO(): Honestly handle all sizes. */
+  /* TODO: Honestly handle all sizes. */
   enum gp_reg dest_addr;
   int32_t dest_disp;
   put_ptr_in_reg(f, dest, gp_choose_altreg(reg), &dest_addr, &dest_disp);
