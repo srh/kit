@@ -86,7 +86,7 @@ void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_numbe
 void gen_crash_jmp(struct objfile *f, struct frame *h);
 void gp_gen_load_addressof(struct objfile *f, enum gp_reg dest, struct loc loc);
 void x64_gen_store_biregister(struct objfile *f, struct loc dest,
-                              enum x64_reg lo, enum x64_reg hi, enum x64_reg spare);
+                              enum x64_reg lo, enum x64_reg hi, enum gp_reg spare);
 
 int platform_prefix_underscore(enum target_platform platform) {
   switch (platform) {
@@ -881,7 +881,7 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
         x64_gen_store_biregister(f, param_loc,
                                  x64_param_regs[ai.first_register],
                                  x64_param_regs[ai.first_register + 1],
-                                 X64_RAX);
+                                 GP_A);
       }
     }
 
@@ -2060,26 +2060,16 @@ void x86_gen_store_biregister(struct objfile *f, struct loc dest,
 }
 
 void x64_gen_store_biregister(struct objfile *f, struct loc dest,
-                              enum x64_reg lo, enum x64_reg hi, enum x64_reg spare) {
+                              enum x64_reg lo, enum x64_reg hi, enum gp_reg spare) {
   /* Notably this is very x64-specific because we could be storing r8 and r9. */
   CHECK(X64_EIGHTBYTE_SIZE < dest.size && dest.size <= 2 * X64_EIGHTBYTE_SIZE);
   CHECK(dest.padded_size == 2 * X64_EIGHTBYTE_SIZE);
-  switch (dest.tag) {
-  case LOC_EBP_OFFSET:
-    x64_gen_store64(f, X64_RBP, dest.u.ebp_offset, lo);
-    x64_gen_store64(f, X64_RBP, int32_add(dest.u.ebp_offset, X64_EIGHTBYTE_SIZE), hi);
-    break;
-  case LOC_GLOBAL: {
-    CRASH("Writing to globals is impossible.");
-  } break;
-  case LOC_EBP_INDIRECT: {
-    x64_gen_load64(f, spare, X64_RBP, dest.u.ebp_indirect);
-    x64_gen_store64(f, spare, 0, lo);
-    x64_gen_store64(f, spare, X64_EIGHTBYTE_SIZE, hi);
-  } break;
-  default:
-    UNREACHABLE();
-  }
+  enum gp_reg dest_addr;
+  int32_t dest_disp;
+  put_ptr_in_reg(f, dest, spare, &dest_addr, &dest_disp);
+
+  x64_gen_store64(f, map_x64_reg(dest_addr), dest_disp, lo);
+  x64_gen_store64(f, map_x64_reg(dest_addr), int32_add(dest_disp, X64_EIGHTBYTE_SIZE), hi);
 }
 
 
@@ -3596,7 +3586,7 @@ void x64_postcall_return_in_loc(struct objfile *f,
     } else {
       CHECK(arglist_info->return_type_size <= 2 * X64_EIGHTBYTE_SIZE);
       x64_gen_store_biregister(f, ebp_loc(8, 8, return_loc.u.ebp_offset),
-                               X64_RAX, X64_RDX, X64_RCX);
+                               X64_RAX, X64_RDX, GP_C);
     }
   }
 }
