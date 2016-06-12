@@ -95,7 +95,6 @@ int platform_prefix_underscore(enum target_platform platform) {
   case TARGET_PLATFORM_OSX_32BIT:
     return 1;
   case TARGET_PLATFORM_OSX_64BIT:
-    /* TODO(): I presume. */
     return 1;
   default:
     UNREACHABLE();
