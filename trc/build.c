@@ -1341,6 +1341,9 @@ struct loc gen_subobject_loc(struct objfile *f,
                              uint32_t size,
                              uint32_t offset);
 
+/* All enum tags have offset 0. */
+static const uint32_t kENUM_TAG_OFFSET = 0;
+
 /* chase mark */
 struct loc make_enum_num_loc(struct objfile *f,
                              struct frame *h,
@@ -1348,7 +1351,7 @@ struct loc make_enum_num_loc(struct objfile *f,
   uint32_t tag_size = enum_tag_size(h->arch);
   CHECK(loc.size >= tag_size);
   /* All enums start with a tag, in [0, tag_size). */
-  return gen_subobject_loc(f, h, loc, tag_size, 0);
+  return gen_subobject_loc(f, h, loc, tag_size, kENUM_TAG_OFFSET);
 }
 
 /* chase mark */
@@ -1357,6 +1360,7 @@ struct loc make_enum_body_loc(struct objfile *f,
                               struct loc loc,
                               uint32_t body_size,
                               uint32_t body_alignment) {
+  CHECK(kENUM_TAG_OFFSET == 0);
   uint32_t tag_size = enum_tag_size(h->arch);
   uint32_t body_offset = uint32_max(tag_size, body_alignment);
   CHECK(loc.size >= uint32_add(body_offset, body_size));
@@ -5145,7 +5149,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     objfile_section_align(objfile_data(f), max_possible_alignof(cs->arch));
     objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
-    /* TODO(): well crap, this is tied to enum representation. */
+    CHECK(enum_tag_size(cs->arch) == 4 && kENUM_TAG_OFFSET == 0);
     char buf[4];
     write_le_u32(buf, size_to_uint32(size_add(value->u.enumvoid_value.enumconstruct_number, FIRST_ENUM_TAG_NUMBER)));
     objfile_section_append_raw(objfile_data(f), buf, sizeof(buf));
