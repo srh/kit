@@ -162,7 +162,7 @@ struct name_table {
   enum target_arch arch;
 };
 
-/* Merely carries target_arch for callee convenience in places.  TODO(): Don't. */
+/* Merely carries target_arch for callee convenience in places.  NOTE: Don't. */
 void name_table_init(struct name_table *t, enum target_arch arch);
 void name_table_destroy(struct name_table *t);
 
