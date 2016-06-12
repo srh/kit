@@ -1,7 +1,11 @@
 #ifndef KIT_X86_H_
 #define KIT_X86_H_
 
+#include <stdint.h>
+
 #include "gp.h"
+
+struct objfile;
 
 #define Y86_DWORD_SIZE 4
 
@@ -10,6 +14,10 @@
 /* REX.W */
 #define kREXW 0x48
 
+#define MOD00 0
+#define MOD01 1
+#define MOD10 2
+#define MOD11 3
 
 enum x64_reg {
   X64_RAX,
@@ -74,5 +82,39 @@ int x86_reg8_is_lowbyte(enum x86_reg8 reg);
 enum x86_reg8 lowbytereg(enum x86_reg reg);
 enum x86_reg16 map_x86_reg16(enum gp_reg reg);
 enum x86_reg8 map_x86_reg8(enum gp_reg reg);
+
+void ia_prefix_no_oz8(struct objfile *f, uint8_t opnum, enum oz oz);
+void ia_prefix(struct objfile *f, uint8_t opnum, enum oz oz);
+void ia_imm(struct objfile *f, int32_t imm, enum oz oz);
+
+size_t x86_encode_reg_rm(uint8_t *b, int reg, int rm_addr,
+                         int32_t rm_addr_disp);
+
+uint8_t mod_reg_rm(int mod, int reg, int rm);
+void ia_gen_push(struct objfile *f, enum gp_reg reg);
+void ia_gen_pop(struct objfile *f, enum gp_reg reg);
+void ia_gen_ret(struct objfile *f);
+void x86_gen_retn(struct objfile *f, uint16_t imm16);
+void ia_gen_mov(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz);
+
+void x64_gen_load64(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
+                    int32_t src_disp);
+void x64_gen_store64(struct objfile *f, enum x64_reg dest_addr, int32_t dest_disp,
+                     enum x64_reg src);
+void ia_gen_movzx8_reg8(struct objfile *f, enum gp_reg dest, enum x86_reg8 src);
+void ia_gen_lea(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                int32_t src_disp);
+void ia_gen_movzx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                  int32_t src_disp, enum oz src_oz);
+void ia_gen_movsx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
+                  int32_t src_disp, enum oz src_oz);
+void ia_help_gen_mov_mem_imm32(struct objfile *f,
+                               enum gp_reg dest,
+                               int32_t dest_disp,
+                               char buf[4]);
+void ia_gen_mov_mem_imm8(struct objfile *f,
+                         enum gp_reg dest,
+                         int32_t dest_disp,
+                         int8_t imm);
 
 #endif /* KIT_X86_H_ */
