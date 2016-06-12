@@ -29,6 +29,36 @@ enum gp_reg {
 
 enum oz { OZ_8, OZ_16, OZ_32, OZ_64, };
 
+/* NOTE: Obviously we'll need platform-independent values at some point. */
+
+/* Only applicable for 0F-prefixed off32 instructions (I think). */
+enum ia_setcc {
+  IA_SETCC_L = 0x9C,
+  IA_SETCC_LE = 0x9E,
+  IA_SETCC_G = 0x9F,
+  IA_SETCC_GE = 0x9D,
+  IA_SETCC_E = 0x94,
+  IA_SETCC_NE = 0x95,
+  IA_SETCC_A = 0x97,
+  IA_SETCC_AE = 0x93,
+  IA_SETCC_B = 0x92,
+  IA_SETCC_BE = 0x96,
+  IA_SETCC_Z = 0x94,
+};
+
+/* Only applicable for 0F-prefixed jmp instructions (I think). */
+enum ia_jcc {
+  IA_JCC_O = 0x80,
+  IA_JCC_Z = 0x84,
+  IA_JCC_NE = 0x85,
+  IA_JCC_S = 0x88,
+  IA_JCC_A = 0x87,
+  IA_JCC_AE = 0x83,
+  IA_JCC_C = 0x82,
+  IA_JCC_G = 0x8F,
+  IA_JCC_L = 0x8C,
+};
+
 void apptext(struct objfile *f, const void *buf, size_t count);
 void pushtext(struct objfile *f, uint8_t byte);
 enum oz ptr_oz(struct objfile *f);

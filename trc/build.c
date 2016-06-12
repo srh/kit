@@ -28,34 +28,6 @@ struct frame;
 
 #define FIRST_ENUM_TAG_NUMBER 1
 
-/* Only applicable for 0F-prefixed off32 instructions (I think). */
-enum ia_setcc {
-  IA_SETCC_L = 0x9C,
-  IA_SETCC_LE = 0x9E,
-  IA_SETCC_G = 0x9F,
-  IA_SETCC_GE = 0x9D,
-  IA_SETCC_E = 0x94,
-  IA_SETCC_NE = 0x95,
-  IA_SETCC_A = 0x97,
-  IA_SETCC_AE = 0x93,
-  IA_SETCC_B = 0x92,
-  IA_SETCC_BE = 0x96,
-  IA_SETCC_Z = 0x94,
-};
-
-/* Only applicable for 0F-prefixed jmp instructions (I think). */
-enum ia_jcc {
-  IA_JCC_O = 0x80,
-  IA_JCC_Z = 0x84,
-  IA_JCC_NE = 0x85,
-  IA_JCC_S = 0x88,
-  IA_JCC_A = 0x87,
-  IA_JCC_AE = 0x83,
-  IA_JCC_C = 0x82,
-  IA_JCC_G = 0x8F,
-  IA_JCC_L = 0x8C,
-};
-
 int ptr_size_bits(struct objfile *f) {
   return 8 << ptr_oz(f);
 }
@@ -964,26 +936,11 @@ void gp_gen_mov_reg(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
   ia_gen_mov(f, dest, src, ptr_oz(f));
 }
 
-void ia_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
-  uint8_t b[2];
-  b[0] = 0x8A;
-  b[1] = mod_reg_rm(MOD11, dest, src);
-  apptext(f, b, 2);
-}
-
-void ia_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2, enum oz oz) {
-  ia_prefix(f, 0x85, oz);
-  pushtext(f, mod_reg_rm(MOD11, reg2, reg1));
-}
-
 /* Tests the whole reg!!! */
 void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2, enum oz oz) {
   check_y86x64(f);
   ia_gen_test_regs(f, reg1, reg2, oz);
 }
-
-void ia_gen_xor_w32(struct objfile *f, enum gp_reg dest, enum gp_reg src);
-void ia_gen_xor(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz);
 
 void ia_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest, int32_t imm32) {
   if (imm32 == 0) {
@@ -1045,156 +1002,6 @@ void gen_debug_trap(struct objfile *f) {
   check_y86x64(f);
   /* INT 3 instruction */
   pushtext(f, 0xCC);
-}
-
-void ia_gen_shl_cl(struct objfile *f, enum gp_reg dest, enum oz oz) {
-  ia_prefix(f, 0xD3, oz);
-  /* SHL, SHR, SAR have different reg/opcode fields. */
-  pushtext(f, mod_reg_rm(MOD11, 4, dest));
-}
-
-void ia_gen_shr_cl(struct objfile *f, enum gp_reg dest, enum oz oz) {
-  ia_prefix(f, 0xD3, oz);
-  /* SHL, SHR, SAR have different reg/opcode fields. */
-  pushtext(f, mod_reg_rm(MOD11, 5, dest));
-}
-
-void ia_gen_sar_cl(struct objfile *f, enum gp_reg dest, enum oz oz) {
-  ia_prefix(f, 0xD3, oz);
-  /* SHL, SHR, SAR have different reg/opcode fields. */
-  pushtext(f, mod_reg_rm(MOD11, 7, dest));
-}
-
-void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
-  uint8_t b[6];
-  b[0] = 0x81;
-  b[1] = mod_reg_rm(MOD11, 0, X86_ESP);
-  write_le_i32(b + 2, x);
-  apptext(f, b, 6);
-}
-
-void ia_gen_add(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
-  ia_prefix(f, 0x01, oz);
-  pushtext(f, mod_reg_rm(MOD11, src, dest));
-}
-
-void ia_gen_azdz_mul(struct objfile *f, enum gp_reg src, enum oz oz) {
-  CHECK(oz != OZ_8);
-  ia_prefix(f, 0xF7, oz);
-  pushtext(f, mod_reg_rm(MOD11, 4, src));
-}
-
-void ia_gen_alah_mul_w8(struct objfile *f, enum x86_reg8 src) {
-  uint8_t b[2];
-  b[0] = 0xF6;
-  b[1] = mod_reg_rm(MOD11, 4, src);
-  apptext(f, b, 2);
-}
-
-void ia_gen_imul(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
-  CHECK(oz != OZ_8);
-  ia_prefix(f, 0x0F, oz);
-  pushtext(f, 0xAF);
-  pushtext(f, mod_reg_rm(MOD11, dest, src));
-}
-
-void ia_gen_alah_imul_w8(struct objfile *f, enum x86_reg8 src) {
-  uint8_t b[2];
-  b[0] = 0xF6;
-  b[1] = mod_reg_rm(MOD11, 5, src);
-  apptext(f, b, 2);
-}
-
-void ia_gen_azdz_div(struct objfile *f, enum gp_reg denom, enum oz oz) {
-  CHECK(oz != OZ_8);
-  ia_prefix(f, 0xF7, oz);
-  pushtext(f, mod_reg_rm(MOD11, 6, denom));
-}
-
-void ia_gen_alah_div_w8(struct objfile *f, enum x86_reg8 denom) {
-  uint8_t b[2];
-  b[0] = 0xF6;
-  b[1] = mod_reg_rm(MOD11, 6, denom);
-  apptext(f, b, 2);
-}
-
-void ia_gen_azdz_idiv(struct objfile *f, enum gp_reg denom, enum oz oz) {
-  CHECK(oz != OZ_8);
-  ia_prefix(f, 0xF7, oz);
-  pushtext(f, mod_reg_rm(MOD11, 7, denom));
-}
-
-void ia_gen_alah_idiv_w8(struct objfile *f, enum x86_reg8 denom) {
-  uint8_t b[2];
-  b[0] = 0xF6;
-  b[1] = mod_reg_rm(MOD11, 7, denom);
-  apptext(f, b, 2);
-}
-
-void ia_gen_cwdqo(struct objfile *f, enum oz oz) {
-  /* cwd/cdq/cqo */
-  CHECK(oz != OZ_8);
-  ia_prefix(f, 0x99, oz);
-}
-
-void ia_gen_cmp(struct objfile *f, enum gp_reg lhs, enum gp_reg rhs, enum oz oz) {
-  ia_prefix(f, 0x39, oz);
-  pushtext(f, mod_reg_rm(MOD11, rhs, lhs));
-}
-
-void ia_gen_cmp_imm(struct objfile *f, enum gp_reg lhs, int32_t imm, enum oz oz) {
-  ia_prefix(f, 0x81, oz);
-  pushtext(f, mod_reg_rm(MOD11, 7, lhs));
-  ia_imm(f, imm, oz);
-}
-
-void ia_gen_xor(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
-  ia_prefix(f, 0x31, oz);
-  pushtext(f, mod_reg_rm(MOD11, src, dest));
-}
-
-void ia_gen_or(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
-  ia_prefix(f, 0x09, oz);
-  pushtext(f, mod_reg_rm(MOD11, src, dest));
-}
-
-void ia_gen_and(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
-  ia_prefix(f, 0x21, oz);
-  pushtext(f, mod_reg_rm(MOD11, src, dest));
-}
-
-void ia_gen_not(struct objfile *f, enum gp_reg dest, enum oz oz) {
-  ia_prefix(f, 0xF7, oz);
-  pushtext(f, mod_reg_rm(MOD11, 2, dest));
-}
-
-void ia_gen_neg(struct objfile *f, enum gp_reg dest, enum oz oz) {
-  ia_prefix(f, 0xF7, oz);
-  pushtext(f, mod_reg_rm(MOD11, 3, dest));
-}
-
-void ia_gen_sub(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
-  ia_prefix(f, 0x29, oz);
-  pushtext(f, mod_reg_rm(MOD11, src, dest));
-}
-
-void x64_gen_sub_w64_imm32(struct objfile *f, enum x64_reg dest, int32_t imm) {
-  CHECK(dest <= X64_RDI);
-  uint8_t b[7];
-  b[0] = kREXW;
-  b[1] = 0x81;
-  b[2] = mod_reg_rm(MOD11, 5, dest);
-  write_le_i32(b + 3, imm);
-  apptext(f, b, 7);
-}
-
-void ia_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
-                     enum ia_setcc code) {
-  uint8_t b[3];
-  b[0] = 0x0F;
-  b[1] = (uint8_t)code;
-  b[2] = mod_reg_rm(MOD11, 0, dest);
-  apptext(f, b, 3);
 }
 
 /* Either leaves upper bits unset or sets them to zero. */
