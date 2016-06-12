@@ -942,18 +942,6 @@ void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2, enu
   ia_gen_test_regs(f, reg1, reg2, oz);
 }
 
-void ia_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest, int32_t imm32) {
-  if (imm32 == 0) {
-    ia_gen_xor(f, dest, dest, ptr_oz(f));
-  } else {
-    CHECK(dest <= GP_DI);
-    ia_prefix_no_oz8(f, 0xB8 + (uint8_t)dest, ptr_oz(f));
-    uint8_t b[4];
-    write_le_i32(b, imm32);
-    apptext(f, b, 4);
-  }
-}
-
 void gp_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
                           int32_t imm32) {
   check_y86x64(f);
@@ -1100,15 +1088,6 @@ size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest) {
   size_t ix = objfile_section_size(objfile_text(f)) + 1 + reg_rm_reloc;
   apptext(f, b, count + 1);
   return ix;
-}
-
-void ia_gen_store(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
-                  enum gp_reg src, enum oz oz) {
-  ia_prefix(f, 0x89, oz);
-  uint8_t b[9];
-  size_t count = x86_encode_reg_rm(b, src, dest_addr, dest_disp);
-  CHECK(count <= 9);
-  apptext(f, b, count);
 }
 
 void gp_gen_store(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
@@ -2106,15 +2085,6 @@ void x64_gen_store_biregister(struct objfile *f, struct loc dest,
   }
 }
 
-void x64_mov_imm64(struct objfile *f, enum x64_reg dest, int64_t imm64) {
-  CHECK(dest <= X64_RDI);
-  uint8_t b[10];
-  b[0] = kREXW;
-  b[1] = 0xB8 + dest;
-  write_le_i64(b + 2, imm64);
-  apptext(f, b, 10);
-}
-
 
 /* chase mark */
 void gen_mov_mem_imm(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
@@ -2182,20 +2152,6 @@ void gen_mov_immediate(struct objfile *f, struct loc dest, struct immediate src)
   }
 }
 
-
-void ia_gen_call(struct objfile *f, struct sti func_sti) {
-  uint8_t b = 0xE8;
-  apptext(f, &b, 1);
-  objfile_section_append_rel32(objfile_text(f), func_sti);
-}
-
-void ia_gen_indirect_call_reg(struct objfile *f, enum gp_reg reg) {
-  check_y86x64(f);
-  uint8_t b[2];
-  b[0] = 0xFF;
-  b[1] = mod_reg_rm(MOD11, 2, reg);
-  apptext(f, b, 2);
-}
 
 enum expr_return_free_tag {
   EXPR_RETURN_FREE_LOC,
