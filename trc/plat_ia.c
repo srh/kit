@@ -137,14 +137,24 @@ void x64_gen_load64(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
 
 void x64_gen_store64(struct objfile *f, enum x64_reg dest_addr, int32_t dest_disp,
                      enum x64_reg src) {
-  /* TODO(): I think this needs to support upper registers. */
-  CHECK(dest_addr <= X64_RDI && src <= X64_RDI);
-  uint8_t b[11];
-  b[0] = kREXW;
-  b[1] = 0x89;
-  size_t count = x86_encode_reg_rm(b + 2, src, dest_addr, dest_disp);
+  CHECK(dest_addr <= X64_RDI);
+  /* This supports use of upper registers for src. */
+  int src_int;
+  if (src <= X64_RDI) {
+    pushtext(f, kREXW);
+    src_int = (int)src;
+  } else {
+    pushtext(f, kREXW | kREXR);
+    src_int = (int)src - 8;
+    CHECK(0 <= src_int && src_int < 8);
+    /* There's still restrictions on encoding R13, iirc. */
+    CHECK(src_int != X64_RSP);
+  }
+  pushtext(f, 0x89);
+  uint8_t b[9];
+  size_t count = x86_encode_reg_rm(b, src_int, dest_addr, dest_disp);
   CHECK(count <= 9);
-  apptext(f, b, count + 2);
+  apptext(f, b, count);
 }
 
 void ia_gen_movzx8_reg8(struct objfile *f, enum gp_reg dest, enum x86_reg8 src) {

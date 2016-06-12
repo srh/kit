@@ -15,8 +15,9 @@ named ia_ because they work on both intel architecture platforms. */
 
 #define X64_EIGHTBYTE_SIZE 8
 
-/* REX.W */
+/* REX.W, REX.R.  Can be bitwise-ored together. */
 #define kREXW 0x48
+#define kREXR 0x44
 
 #define MOD00 0
 #define MOD01 1

@@ -822,9 +822,6 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h,
   funcall_arglist_info_destroy(&arglist_info);
 }
 
-void x64_gen_store64(struct objfile *f, enum x64_reg dest, int32_t dest_disp,
-                     enum x64_reg src);
-
 static const enum x64_reg x64_param_regs[6] = {
   X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8, X64_R9,
 };
