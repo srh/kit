@@ -1,4 +1,4 @@
-#include "x86.h"
+#include "plat_ia.h"
 
 #include "objfile_objfile.h"
 #include "util.h"

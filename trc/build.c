@@ -15,8 +15,8 @@
 #include "objfile_win.h"
 #include "sizeattr.h"
 #include "slice.h"
+#include "plat_ia.h"
 #include "print.h"
-#include "x86.h"
 
 /* TODO(): Change x86 to y86 as code gets ported. */
 /* TODO(): Change y86 back to x86 when done. */

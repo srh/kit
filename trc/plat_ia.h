@@ -1,5 +1,5 @@
-#ifndef KIT_X86_H_
-#define KIT_X86_H_
+#ifndef KIT_PLAT_IA_H_
+#define KIT_PLAT_IA_H_
 
 #include <stdint.h>
 
@@ -154,4 +154,4 @@ void x64_mov_imm64(struct objfile *f, enum x64_reg dest, int64_t imm64);
 void ia_gen_call(struct objfile *f, struct sti func_sti);
 void ia_gen_indirect_call_reg(struct objfile *f, enum gp_reg reg);
 
-#endif /* KIT_X86_H_ */
+#endif /* KIT_PLAT_IA_H_ */
