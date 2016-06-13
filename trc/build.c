@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arch_ia.h"
 #include "arith.h"
 #include "checkstate.h"
 #include "databuf.h"
@@ -15,7 +16,6 @@
 #include "objfile_win.h"
 #include "sizeattr.h"
 #include "slice.h"
-#include "plat_ia.h"
 #include "print.h"
 
 struct expr_return;

@@ -1,4 +1,4 @@
-#include "plat_ia.h"
+#include "arch_ia.h"
 
 #include "objfile_objfile.h"
 #include "util.h"
