@@ -836,7 +836,7 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
     CHECK(hrp_loc.u.ebp_offset == X64_HRP_EBP_DISP);
     return_loc = ebp_indirect_loc(arglist_info.return_type_size, arglist_info.return_type_size,
                                   hrp_loc.u.ebp_offset);
-    x64_gen_store64(f, X64_RBP, hrp_loc.u.ebp_offset, X64_RDI);
+    x64_gen_store(f, X64_RBP, hrp_loc.u.ebp_offset, X64_RDI, OZ_64);
   } else {
     return_loc = frame_push_loc(h, arglist_info.return_type_size);
   }
@@ -2030,8 +2030,8 @@ void x64_gen_store_biregister(struct objfile *f, struct loc dest,
   int32_t dest_disp;
   put_ptr_in_reg(f, dest, spare, &dest_addr, &dest_disp);
 
-  x64_gen_store64(f, map_x64_reg(dest_addr), dest_disp, lo);
-  x64_gen_store64(f, map_x64_reg(dest_addr), int32_add(dest_disp, X64_EIGHTBYTE_SIZE), hi);
+  x64_gen_store(f, map_x64_reg(dest_addr), dest_disp, lo, OZ_64);
+  x64_gen_store(f, map_x64_reg(dest_addr), int32_add(dest_disp, X64_EIGHTBYTE_SIZE), hi, OZ_64);
 }
 
 

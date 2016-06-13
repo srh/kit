@@ -16,6 +16,7 @@ named ia_ because they work on both intel architecture platforms. */
 #define X64_EIGHTBYTE_SIZE 8
 
 /* REX.W, REX.R.  Can be bitwise-ored together. */
+#define kREX 0x40
 #define kREXW 0x48
 #define kREXR 0x44
 
@@ -102,10 +103,8 @@ void ia_gen_ret(struct objfile *f);
 void x86_gen_retn(struct objfile *f, uint16_t imm16);
 void ia_gen_mov(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz);
 
-void x64_gen_load64(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
-                    int32_t src_disp);
-void x64_gen_store64(struct objfile *f, enum x64_reg dest_addr, int32_t dest_disp,
-                     enum x64_reg src);
+void x64_gen_store(struct objfile *f, enum x64_reg dest_addr, int32_t dest_disp,
+                   enum x64_reg src, enum oz oz);
 void ia_gen_movzx8_reg8(struct objfile *f, enum gp_reg dest, enum x86_reg8 src);
 void ia_gen_lea(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                 int32_t src_disp);

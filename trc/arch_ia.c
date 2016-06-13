@@ -59,6 +59,29 @@ void ia_prefix(struct objfile *f, uint8_t opnum, enum oz oz) {
   ia_prefix_no_oz8(f, opnum, oz);
 }
 
+/* "reg" specifies the reg field of a modr/m byte, i.e. REX.R. */
+void x64_prefix(struct objfile *f, uint8_t opnum, enum oz oz,
+                enum x64_reg reg,
+                int *regnum_out) {
+  CHECK(opnum & 1);
+  *regnum_out = reg & 7;
+  if (oz == OZ_8) {
+    if (reg > X64_RBX) {
+      pushtext(f, (reg <= X64_RDI ? kREX : kREXR));
+    }
+    pushtext(f, opnum ^ 1);
+    return;
+  }
+  int rex = (reg > X64_RDI ? kREXR : 0) | (oz == OZ_64 ? kREXW : 0);
+  if (rex) {
+    pushtext(f, rex);
+  }
+  if (oz == OZ_16) {
+    pushtext(f, 0x66);
+  }
+  pushtext(f, opnum);
+}
+
 void ia_imm(struct objfile *f, int32_t imm, enum oz oz) {
   uint8_t b[4];
   write_le_i32(b, imm);
@@ -76,6 +99,7 @@ void ia_imm(struct objfile *f, int32_t imm, enum oz oz) {
 /* Check callers if max count returned increases. */
 size_t x86_encode_reg_rm(uint8_t *b, int reg, int rm_addr,
                          int32_t rm_addr_disp) {
+  CHECK(reg <= 7 && rm_addr <= 7);
   if (rm_addr_disp == 0 && rm_addr != X86_ESP && rm_addr != X86_EBP) {
     b[0] = mod_reg_rm(MOD00, reg, rm_addr);
     return 1;
@@ -125,34 +149,24 @@ void ia_gen_mov(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz
   pushtext(f, mod_reg_rm(MOD11, dest, src));
 }
 
-void x64_gen_load64(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
-                    int32_t src_disp) {
-  uint8_t b[11];
-  b[0] = kREXW;
-  b[1] = 0x8B;
-  size_t count = x86_encode_reg_rm(b + 2, dest, src_addr, src_disp);
+void x64_gen_load(struct objfile *f, enum x64_reg dest,
+                  enum x64_reg src_addr, int32_t src_disp, enum oz oz) {
+  CHECK(src_addr <= X64_RDI);
+  int regnum;
+  x64_prefix(f, 0x8B, oz, dest, &regnum);
+  uint8_t b[9];
+  size_t count = x86_encode_reg_rm(b, regnum, src_addr, src_disp);
   CHECK(count <= 9);
-  apptext(f, b, count + 2);
+  apptext(f, b, count);
 }
 
-void x64_gen_store64(struct objfile *f, enum x64_reg dest_addr, int32_t dest_disp,
-                     enum x64_reg src) {
+void x64_gen_store(struct objfile *f, enum x64_reg dest_addr, int32_t dest_disp,
+                   enum x64_reg src, enum oz oz) {
   CHECK(dest_addr <= X64_RDI);
-  /* This supports use of upper registers for src. */
-  int src_int;
-  if (src <= X64_RDI) {
-    pushtext(f, kREXW);
-    src_int = (int)src;
-  } else {
-    pushtext(f, kREXW | kREXR);
-    src_int = (int)src - 8;
-    CHECK(0 <= src_int && src_int < 8);
-    /* There's still restrictions on encoding R13, iirc. */
-    CHECK(src_int != X64_RSP);
-  }
-  pushtext(f, 0x89);
+  int regnum;
+  x64_prefix(f, 0x89, oz, src, &regnum);
   uint8_t b[9];
-  size_t count = x86_encode_reg_rm(b, src_int, dest_addr, dest_disp);
+  size_t count = x86_encode_reg_rm(b, regnum, dest_addr, dest_disp);
   CHECK(count <= 9);
   apptext(f, b, count);
 }
@@ -220,7 +234,7 @@ void ia_gen_movsx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
     }
   } else {
     CHECK(objfile_arch(f) == TARGET_ARCH_X64);
-    x64_gen_load64(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp);
+    x64_gen_load(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp, OZ_64);
   }
 }
 
