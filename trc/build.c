@@ -3568,7 +3568,7 @@ void x64_postcall_return_in_loc(struct objfile *f,
       x64_gen_store_register(f, return_loc, X64_RAX, GP_C);
     } else {
       CHECK(arglist_info->return_type_size <= 2 * X64_EIGHTBYTE_SIZE);
-      x64_gen_store_biregister(f, ebp_loc(8, 8, return_loc.u.ebp_offset),
+      x64_gen_store_biregister(f, return_loc,
                                X64_RAX, X64_RDX, GP_C);
     }
   }
