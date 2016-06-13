@@ -2027,18 +2027,20 @@ void x64_gen_load_register(struct objfile *f, enum x64_reg reg,
   int32_t src_disp;
   put_ptr_in_reg(f, src, spare, &src_addr, &src_disp);
 
+  enum x64_reg msrc = map_x64_reg(src_addr);
+
   switch (src.size) {
   case 8:
-    x64_gen_store(f, reg, src_addr, src_disp, OZ_64);
+    x64_gen_load(f, reg, msrc, src_disp, OZ_64);
     break;
   case 4:
-    x64_gen_store(f, reg, src_addr, src_disp, OZ_32);
+    x64_gen_load(f, reg, msrc, src_disp, OZ_32);
     break;
   case 2:
-    x64_gen_store(f, reg, src_addr, src_disp, OZ_16);
+    x64_gen_load(f, reg, msrc, src_disp, OZ_16);
     break;
   case 1:
-    x64_gen_store(f, reg, src_addr, src_disp, OZ_8);
+    x64_gen_load(f, reg, msrc, src_disp, OZ_8);
     break;
   default:
     CRASH("not implemented or unreachable");
