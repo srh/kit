@@ -2022,7 +2022,7 @@ void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src) {
 
 void x64_gen_load_register(struct objfile *f, enum x64_reg reg,
                            enum gp_reg spare, struct loc src) {
-  /* TODO: Honestly handle all sizes. */
+  /* TODO(): We definitely have to honestly handle all sizes. */
   enum gp_reg src_addr;
   int32_t src_disp;
   put_ptr_in_reg(f, src, spare, &src_addr, &src_disp);
