@@ -6,6 +6,10 @@
 
 struct objfile;
 
+#include "util.h"
+
+#define TODO_X64 TODO_IMPLEMENT
+
 /* I'm not sure "gp" really means anything. */
 
 /* These "general purpose" register names mimic the y86 mnemonics (for

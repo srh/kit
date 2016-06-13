@@ -961,10 +961,10 @@ void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_reg dest,
                                 subtracted_offset, adjusted_offset);
   } break;
   case TARGET_PLATFORM_LINUX_64BIT: {
-    TODO_IMPLEMENT;
+    TODO_X64;
   } break;
   case TARGET_PLATFORM_OSX_64BIT: {
-    TODO_IMPLEMENT;
+    TODO_X64;
   } break;
   default:
     UNREACHABLE();
@@ -1973,7 +1973,7 @@ void x64_gen_store_register(struct objfile *f, struct loc dest,
   calling convention register like r8 or r9, not named by gp_reg. */
   /* Size might not be padded. */
   (void)f, (void)dest, (void)reg, (void)spare;
-  TODO_IMPLEMENT;
+  TODO_X64;
 }
 
 void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src) {
@@ -2003,7 +2003,7 @@ void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src) {
 void x64_gen_load_register(struct objfile *f, enum x64_reg reg, struct loc src) {
   /* Size might not be padded. */
   (void)f, (void)reg, (void)src;
-  TODO_IMPLEMENT;
+  TODO_X64;
 }
 
 
@@ -5229,7 +5229,7 @@ int build_module(struct identmap *im,
     osx32_flatten(cs.im, objfile, &databuf);
     break;
   case TARGET_PLATFORM_OSX_64BIT:
-    TODO_IMPLEMENT;
+    TODO_X64;
     break;
   case TARGET_PLATFORM_LINUX_64BIT:
     linux64_flatten(cs.im, objfile, &databuf);
