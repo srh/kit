@@ -283,8 +283,8 @@ void linux64_append_relocations_and_mutate_section(
   for (size_t i = 0, e = s->relocs_count; i < e; i++) {
     CHECK(relocs[i].type != OBJFILE_RELOCATION_TYPE_DIFF32);
     struct elf64_Rel rel;
-    /* TODO(): It is not confirmed that our current treatment of 32
-    and PC32 is correct, in 64-bit. */
+    /* TODO(): It is not confirmed that our current treatment of PC32
+    is correct, in 64-bit. */
     rel.r_offset = up_to_le_u64(relocs[i].virtual_address);
     uint32_t sti = relocs[i].symbol_table_index.value;
     CHECK(sti < sti_map_count);

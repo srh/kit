@@ -942,8 +942,7 @@ void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_reg dest,
   switch (objfile_platform(f)) {
   case TARGET_PLATFORM_WIN_32BIT: /* fallthrough */
   case TARGET_PLATFORM_LINUX_32BIT: {
-    uint8_t b = 0xB8 + (uint8_t)map_x86_reg(dest);
-    apptext(f, &b, 1);
+    pushtext(f, 0xB8 + (uint8_t)map_x86_reg(dest));
     objfile_section_append_dir32(objfile_text(f), symbol_table_index);
   } break;
   case TARGET_PLATFORM_OSX_32BIT: {
@@ -962,7 +961,11 @@ void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_reg dest,
                                 subtracted_offset, adjusted_offset);
   } break;
   case TARGET_PLATFORM_LINUX_64BIT: {
-    TODO_X64;
+    /* This is the same as linux 32-bit, apparently.  I checked for
+    global variables _and_ function pointers. */
+    CHECK(dest <= GP_DI);
+    pushtext(f, 0xB8 + (uint8_t)map_x64_reg(dest));
+    objfile_section_append_dir32(objfile_text(f), symbol_table_index);
   } break;
   case TARGET_PLATFORM_OSX_64BIT: {
     TODO_X64;
