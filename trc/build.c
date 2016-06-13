@@ -968,7 +968,7 @@ void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_reg dest,
     objfile_section_append_dir32(objfile_text(f), symbol_table_index);
   } break;
   case TARGET_PLATFORM_OSX_64BIT: {
-    TODO_X64;
+    CRASH("OS X 64-bit not implemented");
   } break;
   default:
     UNREACHABLE();
@@ -5271,7 +5271,7 @@ int build_module(struct identmap *im,
     osx32_flatten(cs.im, objfile, &databuf);
     break;
   case TARGET_PLATFORM_OSX_64BIT:
-    TODO_X64;
+    CRASH("64-bit OS X not really implemented");
     break;
   case TARGET_PLATFORM_LINUX_64BIT:
     linux64_flatten(cs.im, objfile, &databuf);
