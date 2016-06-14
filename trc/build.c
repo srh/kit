@@ -2079,7 +2079,8 @@ void x64_gen_load_register(struct objfile *f, enum x64_reg reg,
                            enum gp_reg spare,
                            enum x64_reg spare2,
                            struct loc src) {
-  /* TODO(): We definitely have to honestly handle all sizes. */
+  CHECK(src.size <= 8);
+
   enum gp_reg src_addr;
   int32_t src_disp;
   put_ptr_in_reg(f, src, spare, &src_addr, &src_disp);
