@@ -320,6 +320,17 @@ struct immediate imm_u64(uint64_t u64) {
   return imm;
 }
 
+struct immediate imm_size(enum target_arch arch, uint32_t u32) {
+  switch (arch) {
+  case TARGET_ARCH_Y86:
+    return imm_u32(u32);
+  case TARGET_ARCH_X64:
+    return imm_u64(u32);
+  default:
+    UNREACHABLE();
+  }
+}
+
 enum loc_tag {
   LOC_EBP_OFFSET,
   LOC_GLOBAL,
@@ -4172,10 +4183,12 @@ int help_gen_immediate_numeric(struct checkstate *cs,
     imm.u.i32 = value;
     expr_return_immediate(f, h, er, imm);
     return 1;
-  } else if (type->u.name.value == cs->cm.u32_type_name
-             || type->u.name.value == cs->cm.size_type_name
-             || type->u.name.value == cs->cm.osize_type_name) {
+  } else if (type->u.name.value == cs->cm.u32_type_name) {
     expr_return_immediate(f, h, er, imm_u32(numeric_literal_value));
+    return 1;
+  } else if (type->u.name.value == cs->cm.size_type_name
+             || type->u.name.value == cs->cm.osize_type_name) {
+    expr_return_immediate(f, h, er, imm_size(cs->arch, numeric_literal_value));
     return 1;
   } else if (type->u.name.value == cs->cm.u8_type_name) {
     uint8_t value;
