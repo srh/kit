@@ -475,9 +475,8 @@ void ia_gen_store(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
 }
 
 void x64_mov_imm64(struct objfile *f, enum x64_reg dest, int64_t imm64) {
-  CHECK(dest <= X64_RDI);
   uint8_t b[10];
-  b[0] = kREXW;
+  b[0] = kREXW | (dest <= X64_RDI ? 0 : kREXB);
   b[1] = 0xB8 + dest;
   write_le_i64(b + 2, imm64);
   apptext(f, b, 10);

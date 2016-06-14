@@ -77,7 +77,7 @@ void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src);
 void x64_gen_store_register(struct objfile *f, struct loc dest, enum x64_reg reg,
                             enum gp_reg spare);
 void x64_gen_load_register(struct objfile *f, enum x64_reg reg, enum gp_reg spare,
-                           struct loc src);
+                           enum x64_reg spare2, struct loc src);
 void gen_crash_jcc(struct objfile *f, struct frame *h, enum ia_jcc code);
 void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_number);
 void gen_crash_jmp(struct objfile *f, struct frame *h);
@@ -1211,7 +1211,7 @@ void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f,
   case TARGET_ARCH_X64:
     /* pointer passed in register */
     adjust_frame_for_callsite_alignment(h, 0);
-    x64_gen_load_register(f, x64_param_regs[0], GP_A, loc);
+    x64_gen_load_register(f, x64_param_regs[0], GP_A, X64_R11, loc);
     break;
   default:
     UNREACHABLE();
@@ -1235,8 +1235,8 @@ void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
   case TARGET_ARCH_X64:
     /* pointer passed in registers */
     adjust_frame_for_callsite_alignment(h, 0);
-    x64_gen_load_register(f, x64_param_regs[1], GP_A, src);
-    x64_gen_load_register(f, x64_param_regs[0], GP_A, dest);
+    x64_gen_load_register(f, x64_param_regs[1], GP_A, X64_R11, src);
+    x64_gen_load_register(f, x64_param_regs[0], GP_A, X64_R11, dest);
     break;
   default:
     UNREACHABLE();
@@ -2032,12 +2032,14 @@ void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src) {
 }
 
 void x64_gen_load_register(struct objfile *f, enum x64_reg reg,
-                           enum gp_reg spare, struct loc src) {
+                           enum gp_reg spare,
+                           enum x64_reg spare2,
+                           struct loc src) {
+  (void)spare2;
   /* TODO(): We definitely have to honestly handle all sizes. */
   enum gp_reg src_addr;
   int32_t src_disp;
   put_ptr_in_reg(f, src, spare, &src_addr, &src_disp);
-
   enum x64_reg msrc = map_x64_reg(src_addr);
 
   switch (src.size) {
@@ -3522,7 +3524,7 @@ void get_funcall_arglist_info(struct checkstate *cs,
 
 void x64_load_register_params(struct objfile *f, struct funcall_arglist_info *arglist_info,
                               int32_t callsite_base_offset, struct loc return_loc,
-                              enum gp_reg spare) {
+                              enum gp_reg spare, enum x64_reg spare2) {
   for (size_t i = 0, e = arglist_info->args_count; i < e; i++) {
     struct funcall_arg_info arg_info = arglist_info->arg_infos[i];
     if (arg_info.first_register != -1) {
@@ -3531,6 +3533,7 @@ void x64_load_register_params(struct objfile *f, struct funcall_arglist_info *ar
 
       x64_gen_load_register(f, x64_param_regs[arg_info.first_register],
                             spare,
+                            spare2,
                             ebp_loc(uint32_min(arg_loc.size, X64_EIGHTBYTE_SIZE),
                                     uint32_min(arg_loc.padded_size, X64_EIGHTBYTE_SIZE),
                                     arg_loc.u.ebp_offset));
@@ -3540,6 +3543,7 @@ void x64_load_register_params(struct objfile *f, struct funcall_arglist_info *ar
         CHECK(arg_info.first_register < 5);
         x64_gen_load_register(f, x64_param_regs[arg_info.first_register + 1],
                               spare,
+                              spare2,
                               ebp_loc(uint32_sub(arg_loc.size, X64_EIGHTBYTE_SIZE),
                                       uint32_sub(arg_loc.padded_size, X64_EIGHTBYTE_SIZE),
                                       int32_add(arg_loc.u.ebp_offset, X64_EIGHTBYTE_SIZE)));
@@ -3708,7 +3712,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   case TARGET_ARCH_X64: {
     switch (func_er.u.free.tag) {
     case EXPR_RETURN_FREE_IMM: {
-      x64_load_register_params(f, &arglist_info, callsite_base_offset, return_loc, GP_A);
+      x64_load_register_params(f, &arglist_info, callsite_base_offset, return_loc, GP_A, X64_R11);
       frame_restore_offset(h, callsite_base_offset);
       gen_call_imm(cs, f, h, func_er.u.free.u.imm, arglist_info.hidden_return_param);
       x64_postcall_return_in_loc(f, &arglist_info, return_loc);
@@ -3717,7 +3721,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
       struct loc func_loc;
       wipe_temporaries(cs, f, h, &func_er, func_type, &func_loc);
 
-      x64_load_register_params(f, &arglist_info, callsite_base_offset, return_loc, GP_A);
+      x64_load_register_params(f, &arglist_info, callsite_base_offset, return_loc, GP_A, X64_R11);
       frame_restore_offset(h, callsite_base_offset);
 
       gp_gen_load_register(f, GP_A, func_loc);
