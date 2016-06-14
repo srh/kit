@@ -15,6 +15,11 @@ enum gp_reg unmap_x86_reg(enum x86_reg reg) {
   return (enum gp_reg)reg;
 }
 
+enum gp_reg unmap_x64_reg(enum x64_reg reg) {
+  CHECK(reg <= X64_RDI);
+  return (enum gp_reg)reg;
+}
+
 /* Returns true if the reg has a lobyte (also, the register code
 happens to identify the lowbyte in a reg or modr/m field). */
 int x86_reg_has_lowbyte(enum x86_reg reg) {

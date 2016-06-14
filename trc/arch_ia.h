@@ -59,6 +59,7 @@ enum x86_reg {
 enum x64_reg map_x64_reg(enum gp_reg reg);
 enum x86_reg map_x86_reg(enum gp_reg reg);
 enum gp_reg unmap_x86_reg(enum x86_reg reg);
+enum gp_reg unmap_x64_reg(enum x64_reg reg);
 
 enum x86_reg8 {
   X86_AL,

@@ -1220,7 +1220,7 @@ void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f,
   case TARGET_ARCH_X64:
     /* pointer passed in register */
     adjust_frame_for_callsite_alignment(h, 0);
-    x64_gen_load_register(f, x64_param_regs[0], GP_A, X64_R11, loc);
+    gp_gen_load_addressof(f, unmap_x64_reg(x64_param_regs[0]), loc);
     break;
   default:
     UNREACHABLE();
@@ -1244,8 +1244,8 @@ void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
   case TARGET_ARCH_X64:
     /* pointer passed in registers */
     adjust_frame_for_callsite_alignment(h, 0);
-    x64_gen_load_register(f, x64_param_regs[1], GP_A, X64_R11, src);
-    x64_gen_load_register(f, x64_param_regs[0], GP_A, X64_R11, dest);
+    gp_gen_load_addressof(f, unmap_x64_reg(x64_param_regs[1]), src);
+    gp_gen_load_addressof(f, unmap_x64_reg(x64_param_regs[0]), dest);
     break;
   default:
     UNREACHABLE();
