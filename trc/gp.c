@@ -12,7 +12,7 @@ void pushtext(struct objfile *f, uint8_t byte) {
 
 enum oz ptr_oz(struct objfile *f) {
   switch (objfile_arch(f)) {
-  case TARGET_ARCH_Y86:
+  case TARGET_ARCH_X86:
     return OZ_32;
   case TARGET_ARCH_X64:
     return OZ_64;

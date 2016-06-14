@@ -322,7 +322,7 @@ struct immediate imm_u64(uint64_t u64) {
 
 struct immediate imm_size(enum target_arch arch, uint32_t u32) {
   switch (arch) {
-  case TARGET_ARCH_Y86:
+  case TARGET_ARCH_X86:
     return imm_u32(u32);
   case TARGET_ARCH_X64:
     return imm_u64(u32);
@@ -589,7 +589,7 @@ void frame_define_target(struct frame *h, size_t target_number,
 }
 
 uint32_t frame_padded_push_size(enum target_arch arch, uint32_t size) {
-  /* Y86/X64 */
+  /* X86/X64 */
   return uint32_ceil_aligned(size, ptr_size(arch));
 }
 
@@ -652,8 +652,8 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
   case TARGET_PLATFORM_WIN_32BIT: {
     uint32_t return_type_size = return_type_attrs.size;
     *return_type_size_out = return_type_size;
-    if (!(return_type_size <= 2 || return_type_size == Y86_DWORD_SIZE
-          || return_type_size == 2 * Y86_DWORD_SIZE)) {
+    if (!(return_type_size <= 2 || return_type_size == X86_DWORD_SIZE
+          || return_type_size == 2 * X86_DWORD_SIZE)) {
       return 1;
     } else {
       struct typeexpr_traits traits;
@@ -677,15 +677,15 @@ int exists_hidden_return_param(struct checkstate *cs, struct ast_typeexpr *retur
   }
 }
 
-const int32_t Y86_HRP_EBP_DISP = 2 * Y86_DWORD_SIZE;
+const int32_t X86_HRP_EBP_DISP = 2 * X86_DWORD_SIZE;
 const int32_t X64_HRP_EBP_DISP = -X64_EIGHTBYTE_SIZE;
 
 /* Returns the ebp_indirect location of the hidden return pointer --
 always the same value. */
 int64_t hrp_ebp_indirect(enum target_arch arch) {
   switch (arch) {
-  case TARGET_ARCH_Y86:
-    return Y86_HRP_EBP_DISP;
+  case TARGET_ARCH_X86:
+    return X86_HRP_EBP_DISP;
   case TARGET_ARCH_X64:
     return X64_HRP_EBP_DISP;
   default:
@@ -762,7 +762,7 @@ struct loc caller_arg_loc(int32_t callsite_base_offset,
                  int32_add(callsite_base_offset, ai.relative_disp));
 }
 
-void y86_get_funcall_arglist_info(struct checkstate *cs,
+void x86_get_funcall_arglist_info(struct checkstate *cs,
                                   struct ast_typeexpr *return_type,
                                   struct ast_typeexpr *args,
                                   size_t args_count,
@@ -774,7 +774,7 @@ void x64_get_funcall_arglist_info(struct checkstate *cs,
                                   size_t args_count,
                                   struct funcall_arglist_info *info_out);
 
-void y86_note_param_locations(struct checkstate *cs, struct frame *h,
+void x86_note_param_locations(struct checkstate *cs, struct frame *h,
                               struct ast_expr *expr) {
   struct ast_typeexpr *params;
   size_t params_count;
@@ -784,10 +784,10 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h,
   CHECK(params_count == expr->u.lambda.params_count);
 
   struct funcall_arglist_info arglist_info;
-  y86_get_funcall_arglist_info(cs, return_type, params, params_count,
+  x86_get_funcall_arglist_info(cs, return_type, params, params_count,
                                &arglist_info);
 
-  int32_t ebp_callsite_offset = 2 * Y86_DWORD_SIZE;
+  int32_t ebp_callsite_offset = 2 * X86_DWORD_SIZE;
 
   size_t vars_pushed = 0;
 
@@ -809,7 +809,7 @@ void y86_note_param_locations(struct checkstate *cs, struct frame *h,
     /* I don't know if anybody promises padding, so we assume none. */
     struct loc loc = ebp_indirect_loc(arglist_info.return_type_size,
                                       arglist_info.return_type_size,
-                                      Y86_HRP_EBP_DISP);
+                                      X86_HRP_EBP_DISP);
     frame_specify_calling_info(h, vars_pushed, loc,
                                arglist_info.hidden_return_param);
   } else {
@@ -901,8 +901,8 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
 void note_param_locations(struct checkstate *cs, struct objfile *f, struct frame *h,
                           struct ast_expr *expr) {
   switch (cs->arch) {
-  case TARGET_ARCH_Y86: {
-    y86_note_param_locations(cs, h, expr);
+  case TARGET_ARCH_X86: {
+    x86_note_param_locations(cs, h, expr);
   } break;
   case TARGET_ARCH_X64: {
     x64_note_param_locations(cs, f, h, expr);
@@ -928,19 +928,19 @@ int lookup_vardata_by_name(struct frame *h, ident_value name, size_t *index_out)
 
 
 void gp_gen_mov_reg(struct objfile *f, enum gp_reg dest, enum gp_reg src) {
-  check_y86x64(f);
+  check_x86x64(f);
   ia_gen_mov(f, dest, src, ptr_oz(f));
 }
 
 /* Tests the whole reg!!! */
 void gp_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2, enum oz oz) {
-  check_y86x64(f);
+  check_x86x64(f);
   ia_gen_test_regs(f, reg1, reg2, oz);
 }
 
 void gp_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest,
                           int32_t imm32) {
-  check_y86x64(f);
+  check_x86x64(f);
   ia_gen_mov_reg_imm32(f, dest, imm32);
 }
 
@@ -986,14 +986,14 @@ void gp_gen_mov_reg_stiptr(struct objfile *f, enum gp_reg dest,
 }
 
 void gen_debug_trap(struct objfile *f) {
-  check_y86x64(f);
+  check_x86x64(f);
   /* INT 3 instruction */
   pushtext(f, 0xCC);
 }
 
 /* Either leaves upper bits unset or sets them to zero. */
 void gp_gen_setcc_b8(struct objfile *f, enum gp_reg dest, enum ia_setcc code) {
-  check_y86x64(f);
+  check_x86x64(f);
   ia_gen_setcc_b8(f, map_x86_reg8(dest), code);
 }
 
@@ -1001,7 +1001,7 @@ void gen_placeholder_jcc(struct objfile *f, struct frame *h,
                          enum ia_jcc code, size_t target_number) {
   struct jmpdata jd;
   jd.target_number = target_number;
-  /* y86/x64 */
+  /* x86/x64 */
   jd.jmp_location = 2 + objfile_section_size(objfile_text(f));
   SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
 
@@ -1014,7 +1014,7 @@ void gen_placeholder_stack_adjustment(struct objfile *f,
                                       struct frame *h,
                                       int downward) {
   struct reset_esp_data red;
-  /* y86/x64 ADD instruction */
+  /* x86/x64 ADD instruction */
   ia_prefix_no_oz8(f, 0x81, ptr_oz(f));
   uint8_t b[5] = { 0 };
   b[0] = mod_reg_rm(MOD11, 0, X86_ESP);
@@ -1058,19 +1058,19 @@ void gp_gen_store(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
 
 void gp_gen_movsx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                   int32_t src_disp, enum oz src_oz) {
-  check_y86x64(f);
+  check_x86x64(f);
   ia_gen_movsx(f, dest, src_addr, src_disp, src_oz);
 }
 
 void gp_gen_movzx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                   int32_t src_disp, enum oz src_oz) {
-  check_y86x64(f);
+  check_x86x64(f);
   ia_gen_movzx(f, dest, src_addr, src_disp, src_oz);
 }
 
 void gp_gen_lea(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                 int32_t src_disp) {
-  check_y86x64(f);
+  check_x86x64(f);
   ia_gen_lea(f, dest, src_addr, src_disp);
 }
 
@@ -1089,13 +1089,13 @@ size_t x86_gen_placeholder_lea32(struct objfile *f, enum x86_reg srcdest) {
 
 void gp_gen_store(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                   enum gp_reg src, enum oz oz) {
-  check_y86x64(f);
+  check_x86x64(f);
   ia_gen_store(f, dest_addr, dest_disp, src, oz);
 }
 
 void gen_function_intro(struct objfile *f, struct frame *h) {
   switch (h->arch) {
-  case TARGET_ARCH_Y86:
+  case TARGET_ARCH_X86:
     ia_gen_push(f, GP_BP);
     gp_gen_mov_reg(f, GP_BP, GP_SP);
     gen_placeholder_stack_adjustment(f, h, 1);
@@ -1135,10 +1135,10 @@ void gen_call_imm_func(struct checkstate *cs, struct objfile *f, struct frame *h
                        int hidden_return_param) {
   /* Dupes code with typetrav_call_func. */
   gen_placeholder_stack_adjustment(f, h, 0);
-  /* y86/x64 */
+  /* x86/x64 */
   ia_gen_call(f, func_sti);
   switch (cs->arch) {
-  case TARGET_ARCH_Y86: {
+  case TARGET_ARCH_X86: {
     if (hidden_return_param && platform_ret4_hrp(cs)) {
       /* TODO: We could do this more elegantly, but right now undo the
       callee's pop of esp. */
@@ -1176,20 +1176,20 @@ void gen_call_imm(struct checkstate *cs, struct objfile *f, struct frame *h,
 /* arglist_size is the size of the on-stack arglist, which you'll need
 special logic to compute, if params are passed in registers. */
 void adjust_frame_for_callsite_alignment(struct frame *h, uint32_t arglist_size) {
-  /* y86/x64 - particularly for 32-bit OS X's 16-byte alignment. */
+  /* x86/x64 - particularly for 32-bit OS X's 16-byte alignment. */
   int32_t unadjusted_callsite_offset
     = int32_sub(h->stack_offset, uint32_to_int32(arglist_size));
 
   uint32_t callsite_adjustment;
   switch (h->arch) {
-  case TARGET_ARCH_Y86: {
+  case TARGET_ARCH_X86: {
     /* We want to lower the stack so that the callsite will be
     8-mod-16 (because we start counting below the ret-ptr and
     ebp-ptr). */
     /* We specifically _don't_ want overflow checking on this addition
     -- unadjusted_callsite_offset could easily be -4, or -8. */
     callsite_adjustment = (8 + (uint32_t)unadjusted_callsite_offset) % 16;
-    CHECK(callsite_adjustment % Y86_DWORD_SIZE == 0);
+    CHECK(callsite_adjustment % X86_DWORD_SIZE == 0);
   } break;
   case TARGET_ARCH_X64: {
     /* We want to lower the stack so that the callsite will be
@@ -1212,9 +1212,9 @@ void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f,
                               struct loc loc, struct def_instantiation *inst) {
   int32_t stack_offset = frame_save_offset(h);
   switch (cs->arch) {
-  case TARGET_ARCH_Y86:
+  case TARGET_ARCH_X86:
     /* pointer passed on stack */
-    adjust_frame_for_callsite_alignment(h, Y86_DWORD_SIZE);
+    adjust_frame_for_callsite_alignment(h, X86_DWORD_SIZE);
     gen_push_address(f, h, loc);
     break;
   case TARGET_ARCH_X64:
@@ -1235,9 +1235,9 @@ void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
                               struct def_instantiation *inst) {
   int32_t stack_offset = frame_save_offset(h);
   switch (cs->arch) {
-  case TARGET_ARCH_Y86:
+  case TARGET_ARCH_X86:
     /* pointer passed on stack */
-    adjust_frame_for_callsite_alignment(h, 2 * Y86_DWORD_SIZE);
+    adjust_frame_for_callsite_alignment(h, 2 * X86_DWORD_SIZE);
     gen_push_address(f, h, src);
     gen_push_address(f, h, dest);
     break;
@@ -1672,12 +1672,12 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
 
   int32_t saved_offset = frame_save_offset(h);
   switch (cs->arch) {
-  case TARGET_ARCH_Y86: {
+  case TARGET_ARCH_X86: {
     if (has_src) {
-      adjust_frame_for_callsite_alignment(h, 2 * Y86_DWORD_SIZE);
+      adjust_frame_for_callsite_alignment(h, 2 * X86_DWORD_SIZE);
       gen_push_address(f, h, src);
     } else {
-      adjust_frame_for_callsite_alignment(h, Y86_DWORD_SIZE);
+      adjust_frame_for_callsite_alignment(h, X86_DWORD_SIZE);
     }
     gen_push_address(f, h, dest);
   } break;
@@ -1722,24 +1722,24 @@ void x86_gen_returnloc_funcreturn_convention(struct objfile *f,
                                              int hidden_return_param,
                                              struct loc return_loc) {
   /* return_loc is always in the stack frame (and padded to
-  Y86_DWORD_SIZE) or via a hidden return param. */
+  X86_DWORD_SIZE) or via a hidden return param. */
   if (hidden_return_param) {
     CHECK(return_loc.tag == LOC_EBP_INDIRECT);
     ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_indirect, OZ_32);
   } else if (return_loc.size == 0) {
     ia_gen_xor(f, GP_A, GP_A, OZ_32);
-  } else if (return_loc.size <= Y86_DWORD_SIZE) {
+  } else if (return_loc.size <= X86_DWORD_SIZE) {
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
-    CHECK(return_loc.padded_size == Y86_DWORD_SIZE);
+    CHECK(return_loc.padded_size == X86_DWORD_SIZE);
     ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_offset, OZ_32);
   } else {
     CHECK(platform_can_return_in_eaxedx(objfile_platform(f)));
-    CHECK(return_loc.size == 2 * Y86_DWORD_SIZE);
+    CHECK(return_loc.size == 2 * X86_DWORD_SIZE);
     CHECK(return_loc.tag == LOC_EBP_OFFSET);
-    CHECK(return_loc.padded_size == 2 * Y86_DWORD_SIZE);
+    CHECK(return_loc.padded_size == 2 * X86_DWORD_SIZE);
     ia_gen_movzx(f, GP_A, GP_BP, return_loc.u.ebp_offset, OZ_32);
     ia_gen_movzx(f, GP_D, GP_BP,
-                 int32_add(return_loc.u.ebp_offset, Y86_DWORD_SIZE), OZ_32);
+                 int32_add(return_loc.u.ebp_offset, X86_DWORD_SIZE), OZ_32);
   }
 }
 
@@ -1783,7 +1783,7 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
 
   int hidden_return_param = frame_hidden_return_param(h);
   switch (h->arch) {
-  case TARGET_ARCH_Y86: {
+  case TARGET_ARCH_X86: {
     x86_gen_returnloc_funcreturn_convention(f, hidden_return_param,
                                             h->return_loc);
 
@@ -1850,7 +1850,7 @@ void ia_gen_load_addressof(struct objfile *f, enum gp_reg dest, struct loc loc) 
 }
 
 void gp_gen_load_addressof(struct objfile *f, enum gp_reg dest, struct loc loc) {
-  check_y86x64(f);
+  check_x86x64(f);
   ia_gen_load_addressof(f, dest, loc);
 }
 
@@ -2089,15 +2089,15 @@ void x64_gen_load_register(struct objfile *f, enum x64_reg reg,
 
 void x86_gen_store_biregister(struct objfile *f, struct loc dest,
                               enum x86_reg lo, enum x86_reg hi) {
-  CHECK(Y86_DWORD_SIZE < dest.size && dest.size <= 2 * Y86_DWORD_SIZE);
-  CHECK(dest.padded_size == 2 * Y86_DWORD_SIZE);
+  CHECK(X86_DWORD_SIZE < dest.size && dest.size <= 2 * X86_DWORD_SIZE);
+  CHECK(dest.padded_size == 2 * X86_DWORD_SIZE);
   enum gp_reg dest_addr;
   int32_t dest_disp;
   put_ptr_in_reg(f, dest, gp_choose_register_2(unmap_x86_reg(lo), unmap_x86_reg(hi)),
                  &dest_addr, &dest_disp);
 
   ia_gen_store(f, dest_addr, dest_disp, unmap_x86_reg(lo), OZ_32);
-  ia_gen_store(f, dest_addr, int32_add(dest_disp, Y86_DWORD_SIZE),
+  ia_gen_store(f, dest_addr, int32_add(dest_disp, X86_DWORD_SIZE),
                unmap_x86_reg(hi), OZ_32);
 }
 
@@ -2126,13 +2126,13 @@ void gen_mov_mem_imm(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp
     gp_gen_store(f, dest_addr, dest_disp, aux, ptr_oz(f));
   } break;
   case IMMEDIATE_U64: {
-    check_y86x64(f);
+    check_x86x64(f);
     CHECK(objfile_arch(f) == TARGET_ARCH_X64);
     x64_mov_imm64(f, map_x64_reg(aux), (int64_t)src.u.u64);
     gp_gen_store(f, dest_addr, dest_disp, aux, OZ_64);
   } break;
   case IMMEDIATE_I64: {
-    check_y86x64(f);
+    check_x86x64(f);
     CHECK(objfile_arch(f) == TARGET_ARCH_X64);
     x64_mov_imm64(f, map_x64_reg(aux), src.u.i64);
     gp_gen_store(f, dest_addr, dest_disp, aux, OZ_64);
@@ -2432,7 +2432,7 @@ void typetrav_call_func(struct checkstate *cs, struct objfile *f, struct frame *
 
   /* Dupes code with gen_call_imm. */
   gen_placeholder_stack_adjustment(f, h, 0);
-  /* y86/x64 */
+  /* x86/x64 */
   ia_gen_call(f, di_symbol_table_index(inst));
   gen_placeholder_stack_adjustment(f, h, 1);
 }
@@ -2523,7 +2523,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
     off1 = int32_add(callsite_base_offset, arglist_info->arg_infos[1].relative_disp);
   }
 
-  /* So, what's the game here?  On y86, put the return value in EAX,
+  /* So, what's the game here?  On x86, put the return value in EAX,
   or EAX:EDX.  On x64, put the return value in RAX, or RAX:RDX. */
 
   switch (prim_op.tag) {
@@ -2703,7 +2703,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_U32: {
     gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
     switch (cs->arch) {
-    case TARGET_ARCH_Y86:
+    case TARGET_ARCH_X86:
       break;
     case TARGET_ARCH_X64: {
       gp_gen_mov_reg(f, GP_D, GP_A);
@@ -2778,7 +2778,7 @@ void gen_very_primitive_op_behavior(struct checkstate *cs,
   case PRIMITIVE_OP_CONVERT_OSIZE_TO_I32: {
     gp_gen_movzx(f, GP_A, GP_BP, off0, ptr_oz(f));
     switch (cs->arch) {
-    case TARGET_ARCH_Y86:
+    case TARGET_ARCH_X86:
       break;
     case TARGET_ARCH_X64: {
       gp_gen_mov_reg(f, GP_D, GP_A);
@@ -3452,7 +3452,7 @@ int platform_can_return_in_eaxedx(enum target_platform plat) {
 
 /* Used to precompute arglist size, so that we can align the stack to
 16-byte boundary at the function call. */
-void y86_get_funcall_arglist_info(struct checkstate *cs,
+void x86_get_funcall_arglist_info(struct checkstate *cs,
                                   struct ast_typeexpr *return_type,
                                   struct ast_typeexpr *args,
                                   size_t args_count,
@@ -3465,7 +3465,7 @@ void y86_get_funcall_arglist_info(struct checkstate *cs,
 
   struct funcall_arg_info *infos = malloc_mul(sizeof(*infos), args_count);
 
-  uint32_t total_size = (hidden_return_param ? Y86_DWORD_SIZE : 0);
+  uint32_t total_size = (hidden_return_param ? X86_DWORD_SIZE : 0);
   for (size_t i = 0; i < args_count; i++) {
     uint32_t arg_size = gp_sizeof(&cs->nt, &args[i]);
     uint32_t padded_size = frame_padded_push_size(cs->arch, arg_size);
@@ -3530,15 +3530,15 @@ void x64_get_funcall_arglist_info(struct checkstate *cs,
                             offset, neg_offset);
 }
 
-/* y86/x64 */
+/* x86/x64 */
 void get_funcall_arglist_info(struct checkstate *cs,
                               struct ast_typeexpr *return_type,
                               struct ast_typeexpr *args,
                               size_t args_count,
                               struct funcall_arglist_info *info_out) {
   switch (cs->arch) {
-  case TARGET_ARCH_Y86: {
-    y86_get_funcall_arglist_info(cs, return_type, args, args_count, info_out);
+  case TARGET_ARCH_X86: {
+    x86_get_funcall_arglist_info(cs, return_type, args, args_count, info_out);
   } break;
   case TARGET_ARCH_X64: {
     x64_get_funcall_arglist_info(cs, return_type, args, args_count, info_out);
@@ -3582,19 +3582,19 @@ void x64_load_register_params(struct objfile *f, struct funcall_arglist_info *ar
   }
 }
 
-void y86_postcall_return_in_loc(struct checkstate *cs,
+void x86_postcall_return_in_loc(struct checkstate *cs,
                                 struct objfile *f,
                                 struct funcall_arglist_info *arglist_info,
                                 struct loc return_loc) {
   if (!arglist_info->hidden_return_param) {
     if (arglist_info->return_type_size == 0) {
       /* nothing */
-    } else if (arglist_info->return_type_size <= Y86_DWORD_SIZE) {
+    } else if (arglist_info->return_type_size <= X86_DWORD_SIZE) {
       /* Return value in eax. */
       gp_gen_store_register(f, return_loc, GP_A);
     } else {
       CHECK(platform_can_return_in_eaxedx(cs->platform));
-      CHECK(arglist_info->return_type_size == 2 * Y86_DWORD_SIZE);
+      CHECK(arglist_info->return_type_size == 2 * X86_DWORD_SIZE);
       x86_gen_store_biregister(f, return_loc, X86_EAX, X86_EDX);
     }
   }
@@ -3622,8 +3622,8 @@ void postcall_return_in_loc(struct checkstate *cs,
                             struct funcall_arglist_info *arglist_info,
                             struct loc return_loc) {
   switch (cs->arch) {
-  case TARGET_ARCH_Y86:
-    y86_postcall_return_in_loc(cs, f, arglist_info, return_loc);
+  case TARGET_ARCH_X86:
+    x86_postcall_return_in_loc(cs, f, arglist_info, return_loc);
     break;
   case TARGET_ARCH_X64:
     x64_postcall_return_in_loc(f, arglist_info, return_loc);
@@ -3656,7 +3656,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   struct funcall_arglist_info arglist_info;
   get_funcall_arglist_info(cs, return_type, args, args_count, &arglist_info);
 
-  /* y86/x64 */
+  /* x86/x64 */
   struct loc return_loc;
   if (er->tag == EXPR_RETURN_DEMANDED) {
     /* Return locations perhaps must be non-aliasable locations on the
@@ -3696,9 +3696,9 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   }
 
   switch (cs->arch) {
-  case TARGET_ARCH_Y86: {
+  case TARGET_ARCH_X86: {
     if (arglist_info.hidden_return_param) {
-      struct loc ptr_loc = ebp_loc(Y86_DWORD_SIZE, Y86_DWORD_SIZE, callsite_base_offset);
+      struct loc ptr_loc = ebp_loc(X86_DWORD_SIZE, X86_DWORD_SIZE, callsite_base_offset);
       gen_mov_addressof(f, ptr_loc, return_loc);
     }
 
@@ -3707,7 +3707,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     switch (func_er.u.free.tag) {
     case EXPR_RETURN_FREE_IMM: {
       gen_call_imm(cs, f, h, func_er.u.free.u.imm, arglist_info.hidden_return_param);
-      y86_postcall_return_in_loc(cs, f, &arglist_info, return_loc);
+      x86_postcall_return_in_loc(cs, f, &arglist_info, return_loc);
     } break;
     case EXPR_RETURN_FREE_LOC: {
       struct loc func_loc;
@@ -3721,7 +3721,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
         x86_gen_add_esp_i32(f, -4);
       }
       gen_placeholder_stack_adjustment(f, h, 1);
-      y86_postcall_return_in_loc(cs, f, &arglist_info, return_loc);
+      x86_postcall_return_in_loc(cs, f, &arglist_info, return_loc);
     } break;
     case EXPR_RETURN_FREE_PRIMITIVE_OP: {
       gen_primitive_op_behavior(cs, f, h, func_er.u.free.u.primitive_op,
@@ -3952,7 +3952,7 @@ void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_numbe
   jd.target_number = target_number;
   jd.jmp_location = 1 + objfile_section_size(objfile_text(f));
   SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
-  /* y86/x64 */
+  /* x86/x64 */
   /* E9 jmp instruction */
   uint8_t b[5] = { 0xE9, 0, 0, 0, 0 };
   apptext(f, b, 5);
@@ -3960,7 +3960,7 @@ void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_numbe
 
 void replace_placeholder_jump(struct objfile *f, size_t jmp_location,
                               size_t target_offset) {
-  /* y86/x64 - we use same jmp instructions. */
+  /* x86/x64 - we use same jmp instructions. */
   int32_t target32 = size_to_int32(target_offset);
   int32_t jmp32 = size_to_int32(size_add(jmp_location, 4));
   int32_t diff = int32_sub(target32, jmp32);
@@ -5088,7 +5088,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
   switch (value->tag) {
   case STATIC_VALUE_U64: {
     STATIC_CHECK(sizeof(value->u.u64_value) == 8);
-    /* y86/x64 */
+    /* x86/x64 */
     objfile_section_align_quadword(objfile_data(f));
     objfile_set_symbol_value(f, di_symbol_table_index(inst),
                              objfile_section_size(objfile_data(f)));
@@ -5157,7 +5157,7 @@ int build_instantiation(struct checkstate *cs, struct objfile *f,
     return 1;
   } break;
   case STATIC_VALUE_LAMBDA: {
-    /* y86/x64: 16 byte function pointer alignment. */
+    /* x86/x64: 16 byte function pointer alignment. */
     /* TODO: Verify this on Linux, Windows. */
     objfile_fillercode_align_double_quadword(f);
     objfile_set_symbol_value(f, di_symbol_table_index(inst),
@@ -5195,7 +5195,7 @@ void build_typetrav_defs(struct checkstate *cs,
   typetravs to generate when we generate the first. */
   while (cs->typetrav_symbol_infos_first_ungenerated < cs->typetrav_symbol_infos_count) {
     struct typetrav_symbol_info *info = cs->typetrav_symbol_infos[cs->typetrav_symbol_infos_first_ungenerated];
-    /* y86/x64: 16 byte function pointer alignment. */
+    /* x86/x64: 16 byte function pointer alignment. */
     objfile_fillercode_align_double_quadword(f);
     objfile_set_symbol_value(f, info->symbol_table_index,
                              objfile_section_size(objfile_text(f)));
@@ -5216,12 +5216,12 @@ void build_typetrav_defs(struct checkstate *cs,
     uint32_t sz = gp_sizeof(&cs->nt, &info->type);
 
     switch (cs->arch) {
-    case TARGET_ARCH_Y86: {
+    case TARGET_ARCH_X86: {
       /* TODO: This duplicates calling-convention-specific logic of
       note_param_locations. */
       /* src is a garbage value if has_src is false. */
-      struct loc src = ebp_indirect_loc(sz, sz, 3 * Y86_DWORD_SIZE);
-      struct loc dest = ebp_indirect_loc(sz, sz, 2 * Y86_DWORD_SIZE);
+      struct loc src = ebp_indirect_loc(sz, sz, 3 * X86_DWORD_SIZE);
+      struct loc dest = ebp_indirect_loc(sz, sz, 2 * X86_DWORD_SIZE);
 
       really_gen_typetrav_behavior(cs, f, &h, info->func, dest, has_src, src,
                                    &info->type);

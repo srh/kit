@@ -10,7 +10,7 @@ enum target_platform {
 };
 
 enum target_arch {
-  TARGET_ARCH_Y86,
+  TARGET_ARCH_X86,
   TARGET_ARCH_X64,
 };
 

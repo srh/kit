@@ -11,7 +11,7 @@ struct sti;
 /* Obviously some stuff is named x86_, some is named x64_, others are
 named ia_ because they work on both intel architecture platforms. */
 
-#define Y86_DWORD_SIZE 4
+#define X86_DWORD_SIZE 4
 
 #define X64_EIGHTBYTE_SIZE 8
 

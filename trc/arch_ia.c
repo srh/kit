@@ -55,7 +55,6 @@ void ia_prefix_no_oz8(struct objfile *f, uint8_t opnum, enum oz oz) {
 }
 
 void ia_prefix(struct objfile *f, uint8_t opnum, enum oz oz) {
-  /* y86/x64 */
   CHECK(opnum & 1);
   if (oz == OZ_8) {
     pushtext(f, opnum ^ 1);
@@ -231,7 +230,7 @@ void ia_gen_movzx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
 
 void ia_gen_movsx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                   int32_t src_disp, enum oz src_oz) {
-  check_y86x64(f);
+  check_x86x64(f);
   if (src_oz <= OZ_16) {
     uint8_t b[11];
     b[0] = 0x0F;
@@ -241,7 +240,7 @@ void ia_gen_movsx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
     apptext(f, b, count + 2);
   } else if (src_oz == OZ_32) {
     switch (objfile_arch(f)) {
-    case TARGET_ARCH_Y86:
+    case TARGET_ARCH_X86:
       ia_gen_movzx(f, dest, src_addr, src_disp, OZ_32);
       break;
     case TARGET_ARCH_X64: {
@@ -265,7 +264,7 @@ void ia_help_gen_mov_mem_imm32(struct objfile *f,
                                enum gp_reg dest,
                                int32_t dest_disp,
                                char buf[4]) {
-  check_y86x64(f);
+  check_x86x64(f);
   uint8_t b[10];
   b[0] = 0xC7;
   size_t count = x86_encode_reg_rm(b + 1, 0, map_x86_reg(dest), dest_disp);
@@ -278,7 +277,7 @@ void ia_gen_mov_mem_imm8(struct objfile *f,
                          enum gp_reg dest,
                          int32_t dest_disp,
                          int8_t imm) {
-  check_y86x64(f);
+  check_x86x64(f);
   uint8_t b[11];
   b[0] = 0xC6;
   size_t count = x86_encode_reg_rm(b + 1, 0, map_x86_reg(dest), dest_disp);
@@ -510,7 +509,7 @@ void ia_gen_call(struct objfile *f, struct sti func_sti) {
 }
 
 void ia_gen_indirect_call_reg(struct objfile *f, enum gp_reg reg) {
-  check_y86x64(f);
+  check_x86x64(f);
   uint8_t b[2];
   b[0] = 0xFF;
   b[1] = mod_reg_rm(MOD11, 2, reg);
