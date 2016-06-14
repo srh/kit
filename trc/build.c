@@ -1110,8 +1110,7 @@ void gen_function_intro(struct objfile *f, struct frame *h) {
   }
 }
 
-void y86_push_address(struct objfile *f, struct frame *h, struct loc loc) {
-  CHECK(h->arch == TARGET_ARCH_Y86);
+void gen_push_address(struct objfile *f, struct frame *h, struct loc loc) {
   struct loc dest = frame_push_loc(h, ptr_size(h->arch));
   gen_mov_addressof(f, dest, loc);
 }
@@ -1216,7 +1215,7 @@ void gen_typetrav_onearg_call(struct checkstate *cs, struct objfile *f,
   case TARGET_ARCH_Y86:
     /* pointer passed on stack */
     adjust_frame_for_callsite_alignment(h, Y86_DWORD_SIZE);
-    y86_push_address(f, h, loc);
+    gen_push_address(f, h, loc);
     break;
   case TARGET_ARCH_X64:
     /* pointer passed in register */
@@ -1239,8 +1238,8 @@ void gen_typetrav_twoarg_call(struct checkstate *cs, struct objfile *f,
   case TARGET_ARCH_Y86:
     /* pointer passed on stack */
     adjust_frame_for_callsite_alignment(h, 2 * Y86_DWORD_SIZE);
-    y86_push_address(f, h, src);
-    y86_push_address(f, h, dest);
+    gen_push_address(f, h, src);
+    gen_push_address(f, h, dest);
     break;
   case TARGET_ARCH_X64:
     /* pointer passed in registers */
@@ -1675,14 +1674,12 @@ void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h
   switch (cs->arch) {
   case TARGET_ARCH_Y86: {
     if (has_src) {
-      /* X86 - pointer size */
       adjust_frame_for_callsite_alignment(h, 2 * Y86_DWORD_SIZE);
-      y86_push_address(f, h, src);
+      gen_push_address(f, h, src);
     } else {
-      /* X86 - pointer size */
       adjust_frame_for_callsite_alignment(h, Y86_DWORD_SIZE);
     }
-    y86_push_address(f, h, dest);
+    gen_push_address(f, h, dest);
   } break;
   case TARGET_ARCH_X64: {
     adjust_frame_for_callsite_alignment(h, 0);
