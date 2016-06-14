@@ -602,7 +602,6 @@ void frame_push_exact_amount(struct frame *h, uint32_t size) {
 }
 
 struct loc frame_push_loc(struct frame *h, uint32_t size) {
-  /* X86: Make sure new generic padding logic is right for callers on X64. */
   uint32_t padded_size = frame_padded_push_size(h->arch, size);
   frame_push_exact_amount(h, padded_size);
   return ebp_loc(size, padded_size, h->stack_offset);
@@ -4336,8 +4335,7 @@ int gen_local_field_access(struct checkstate *cs, struct objfile *f,
     gen_destroy_temp(cs, f, h, *er_tr(&lhs_er));
     uint32_t lhs_arraytype_count
       = unsafe_numeric_literal_u32(&lhs_type->u.arraytype.number);
-    /* X86 32-bit size specific. */
-    expr_return_immediate(f, h, er, imm_u32(lhs_arraytype_count));
+    expr_return_immediate(f, h, er, imm_size(cs->arch, lhs_arraytype_count));
   } else {
     apply_field_access(cs, f, h, ero_loc(&lhs_er.u.open), *er_tr(&lhs_er),
                        lhs_type,
