@@ -316,16 +316,14 @@ void checkstate_import_primitive_types(struct checkstate *cs) {
   intern_primitive_type(cs, I16_TYPE_NAME, NULL, 0, 2, 2);
   intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0, 4, 4);
   intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0, 4, 4);
-  /* X86 -- 32-bit sizes */
-  intern_primitive_type(cs, SIZE_TYPE_NAME, NULL, 0, 4, 4);
-  intern_primitive_type(cs, OSIZE_TYPE_NAME, NULL, 0, 4, 4);
+  uint32_t psize = ptr_size(cs->arch);
+  intern_primitive_type(cs, SIZE_TYPE_NAME, NULL, 0, psize, psize);
+  intern_primitive_type(cs, OSIZE_TYPE_NAME, NULL, 0, psize, psize);
 
   int not_flatly_held[20] = { 0 };
-  /* X86 -- 32-bit pointers */
-  intern_primitive_type(cs, PTR_TYPE_NAME, not_flatly_held, 1, 4, 4);
+  intern_primitive_type(cs, PTR_TYPE_NAME, not_flatly_held, 1, psize, psize);
   for (size_t i = 1; i < 21; i++) {
-    /* X86 -- 32-bit function pointers */
-    intern_primitive_type(cs, FUNC_TYPE_NAME, not_flatly_held, i, 4, 4);
+    intern_primitive_type(cs, FUNC_TYPE_NAME, not_flatly_held, i, psize, psize);
   }
 }
 
