@@ -19,6 +19,7 @@ named ia_ because they work on both intel architecture platforms. */
 #define kREX 0x40
 #define kREXW 0x48
 #define kREXR 0x44
+#define kREXB 0x41
 
 #define MOD00 0
 #define MOD01 1
@@ -126,6 +127,7 @@ void ia_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src);
 void ia_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2, enum oz oz);
 void ia_gen_xor(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz);
 void ia_gen_shl_cl(struct objfile *f, enum gp_reg dest, enum oz oz);
+void x64_gen_shr_imm(struct objfile *f, enum x64_reg dest, int8_t imm, enum oz oz);
 void ia_gen_shr_cl(struct objfile *f, enum gp_reg dest, enum oz oz);
 void ia_gen_sar_cl(struct objfile *f, enum gp_reg dest, enum oz oz);
 void x86_gen_add_esp_i32(struct objfile *f, int32_t x);

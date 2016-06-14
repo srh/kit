@@ -1973,26 +1973,37 @@ void gp_gen_store_register(struct objfile *f, struct loc dest, enum gp_reg reg) 
 
 void x64_gen_store_register(struct objfile *f, struct loc dest,
                             enum x64_reg reg, enum gp_reg spare) {
-  /* TODO: Honestly handle all sizes. */
   enum gp_reg dest_addr;
   int32_t dest_disp;
   put_ptr_in_reg(f, dest, spare, &dest_addr, &dest_disp);
+  enum x64_reg mdest = map_x64_reg(dest_addr);
 
-  switch (dest.size) {
-  case 8:
-    x64_gen_store(f, map_x64_reg(dest_addr), dest_disp, reg, OZ_64);
-    break;
-  case 4:
-    x64_gen_store(f, map_x64_reg(dest_addr), dest_disp, reg, OZ_32);
-    break;
-  case 2:
-    x64_gen_store(f, map_x64_reg(dest_addr), dest_disp, reg, OZ_16);
-    break;
-  case 1:
-    x64_gen_store(f, map_x64_reg(dest_addr), dest_disp, reg, OZ_8);
-    break;
-  default:
-    CRASH("x64_gen_store_register weird size not implemented");
+  uint32_t n = dest.padded_size;
+  while (n) {
+    CHECK(n <= 8);
+    if (n == 8) {
+      x64_gen_store(f, mdest, dest_disp, reg, OZ_64);
+      n = uint32_sub(n, 8);
+      dest_disp = int32_add(dest_disp, 8);
+    } else if (n >= 4) {
+      x64_gen_store(f, mdest, dest_disp, reg, OZ_32);
+      n = uint32_sub(n, 4);
+      dest_disp = int32_add(dest_disp, 4);
+      if (n) {
+        x64_gen_shr_imm(f, reg, 32, OZ_64);
+      }
+    } else if (n >= 2) {
+      x64_gen_store(f, mdest, dest_disp, reg, OZ_16);
+      n = uint32_sub(n, 2);
+      dest_disp = int32_add(dest_disp, 2);
+      if (n) {
+        x64_gen_shr_imm(f, reg, 16, OZ_64);
+      }
+    } else {
+      CHECK(n == 1);
+      x64_gen_store(f, mdest, dest_disp, reg, OZ_8);
+      n = 0;
+    }
   }
 }
 

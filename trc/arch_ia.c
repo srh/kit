@@ -60,19 +60,29 @@ void ia_prefix(struct objfile *f, uint8_t opnum, enum oz oz) {
 }
 
 /* "reg" specifies the reg field of a modr/m byte, i.e. REX.R. */
-void x64_prefix(struct objfile *f, uint8_t opnum, enum oz oz,
-                enum x64_reg reg,
-                int *regnum_out) {
+/* "base" specifies the r/m field or SIB base or what-have-you.
+Beware that oz is assumed to refer to both register sizes!  (But one
+might really be a pointer.)  */
+/* Just pass in X64_RAX if the reg or base aren't supposed to affect
+the REX prefix. */
+void x64_super_prefix(struct objfile *f, uint8_t opnum, enum oz oz,
+                      enum x64_reg reg,
+                      int *regnum_out,
+                      enum x64_reg base,
+                      int *basenum_out) {
   CHECK(opnum & 1);
   *regnum_out = reg & 7;
+  *basenum_out = base & 7;
   if (oz == OZ_8) {
-    if (reg > X64_RBX) {
-      pushtext(f, (reg <= X64_RDI ? kREX : kREXR));
+    if (reg > X64_RBX || base > X64_RBX) {
+      pushtext(f, (reg <= X64_RDI ? kREX : kREXR) | (base <= X64_RDI ? kREX : kREXB));
     }
     pushtext(f, opnum ^ 1);
     return;
   }
-  int rex = (reg > X64_RDI ? kREXR : 0) | (oz == OZ_64 ? kREXW : 0);
+  int rex = (reg > X64_RDI ? kREXR : 0)
+    | (oz == OZ_64 ? kREXW : 0)
+    | (base > X64_RDI ? kREXR : 0);
   if (rex) {
     pushtext(f, rex);
   }
@@ -81,6 +91,14 @@ void x64_prefix(struct objfile *f, uint8_t opnum, enum oz oz,
   }
   pushtext(f, opnum);
 }
+
+void x64_prefix(struct objfile *f, uint8_t opnum, enum oz oz,
+                enum x64_reg reg,
+                int *regnum_out) {
+  int basenum;
+  x64_super_prefix(f, opnum, oz, reg, regnum_out, X64_RAX, &basenum);
+}
+
 
 void ia_imm(struct objfile *f, int32_t imm, enum oz oz) {
   uint8_t b[4];
@@ -285,6 +303,15 @@ void ia_gen_shl_cl(struct objfile *f, enum gp_reg dest, enum oz oz) {
   ia_prefix(f, 0xD3, oz);
   /* SHL, SHR, SAR have different reg/opcode fields. */
   pushtext(f, mod_reg_rm(MOD11, 4, dest));
+}
+
+void x64_gen_shr_imm(struct objfile *f, enum x64_reg dest, int8_t imm, enum oz oz) {
+  int regnum;
+  int destnum;
+  x64_super_prefix(f, 0xC1, oz, X64_RAX, &regnum, dest, &destnum);
+  CHECK(regnum == 0);
+  pushtext(f, mod_reg_rm(MOD11, 4, destnum));
+  pushtext(f, (uint8_t)imm);
 }
 
 void ia_gen_shr_cl(struct objfile *f, enum gp_reg dest, enum oz oz) {
