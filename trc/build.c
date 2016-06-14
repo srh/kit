@@ -2031,33 +2031,51 @@ void gp_gen_load_register(struct objfile *f, enum gp_reg reg, struct loc src) {
   }
 }
 
+void help_x64_gen_load_register(struct objfile *f, enum x64_reg dest,
+                                enum x64_reg src_addr, int32_t src_disp,
+                                uint32_t size,
+                                enum x64_reg spare2) {
+  CHECK(size <= 8);
+  if (size == 0) {
+    return;
+  } else if (size == 8) {
+    x64_gen_load(f, dest, src_addr, src_disp, OZ_64);
+    return;
+  } else if (size > 4) {
+    help_x64_gen_load_register(f, spare2, src_addr, int32_add(src_disp, 4),
+                               uint32_sub(size, 4), dest);
+    x64_gen_load(f, dest, src_addr, src_disp, OZ_32);
+    x64_gen_shl_imm(f, spare2, 32, OZ_64);
+    x64_gen_or(f, dest, spare2, OZ_64);
+    return;
+  } else if (size == 4) {
+    x64_gen_load(f, dest, src_addr, src_disp, OZ_32);
+    return;
+  } else if (size == 3) {
+    x64_gen_load(f, spare2, src_addr, src_disp, OZ_8);
+    x64_gen_load(f, dest, src_addr, src_disp, OZ_16);
+    x64_gen_shl_imm(f, spare2, 16, OZ_32);
+    x64_gen_or(f, dest, spare2, OZ_32);
+    return;
+  } else if (size == 2) {
+    x64_gen_load(f, dest, src_addr, src_disp, OZ_16);
+  } else {
+    CHECK(size == 1);
+    x64_gen_load(f, dest, src_addr, src_disp, OZ_8);
+  }
+}
+
 void x64_gen_load_register(struct objfile *f, enum x64_reg reg,
                            enum gp_reg spare,
                            enum x64_reg spare2,
                            struct loc src) {
-  (void)spare2;
   /* TODO(): We definitely have to honestly handle all sizes. */
   enum gp_reg src_addr;
   int32_t src_disp;
   put_ptr_in_reg(f, src, spare, &src_addr, &src_disp);
   enum x64_reg msrc = map_x64_reg(src_addr);
 
-  switch (src.size) {
-  case 8:
-    x64_gen_load(f, reg, msrc, src_disp, OZ_64);
-    break;
-  case 4:
-    x64_gen_load(f, reg, msrc, src_disp, OZ_32);
-    break;
-  case 2:
-    x64_gen_load(f, reg, msrc, src_disp, OZ_16);
-    break;
-  case 1:
-    x64_gen_load(f, reg, msrc, src_disp, OZ_8);
-    break;
-  default:
-    CRASH("not implemented or unreachable");
-  }
+  help_x64_gen_load_register(f, reg, msrc, src_disp, src.size, spare2);
 }
 
 

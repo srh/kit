@@ -310,6 +310,15 @@ void x64_gen_shr_imm(struct objfile *f, enum x64_reg dest, int8_t imm, enum oz o
   int destnum;
   x64_super_prefix(f, 0xC1, oz, X64_RAX, &regnum, dest, &destnum);
   CHECK(regnum == 0);
+  pushtext(f, mod_reg_rm(MOD11, 5, destnum));
+  pushtext(f, (uint8_t)imm);
+}
+
+void x64_gen_shl_imm(struct objfile *f, enum x64_reg dest, int8_t imm, enum oz oz) {
+  int regnum;
+  int destnum;
+  x64_super_prefix(f, 0xC1, oz, X64_RAX, &regnum, dest, &destnum);
+  CHECK(regnum == 0);
   pushtext(f, mod_reg_rm(MOD11, 4, destnum));
   pushtext(f, (uint8_t)imm);
 }
@@ -412,6 +421,13 @@ void ia_gen_cmp_imm(struct objfile *f, enum gp_reg lhs, int32_t imm, enum oz oz)
 void ia_gen_or(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
   ia_prefix(f, 0x09, oz);
   pushtext(f, mod_reg_rm(MOD11, src, dest));
+}
+
+void x64_gen_or(struct objfile *f, enum x64_reg dest, enum x64_reg src, enum oz oz) {
+  int regnum;
+  int basenum;
+  x64_super_prefix(f, 0x09, oz, src, &regnum, dest, &basenum);
+  pushtext(f, mod_reg_rm(MOD11, regnum, basenum));
 }
 
 void ia_gen_and(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
