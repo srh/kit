@@ -144,7 +144,8 @@ func checkmalloc(n size) *void {
       ret = malloc(1);
     }
     if ret == null {
-      crash(_u8!"checkmalloc fail");
+      debugstr("checkmalloc fail\n");
+      abort();
     }
   }
   return ret;
