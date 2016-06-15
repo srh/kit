@@ -1372,9 +1372,6 @@ void gen_typetrav_rhs_func(struct checkstate *cs, struct objfile *f, struct fram
     gen_typetrav_func(cs, f, h, tf, dest, has_src, src, &rhs->u.type);
     break;
   case AST_DEFTYPE_RHS_ENUMSPEC: {
-    /* TODO: Instead of duplicating this code everywhere, enums should
-    have their do_construct, do_copy, do_move functions defined in one
-    place and called. */
     int32_t saved_offset = frame_save_offset(h);
     CHECK(tf != TYPETRAV_FUNC_DEFAULT_CONSTRUCT);
     struct loc enum_num_loc;
