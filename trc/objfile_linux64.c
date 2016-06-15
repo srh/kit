@@ -91,14 +91,15 @@ struct elf64_Symtab_Entry {
 PACK_POP
 
 PACK_PUSH
-struct elf64_Rel {
+struct elf64_Rela {
   struct le_u64 r_offset;
   struct le_u64 r_info;
+  struct le_i64 r_addend;
 } PACK_ATTRIBUTE;
 PACK_POP
 
 /* Seems like a good idea. */
-enum { kRel_Section_Alignment = 8 };
+enum { kRela_Section_Alignment = 8 };
 
 enum {
   kELFCLASS32 = 1,
@@ -113,7 +114,7 @@ enum {
   kSHT_PROGBITS = 1,
   kSHT_SYMTAB = 2,
   kSHT_STRTAB = 3,
-  kSHT_REL = 9,
+  kSHT_RELA = 4,
   kSTT_OBJECT = 1,
   kSTT_FUNC = 2,
   kSTB_LOCAL = 0,
@@ -237,21 +238,21 @@ enum { kSymTabSectionNumber = 3 };
 void linux64_section_headers(uint32_t prev_end_offset,
                              int sh_out_index,
                              struct objfile_section *s,
-                             uint32_t sh_strtab_rel_index, uint32_t sh_strtab_index,
+                             uint32_t sh_strtab_rela_index, uint32_t sh_strtab_index,
                              uint32_t sh_flags,
                              struct elf64_Section_Header *rel_out,
                              struct elf64_Section_Header *sh_out,
                              uint32_t *end_out) {
-  uint32_t rel_offset = uint32_ceil_aligned(prev_end_offset, kRel_Section_Alignment);
-  uint32_t rel_size = uint32_mul(s->relocs_count, sizeof(struct elf64_Rel));
+  uint32_t rel_offset = uint32_ceil_aligned(prev_end_offset, kRela_Section_Alignment);
+  uint32_t rel_size = uint32_mul(s->relocs_count, sizeof(struct elf64_Rela));
   uint32_t rel_end = uint32_add(rel_offset, rel_size);
   uint32_t sh_alignment = s->max_requested_alignment;
   uint32_t sh_offset = uint32_ceil_aligned(rel_end, sh_alignment);
   uint32_t sh_size = size_to_uint32(s->raw.count);
   uint32_t sh_end = uint32_add(sh_offset, sh_size);
 
-  rel_out->sh_name = to_le_u32(sh_strtab_rel_index);
-  rel_out->sh_type = to_le_u32(kSHT_REL);
+  rel_out->sh_name = to_le_u32(sh_strtab_rela_index);
+  rel_out->sh_type = to_le_u32(kSHT_RELA);
   rel_out->sh_flags = to_le_u64(0);
   rel_out->sh_addr = to_le_u64(0);
   rel_out->sh_offset = up_to_le_u64(rel_offset);
@@ -259,7 +260,7 @@ void linux64_section_headers(uint32_t prev_end_offset,
   rel_out->sh_link = to_le_u32(kSymTabSectionNumber);
   rel_out->sh_info = to_le_u32(sh_out_index);
   rel_out->sh_addralign = to_le_u64(0);
-  rel_out->sh_entsize = to_le_u64(sizeof(struct elf64_Rel));
+  rel_out->sh_entsize = to_le_u64(sizeof(struct elf64_Rela));
 
   sh_out->sh_name = to_le_u32(sh_strtab_index);
   sh_out->sh_type = to_le_u32(kSHT_PROGBITS);
@@ -275,16 +276,13 @@ void linux64_section_headers(uint32_t prev_end_offset,
   *end_out = sh_end;
 }
 
-/* TODO: (Also in s2:) Don't mutate the section, plz.  Thanks. */
-void linux64_append_relocations_and_mutate_section(
+void linux64_append_relocations(
     uint32_t *sti_map, size_t sti_map_count,
     struct databuf *d, struct objfile_section *s) {
   struct objfile_relocation *relocs = s->relocs;
   for (size_t i = 0, e = s->relocs_count; i < e; i++) {
     CHECK(relocs[i].type != OBJFILE_RELOCATION_TYPE_DIFF32);
-    struct elf64_Rel rel;
-    /* TODO(): It is not confirmed that our current treatment of PC32
-    is correct, in 64-bit. */
+    struct elf64_Rela rel;
     rel.r_offset = up_to_le_u64(relocs[i].virtual_address);
     uint32_t sti = relocs[i].symbol_table_index.value;
     CHECK(sti < sti_map_count);
@@ -297,15 +295,15 @@ void linux64_append_relocations_and_mutate_section(
 
     uint32_t rel_type = rel_types[relocs[i].type];
     rel.r_info = to_le_u64((((uint64_t)new_sti) << 32) | (uint64_t)rel_type);
-    databuf_append(d, &rel, sizeof(rel));
 
     static const int32_t rel_addends[] = {
       [OBJFILE_RELOCATION_TYPE_DIR32] = 0,
       [OBJFILE_RELOCATION_TYPE_REL32] = -4,
       [OBJFILE_RELOCATION_TYPE_DIFF32] = 0, /* garbage */
     };
-    struct le_u32 addend_le = to_le_u32((uint32_t)rel_addends[relocs[i].type]);
-    databuf_overwrite(&s->raw, uint64_to_size(from_le_u64(rel.r_offset)), &addend_le, sizeof(addend_le));
+
+    rel.r_addend = to_le_i64(rel_addends[relocs[i].type]);
+    databuf_append(d, &rel, sizeof(rel));
   }
 }
 
@@ -330,16 +328,16 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     = strtab_append_c_str(&sh_strtab, ".strtab");
   const uint32_t dot_symtab_index
     = strtab_append_c_str(&sh_strtab, ".symtab");
-  const uint32_t dot_rel_data_index
-    = strtab_append_c_str(&sh_strtab, ".rel.data");
+  const uint32_t dot_rela_data_index
+    = strtab_append_c_str(&sh_strtab, ".rela.data");
   const uint32_t dot_data_index
     = strtab_append_c_str(&sh_strtab, ".data");
-  const uint32_t dot_rel_rodata_index
-    = strtab_append_c_str(&sh_strtab, ".rel.rodata");
+  const uint32_t dot_rela_rodata_index
+    = strtab_append_c_str(&sh_strtab, ".rela.rodata");
   const uint32_t dot_rodata_index
     = strtab_append_c_str(&sh_strtab, ".rodata");
-  const uint32_t dot_rel_text_index
-    = strtab_append_c_str(&sh_strtab, ".rel.text");
+  const uint32_t dot_rela_text_index
+    = strtab_append_c_str(&sh_strtab, ".rela.text");
   const uint32_t dot_text_index
     = strtab_append_c_str(&sh_strtab, ".text");
   strtab_append_c_str(&sh_strtab, "");
@@ -366,31 +364,31 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
 
   const uint32_t symtab_end = uint32_add(symtab_offset, symtab_size);
 
-  struct elf64_Section_Header sh_rel_data;
+  struct elf64_Section_Header sh_rela_data;
   struct elf64_Section_Header sh_data;
   uint32_t data_end;
   linux64_section_headers(symtab_end, kLinux64DataSectionNumber, &f->data,
-                          dot_rel_data_index, dot_data_index,
+                          dot_rela_data_index, dot_data_index,
                           kSHF_WRITE,
-                          &sh_rel_data, &sh_data,
+                          &sh_rela_data, &sh_data,
                           &data_end);
 
-  struct elf64_Section_Header sh_rel_rodata;
+  struct elf64_Section_Header sh_rela_rodata;
   struct elf64_Section_Header sh_rodata;
   uint32_t rodata_end;
   linux64_section_headers(data_end, kLinux64RodataSectionNumber, &f->rdata,
-                          dot_rel_rodata_index, dot_rodata_index,
+                          dot_rela_rodata_index, dot_rodata_index,
                           0,
-                          &sh_rel_rodata, &sh_rodata,
+                          &sh_rela_rodata, &sh_rodata,
                           &rodata_end);
 
-  struct elf64_Section_Header sh_rel_text;
+  struct elf64_Section_Header sh_rela_text;
   struct elf64_Section_Header sh_text;
   uint32_t text_end;
   linux64_section_headers(rodata_end, kLinux64TextSectionNumber, &f->text,
-                          dot_rel_text_index, dot_text_index,
+                          dot_rela_text_index, dot_text_index,
                           kSHF_EXEC,
-                          &sh_rel_text, &sh_text,
+                          &sh_rela_text, &sh_text,
                           &text_end);
 
   {
@@ -492,13 +490,13 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   }
 
   STATIC_CHECK(kLinux64DataSectionNumber == 5);
-  databuf_append(d, &sh_rel_data, sizeof(sh_rel_data));
+  databuf_append(d, &sh_rela_data, sizeof(sh_rela_data));
   databuf_append(d, &sh_data, sizeof(sh_data));
   STATIC_CHECK(kLinux64RodataSectionNumber == 7);
-  databuf_append(d, &sh_rel_rodata, sizeof(sh_rel_rodata));
+  databuf_append(d, &sh_rela_rodata, sizeof(sh_rela_rodata));
   databuf_append(d, &sh_rodata, sizeof(sh_rodata));
   STATIC_CHECK(kLinux64TextSectionNumber == 9);
-  databuf_append(d, &sh_rel_text, sizeof(sh_rel_text));
+  databuf_append(d, &sh_rela_text, sizeof(sh_rela_text));
   databuf_append(d, &sh_text, sizeof(sh_text));
 
   /* Section headers done -- append string table. */
@@ -520,26 +518,23 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
 
   CHECK(d->count == symtab_end);
 
-  append_zeros_to_align(d, kRel_Section_Alignment);
-  CHECK(d->count == from_le_u64(sh_rel_data.sh_offset));
-  linux64_append_relocations_and_mutate_section(
-      sti_map, f->symbol_table_count, d, &f->data);
+  append_zeros_to_align(d, kRela_Section_Alignment);
+  CHECK(d->count == from_le_u64(sh_rela_data.sh_offset));
+  linux64_append_relocations(sti_map, f->symbol_table_count, d, &f->data);
   append_zeros_to_align(d, f->data.max_requested_alignment);
   CHECK(d->count == from_le_u64(sh_data.sh_offset));
   databuf_append(d, f->data.raw.buf, f->data.raw.count);
 
-  append_zeros_to_align(d, kRel_Section_Alignment);
-  CHECK(d->count == from_le_u64(sh_rel_rodata.sh_offset));
-  linux64_append_relocations_and_mutate_section(
-      sti_map, f->symbol_table_count, d, &f->rdata);
+  append_zeros_to_align(d, kRela_Section_Alignment);
+  CHECK(d->count == from_le_u64(sh_rela_rodata.sh_offset));
+  linux64_append_relocations(sti_map, f->symbol_table_count, d, &f->rdata);
   append_zeros_to_align(d, f->rdata.max_requested_alignment);
   CHECK(d->count == from_le_u64(sh_rodata.sh_offset));
   databuf_append(d, f->rdata.raw.buf, f->rdata.raw.count);
 
-  append_zeros_to_align(d, kRel_Section_Alignment);
-  CHECK(d->count == from_le_u64(sh_rel_text.sh_offset));
-  linux64_append_relocations_and_mutate_section(
-      sti_map, f->symbol_table_count, d, &f->text);
+  append_zeros_to_align(d, kRela_Section_Alignment);
+  CHECK(d->count == from_le_u64(sh_rela_text.sh_offset));
+  linux64_append_relocations(sti_map, f->symbol_table_count, d, &f->text);
   append_zeros_to_align(d, f->text.max_requested_alignment);
   CHECK(d->count == from_le_u64(sh_text.sh_offset));
   databuf_append(d, f->text.raw.buf, f->text.raw.count);
