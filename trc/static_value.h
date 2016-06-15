@@ -2,6 +2,7 @@
 #define KIT_STATIC_VALUE_H_
 
 #include "ast.h"
+#include "platform.h"
 #include "primitive.h"
 
 enum static_value_tag {
@@ -38,6 +39,8 @@ struct static_value {
 
 void static_value_init_i32(struct static_value *a, int32_t i32_value);
 void static_value_init_u32(struct static_value *a, uint32_t u32_value);
+void static_value_init_size(enum target_arch arch,
+                            struct static_value *a, uint32_t size_value);
 void static_value_init_u8(struct static_value *a, uint8_t u8_value);
 void static_value_init_bool(struct static_value *a, int bool_value);
 void static_value_init_enumvoid(struct static_value *a, size_t enumconstruct_number, size_t enumsize);

@@ -1,5 +1,7 @@
 #include "static_value.h"
 
+#include "sizeattr.h"
+
 void static_value_init_i32(struct static_value *a, int32_t i32_value) {
   a->tag = STATIC_VALUE_I32;
   a->u.i32_value = i32_value;
@@ -9,6 +11,22 @@ void static_value_init_u32(struct static_value *a, uint32_t u32_value) {
   a->tag = STATIC_VALUE_U32;
   a->u.u32_value = u32_value;
 }
+
+void static_value_init_size(enum target_arch arch,
+                            struct static_value *a, uint32_t size_value) {
+  switch (ptr_size(arch)) {
+  case 4:
+    static_value_init_u32(a, size_value);
+    break;
+  case 8:
+    a->tag = STATIC_VALUE_U64;
+    a->u.u64_value = (uint64_t)size_value;
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
 
 void static_value_init_u8(struct static_value *a, uint8_t u8_value) {
   a->tag = STATIC_VALUE_U8;
