@@ -473,15 +473,29 @@ void ia_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
   apptext(f, b, 3);
 }
 
+void x64_mov_imm64(struct objfile *f, enum x64_reg dest, int64_t imm64) {
+  uint8_t b[10];
+  b[0] = kREXW | (dest <= X64_RDI ? 0 : kREXB);
+  b[1] = 0xB8 + dest;
+  write_le_i64(b + 2, imm64);
+  apptext(f, b, 10);
+}
+
 void ia_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest, int32_t imm32) {
   if (imm32 == 0) {
     ia_gen_xor(f, dest, dest, ptr_oz(f));
   } else {
-    CHECK(dest <= GP_DI);
-    ia_prefix_no_oz8(f, 0xB8 + (uint8_t)dest, ptr_oz(f));
-    uint8_t b[4];
-    write_le_i32(b, imm32);
-    apptext(f, b, 4);
+    enum oz oz = ptr_oz(f);
+    if (oz <= OZ_32 || imm32 >= 0) {
+      CHECK(dest <= GP_DI);
+      ia_prefix_no_oz8(f, 0xB8 + (uint8_t)dest, OZ_32);
+      uint8_t b[4];
+      write_le_i32(b, imm32);
+      apptext(f, b, 4);
+    } else {
+      CHECK(objfile_arch(f) == TARGET_ARCH_X64);
+      x64_mov_imm64(f, map_x64_reg(dest), imm32);
+    }
   }
 }
 
@@ -492,14 +506,6 @@ void ia_gen_store(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
   size_t count = x86_encode_reg_rm(b, src, dest_addr, dest_disp);
   CHECK(count <= 9);
   apptext(f, b, count);
-}
-
-void x64_mov_imm64(struct objfile *f, enum x64_reg dest, int64_t imm64) {
-  uint8_t b[10];
-  b[0] = kREXW | (dest <= X64_RDI ? 0 : kREXB);
-  b[1] = 0xB8 + dest;
-  write_le_i64(b + 2, imm64);
-  apptext(f, b, 10);
 }
 
 void ia_gen_call(struct objfile *f, struct sti func_sti) {

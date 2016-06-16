@@ -154,10 +154,10 @@ void ia_gen_sub(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz
 void x64_gen_sub_w64_imm32(struct objfile *f, enum x64_reg dest, int32_t imm);
 void ia_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
                      enum ia_setcc code);
+void x64_mov_imm64(struct objfile *f, enum x64_reg dest, int64_t imm64);
 void ia_gen_mov_reg_imm32(struct objfile *f, enum gp_reg dest, int32_t imm32);
 void ia_gen_store(struct objfile *f, enum gp_reg dest_addr, int32_t dest_disp,
                   enum gp_reg src, enum oz oz);
-void x64_mov_imm64(struct objfile *f, enum x64_reg dest, int64_t imm64);
 void ia_gen_call(struct objfile *f, struct sti func_sti);
 void ia_gen_indirect_call_reg(struct objfile *f, enum gp_reg reg);
 
