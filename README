@@ -70,3 +70,10 @@ expressions.  s5 uses s4's foreach loops, and is "in-development"
 capable of compiling s5 directly.  At some point the
 highest-numbered version will use features that s1 will never
 support.  See FEATURES for more information.
+
+  ABOUT THE IMPLEMENTATIONS
+
+s1 can target x86 and, on Linux, amd64.  Use --linux64 to target
+amd64.
+
+s2, s3, s4, and s5 can only target x86.
