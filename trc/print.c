@@ -95,7 +95,7 @@ void sprint_type_param_list(struct databuf *b, struct identmap *im, struct ast_t
   databuf_append_c_str(b, "[");
   for (size_t i = 0; i < types_count; i++) {
     if (i) {
-      databuf_append_c_str(b, ", ");
+      databuf_append_c_str(b, ",");
     }
     sprint_typeexpr(b, im, &types[i]);
   }
