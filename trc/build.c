@@ -2056,7 +2056,7 @@ void help_x64_gen_load_register(struct objfile *f, enum x64_reg dest,
     x64_gen_load(f, dest, src_addr, src_disp, OZ_32);
     return;
   } else if (size == 3) {
-    x64_gen_load(f, spare2, src_addr, src_disp, OZ_8);
+    x64_gen_load(f, spare2, src_addr, int32_add(src_disp, 2), OZ_8);
     x64_gen_load(f, dest, src_addr, src_disp, OZ_16);
     x64_gen_shl_imm(f, spare2, 16, OZ_32);
     x64_gen_or(f, dest, spare2, OZ_32);
