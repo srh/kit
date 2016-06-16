@@ -86,7 +86,7 @@ void x64_super_prefix(struct objfile *f, uint8_t opnum, enum oz oz,
   }
   int rex = (reg > X64_RDI ? kREXR : 0)
     | (oz == OZ_64 ? kREXW : 0)
-    | (base > X64_RDI ? kREXR : 0);
+    | (base > X64_RDI ? kREXB : 0);
   if (rex) {
     pushtext(f, rex);
   }
@@ -171,11 +171,27 @@ void ia_gen_mov(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz
   pushtext(f, mod_reg_rm(MOD11, dest, src));
 }
 
+/* TODO(): Rename x64_gen_movzx */
+/* oz depicts the source operand -- the dest is always the full
+register, which gets zero-extended */
 void x64_gen_load(struct objfile *f, enum x64_reg dest,
                   enum x64_reg src_addr, int32_t src_disp, enum oz oz) {
   CHECK(src_addr <= X64_RDI);
-  int regnum;
-  x64_prefix(f, 0x8B, oz, dest, &regnum);
+  int regnum = dest & 7;
+  if (oz <= OZ_16) {
+    if (dest > X64_RDI || (oz == OZ_8 && dest > X64_RBX)) {
+      pushtext(f, (dest > X64_RDI ? kREXR : kREX));
+    }
+    uint8_t pref[2];
+    pref[0] = 0x0F;
+    pref[1] = 0xB6 + (oz == OZ_16);
+    apptext(f, pref, 2);
+  } else {
+    int altregnum;
+    x64_prefix(f, 0x8B, oz, dest, &altregnum);
+    CHECK(altregnum == regnum);
+  }
+
   uint8_t b[9];
   size_t count = x86_encode_reg_rm(b, regnum, src_addr, src_disp);
   CHECK(count <= 9);
