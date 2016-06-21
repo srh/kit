@@ -1051,7 +1051,7 @@ func x86_cmp_imm_sized(cs *checkstate, f *objfile, lhs u8, rhs *st_value, avail 
       ice(_u8("x86_cmp_imm_sized sees non-simple (impossible) symbolref: "), pm.msg);
     }
     x86_mov_stiptr(&cs->plat, f, avail, *un(&ref_fn_body(cs, fnid)->symbol_table_index));
-    x86_cmp_w32(f, lhs, avail);
+    x86_cmp(f, lhs, avail, OZ_32);
   } else {
     val u32 = get(&rhs->words, 0);
     if rhs->length == 1 {
@@ -1277,15 +1277,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
     case NumBitXor:
       x86_xor_w32(f, X86_EAX, X86_ECX);
     case NumBitNot:
-      if b.op_size == 1 {
-        x86_not_w8(f, X86_EAX);
-      } else if b.op_size == 2 {
-        x86_not_w16(f, X86_EAX);
-      } else if b.op_size == 4 {
-        x86_not_w32(f, X86_EAX);
-      } else {
-        ice(_u8("NumBitNot bad size"));
-      }
+      x86_not(f, X86_EAX, x86_opsize_oz(b.op_size));
     case NumShiftLeft:
       // It is intentional that we always range check here, even if !trap_overflow.  It is
       // also intentional that the shift could overflow.
@@ -1344,15 +1336,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
     x86_load32_for_primop(f, X86_EAX, get_loc(h, get(&a->params, 0)), b.op_size);
     x86_load32_for_primop(f, X86_ECX, get_loc(h, get(&a->params, 1)), b.op_size);
 
-    if b.op_size == 1 {
-      x86_cmp_w8(f, X86_EAX, X86_ECX);
-    } else if b.op_size == 2 {
-      x86_cmp_w16(f, X86_EAX, X86_ECX);
-    } else if b.op_size == 4 {
-      x86_cmp_w32(f, X86_EAX, X86_ECX);
-    } else {
-      ice(_u8("PrimNumCompare bad size"));
-    }
+    x86_cmp(f, X86_EAX, X86_ECX, x86_opsize_oz(b.op_size));
 
     setcc_code u8;
     switch b.op_numtraits.repr {
@@ -1392,10 +1376,10 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
       x86_test_regs8(f, X86_AL, X86_AL);
       x86_setcc_b8(f, X86_AL, X86_SETCC_Z);
     case BoolEq:
-      x86_cmp_w8(f, X86_EAX, X86_ECX);
+      x86_cmp(f, X86_EAX, X86_ECX, OZ_8);
       x86_setcc_b8(f, X86_EAX, X86_SETCC_E);
     case BoolNe:
-      x86_cmp_w8(f, X86_EAX, X86_ECX);
+      x86_cmp(f, X86_EAX, X86_ECX, OZ_8);
       x86_setcc_b8(f, X86_EAX, X86_SETCC_NE);
     case BoolBitAnd:
       x86_and_w32(f, X86_EAX, X86_ECX);
@@ -1408,7 +1392,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
     op_size u32 = 4;
     x86_load32_for_primop(f, X86_EAX, get_loc(h, get(&a->params, 0)), op_size);
     x86_load32_for_primop(f, X86_ECX, get_loc(h, get(&a->params, 1)), op_size);
-    x86_cmp_w32(f, X86_EAX, X86_ECX);
+    x86_cmp(f, X86_EAX, X86_ECX, OZ_32);
     setcc_code u8;
     switch b.op_action {
     case CmpEq: setcc_code = X86_SETCC_E;
