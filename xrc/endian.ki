@@ -1,3 +1,10 @@
+// You should probably use to_le! instead of `~`.
+inline func to_le(n u32) le_u32 { return ~n; }
+inline func to_le(n i32) le_i32 { return ~n; }
+inline func to_le(n i16) le_i16 { return ~n; }
+inline func to_le(n u16) le_u16 { return ~n; }
+
+
 struct le_u32 {
   buf ^[4]u8;
 }

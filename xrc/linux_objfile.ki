@@ -96,10 +96,10 @@ def kSHT_PROGBITS u32 = 1;
 def kSHT_SYMTAB u32 = 2;
 def kSHT_STRTAB u32 = 3;
 def kSHT_REL u32 = 9;
-def kSTT_OBJECT u32 = 1;
-def kSTT_FUNC u32 = 2;
-def kSTB_LOCAL u32 = 0;
-def kSTB_GLOBAL u32 = 1;
+def kSTT_OBJECT u8 = 1;
+def kSTT_FUNC u8 = 2;
+def kSTB_LOCAL u8 = 0;
+def kSTB_GLOBAL u8 = 1;
 def kSHN_UNDEF u32 = 0;
 def kLinux32DataSectionNumber u32 = 5;
 def kLinux32RodataSectionNumber u32 = 7;
@@ -178,20 +178,20 @@ func linux32_flatten(im *identmap, f *objfile) array[u8] {
     n_kEI_NIDENT size = ~kEI_NIDENT;
     fill(ixcast(&h.e_ident[9]), ~(kEI_NIDENT - 9), 0);
 
-    h.e_type = ~ @[u16] ~kET_REL;
-    h.e_machine = ~ @[u16] ~kEM_386;
-    h.e_version = ~ kEV_CURRENT;
-    h.e_entry = ~ @[u32] 0;
-    h.e_phoff = ~ @[u32] 0;
-    h.e_shoff = ~ section_header_offset;
-    h.e_flags = ~ @[u32] 0;
-    h.e_ehsize = ~ @[u16] ~ sizeof@[elf32_Header];
-    h.e_phentsize = ~ @[u16] 0;
-    h.e_phnum = ~ @[u16] 0;
-    h.e_shentsize = ~ @[u16] ~ sizeof@[elf32_Section_Header];
-    h.e_shnum = ~ @[u16] ~kNumSectionHeaders;
+    h.e_type = to_le! @[u16] ~kET_REL;
+    h.e_machine = to_le! @[u16] ~kEM_386;
+    h.e_version = to_le! kEV_CURRENT;
+    h.e_entry = to_le! @[u32] 0;
+    h.e_phoff = to_le! @[u32] 0;
+    h.e_shoff = to_le! section_header_offset;
+    h.e_flags = to_le! @[u32] 0;
+    h.e_ehsize = to_le! @[u16] ~sizeof@[elf32_Header];
+    h.e_phentsize = to_le! @[u16] 0;
+    h.e_phnum = to_le! @[u16] 0;
+    h.e_shentsize = to_le! @[u16] ~sizeof@[elf32_Section_Header];
+    h.e_shnum = to_le! @[u16] ~kNumSectionHeaders;
     // String table section header is at index 1.
-    h.e_shstrndx = ~ @[u16] 1;
+    h.e_shstrndx = to_le! @[u16] 1;
 
     append_reinterpret(&d, &h);
   }
@@ -199,48 +199,48 @@ func linux32_flatten(im *identmap, f *objfile) array[u8] {
   if true {
     // Null section header (for index 0).
     sh elf32_Section_Header;
-    sh.sh_name = ~ @[u32] 0;
-    sh.sh_type = ~kSHT_NULL;
-    sh.sh_flags = ~ @[u32] 0;
-    sh.sh_addr = ~ @[u32] 0;
-    sh.sh_offset = ~ @[u32] 0;
-    sh.sh_size = ~ @[u32] 0;
-    sh.sh_link = ~ @[u32] 0;
-    sh.sh_info = ~ @[u32] 0;
-    sh.sh_addralign = ~ @[u32] 0;
-    sh.sh_entsize = ~ @[u32] 0;
+    sh.sh_name = to_le! @[u32] 0;
+    sh.sh_type = to_le! kSHT_NULL;
+    sh.sh_flags = to_le! @[u32] 0;
+    sh.sh_addr = to_le! @[u32] 0;
+    sh.sh_offset = to_le! @[u32] 0;
+    sh.sh_size = to_le! @[u32] 0;
+    sh.sh_link = to_le! @[u32] 0;
+    sh.sh_info = to_le! @[u32] 0;
+    sh.sh_addralign = to_le! @[u32] 0;
+    sh.sh_entsize = to_le! @[u32] 0;
     append_reinterpret(&d, &sh);
   }
 
   if true {
     // Strings table section header -- index 1.
     sh elf32_Section_Header;
-    sh.sh_name = ~dot_shstrtab_index;
-    sh.sh_type = ~kSHT_STRTAB;
-    sh.sh_flags = ~ @[u32] 0;
-    sh.sh_addr = ~ @[u32] 0;
-    sh.sh_offset = ~sh_strtab_offset;
-    sh.sh_size = ~ @[u32] ~count(&sh_strtab);
-    sh.sh_link = ~ @[u32] 0;
-    sh.sh_info = ~ @[u32] 0;
-    sh.sh_addralign = ~ @[u32] 0;
-    sh.sh_entsize = ~ @[u32] 0;
+    sh.sh_name = to_le! dot_shstrtab_index;
+    sh.sh_type = to_le! kSHT_STRTAB;
+    sh.sh_flags = to_le! @[u32] 0;
+    sh.sh_addr = to_le! @[u32] 0;
+    sh.sh_offset = to_le! sh_strtab_offset;
+    sh.sh_size = to_le! @[u32] ~count(&sh_strtab);
+    sh.sh_link = to_le! @[u32] 0;
+    sh.sh_info = to_le! @[u32] 0;
+    sh.sh_addralign = to_le! @[u32] 0;
+    sh.sh_entsize = to_le! @[u32] 0;
     append_reinterpret(&d, &sh);
   }
 
   if true {
     // Symbol table strings section header -- index 2.
     sh elf32_Section_Header;
-    sh.sh_name = ~dot_strtab_index;
-    sh.sh_type = ~kSHT_STRTAB;
-    sh.sh_flags = ~ @[u32] 0;
-    sh.sh_addr = ~ @[u32] 0;
-    sh.sh_offset = ~sym_strtab_offset;
-    sh.sh_size = ~sym_strtab_size;
-    sh.sh_link = ~ @[u32] 0;
-    sh.sh_info = ~ @[u32] 0;
-    sh.sh_addralign = ~ @[u32] 0;
-    sh.sh_entsize = ~ @[u32] 0;
+    sh.sh_name = to_le! dot_strtab_index;
+    sh.sh_type = to_le! kSHT_STRTAB;
+    sh.sh_flags = to_le! @[u32] 0;
+    sh.sh_addr = to_le! @[u32] 0;
+    sh.sh_offset = to_le! sym_strtab_offset;
+    sh.sh_size = to_le! sym_strtab_size;
+    sh.sh_link = to_le! @[u32] 0;
+    sh.sh_info = to_le! @[u32] 0;
+    sh.sh_addralign = to_le! @[u32] 0;
+    sh.sh_entsize = to_le! @[u32] 0;
     append_reinterpret(&d, &sh);
   }
 
@@ -248,17 +248,17 @@ func linux32_flatten(im *identmap, f *objfile) array[u8] {
     check(kSymTabSectionNumber == 3);
     // Symbol table section header -- index 3.
     sh elf32_Section_Header;
-    sh.sh_name = ~dot_symtab_index;
-    sh.sh_type = ~kSHT_SYMTAB;
-    sh.sh_flags = ~ @[u32] 0;
-    sh.sh_addr = ~ @[u32] 0;
-    sh.sh_offset = ~symtab_offset;
-    sh.sh_size = ~symtab_size;
+    sh.sh_name = to_le! dot_symtab_index;
+    sh.sh_type = to_le! kSHT_SYMTAB;
+    sh.sh_flags = to_le! @[u32] 0;
+    sh.sh_addr = to_le! @[u32] 0;
+    sh.sh_offset = to_le! symtab_offset;
+    sh.sh_size = to_le! symtab_size;
     // The associated string table's section header index.
-    sh.sh_link = ~ @[u32] 2;
-    sh.sh_info = ~end_local_symbols;
-    sh.sh_addralign = ~ @[u32] 0;
-    sh.sh_entsize = ~ @[u32] ~sizeof@[elf32_Symtab_Entry];
+    sh.sh_link = to_le! @[u32] 2;
+    sh.sh_info = to_le! end_local_symbols;
+    sh.sh_addralign = to_le! @[u32] 0;
+    sh.sh_entsize = to_le! @[u32] ~sizeof@[elf32_Symtab_Entry];
     append_reinterpret(&d, &sh);
   }
 
@@ -314,7 +314,7 @@ func linux32_append_relocations_and_mutate_section(sti_map *array[u32], d *array
   for i size = 0; i < nrelocs; i = i + 1 {
     reloc *objfile_relocation = ref(&s->relocs, i);
     rel elf32_Rel;
-    rel.r_offset = ~reloc->virtual_address;
+    rel.r_offset = to_le! reloc->virtual_address;
     sti u32 = reloc->symbol_table_index.x;
     new_sti u32 = get(sti_map, ~sti);
     check(new_sti <= (@[u32]0xFFFFFFFF >> 8));
@@ -323,14 +323,14 @@ func linux32_append_relocations_and_mutate_section(sti_map *array[u32], d *array
     switch reloc->type {
     case Dir32:
       rel_type = kR_386_32;
-      addend_le = ~ @[i32] 0;
+      addend_le = to_le! @[i32] 0;
     case Rel32:
       rel_type = kR_386_PC32;
-      addend_le = ~ - @[i32] 4;  // (There's a negative sign!)
+      addend_le = to_le! - @[i32] 4;  // (There's a negative sign!)
     case Diff32:
       crash(_u8("linux sees Diff32 reloc"));
     }
-    rel.r_info = ~((new_sti << 8) | rel_type);
+    rel.r_info = to_le! ((new_sti << 8) | rel_type);
     append_reinterpret(d, &rel);
 
     overwrite_raw(&s->raw, ~ @[u32] ~rel.r_offset, ixcast(&addend_le.buf[0]), sizeof@[le_i32]);
@@ -350,27 +350,27 @@ func linux32_section_headers(prev_end_offset u32, sh_out_index u32, s *objfile_s
   sh_size u32 = ~count(&s->raw);
   sh_end u32 = sh_offset + sh_size;
 
-  rel_out->sh_name = ~sh_strtab_rel_index;
-  rel_out->sh_type = ~kSHT_REL;
-  rel_out->sh_flags = ~ @[u32] 0;
-  rel_out->sh_addr = ~ @[u32] 0;
-  rel_out->sh_offset = ~rel_offset;
-  rel_out->sh_size = ~rel_size;
-  rel_out->sh_link = ~kSymTabSectionNumber;
-  rel_out->sh_info = ~sh_out_index;
-  rel_out->sh_addralign = ~ @[u32] 0;
-  rel_out->sh_entsize = ~ @[u32] ~sizeof@[elf32_Rel];
+  rel_out->sh_name = to_le! sh_strtab_rel_index;
+  rel_out->sh_type = to_le! kSHT_REL;
+  rel_out->sh_flags = to_le! @[u32] 0;
+  rel_out->sh_addr = to_le! @[u32] 0;
+  rel_out->sh_offset = to_le! rel_offset;
+  rel_out->sh_size = to_le! rel_size;
+  rel_out->sh_link = to_le! kSymTabSectionNumber;
+  rel_out->sh_info = to_le! sh_out_index;
+  rel_out->sh_addralign = to_le! @[u32] 0;
+  rel_out->sh_entsize = to_le! @[u32] ~sizeof@[elf32_Rel];
 
-  sh_out->sh_name = ~sh_strtab_index;
-  sh_out->sh_type = ~kSHT_PROGBITS;
-  sh_out->sh_flags = ~(kSHF_ALLOC | sh_flags);
-  sh_out->sh_addr = ~ @[u32] 0;
-  sh_out->sh_offset = ~sh_offset;
-  sh_out->sh_size = ~sh_size;
-  sh_out->sh_link = ~kSHN_UNDEF;
-  sh_out->sh_info = ~ @[u32] 0;
-  sh_out->sh_addralign = ~sh_alignment;
-  sh_out->sh_entsize = ~ @[u32] 0;
+  sh_out->sh_name = to_le! sh_strtab_index;
+  sh_out->sh_type = to_le! kSHT_PROGBITS;
+  sh_out->sh_flags = to_le! (kSHF_ALLOC | sh_flags);
+  sh_out->sh_addr = to_le! @[u32] 0;
+  sh_out->sh_offset = to_le! sh_offset;
+  sh_out->sh_size = to_le! sh_size;
+  sh_out->sh_link = to_le! kSHN_UNDEF;
+  sh_out->sh_info = to_le! @[u32] 0;
+  sh_out->sh_addralign = to_le! sh_alignment;
+  sh_out->sh_entsize = to_le! @[u32] 0;
 
   *end_out = sh_end;
 }
@@ -389,12 +389,12 @@ func linux32_write_symbols_and_strings(im *identmap, f *objfile,
 
   if true {
     ent elf32_Symtab_Entry;
-    ent.st_name = ~ @[u32] 0;
-    ent.st_value = ~ @[u32] 0;
-    ent.st_size = ~ @[u32] 0;
+    ent.st_name = to_le! @[u32] 0;
+    ent.st_value = to_le! @[u32] 0;
+    ent.st_size = to_le! @[u32] 0;
     ent.st_info = 0;
     ent.st_other = 0;
-    ent.st_shndx = ~ @[u16] ~ kSHN_UNDEF;
+    ent.st_shndx = to_le! @[u16] ~ kSHN_UNDEF;
     append_reinterpret(&symbols, &ent);
     symbols_count = symbols_count + 1;
   }
@@ -435,29 +435,29 @@ func push_symbol(im *identmap, symbol *objfile_symbol_record, symbols *array[u8]
   name_buf string = lookup(im, name);
 
   offset u32 = strtab_add(strings, zeroless_string_to_u8symbol(&name_buf));
-  ent.st_name = ~offset;
-  ent.st_value = ~symbol->value;
+  ent.st_name = to_le! offset;
+  ent.st_value = to_le! symbol->value;
   // TODO: (Also in s1:) It's OK to just use zero for everything?
-  ent.st_size = ~ @[u32] 0;
+  ent.st_size = to_le! @[u32] 0;
   st_info u8;
   if case IsFunctionYes = symbol->is_function {
-    st_info = ~kSTT_FUNC;
+    st_info = kSTT_FUNC;
   } else {
-    st_info = ~kSTT_OBJECT;
+    st_info = kSTT_OBJECT;
   }
   if case IsStaticYes = symbol->is_static {
-    st_info = st_info | ~(kSTB_LOCAL << 4);
+    st_info = st_info | (kSTB_LOCAL << 4);
   } else {
-    st_info = st_info | ~(kSTB_GLOBAL << 4);
+    st_info = st_info | (kSTB_GLOBAL << 4);
   }
   ent.st_info = st_info;
   ent.st_other = 0;
 
   switch symbol->section {
-  case SymbolSectionUndefined: ent.st_shndx = ~ @[u16] ~kSHN_UNDEF;
-  case SymbolSectionData: ent.st_shndx = ~ @[u16] ~kLinux32DataSectionNumber;
-  case SymbolSectionRdata: ent.st_shndx = ~ @[u16] ~kLinux32RodataSectionNumber;
-  case SymbolSectionText: ent.st_shndx = ~ @[u16] ~kLinux32TextSectionNumber;
+  case SymbolSectionUndefined: ent.st_shndx = to_le! @[u16] ~kSHN_UNDEF;
+  case SymbolSectionData: ent.st_shndx = to_le! @[u16] ~kLinux32DataSectionNumber;
+  case SymbolSectionRdata: ent.st_shndx = to_le! @[u16] ~kLinux32RodataSectionNumber;
+  case SymbolSectionText: ent.st_shndx = to_le! @[u16] ~kLinux32TextSectionNumber;
   }
 
   append_reinterpret(symbols, &ent);
