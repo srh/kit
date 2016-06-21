@@ -443,16 +443,9 @@ func x86_neg_w32(f *objfile, dest u8) void {
   appendtext(f, 0xF7, mrr(MOD11, 3, dest));
 }
 
-func x86_sub_w32(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x29, mrr(MOD11, src, dest));
-}
-
-func x86_sub_w16(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x66, @[u8]0x29, mrr(MOD11, src, dest));
-}
-
-func x86_sub_w8(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x28, mrr(MOD11, src, dest));
+func x86_sub(f *objfile, dest u8, src u8, oz oz) void {
+  x86_prefix(f, 0x29, oz);
+  appendtext(f, mrr(MOD11, src, dest));
 }
 
 func x86_setcc_b8(f *objfile, dest u8, setcc_code u8) void {

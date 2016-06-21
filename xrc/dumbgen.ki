@@ -1090,15 +1090,7 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
         x86_gen_crash_jcc(f, h, x86_repr_overflow_code(b.op_numtraits.repr));
       }
     case NumSub:
-      if b.op_size == 1 {
-        x86_sub_w8(f, X86_EAX, X86_ECX);
-      } else if b.op_size == 2 {
-        x86_sub_w16(f, X86_EAX, X86_ECX);
-      } else if b.op_size == 4 {
-        x86_sub_w32(f, X86_EAX, X86_ECX);
-      } else {
-        ice(_u8("NumSub bad size"));
-      }
+      x86_sub(f, X86_EAX, X86_ECX, x86_opsize_oz(b.op_size));
       if b.op_numtraits.trap_overflow {
         x86_gen_crash_jcc(f, h, x86_repr_overflow_code(b.op_numtraits.repr));
       }
