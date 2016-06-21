@@ -691,7 +691,7 @@ func universal_cc_write_to_retcell(f *objfile, h *frame, c cell_num) void {
   if retsize <= 4 {
     x86_store32_partial_destructively(f, dest_addr, dest_disp, X86_EAX, retsize);
   } else if retsize <= 8 {
-    // TODO: This should not even be theoretically reachable on Linux32.
+    check(h->cs->plat.opsys != Linux32);
     x86_store32(f, dest_addr, dest_disp, X86_EAX);
     x86_store32_partial_destructively(f, dest_addr, dest_disp + 4, X86_EDX, retsize - 4);
   } else {
