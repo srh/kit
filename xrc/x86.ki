@@ -549,7 +549,7 @@ func as_imm8(x u16) opt[u8] {
 
 func as_imm8(x u32) opt[u8] {
   if x <= 127 {
-    return Has(~ (x & 0xFF));
+    return Has(~x);
   } else {
     return None;
   }
