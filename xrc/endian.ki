@@ -1,15 +1,15 @@
 // You should probably use to_le! instead of `~`.
-inline func to_le(n u32) le_u32 { return ~n; }
-inline func to_le(n i32) le_i32 { return ~n; }
-inline func to_le(n i16) le_i16 { return ~n; }
-inline func to_le(n u16) le_u16 { return ~n; }
+inline func `~`(n u32) le_u32 { return to_le(n); }
+inline func `~`(n i32) le_i32 { return to_le(n); }
+inline func `~`(n i16) le_i16 { return to_le(n); }
+inline func `~`(n u16) le_u16 { return to_le(n); }
 
 
 struct le_u32 {
   buf ^[4]u8;
 }
 
-func `~`(x u32) le_u32 {
+func to_le(x u32) le_u32 {
   ret le_u32;
   write_le_u32(ixcast(&ret.buf[0]), x);
   return ret;
@@ -31,7 +31,7 @@ struct le_i32 {
   buf ^[4]u8;
 }
 
-func `~`(x i32) le_i32 {
+func to_le(x i32) le_i32 {
   ret le_i32;
   write_le_i32(ixcast(&ret.buf[0]), x);
   return ret;
@@ -48,7 +48,7 @@ struct le_u16 {
   buf ^[2]u8;
 }
 
-func `~`(x u16) le_u16 {
+func to_le(x u16) le_u16 {
   ret le_u16;
   write_le_u16(ixcast(&ret.buf[0]), x);
   return ret;
@@ -63,7 +63,7 @@ struct le_i16 {
   buf ^[2]u8;
 }
 
-func `~`(x i16) le_i16 {
+func to_le(x i16) le_i16 {
   ret le_i16;
   write_le_i16(ixcast(&ret.buf[0]), x);
   return ret;
