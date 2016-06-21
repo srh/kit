@@ -1,6 +1,6 @@
 import objfile;
 
-def IMAGE_FILE_MACHINE_I386 u32 = 0x14c;
+def IMAGE_FILE_MACHINE_I386 u16 = 0x14c;
 def kFakeTimeDateStamp u32 = 12345;
 
 struct COFF_Header {
@@ -59,7 +59,7 @@ func real_file_characteristics() u16 {
   */
 
   /* cl outputs 0 for a general .obj file too. */
-  return ~ @[u32] 0;
+  return 0;
 }
 
 def IMAGE_SCN_CNT_CODE u32 = (1 << 5);
@@ -262,7 +262,7 @@ func win_flatten(im *identmap, f *objfile) array[u8] {
   if true {
     h COFF_Header;
     check(~sizeof@[COFF_Header] == COFF_Header_EXPECTED_SIZE);
-    h.Machine = ~ @[u16] ~IMAGE_FILE_MACHINE_I386;
+    h.Machine = ~IMAGE_FILE_MACHINE_I386;
     h.NumberOfSections = ~ @[u16] ~kNumberOfSections;
     h.TimeDateStamp = ~kFakeTimeDateStamp;
     h.PointerToSymbolTable = ~end_of_section_headers;
