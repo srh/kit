@@ -263,13 +263,13 @@ func win_flatten(im *identmap, f *objfile) array[u8] {
     h COFF_Header;
     check(~sizeof@[COFF_Header] == COFF_Header_EXPECTED_SIZE);
     h.Machine = ~IMAGE_FILE_MACHINE_I386;
-    h.NumberOfSections = ~ @[u16] ~kNumberOfSections;
+    h.NumberOfSections = to_le! @[u16] ~kNumberOfSections;
     h.TimeDateStamp = ~kFakeTimeDateStamp;
     h.PointerToSymbolTable = ~end_of_section_headers;
     h.NumberOfSymbols = ~win_symbols_to_write(f);
     // Should be zero for an object file.
-    h.SizeOfOptionalHeader = ~ @[u16] 0;
-    h.Characteristics = ~ real_file_characteristics();
+    h.SizeOfOptionalHeader = to_le! @[u16] 0;
+    h.Characteristics = to_le! real_file_characteristics();
     append_reinterpret(&d, &h);
   }
 
@@ -318,8 +318,8 @@ func win_flatten(im *identmap, f *objfile) array[u8] {
   return d;
 }
 
-def IMAGE_REL_I386_DIR32 u32 = 0x0006;
-def IMAGE_REL_I386_REL32 u32 = 0x0014;
+def IMAGE_REL_I386_DIR32 u16 = 0x0006;
+def IMAGE_REL_I386_REL32 u16 = 0x0014;
 
 func win_append_relocs(d *array[u8], relocs *array[objfile_relocation]) void {
   nrelocs size = count(relocs);
@@ -330,9 +330,9 @@ func win_append_relocs(d *array[u8], relocs *array[objfile_relocation]) void {
     coff_reloc.SymbolTableIndex = ~reloc->symbol_table_index.x;
     switch reloc->type {
     case Dir32:
-      coff_reloc.Type = ~ @[u16] ~IMAGE_REL_I386_DIR32;
+      coff_reloc.Type = to_le! IMAGE_REL_I386_DIR32;
     case Rel32:
-      coff_reloc.Type = ~ @[u16] ~IMAGE_REL_I386_REL32;
+      coff_reloc.Type = to_le! IMAGE_REL_I386_REL32;
     case Diff32:
       crash(_u8("win32 sees Diff32 reloc"));
     }
@@ -352,16 +352,16 @@ func win_write_section_header(d *array[u8], s *objfile_section, name array[u8], 
   fill(ixcast(&h.Name[0]), 8, 0);
   bufcopy(ixcast(&h.Name[0]), data(&name), name_len);
   // Should be set to zero for object files.
-  h.VirtualSize = ~ @[u32] 0;
+  h.VirtualSize = to_le! @[u32] 0;
   // For simplicity, should be set to zero for object files.
-  h.VirtualAddress = ~ @[u32] 0;
-  h.SizeOfRawData = ~ @[u32] ~count(&s->raw);
+  h.VirtualAddress = to_le! @[u32] 0;
+  h.SizeOfRawData = to_le! @[u32] ~count(&s->raw);
   h.PointerToRawData = ~start_of_raw;
   h.PointerToRelocations = ~PointerToRelocations;
   // We output no COFF line numbers.
-  h.PointerToLineNumbers = ~ @[u32] 0;
+  h.PointerToLineNumbers = to_le! @[u32] 0;
   h.NumberOfRelocations = ~objfile_section_small_relocations_count(s);
-  h.NumberOfLineNumbers = ~ @[u16] 0;
+  h.NumberOfLineNumbers = to_le! @[u16] 0;
   h.Characteristics = ~Characteristics;
 
   append_reinterpret(d, &h);
@@ -402,34 +402,34 @@ func win_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *array[
       /* The offset includes the leading 4 bytes -- the minimimum
          possible offset is 4. */
       offset u32 = strtab_add(&strings, nameu8);
-      standard.Name.u.LongName.Zeroes = ~ @[u32] 0;
-      standard.Name.u.LongName.Offset = ~ offset;
+      standard.Name.u.LongName.Zeroes = to_le! @[u32] 0;
+      standard.Name.u.LongName.Offset = to_le! offset;
     }
 
     standard.Value = ~rec->value;
     switch rec->section {
     case SymbolSectionUndefined:
-      standard.SectionNumber = ~ @[u16] ~IMAGE_SYM_UNDEFINED;
+      standard.SectionNumber = to_le! IMAGE_SYM_UNDEFINED;
     case SymbolSectionData:
-      standard.SectionNumber = ~ @[u16] ~kWinDataSectionNumber;
+      standard.SectionNumber = to_le! kWinDataSectionNumber;
     case SymbolSectionRdata:
-      standard.SectionNumber = ~ @[u16] ~kWinRdataSectionNumber;
+      standard.SectionNumber = to_le! kWinRdataSectionNumber;
     case SymbolSectionText:
-      standard.SectionNumber = ~ @[u16] ~kWinTextSectionNumber;
+      standard.SectionNumber = to_le! kWinTextSectionNumber;
     }
 
     switch rec->is_function {
     case IsFunctionNo:
-      standard.Type = ~ @[u16] ~kNullSymType;
+      standard.Type = to_le! kNullSymType;
     case IsFunctionYes:
-      standard.Type = ~ @[u16] ~kFunctionSymType;
+      standard.Type = to_le! kFunctionSymType;
     }
 
     switch rec->is_static {
     case IsStaticNo:
-      standard.StorageClass = ~ @[u16] ~IMAGE_SYM_CLASS_EXTERNAL;
+      standard.StorageClass = IMAGE_SYM_CLASS_EXTERNAL;
     case IsStaticYes:
-      standard.StorageClass = ~ @[u16] ~IMAGE_SYM_CLASS_STATIC;
+      standard.StorageClass = IMAGE_SYM_CLASS_STATIC;
     }
     standard.NumberOfAuxSymbols = 0;
     append_reinterpret(&symbols, &standard);
@@ -437,27 +437,27 @@ func win_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *array[
 
   win_append_all_section_symbols(&symbols, f);
 
-  strings_size_le le_u32 = ~ @[u32] ~count(&strings);
+  strings_size_le le_u32 = to_le! @[u32] ~count(&strings);
   overwrite_raw(&strings, 0, ixcast(&strings_size_le.buf[0]), 4);
 
   *symbols_out = symbols;
   *strings_out = strings;
 }
 
-def IMAGE_SYM_UNDEFINED u32 = 0;
+def IMAGE_SYM_UNDEFINED u16 = 0;
 def IMAGE_SYM_CLASS_EXTERNAL u8 = 2;
 def IMAGE_SYM_CLASS_STATIC u8 = 3;
-def kNullSymType u32 = 0;
-def kFunctionSymType u32 = 0x20;
+def kNullSymType u16 = 0;
+def kFunctionSymType u16 = 0x20;
 
-def kWinDataSectionNumber u32 = 1;
-def kWinRdataSectionNumber u32 = 2;
-def kWinTextSectionNumber u32 = 3;
+def kWinDataSectionNumber u16 = 1;
+def kWinRdataSectionNumber u16 = 2;
+def kWinTextSectionNumber u16 = 3;
 
 func win_append_all_section_symbols(d *array[u8], f *objfile) void {
-  win_append_section_symbols(d, &f->data, _u8(".data"), ~kWinDataSectionNumber);
-  win_append_section_symbols(d, &f->rdata, _u8(".rdata"), ~kWinRdataSectionNumber);
-  win_append_section_symbols(d, &f->text, _u8(".text"), ~kWinTextSectionNumber);
+  win_append_section_symbols(d, &f->data, _u8(".data"), kWinDataSectionNumber);
+  win_append_section_symbols(d, &f->rdata, _u8(".rdata"), kWinRdataSectionNumber);
+  win_append_section_symbols(d, &f->text, _u8(".text"), kWinTextSectionNumber);
 }
 
 func win_append_section_symbols(d *array[u8], s *objfile_section, name array[u8], SectionNumber u16) void {
@@ -466,20 +466,20 @@ func win_append_section_symbols(d *array[u8], s *objfile_section, name array[u8]
     check(count(&name) <= 8);
     fill(ixcast(&standard.Name.u.ShortName[0]), 8, 0);
     bufcopy(ixcast(&standard.Name.u.ShortName[0]), data(&name), count(&name));
-    standard.Value = ~ @[u32] 0;
-    standard.SectionNumber = ~ SectionNumber;
-    standard.Type = ~ @[u16] 0;
+    standard.Value = to_le! @[u32] 0;
+    standard.SectionNumber = to_le! SectionNumber;
+    standard.Type = to_le! @[u16] 0;
     standard.StorageClass = IMAGE_SYM_CLASS_STATIC;
     standard.NumberOfAuxSymbols = 1;
     append_reinterpret(d, &standard);
   }
   if true {
     aux_sectiondef COFF_symbol_aux_sectiondef;
-    aux_sectiondef.Length = ~ @[u32]~count(&s->raw);
+    aux_sectiondef.Length = to_le! @[u32]~count(&s->raw);
     aux_sectiondef.NumberOfRelocations = ~objfile_section_small_relocations_count(s);
-    aux_sectiondef.NumberOfLineNumbers = ~ @[u16] 0;
-    aux_sectiondef.CheckSum = ~ @[u32] 0;
-    aux_sectiondef.Number = ~ @[u16] 0;
+    aux_sectiondef.NumberOfLineNumbers = to_le! @[u16] 0;
+    aux_sectiondef.CheckSum = to_le! @[u32] 0;
+    aux_sectiondef.Number = to_le! @[u16] 0;
     aux_sectiondef.Selection = 0;
     // TODO: Assert that aux_sectiondef.Unused has size 3.
     fill(ixcast(&aux_sectiondef.Unused[0]), 3, 0);
