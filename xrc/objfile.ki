@@ -93,7 +93,7 @@ func append_rel32(s *objfile_section, sti sti) void {
 func append_32bit_reloc(s *objfile_section, sti sti, type objfile_relocation_type) void {
   reloc objfile_relocation = {~count(&s->raw), sti, 0, type};
   push(&s->relocs, reloc);
-  zero le_u32 = ~ @[u32] 0;
+  zero le_u32 = to_le! @[u32] 0;
   append_raw(s, ixcast(&zero.buf[0]), 4);
 }
 

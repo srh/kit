@@ -262,11 +262,11 @@ func win_flatten(im *identmap, f *objfile) array[u8] {
   if true {
     h COFF_Header;
     check(~sizeof@[COFF_Header] == COFF_Header_EXPECTED_SIZE);
-    h.Machine = ~IMAGE_FILE_MACHINE_I386;
+    h.Machine = to_le! IMAGE_FILE_MACHINE_I386;
     h.NumberOfSections = to_le! @[u16] ~kNumberOfSections;
-    h.TimeDateStamp = ~kFakeTimeDateStamp;
-    h.PointerToSymbolTable = ~end_of_section_headers;
-    h.NumberOfSymbols = ~win_symbols_to_write(f);
+    h.TimeDateStamp = to_le! kFakeTimeDateStamp;
+    h.PointerToSymbolTable = to_le! end_of_section_headers;
+    h.NumberOfSymbols = to_le! win_symbols_to_write(f);
     // Should be zero for an object file.
     h.SizeOfOptionalHeader = to_le! @[u16] 0;
     h.Characteristics = to_le! real_file_characteristics();
@@ -326,8 +326,8 @@ func win_append_relocs(d *array[u8], relocs *array[objfile_relocation]) void {
   for i size = 0; i < nrelocs; i = i + 1 {
     reloc *objfile_relocation = ref(relocs, i);
     coff_reloc COFF_Relocation;
-    coff_reloc.VirtualAddress = ~reloc->virtual_address;
-    coff_reloc.SymbolTableIndex = ~reloc->symbol_table_index.x;
+    coff_reloc.VirtualAddress = to_le! reloc->virtual_address;
+    coff_reloc.SymbolTableIndex = to_le! reloc->symbol_table_index.x;
     switch reloc->type {
     case Dir32:
       coff_reloc.Type = to_le! IMAGE_REL_I386_DIR32;
@@ -356,13 +356,13 @@ func win_write_section_header(d *array[u8], s *objfile_section, name array[u8], 
   // For simplicity, should be set to zero for object files.
   h.VirtualAddress = to_le! @[u32] 0;
   h.SizeOfRawData = to_le! @[u32] ~count(&s->raw);
-  h.PointerToRawData = ~start_of_raw;
-  h.PointerToRelocations = ~PointerToRelocations;
+  h.PointerToRawData = to_le! start_of_raw;
+  h.PointerToRelocations = to_le! PointerToRelocations;
   // We output no COFF line numbers.
   h.PointerToLineNumbers = to_le! @[u32] 0;
-  h.NumberOfRelocations = ~objfile_section_small_relocations_count(s);
+  h.NumberOfRelocations = to_le! objfile_section_small_relocations_count(s);
   h.NumberOfLineNumbers = to_le! @[u16] 0;
-  h.Characteristics = ~Characteristics;
+  h.Characteristics = to_le! Characteristics;
 
   append_reinterpret(d, &h);
 }
@@ -406,7 +406,7 @@ func win_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *array[
       standard.Name.u.LongName.Offset = to_le! offset;
     }
 
-    standard.Value = ~rec->value;
+    standard.Value = to_le! rec->value;
     switch rec->section {
     case SymbolSectionUndefined:
       standard.SectionNumber = to_le! IMAGE_SYM_UNDEFINED;
@@ -476,7 +476,7 @@ func win_append_section_symbols(d *array[u8], s *objfile_section, name array[u8]
   if true {
     aux_sectiondef COFF_symbol_aux_sectiondef;
     aux_sectiondef.Length = to_le! @[u32]~count(&s->raw);
-    aux_sectiondef.NumberOfRelocations = ~objfile_section_small_relocations_count(s);
+    aux_sectiondef.NumberOfRelocations = to_le! objfile_section_small_relocations_count(s);
     aux_sectiondef.NumberOfLineNumbers = to_le! @[u16] 0;
     aux_sectiondef.CheckSum = to_le! @[u32] 0;
     aux_sectiondef.Number = to_le! @[u16] 0;

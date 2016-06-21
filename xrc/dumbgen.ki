@@ -674,7 +674,7 @@ func dumbly_gen_function_exit(f *objfile, h *frame) void {
       p *jmpdata = ref(&h->placeholder_jumps, i);
       target u32 = *un(ref(&h->jmp_targets, p->target.x));
       diff i32 = @[i32]~target - @[i32]~p->relative_mathpoint;
-      le le_i32 = ~diff;
+      le le_i32 = to_le! diff;
       overwrite_raw(&f->text, ~p->overwrite_location, ixcast(&le.buf[0]), 4);
     }
   }
