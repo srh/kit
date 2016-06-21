@@ -466,9 +466,13 @@ func osx32_flatten(im *identmap, f *objfile) array[u8] {
   append_to_alignment(&d, ~segment_filealign, 0);
   check(~count(&d) == segment_fileoff);
   check(~count(&d) == text_offset);
+
+  // The .text section should be a multiple of 16 in length, because
+  // we append fillercode after the last function.
   append(&d, &f->text.raw);
-  // TODO: Assert that f->text is already to this alignment (pad after funcs in codegen).
-  // TODO: This should be 0xCC?  No, do the assertion.
+  check(count(&f->text.raw) % 16 == 0);
+  check(count(&d) % 16 == 0);
+
   append_to_alignment(&d, ~text_align, 0);
   append_to_alignment(&d, ~rdata_align, 0);
 

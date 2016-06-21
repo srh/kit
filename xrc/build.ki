@@ -57,6 +57,8 @@ func build_fn_bodies(cs *checkstate, f *objfile) np {
     ent *fn_body_entry = oo(ref(&cs->fn_bodies, i));
     #build_fn_body(cs, f, ent);
   }
+  // We pad after the last func so that .text is alignod to 16-byte.
+  fillercode_align_double_quadword(f);
   return NoFail;
 }
 
