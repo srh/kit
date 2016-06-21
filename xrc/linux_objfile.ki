@@ -285,24 +285,24 @@ func linux32_flatten(im *identmap, f *objfile) array[u8] {
   append(&d, &symbols);
   check(~count(&d) == symtab_end);
   append_to_alignment(&d, ~kRel_Section_Alignment, 0);
-  check(~count(&d) == ~sh_rel_data.sh_offset);
+  check(~count(&d) == from_le! sh_rel_data.sh_offset);
   linux32_append_relocations_and_mutate_section(&sti_map, &d, &f->data);
   append_to_alignment(&d, ~f->data.max_requested_alignment, 0);
-  check(~count(&d) == ~sh_data.sh_offset);
+  check(~count(&d) == from_le! sh_data.sh_offset);
   append(&d, &f->data.raw);
 
   append_to_alignment(&d, ~kRel_Section_Alignment, 0);
-  check(~count(&d) == ~sh_rel_rodata.sh_offset);
+  check(~count(&d) == from_le! sh_rel_rodata.sh_offset);
   linux32_append_relocations_and_mutate_section(&sti_map, &d, &f->rdata);
   append_to_alignment(&d, ~f->rdata.max_requested_alignment, 0);
-  check(~count(&d) == ~sh_rodata.sh_offset);
+  check(~count(&d) == from_le! sh_rodata.sh_offset);
   append(&d, &f->rdata.raw);
 
   append_to_alignment(&d, ~kRel_Section_Alignment, 0);
-  check(~count(&d) == ~sh_rel_text.sh_offset);
+  check(~count(&d) == from_le! sh_rel_text.sh_offset);
   linux32_append_relocations_and_mutate_section(&sti_map, &d, &f->text);
   append_to_alignment(&d, ~f->text.max_requested_alignment, 0);
-  check(~count(&d) == ~sh_text.sh_offset);
+  check(~count(&d) == from_le! sh_text.sh_offset);
   append(&d, &f->text.raw);
 
   return d;
@@ -333,7 +333,7 @@ func linux32_append_relocations_and_mutate_section(sti_map *array[u32], d *array
     rel.r_info = to_le! ((new_sti << 8) | rel_type);
     append_reinterpret(d, &rel);
 
-    overwrite_raw(&s->raw, ~ @[u32] ~rel.r_offset, ixcast(&addend_le.buf[0]), sizeof@[le_i32]);
+    overwrite_raw(&s->raw, ~ @[u32] from_le! rel.r_offset, ixcast(&addend_le.buf[0]), sizeof@[le_i32]);
   }
 }
 

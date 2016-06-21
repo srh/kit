@@ -16,7 +16,7 @@ func write_le_u32(dest * ^[0]u8, x u32) void {
   dest[3] = ~ ((x >> 24) & 0xFF);
 }
 
-func `~`(x le_u32) u32 {
+func from_le(x le_u32) u32 {
   ret u32 = ((~x.buf[0] | (@[u32]~x.buf[1] << 8)) | (@[u32]~x.buf[2] << 16)) | (@[u32]~x.buf[3] << 24);
   return ret;
 }
