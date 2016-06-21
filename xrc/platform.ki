@@ -61,6 +61,9 @@ enum platform_os {
   Osx32 void;
 }
 
+func `==`(x platform_os, y platform_os) bool { return enumnum(&x) == enumnum(&y); }
+func `!=`(x platform_os, y platform_os) bool { return enumnum(&x) != enumnum(&y); }
+
 enum universal_calling_convention {
   UniversalCdeclConvention void;
 }

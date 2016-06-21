@@ -641,7 +641,7 @@ func dumbly_gen_function_exit(f *objfile, h *frame) void {
       if retsize <= 4 {
         x86_load32_zeroextend(f, X86_EAX, X86_EBP, loc, retsize);
       } else if retsize <= 8 {
-        // TODO: This should not even be theoretically reachable on Linux32.
+        check(h->cs->plat.opsys != Linux32);
         x86_load32(f, X86_EAX, X86_EBP, loc);
         x86_load32_zeroextend(f, X86_EDX, X86_EBP, loc + 4, retsize - 4);
       } else {
