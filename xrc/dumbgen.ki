@@ -991,7 +991,7 @@ func x86_gen_write_data(f *objfile, h *frame, dest_addr u8, dest_disp i32, words
     return;
   }
 
-  // TODO: We assume (in terms of the optimality of this code) that dest_addr+dest_disp is
+  // NOTE: We assume (in terms of the optimality of this code) that dest_addr+dest_disp is
   // aligned modulo 4.
 
   i u32 = begin;
