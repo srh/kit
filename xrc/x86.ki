@@ -276,16 +276,42 @@ func x86_add_esp_i32(f *objfile, x i32) void {
   }
 }
 
-func x86_add_w32(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x01, mrr(MOD11, src, dest));
+enum oz {
+  OZ_8 void;
+  OZ_16 void;
+  OZ_32 void;
 }
 
-func x86_add_w16(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x66, @[u8]0x01, mrr(MOD11, src, dest));
+func x86_prefix(f *objfile, opnum u8, oz oz) void {
+  check((opnum & 1) == 1);
+  switch oz {
+  case OZ_8:
+    appendtext(f, opnum ^ 1);
+    return;
+  case OZ_16:
+    appendtext(f, 0x66);
+  case OZ_32:
+    void;
+  }
+  appendtext(f, opnum);
 }
 
-func x86_add_w8(f *objfile, dest u8, src u8) void {
-  appendtext(f, 0x00, mrr(MOD11, src, dest));
+func x86_opsize_oz(op_size u32) oz {
+  if op_size == 4 {
+    return OZ_32;
+  } else if op_size == 1 {
+    return OZ_8;
+  } else if op_size == 2 {
+    return OZ_16;
+  } else {
+    ice(_u8("opsize_oz bad size"));
+    return fake();
+  }
+}
+
+func x86_add(f *objfile, dest u8, src u8, oz oz) void {
+  x86_prefix(f, 0x01, oz);
+  appendtext(f, mrr(MOD11, src, dest));
 }
 
 func x86_eaxedx_mul_w32(f *objfile, src u8) void {
