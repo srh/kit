@@ -2,6 +2,9 @@ import stdlib;
 import hash;
 import kitutil;
 
+// See "struct celltrack" -- tracks whether a cell is "active" at a given point
+// in control flow.
+
 struct cell_num { x size; }
 
 def `~` fn[size, cell_num] = wrapconvert;
