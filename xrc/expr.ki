@@ -829,19 +829,6 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   return NoFail;
 }
 
-// Makes a miscellaneous ipse.
-func misc_ipse(es *framescope, oftype cu_typeexpr) te_typeexpr {
-  n sym = intern(es->im, _s("$frame_") + from_u8(to_u8str(void, es->ipse_gen_counter)));
-  es->ipse_gen_counter++;
-  scope_add(&es->tscope, n, oftype);
-  return TeIpse({n});
-}
-
-// Rvalues' ipses are generally created with this.
-func unnamed_ipse(es *framescope, oftype cu_typeexpr) te_typeexpr {
-  return misc_ipse(es, oftype);
-}
-
 func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr, x *ast_expr) np {
   unknown te_typeexpr = TeUnknown;
   #check_expr_ai(es, AllowIncompleteNo, oo(&a->lhs), &unknown);
