@@ -45,7 +45,6 @@ func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
         return false;
       }
       up->tys[ix] = unified;
-      up->dirty[ix] |= info.updated;
       *unified_out = TeName({a.value, None});
       return true;
     } else {
@@ -140,33 +139,6 @@ func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
       return false;
     }
 
-  case &TeIpse(a te_ipse):
-    // NOTE: I mimicked the TeName case, and haven't fully thought out how that would
-    // affect this function's callers, so treat this code with skepticism.
-    if case &TeIpse(pa te_ipse) = pt {
-      // NOTE: Beware scopage, as with TeName, when that becomes a factor.
-      if a.name != pa.name {
-        a_oftype cu_typeexpr = scope_lookup(scope, a.name);
-        pa_oftype cu_typeexpr = scope_lookup(scope, pa.name);
-        // If a.name isn't in "names", it cannot have an oftype that references "names".  So we can just use unify_types.  I mean generally a cu_typeexpr can't reference "names", so if they types share the same local scope, ditto, we already replaced its generics and cac'd the oftype.
-
-        info unify_information = mk_fresh_info();
-        unified_oftype_discard te_typeexpr;
-        if !unify_types(scope, &a_oftype.x, &pa_oftype.x, &info, &unified_oftype_discard) {
-          return false;
-        }
-        // we're unifying complete types just to check equivalence.
-        check(!info.updated);
-      } else {
-        // Just to assert the scope actually has the name.
-        discard cu_typeexpr = scope_lookup(scope, a.name);
-      }
-      *unified_out = TeIpse({a.name});
-      return true;
-    } else {
-      return false;
-    }
-
   case &TeUnknown:
     // Right now, the only callers are type_matches and unify_types.  From type_matches,
     // t is complete, and from unify_types, there are no generic names.
@@ -233,20 +205,17 @@ enum type_matches_res {
 
 struct unif_parms {
   tys shray[te_typeexpr];
-  // They _start out_ dirty -- verify_matches_oftypes de-dirties some.
-  // (The reason is, "dirty" means "consider smashing its oftype with a generic oftype" right now.  This could change later.)
-  dirty shray[bool];
 }
 
 // Makes a _copy_ of parms.
 func mk_unif_parms(parms *shray[te_typeexpr]) unif_parms {
   tmp array[te_typeexpr] = mk_copy(parms);
   n size = count(&tmp);
-  return {freeze(&tmp), repeat(n, false)};
+  return {freeze(&tmp)};
 }
 
 func mk_empty_unif_parms() unif_parms {
-  return {mk_shray(), mk_shray()};
+  return {mk_shray()};
 }
 
 // t is complete, but it references the generic names in "names", whose corresponding
@@ -265,39 +234,8 @@ func type_matches(scope *type_scope, parms *shray[te_typeexpr], pt *te_typeexpr,
   if !unify_under_generics(scope, &up, pt, names, t, &info, &unified) {
     return TypeDoesNotMatch;
   }
-  if !verify_matches_oftypes(scope, &up, names) {
-    // This does not kill match_def completely.  The reason is, it's oftypes getting smashed with other concrete types that would cause verify_matches_oftypes to fail.
-    return TypeDoesNotMatch;
-  }
   if !all_complete_computed(&up.tys).complete {
     return TypeMatchesAmbiguously;
   }
   return TypeMatchesPrecisely({up.tys});
-}
-
-func verify_matches_oftypes(scope *type_scope, up *unif_parms, names *shray[te_generik]) bool {
-  n size = count(names);
-  check(n == count(&up->tys));
-  for i size = 0; i < n; i++ {
-    if up->dirty[i] {
-      up->dirty[i] = false;
-      switch &names[i] {
-      case &TePlainGeneric(s sym):
-        if case &TeIpse(ti te_ipse) = &up->tys[i] {
-          // See (A) ^^, likewise.
-          return false;
-        }
-      }
-    }
-  }
-  return true;
-}
-
-func verify_all_plainar(p *shray[te_typeexpr]) bool {
-  foreach ty *te_typeexpr in refs(p) {
-    if case &TeIpse(ti te_ipse) = ty {
-      return false;
-    }
-  }
-  return true;
 }

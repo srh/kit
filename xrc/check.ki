@@ -459,14 +459,6 @@ func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_sc
     *out = {param.complete && isHas(&a.count), TeArraytype({a.count, emshp(param.te)})};
     return NoFail;
 
-  case &TeIpse(a te_ipse):
-    if !ipse_in_scope(scope, a.name) {
-      return ERR(_u8("Ipse '"), lookup(clq->im, a.name), _u8(" not in scope"));
-    } else {
-      *out = {true, TeIpse({a.name})};
-      return NoFail;
-    }
-
   case &TeUnknown:
     *out = {false, TeUnknown};
     return NoFail;
@@ -640,9 +632,6 @@ func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typee
       }
 
       up unif_parms = mk_unif_parms(p);
-      if !verify_matches_oftypes(scope, &up, &sh) {
-        return NotAny;
-      }
       *learned_params_out = Has(up.tys);
       return Success;
     } else {
@@ -652,10 +641,6 @@ func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typee
     // Variadics don't support ipse generics yet.
     if case Has(p *shray[te_typeexpr]) = params {
       if count(&vg.before) + count(&vg.after) <= count(p) {
-        if !verify_all_plainar(p) {
-          return NotAny;
-        }
-
         cp array[te_typeexpr] = mk_copy(p);
         *learned_params_out = Has(freeze(&cp));
         return Success;
@@ -1051,9 +1036,6 @@ func compute_complete_type_properties(clq *clqueue, scope *type_scope, t *te_typ
       ice(_u8("compute_type_properties called on incomplete arraytype."));
       return fake();
     }
-
-  case &TeIpse(a te_ipse):
-    return ERR(_u8("ICE: compute_complete_type_properties on TeIpse"));
 
   case &TeUnknown:
     ice(_u8("compute_type_properties called on incomplete type."));
@@ -1685,10 +1667,6 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
     } else {
       return {false, false};
     }
-
-  case &TeIpse(a te_ipse):
-    // Yes, I guess.
-    return {true, true};
 
   case &TeUnknown:
     return {false, false};
