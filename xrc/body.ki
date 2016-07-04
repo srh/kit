@@ -326,10 +326,7 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
   swartch_type *cu_typeexpr = expr_complete_type(&a->expr);
   checkobj_out->swartch_type = swartch_type;
   switchable_type *te_typeexpr;
-  switchable_type_ipse te_typeexpr;
-  is_deref bool = decompose_ref_or_ptr(swartch_type, es,
-                                       &switchable_type_ipse,
-                                       &switchable_type);
+  is_deref bool = decompose_ref_or_ptr(swartch_type, es, &switchable_type);
   if !is_deref {
     switchable_type = &swartch_type->x;
   }

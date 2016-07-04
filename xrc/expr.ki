@@ -804,9 +804,8 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   unknown te_typeexpr = TeUnknown;
   #check_consume_then_discard_expr(es, oo(&a->lhs), &unknown, &a->ptr_discard);
   info *ast_expr_complete_info = expr_complete_info(&oo(&a->lhs)->expr);
-  ipse te_typeexpr;
   param *te_typeexpr;
-  if !decompose_ref_or_ptr(&info->cu, es, &ipse, &param) {
+  if !decompose_ref_or_ptr(&info->cu, es, &param) {
     return ERR(_u8("Expected pointer for lhs of deref field"));
   }
   cu_param cu_typeexpr = ~ *param;
@@ -828,26 +827,6 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   }
   annotate_info(x, CompleteCheck(mk(lval, fieldtype, props, {emissions})));
   return NoFail;
-}
-
-// Not sure we use field_ipse properly(?) for rvalue fields?  Deref+indexing fields?
-func field_ipse(es *framescope, outer_ipse te_typeexpr, inner_cu cu_typeexpr) te_typeexpr {
-  return misc_ipse(es, inner_cu);
-}
-
-// This ipse's validity and presence is really conditional on a tag value, so... uh, beware?
-func enum_field_ipse(es *framescope, outer_ipse te_typeexpr, inner_cu cu_typeexpr) te_typeexpr {
-  return misc_ipse(es, inner_cu);
-}
-
-// Varnames aren't supposed to shadow, so... we have user-friendly ipse names.  (Note
-// that vars could shadow generic ipse parameters, for now, so we add the $var_
-// prefix.)
-func varname_ipse(es *framescope, name sym, oftype cu_typeexpr, scope_app *type_scope) te_typeexpr {
-  n sym = intern(es->im, _s("$var_") + lookup(es->im, name) + _s("_") + from_u8(to_u8str(es->ipse_gen_counter)));
-  es->ipse_gen_counter++;
-  scope_add(scope_app, n, oftype);
-  return TeIpse({n});
 }
 
 // Makes a miscellaneous ipse.
@@ -899,9 +878,8 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
   // Let's force the rhs to be a complete type.  Because why not!
   #check_consume_then_discard_expr(es, oo(&a->rhs), &ptr_pt, &a->ptr_discard);
   rhs_type *cu_typeexpr = expr_complete_type(&oo(&a->rhs)->expr);
-  ipse te_typeexpr;
   param *te_typeexpr;
-  if decompose_ref_or_ptr(rhs_type, es, &ipse, &param) {
+  if decompose_ref_or_ptr(rhs_type, es, &param) {
     // param is already complete.
     emissions array[unify_emission];
     unified_discard te_typeexpr;
@@ -1458,17 +1436,14 @@ func decompose_ref(t *te_typeexpr, cs *checkstate, ipse_out **te_typeexpr, param
   return decompose_typeapp(t, primitive_ref_puretype(cs), ipse_out, param_out);
 }
 
-// Writes a fake ipse in the case of pointer, a real ipse in the case of a reference.
-func decompose_ref_or_ptr(t *cu_typeexpr, es *framescope, ipse_out *te_typeexpr, param_out **te_typeexpr) bool {
+func decompose_ref_or_ptr(t *cu_typeexpr, es *framescope, param_out **te_typeexpr) bool {
   lt *te_typeexpr;
   param *te_typeexpr;
   if decompose_ref(&t->x, es->cs, &lt, &param) {
-    *ipse_out = *lt;
     *param_out = param;
     return true;
   }
   if decompose_typeapp(&t->x, primitive_pointer_puretype(es->cs), &param) {
-    *ipse_out = misc_ipse(es, ~*param);
     *param_out = param;
     return true;
   }
@@ -1972,7 +1947,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     } else {
       // Dereferencing a pointer always makes an lvalue.
       lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
-                        DeadMe});  // Yes, this misc_ipse is a field_ipse of some indexee object that was pointed at.
+                        DeadMe});
       ie_info_after nc[ast_expr_after_consume] = NotComputed;
       lhs_later ast_later_discard_info = mk_later();
       #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
