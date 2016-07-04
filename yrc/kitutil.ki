@@ -1,0 +1,244 @@
+import stdlib;
+import state;
+
+// A "printed" error happened.  (More like, "to be printed.")
+struct err_printed {
+  // True if location info is part of msg.
+  printed_meta bool;
+  msg array[u8];
+}
+
+// Tells (a) if the operation failed, and (b) if it did, whether location info was
+// printed.  Might be expanded to include other info.
+enum np {
+  // No failure happened.
+  #NoFail void;
+  // We had a failure...
+  Unprinted err_printed;
+}
+
+// cr = check result.
+enum[T] cr {
+  #NoFail T;
+  Unprinted err_printed;
+}
+
+func[T] ERR(x T) np { return Unprinted({false, err_string(x)}); }
+func[T, U] ERR(x T, y U) np { return ERR(consup(x, y)); }
+func[T, U, V] ERR(x T, y U, z V) np { return ERR(consup(x, y, z)); }
+func[T, U, V, W] ERR(x T, y U, z V, p W) np { return ERR(consup(x, y, z, p)); }
+func[T, U, V, W, X] ERR(x T, y U, z V, p W, q X) np { return ERR(consup(x, y, z, p, q)); }
+func[T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) np { return ERR(consup(x, y, z, p, q, r)); }
+func[T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) np { return ERR(consup(x, y, z, p, q, r, s)); }
+func[T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) np { return ERR(consup(x, y, z, p, q, r, s, t)); }
+
+func[R, T] ERR(x T) cr[R] { return Unprinted({false, err_string(x)}); }
+func[R, T, U] ERR(x T, y U) cr[R] { return ERR(consup(x, y)); }
+func[R, T, U, V] ERR(x T, y U, z V) cr[R] { return ERR(consup(x, y, z)); }
+func[R, T, U, V, W] ERR(x T, y U, z V, p W) cr[R] { return ERR(consup(x, y, z, p)); }
+func[R, T, U, V, W, X] ERR(x T, y U, z V, p W, q X) cr[R] { return ERR(consup(x, y, z, p, q)); }
+func[R, T, U, V, W, X, Y] ERR(x T, y U, z V, p W, q X, r Y) cr[R] { return ERR(consup(x, y, z, p, q, r)); }
+func[R, T, U, V, W, X, Y, Z] ERR(x T, y U, z V, p W, q X, r Y, s Z) cr[R] { return ERR(consup(x, y, z, p, q, r, s)); }
+func[R, T, U, V, W, X, Y, Z, A] ERR(x T, y U, z V, p W, q X, r Y, s Z, t A) cr[R] { return ERR(consup(x, y, z, p, q, r, s, t)); }
+
+func[T, U, V, W, X, Y, Z, A] consup(x T, y U, z V, p W, q X, r Y, s Z, t A) tup[tup[tup[T, U], tup[V, W]], tup[tup[X, Y], tup[Z, A]]] {
+  return {{{x, y}, {z, p}}, {{q, r}, {s, t}}};
+}
+func[T, U, V, W, X, Y, Z] consup(x T, y U, z V, p W, q X, r Y, s Z) tup[tup[tup[T, U], tup[V, W]], tup[tup[X, Y], Z]] {
+  return {{{x, y}, {z, p}}, {{q, r}, s}};
+}
+func[T, U, V, W, X, Y] consup(x T, y U, z V, p W, q X, r Y) tup[tup[tup[T, U], tup[V, W]], tup[X, Y]] {
+  return {{{x, y}, {z, p}}, {q, r}};
+}
+func[T, U, V, W, X] consup(x T, y U, z V, p W, q X) tup[tup[tup[T, U], tup[V, W]], X] {
+  return {{{x, y}, {z, p}}, q};
+}
+func[T, U, V, W] consup(x T, y U, z V, p W) tup[tup[T, U], tup[V, W]] {
+  return {{x, y}, {z, p}};
+}
+func[T, U, V] consup(x T, y U, z V) tup[tup[T, U], V] {
+  return {{x, y}, z};
+}
+func[T, U] consup(x T, y U) tup[T, U] {
+  return {x, y};
+}
+
+
+func[T, U, V, W, X, Y, Z, A] DBG(x T, y U, z V, p W, q X, r Y, s Z, t A) void {
+  DBG(consup(x, y, z, p, q, r, s, t));
+}
+
+func[T, U, V, W, X, Y, Z] DBG(x T, y U, z V, p W, q X, r Y, s Z) void {
+  DBG(consup(x, y, z, p, q, r, s));
+}
+
+func[T, U, V, W, X, Y] DBG(x T, y U, z V, p W, q X, r Y) void {
+  DBG(consup(x, y, z, p, q, r));
+}
+
+func[T, U, V, W, X] DBG(x T, y U, z V, p W, q X) void {
+  DBG(consup(x, y, z, p, q));
+}
+
+func[T, U, V, W] DBG(x T, y U, z V, p W) void {
+  DBG(consup(x, y, z, p));
+}
+
+func[T, U, V] DBG(x T, y U, z V) void {
+  DBG(consup(x, y, z));
+}
+
+func[T, U] DBG(x T, y U) void {
+  DBG(consup(x, y));
+}
+
+func[T] DBG(x T) void {
+  r array[u8];
+  build_u8str(void, &r, &x);
+  push(&r, '\n');
+  print(Stderr(), r);
+  ign var = fflush(Stderr());
+}
+
+func dump_err_printed(pm err_printed) void {
+  print(Stderr(), pm.msg);
+  ign var = fflush(Stderr());
+}
+
+func[T, U, V, W, X, Y, Z, A] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z, t A) np {
+  return MERR(cs, m, consup(x, y, z, p, q, r, s, t));
+}
+
+func[T, U, V, W, X, Y, Z] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z) np {
+  return MERR(cs, m, consup(x, y, z, p, q, r, s));
+}
+
+func[T, U, V, W, X, Y] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y) np {
+  return MERR(cs, m, consup(x, y, z, p, q, r));
+}
+
+func[T, U, V, W, X] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X) np {
+  return MERR(cs, m, consup(x, y, z, p, q));
+}
+
+func[T, U, V, W] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W) np {
+  return MERR(cs, m, consup(x, y, z, p));
+}
+
+func[T, U, V] MERR(cs *checkstate, m ast_meta, x T, y U, z V) np {
+  return MERR(cs, m, consup(x, y, z));
+}
+
+func[T, U] MERR(cs *checkstate, m ast_meta, x T, y U) np {
+  return MERR(cs, m, consup(x, y));
+}
+
+func[R, T, U, V, W, X, Y, Z, A] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z, t A) cr[R] {
+  return MERR(cs, m, consup(x, y, z, p, q, r, s, t));
+}
+
+func[R, T, U, V, W, X, Y, Z] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y, s Z) cr[R] {
+  return MERR(cs, m, consup(x, y, z, p, q, r, s));
+}
+
+func[R, T, U, V, W, X, Y] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X, r Y) cr[R] {
+  return MERR(cs, m, consup(x, y, z, p, q, r));
+}
+
+func[R, T, U, V, W, X] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W, q X) cr[R] {
+  return MERR(cs, m, consup(x, y, z, p, q));
+}
+
+func[R, T, U, V, W] MERR(cs *checkstate, m ast_meta, x T, y U, z V, p W) cr[R] {
+  return MERR(cs, m, consup(x, y, z, p));
+}
+
+func[R, T, U, V] MERR(cs *checkstate, m ast_meta, x T, y U, z V) cr[R] {
+  return MERR(cs, m, consup(x, y, z));
+}
+
+func[R, T, U] MERR(cs *checkstate, m ast_meta, x T, y U) cr[R] {
+  return MERR(cs, m, consup(x, y));
+}
+
+// Hopefully msg ends in \n, like strings created by err_string.
+func ERR_append(pm err_printed, msg array[u8]) np {
+  // We ignore pm.printed_meta.  (It's like ERR.
+  return Unprinted({false, concat(pm.msg, msg)});
+}
+
+func MERR_append(cs *checkstate, m ast_meta, pm err_printed, msg array[u8]) np {
+  return Unprinted({true, concat(pm.msg, merr_string(cs, m, msg))});
+}
+
+func[T] err_string(x T) array[u8] {
+  r array[u8];
+  build_u8str(void, &r, &x);
+  push(&r, '\n');
+  return r;
+}
+
+func[T, U] err_string(x T, y U) array[u8] {
+  return err_string(consup(x, y));
+}
+
+func[T, U, V] err_string(x T, y U, z V) array[u8] {
+  return err_string(consup(x, y, z));
+}
+
+func[T] merr_string(cs *checkstate, m ast_meta, x T) array[u8] {
+  r array[u8];
+  if case Has(p pos) = cs->posits.metas[m.x].left {
+    hp human_pos = to_human_pos(cs, p);
+    build_u8str(cs->im, &r, &hp);
+    append(&r, _u8(": "));
+  } else {
+    append(&r, _u8("At ??: "));
+  }
+  build_u8str(cs->im, &r, &x);
+  push(&r, '\n');
+  return r;
+}
+
+func[T] MERR(cs *checkstate, m ast_meta, x T) np {
+  return Unprinted({true, merr_string(cs, m, x)});
+}
+
+func[R, T] MERR(cs *checkstate, m ast_meta, x T) cr[R] {
+  return Unprinted({true, merr_string(cs, m, x)});
+}
+
+func[T] ice(x T) void {
+  DBG(_u8("ICE: "), x);
+  abort();
+}
+
+func[T, U] ice(x T, y U) void {
+  DBG(_u8("ICE: "), x, y);
+  abort();
+}
+
+func[T, U, V] ice(x T, y U, z V) void {
+  DBG(_u8("ICE: "), x, y, z);
+  abort();
+}
+
+func[T, U, V, W] ice(x T, y U, z V, p W) void {
+  DBG(_u8("ICE: "), x, y, z, p);
+  abort();
+}
+
+func[T, U, V, W, X] ice(x T, y U, z V, p W, q X) void {
+  DBG(_u8("ICE: "), x, y, z, p, q);
+  abort();
+}
+
+func[T, U, V, W, X, Y] ice(x T, y U, z V, p W, q X, r Y) void {
+  DBG(_u8("ICE: "), x, y, z, p, q, r);
+  abort();
+}
+
+func[T, U, V, W, X, Y, Z] ice(x T, y U, z V, p W, q X, r Y, s Z) void {
+  DBG(_u8("ICE: "), x, y, z, p, q, r, s);
+  abort();
+}

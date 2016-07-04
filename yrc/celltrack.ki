@@ -1,0 +1,190 @@
+import stdlib;
+import hash;
+import kitutil;
+
+// See "struct celltrack" -- tracks whether a cell is "active" at a given point
+// in control flow.
+
+struct cell_num { x size; }
+
+def `~` fn[size, cell_num] = wrapconvert;
+def `==` fn[cell_num, cell_num, bool] = wrapequate;
+func `!=`(x cell_num, y cell_num) bool { return x.x != y.x; }
+func `<`(x cell_num, y cell_num) bool { return x.x < y.x; }
+func[H] build_u8str(help H, r *array[u8], c *cell_num) void {
+  build_u8str(help, r, &c->x);
+}
+inline func hash_compute_hash(x *cell_num) osize {
+  return hash_compute_hash(&x->x);
+}
+inline func hash_equal(x *cell_num, y *cell_num) bool {
+  return x->x == y->x;
+}
+
+
+struct cellset_checksum {
+  xored osize;
+  summed osize;
+}
+
+func matches_checksum(a *cellset_checksum, b *cellset_checksum) bool {
+  return a->xored == b->xored && a->summed == b->summed;
+}
+
+func checksum_add(a *cellset_checksum, c cell_num) void {
+  a->xored = a->xored ^ +c.x;
+  a->summed = a->summed + +c.x;
+}
+
+func checksum_remove(a *cellset_checksum, c cell_num) void {
+  a->xored = a->xored ^ +c.x;
+  a->summed = a->summed - +c.x;
+}
+
+struct celltrack_entry {
+  cell cell_num;
+  // An "active" cell is one whose destructor needs to be run (if we threw an
+  // exception at the given point in time).
+  active bool;
+}
+
+struct celltrack {
+  all array[celltrack_entry];
+  checksum celltrack_checksum;
+}
+
+func[H] build_u8str(help H, r *array[u8], x *celltrack) void {
+  build_array_u8str(help, r, &x->all);
+}
+
+func[H] build_u8str(help H, r *array[u8], x *celltrack_entry) void {
+  push(r, '{');
+  build_u8str(help, r, &x->cell);
+  if x->active {
+    append(r, _u8(" active"));
+  }
+  push(r, '}');
+}
+
+struct celltrack_checksum {
+  live_checksum cellset_checksum;
+  active_checksum cellset_checksum;
+}
+
+func matches_checksum(a *celltrack_checksum, b *celltrack_checksum) bool {
+  return matches_checksum(&a->live_checksum, &b->live_checksum) &&
+    matches_checksum(&a->active_checksum, &b->active_checksum);
+}
+
+func get_checksum(ctr *celltrack) celltrack_checksum {
+  return ctr->checksum;
+}
+
+func matches_checksum(a *celltrack, b *celltrack_checksum) bool {
+  return matches_checksum(&a->checksum, b);
+}
+
+func matches_checksum(a *celltrack, b *celltrack) bool {
+  return matches_checksum(&a->checksum, &b->checksum);
+}
+
+func mk_celltrack() celltrack {
+  x celltrack;
+  return x;
+}
+
+func celltrack_is_empty(ctr *celltrack) bool {
+  return empty(&ctr->all);
+}
+
+func gr_check_empty(ctr *celltrack) void {
+  if !celltrack_is_empty(ctr) {
+    ice(_u8("celltrack has leftover live cells"));
+  }
+}
+
+struct noted_celltrack {
+  ctr opt[celltrack];
+}
+
+func mk_noted() noted_celltrack {
+  return {None};
+}
+
+func mk_noted(copyee *celltrack) noted_celltrack {
+  return {Has(*copyee)};
+}
+
+func note_celltrack(targ *noted_celltrack, current *celltrack) void {
+  if case &Has(ct celltrack) = &targ->ctr {
+    if !matches_checksum(&ct, current) {
+      ice(_u8("Inconsistent celltrack state, current="), *current, _u8(", saved="), ct);
+    }
+  } else {
+    targ->ctr = Has(*current);
+  }
+}
+
+func ctr_find(ctr *celltrack, c cell_num) opt[size] {
+  p * ^[0]celltrack_entry = data(&ctr->all);
+  for i size = count(&ctr->all); i > 0; {
+    i = i - 1;
+    if p[i].cell == c {
+      return Has(i);
+    }
+  }
+  return None;
+}
+
+func ctr_create(ctr *celltrack, c cell_num) void {
+  if case Has(ix size) = ctr_find(ctr, c) {
+    ice(_u8("ctr_create: has cell "), c);
+  }
+  push(&ctr->all, {c, false});
+  checksum_add(&ctr->checksum.live_checksum, c);
+}
+
+func ctr_expect_live(ctr *celltrack, c cell_num) void {
+  if case None = ctr_find(ctr, c) {
+    ice(_u8("ctr_expect_live: no has cell "), c);
+  }
+}
+
+func ctr_deaden(ctr *celltrack, c cell_num) void {
+  if case Has(ix size) = ctr_find(ctr, c) {
+    ent *celltrack_entry = ref(&ctr->all, ix);
+    if ent->active {
+      ice(_u8("ctr_deaden: active cell "), c);
+    }
+    shifterase_elem(&ctr->all, ix);
+    checksum_remove(&ctr->checksum.live_checksum, c);
+  } else {
+    ice(_u8("ctr_deaden: no has cell "), c);
+  }
+}
+
+func ctr_activate(ctr *celltrack, c cell_num) void {
+  if case Has(ix size) = ctr_find(ctr, c) {
+    ent *celltrack_entry = ref(&ctr->all, ix);
+    if ent->active {
+      ice(_u8("ctr_activate: active cell "), c);
+    }
+    ent->active = true;
+    checksum_add(&ctr->checksum.active_checksum, c);
+  } else {
+    ice(_u8("ctr_activate: no has cell "), c);
+  }
+}
+
+func ctr_deactivate(ctr *celltrack, c cell_num) void {
+  if case Has(ix size) = ctr_find(ctr, c) {
+    ent *celltrack_entry = ref(&ctr->all, ix);
+    if !ent->active {
+      ice(_u8("ctr_deactivate: inactive cell "), c);
+    }
+    ent->active = false;
+    checksum_remove(&ctr->checksum.active_checksum, c);
+  } else {
+    ice(_u8("ctr_activate: no has cell "), c);
+  }
+}

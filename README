@@ -20,18 +20,18 @@ or  (on OS X, with XCode tools (i.e. clang) installed)
 2. RUN INSTRUCTIONS
 
    # Run tests.
-   s4
+   s6
    # Run tests more verbosely.
-   s4 --build
+   s6 --build
    # Run tests verbosely, without the codegen phase.
-   s4 --no-build
+   s6 --no-build
 
    # Build modulename.ki and its imports for Windows, => modulename.obj
-   s4 <modulename>
+   s6 <modulename>
 
    # Build modulename.ki and its imports, => modulename.o
-   s4 --linux <modulename>
-   s4 --osx <modulename>
+   s6 --linux <modulename>
+   s6 --osx <modulename>
 
 3. FOR FREEBSD USERS
 
@@ -55,21 +55,31 @@ The current directory structure is:
    urc - s2, implemented in proto-Kit.  Compiles s2 and s3.
    vrc - s3, implemented in proto-Kit.  Compiles s3 and s4.
    wrc - s4, implemented in proto-Kit.  Compiles s4 and s5.
-   xrc - s5, implemented in proto-Kit.  Compiles s5.
+   xrc - s5, implemented in proto-Kit.  Compiles s5 and s6.
+   yrc - s6, implemented in proto-Kit.  Compiles s6.
    examples - examples to run, disorganized junk
 
   ABOUT THE VERSIONS
 
-s1's language is merely "C, with templates, constructors and
+- s1's language is merely "C, with templates, constructors and
 destructors, elementary encapsulation, tagged enum types, no
-implicit conversions."  s2's is very similar to s1's, but with some
-worthwhile enhancements that s1 does not support.  s3 uses s2's
-quick-return expressions.  s4 uses s3's generalize indexing
-expressions.  s5 uses s4's foreach loops, and is "in-development"
--- it might not work, from commit to commit.  s1 will someday be
-capable of compiling s5 directly.  At some point the
-highest-numbered version will use features that s1 will never
-support.  See FEATURES for more information.
+implicit conversions."
+
+- s2's is very similar to s1's, but with some worthwhile
+enhancements that s1 does not support.
+
+- s3 uses s2's quick-return expressions.
+
+- s4 uses s3's generalized indexing expressions.
+
+- s5 uses s4's foreach loops. It defines the same language as s4.
+
+- s6 should be compilable via s4 and s5.  s1 will someday be
+  capable of compiling s6 directly (once quick-return, generalized
+  indexing, and foreach loops get added).
+
+At some point, the highest-numbered version will use features that
+s1 will never support.  See FEATURES for more information.
 
   ABOUT THE IMPLEMENTATIONS
 

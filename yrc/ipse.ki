@@ -1,0 +1,177 @@
+import state;
+
+// This file's a grab-bag for ipse type related stuff.  Probably most of it should be
+// moved to other files and this should go away.
+
+// I suspect instpacks might require ipse type name mapping information, so this is a
+// placeholder.
+func canonicalized_pack(pack *te_instpack) te_instpack {
+  return *pack;
+}
+
+func canonicalized_ipse_sym(ctx *canonicalizing_ctx, s sym) sym {
+  if case Has(ix size) = find(ctx->ipse_names_app, s) {
+    return make_canonicalized_ipse_name(ctx->im, ix);
+  } else {
+    n size = count(ctx->ipse_names_app);
+    push(ctx->ipse_names_app, s);
+    ret sym = make_canonicalized_ipse_name(ctx->im, n);
+    scope_add(ctx->canonicalized_scope_app, ret, scope_lookup(ctx->scope, s));
+    return ret;
+  }
+}
+
+func canonicalized_unify_emission(ctx *canonicalizing_ctx, u *unify_emission) unify_emission {
+  switch u {
+  case &SameIpse(a unify_same_ipse):
+    return SameIpse({canonicalized_ipse_sym(ctx, a.name1),
+                     canonicalized_ipse_sym(ctx, a.name2)});
+  }
+}
+
+func canonicalized_emittance(ctx *canonicalizing_ctx, us *shray[unify_emission]) shray[unify_emission] {
+  emittance_bu array[unify_emission];
+  foreach u *unify_emission in refs(us) {
+    push(&emittance_bu, canonicalized_unify_emission(ctx, u));
+  }
+  return freeze(&emittance_bu);
+}
+
+func canonicalized_app_pack(ctx *canonicalizing_ctx, pack *te_app_pack) te_app_pack {
+  ipse_mappings_bu array[sym];
+  foreach s sym in elems(&pack->ipse_mappings) {
+    push(&ipse_mappings_bu, canonicalized_ipse_sym(ctx, s));
+  }
+
+  return {pack->teip, freeze(&ipse_mappings_bu), canonicalized_emittance(ctx, &pack->emittance)};
+}
+
+func canonicalize_arraytype_count(a *opt[u32]) opt[u32] {
+  return *a;
+}
+
+func make_canonicalized_ipse_name(im *identmap, ix size) sym {
+  b array[u8];
+  push(&b, '$');
+  build_u8str(void, &b, &ix);
+  return intern(im, from_u8(&b));
+}
+
+struct canonicalizing_ctx {
+  im *identmap;
+  scope *type_scope;
+  ipse_names_app *array[sym];
+  canonicalized_scope_app *type_scope;
+}
+
+func canonicalize_idy_ipses(ctx *canonicalizing_ctx, t *te_typeexpr) te_typeexpr {
+  switch t {
+  case &TeName(a te_name):
+    return TeName({a.value, Has!canonicalized_pack(unHas!&a.pack)});
+  case &TeApp(a te_app):
+    newparams array[te_typeexpr];
+    nparams size = count(&a.params);
+    for i size = 0; i < nparams; i = i + 1 {
+      push(&newparams, canonicalize_idy_ipses(ctx, &a.params[i]));
+    }
+    return TeApp({a.typefunc, freeze(&newparams), Has!canonicalized_app_pack(ctx, unHas!&a.pack)});
+  case &TeUnion(a te_union):
+    // Honestly, a union having ipses would be pretty weird.
+    return TeUnion({canonicalize_idy_vardecls(ctx, &a.fields)});
+  case &TeArraytype(a te_arraytype):
+    count opt[u32] = canonicalize_arraytype_count(&a.count);
+    return TeArraytype({count, emshp(canonicalize_idy_ipses(ctx, oo(&a.param)))});
+  case &TeIpse(a te_ipse):
+    return TeIpse({canonicalized_ipse_sym(ctx, a.name)});
+  case &TeDotted(a te_dotted):
+    return TeDotted({emshp!canonicalize_idy_ipses(ctx, oo(&a.lhs)), a.fieldname});
+  case &TeUnknown:
+    ice(_u8("canonicalize_idy_ipses sees TeUnknown."));
+    return fake();
+  }
+}
+
+func canonicalize_idy_vardecls(ctx *canonicalizing_ctx, a *shray[te_vardecl]) shray[te_vardecl] {
+  build array[te_vardecl];
+  n size = count(a);
+  for i size = 0; i < n; i = i + 1 {
+    push(&build, {a[i].name, canonicalize_idy_ipses(ctx, &a[i].type)});
+  }
+  return freeze(&build);
+}
+
+
+func map_ipses_arraytype_count(ipse_mappings *shray[sym], count *opt[u32]) opt[u32] {
+  return *count;
+}
+
+func map_vardecl_ipses(im *identmap, ipse_mappings *shray[sym], inn *shray[te_vardecl]) shray[te_vardecl] {
+  // A performant short-cut.
+  if empty(ipse_mappings) {
+    return *inn;
+  }
+
+  bu array[te_vardecl];
+  foreach vd *te_vardecl in refs(inn) {
+    push(&bu, {vd->name, map_ipses(im, ipse_mappings, &vd->type)});
+  }
+  return freeze(&bu);
+}
+
+func map_ipses_to_unify_emission(im *identmap, ipse_mappings *shray[sym], u *unify_emission) unify_emission {
+  switch u {
+  case &SameIpse(a unify_same_ipse):
+    return SameIpse({map_ipse_sym(im, ipse_mappings, a.name1),
+                     map_ipse_sym(im, ipse_mappings, a.name2)});
+  }
+}
+
+func map_ipses_to_app_pack(im *identmap, ipse_mappings *shray[sym], pack *te_app_pack) te_app_pack {
+  ipse_mappings_bu array[sym];
+  foreach s sym in elems(&pack->ipse_mappings) {
+    push(&ipse_mappings_bu, map_ipse_sym(im, ipse_mappings, s));
+  }
+
+  emittance_bu array[unify_emission];
+  foreach u *unify_emission in refs(&pack->emittance) {
+    push(&emittance_bu, map_ipses_to_unify_emission(im, ipse_mappings, u));
+  }
+
+  return {pack->teip, freeze(&ipse_mappings_bu), freeze(&emittance_bu)};
+}
+
+func map_ipse_sym(im *identmap, ipse_mappings *shray[sym], s sym) sym {
+  n size = count(ipse_mappings);
+  for i size = 0; i < n; i++ {
+    if s == make_canonicalized_ipse_name(im, i) {
+      return ipse_mappings[i];
+    }
+  }
+  DBG(_u8("map_ipse_sym symbol "), lookup(im, s), _u8(" unmapped"));
+  return s;
+}
+
+func map_ipses(im *identmap, ipse_mappings *shray[sym], t *te_typeexpr) te_typeexpr {
+  switch t {
+  case &TeName(a te_name):
+    return *t;
+  case &TeApp(a te_app):
+    newparams array[te_typeexpr];
+    foreach param *te_typeexpr in refs(&a.params) {
+      push(&newparams, map_ipses(im, ipse_mappings, param));
+    }
+    return TeApp({a.typefunc, freeze(&newparams), Has!map_ipses_to_app_pack(im, ipse_mappings, unHas!&a.pack)});
+  case &TeUnion(a te_union):
+    return TeUnion({map_vardecl_ipses(im, ipse_mappings, &a.fields)});
+  case &TeArraytype(a te_arraytype):
+    count opt[u32] = map_ipses_arraytype_count(ipse_mappings, &a.count);
+    return TeArraytype({count, emshp(map_ipses(im, ipse_mappings, oo(&a.param)))});
+  case &TeIpse(a te_ipse):
+    return TeIpse({map_ipse_sym(im, ipse_mappings, a.name)});
+  case &TeDotted(a te_dotted):
+    return TeDotted({emshp!map_ipses(im, ipse_mappings, oo(&a.lhs)), a.fieldname});
+  case &TeUnknown:
+    ice(_u8("map_ipses sees TeUnknown"));
+    return fake();
+  }
+}

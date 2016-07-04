@@ -26,3 +26,6 @@ Some feature/implementation differences between s3 and s4:
   Superset of s3, necessary to compile s5:
   - s4 has foreach loops.
 
+Feature/implementation differences (to speak of) between s4 and s5:
+  - (None.)
+

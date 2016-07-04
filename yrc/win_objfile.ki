@@ -1,0 +1,505 @@
+import objfile;
+
+def IMAGE_FILE_MACHINE_I386 u16 = 0x14c;
+def kFakeTimeDateStamp u32 = 12345;
+
+struct COFF_Header {
+  Machine le_u16;
+  NumberOfSections le_u16;
+  TimeDateStamp le_u32;
+  PointerToSymbolTable le_u32;
+  NumberOfSymbols le_u32;
+  SizeOfOptionalHeader le_u16;
+  Characteristics le_u16;
+}
+
+def COFF_Header_EXPECTED_SIZE u32 = 20;
+
+struct Section_Header {
+  Name ^[8]u8;
+  VirtualSize le_u32;
+  VirtualAddress le_u32;
+  SizeOfRawData le_u32;
+  PointerToRawData le_u32;
+  PointerToRelocations le_u32;
+  PointerToLineNumbers le_u32;
+  NumberOfRelocations le_u16;
+  NumberOfLineNumbers le_u16;
+  Characteristics le_u32;
+}
+
+def Section_Header_EXPECTED_SIZE u32 = 40;
+
+func real_file_characteristics() u16 {
+  /*
+  0x0001 IMAGE_FILE_RELOCS_STRIPPED: image only.
+  0x0002 IMAGE_FILE_EXECUTABLE_IMAGE: image only.
+  0x0004 IMAGE_FILE_LINE_NUMS_STRIPPED: deprecated, should be zero.
+  0x0008 IMAGE_FILE_LOCAL_SYMS_STRIPPED: deprecated, should be zero.
+  0x0010 IMAGE_FILE_AGGRESSIVE_WS_TRIM: deprecated, must be zero.
+  0x0020 IMAGE_FILE_LARGE_ADDRESS_AWARE:
+             Presumably zero, unaware, for 32-bit progs.
+  0x0040 reserved
+  0x0080 IMAGE_FILE_BYTES_REVERSED_LO: deprecated, should be zero.
+  0x0100 IMAGE_FILE_32BIT_MACHINE:
+             Machine is 32-bit. (As opposed to 16-bit?  Or 64-bit?
+             cl is outputting 0 for 32-bit obj files.)
+  0x0200 IMAGE_FILE_DEBUG_STRIPPED:
+             Debugging information is removed from the image file.
+             (Irrelevant for obj files?  cl is outputting 0.)
+  0x0400 IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP:
+             for if the image is on removable media... I say, set to zero.
+  0x0800 IMAGE_FILE_NET_RUN_FROM_SWAP:
+             for if the image is on network-mounted media... I say,
+             set to zero.
+  0x1000 IMAGE_FILE_SYSTEM: a system file, not a user program
+  0x2000 IMAGE_FILE_DLL: The image file is a DLL.
+  0x4000 IMAGE_FILE_UP_SYSTEM_ONLY: Only run file on a uniprocessor machine.
+  0x8000 IMAGE_FILE_BYTES_REVERSED_HI: deprecated, should be zero.
+  */
+
+  /* cl outputs 0 for a general .obj file too. */
+  return 0;
+}
+
+def IMAGE_SCN_CNT_CODE u32 = (1 << 5);
+def IMAGE_SCN_CNT_INITIALIZED_DATA u32 = (1 << 6);
+def IMAGE_SCN_ALIGN_4_BYTES u32 = (3 << 20);
+def IMAGE_SCN_ALIGN_8_BYTES u32 = (4 << 20);
+def IMAGE_SCN_ALIGN_16_BYTES u32 = (5 << 20);
+def IMAGE_SCN_MEM_EXECUTE u32 = (1 << 29);
+def IMAGE_SCN_MEM_READ u32 = (1 << 30);
+def IMAGE_SCN_MEM_WRITE u32 = (1 << 31);
+
+func text_section_characteristics() u32 {
+  /*
+  bit  0. Reserved.
+  bit  1. Reserved.
+  bit  2. Reserved.
+  bit  3. IMAGE_SCN_TYPE_NO_PAD.
+          Obsolete, replaced by IMAGE_SCN_ALIGN_1BYTES.
+  bit  4. Reserved.
+  bit  5. IMAGE_SCN_CNT_CODE. The section contains executable code.
+  bit  6. IMAGE_SCN_CNT_INITIALIZED_DATA.
+          The section contains initialized data.
+  bit  7. IMAGE_SCN_CNT_UNINITIALIZED_DATA.
+          The section contains uninitialized data.
+  bit  8. IMAGE_SCN_LNK_OTHER. Reserved.
+  bit  9. IMAGE_SCN_LINK_INFO. The section contains comments or other
+          information. The .drectve section has this type. Object files only.
+  bit 10. Reserved.
+  bit 11. IMAGE_SCN_LNK_REMOVE. The section will not become part of
+          the image. Object files only.
+  bit 12. IMAGE_SCN_LNK_COMDAT. The section contains COMDAT
+          data. Object files only.
+  bit 13. Undocumented.
+  bit 14. Undocumented.
+  bit 15. IMAGE_SCN_GPREL.
+      The section contains data referenced through the global pointer (GP).
+  bit 16. IMAGE_SCN_MEM_PURGEABLE (reserved)? Or undocumented?
+  bit 17. IMAGE_SCN_MEM_PURGEABLE (reserved)? Or undocumented?
+          IMAGE_SCN_MEM_16BIT for ARM, section contains Thumb code.
+  bit 18. IMAGE_SCN_MEM_LOCKED. Reserved.
+  bit 19. IMAGE_SCN_MEM_PRELOAD. Reserved.
+  bits 20:23. IMAGE_SCN_ALIGN_ ## n ## BYTES. Align data on a 2^(k-1)
+              boundary. Valid only for object files.
+  bit 24. IMAGE_SCN_LNK_NRELOC_OVFL. The section contains extended
+          relocations. (We don't support that yet.)
+  bit 25. IMAGE_SCN_MEM_DISCARDABLE. The section can be discarded
+          as needed. (I guess ours can't be.)
+  bit 26. IMAGE_SCN_MEM_NOT_CACHED. The section cannot be cached.
+          (Who knows.)
+  bit 27. IMAGE_SCN_MEM_NOT_PAGED. The section is not pageable. (Ours are.)
+  bit 28. IMAGE_SCN_MEM_SHARED. The section can be shared in memory. (Ok...)
+  bit 29. IMAGE_SCN_MEM_EXECUTE. The section can be executed as code.
+  bit 30. IMAGE_SCN_MEM_READ. The section can be read.
+  bit 31. IMAGE_SCN_MEM_WRITE. The section can be written to.
+  */
+  /* This value is also that produced by cl for its .text sections. */
+  return ((IMAGE_SCN_CNT_CODE | IMAGE_SCN_ALIGN_16_BYTES) | IMAGE_SCN_MEM_EXECUTE)
+    | IMAGE_SCN_MEM_READ;
+}
+
+func section_alignment_characteristic(max_requested_alignment u32) u32 {
+  if max_requested_alignment == 4 {
+    return IMAGE_SCN_ALIGN_4_BYTES;
+  } else if max_requested_alignment == 8 {
+    return IMAGE_SCN_ALIGN_8_BYTES;
+  } else if max_requested_alignment == 16 {
+    return IMAGE_SCN_ALIGN_16_BYTES;
+  } else {
+    crash(_u8("max_requested_alignment has a weird value."));
+    return fake();
+  }
+}
+
+func rdata_section_characteristics(max_requested_alignment u32) u32 {
+  return (IMAGE_SCN_CNT_INITIALIZED_DATA
+    | section_alignment_characteristic(max_requested_alignment))
+    | IMAGE_SCN_MEM_READ;
+}
+
+func data_section_characteristics(max_requested_alignment u32) u32 {
+  /* cl uses 8 bytes if there's a double, by the way. */
+  return ((IMAGE_SCN_CNT_INITIALIZED_DATA
+    | section_alignment_characteristic(max_requested_alignment))
+    | IMAGE_SCN_MEM_READ) | IMAGE_SCN_MEM_WRITE;
+}
+
+struct COFF_Relocation {
+  /* Offset from beginning of section, assuming its section header
+  VirtualAddress is zero. */
+  VirtualAddress le_u32;
+  /* Index into the symbol table. */
+  SymbolTableIndex le_u32;
+  /* What kind of relocation should be performed?
+  IMAGE_REL_I386_ABSOLUTE 0x0000 The relocation is ignored.
+  IMAGE_REL_I386_DIR16 0x0001 Not supported.
+  IMAGE_REL_I386_REL16 0x0002 Not supported.
+  IMAGE_REL_I386_DIR32 0x0006 The target's 32-bit VA.
+  IMAGE_REL_I386_DIR32NB 0x0007 The target's 32-bit RVA.
+  IMAGE_REL_I386_SEG12 0x0009 Not supported.
+  IMAGE_REL_I386_SECTION 0x000A The 16-bit section index of the section
+  that contains the target.  For debugging information.
+  IMAGE_REL_I386_SECREL 0x000B The 32-bit offset of the target from the
+  beginning of its section.  For debugging info.  Also for static thread
+  local storage.
+  IMAGE_REL_I386_TOKEN 0x000C The CLR token.  (wut.)
+  IMAGE_REL_I386_SECREL7 0x000D The 7-bit offset from the base of the
+  section that contains the target.
+  IMAGE_REL_I386_REL32 0x0014 The 32-bit relative displacement from the
+  target.  This supports the x86 relative branch and call instructions.
+  */
+  /* Looking at cl output, I see a bunch of use of 6h and 14h. */
+  Type le_u16;
+}
+
+struct long_name {
+  Zeroes le_u32;
+  Offset le_u32;
+}
+
+struct name_eight {
+  u union {
+    ShortName ^[8]u8;
+    LongName long_name;
+  };
+}
+
+struct COFF_symbol_standard_record {
+  Name name_eight;
+  Value le_u32;
+  /* Uses a 1-based index into the section table.  Special values:
+  IMAGE_SYM_UNDEFINED (0).  Section not yet defined, e.g. for an
+  external symbol.
+  IMAGE_SYM_ABSOLUTE (0xFFFF).  The symbol has an absolute value,
+  not an address relative to some section.
+  IMAGE_SYM_DEBUG (0xFFFE).  Some debuggery. */
+  SectionNumber le_u16;
+  /* MS tools set this field to 0x20 (function) or 0x0 (not a
+  function).  I.e. kFunctionSymType or kNullSymType. */
+  Type le_u16;
+  /* MS tools generally only use IMAGE_SYM_CLASS_EXTERNAL (2),
+  IMAGE_SYM_CLASS_STATIC (3), IMAGE_SYM_CLASS_FUNCTION (101), and
+  IMAGE_SYM_CLASS_FILE (103) which is followed by aux records that
+  name the file.  There's also a 'weak external' storage class, which
+  is mentioned.  Note: I don't see FILE used in a .obj file.  Also
+  FUNCTION is used for .bf and .ef records, which I don't see
+  either.  We only use EXTERNAL and STATIC. */
+  StorageClass u8;
+  /* How many aux records follow this record. */
+  NumberOfAuxSymbols u8;
+}
+
+struct COFF_symbol_aux_sectiondef {
+  Length le_u32;
+  NumberOfRelocations le_u16;
+  NumberOfLineNumbers le_u16;
+  /* COMDAT-only, set to zero. */
+  /* I don't know if this is really COMDAT-only, I see it being used... */
+  CheckSum le_u32;
+  /* COMDAT-only, set to zero. */
+  Number le_u16;
+  /* COMDAT selection number, set to zero. */
+  Selection u8;
+  Unused ^[3]u8;
+}
+
+def kNumberOfSections u32 = 3;
+def kNumSectionSymbolsPerSection u32 = 2;
+
+
+def WIN_SECTION_ALIGNMENT u32 = 16;
+
+func win_flatten(im *identmap, f *objfile) array[u8] {
+  d array[u8];
+  end_of_section_headers u32 = ~sizeof@[COFF_Header] + kNumberOfSections * ~sizeof@[Section_Header];
+  symbols array[u8];
+  strings array[u8];
+  win_write_symbols_and_strings(im, f, &symbols, &strings);
+
+  end_of_symbols u32 = end_of_section_headers + ~count(&symbols);
+  end_of_strings u32 = end_of_symbols + ~count(&strings);
+  ceil_end_of_strings u32 = ceil_aligned(end_of_strings, WIN_SECTION_ALIGNMENT);
+
+  start_of_data_raw u32 = ceil_end_of_strings;
+  start_of_data_relocs u32;
+  end_of_data_relocs u32;
+  win_compute_section_dimensions(&f->data, start_of_data_raw, &start_of_data_relocs, &end_of_data_relocs);
+  ceil_end_of_data_relocs u32 = ceil_aligned(end_of_data_relocs, WIN_SECTION_ALIGNMENT);
+
+  start_of_read_data_raw u32 = ceil_end_of_data_relocs;
+  start_of_read_data_relocs u32;
+  end_of_read_data_relocs u32;
+  win_compute_section_dimensions(&f->rdata, start_of_read_data_raw, &start_of_read_data_relocs, &end_of_read_data_relocs);
+  ceil_end_of_read_data_relocs u32 = ceil_aligned(end_of_read_data_relocs, WIN_SECTION_ALIGNMENT);
+
+  start_of_text_raw u32 = ceil_end_of_read_data_relocs;
+  start_of_text_relocs u32;
+  end_of_text_relocs u32;
+  win_compute_section_dimensions(&f->text, start_of_text_raw, &start_of_text_relocs, &end_of_text_relocs);
+
+  if true {
+    h COFF_Header;
+    check(~sizeof@[COFF_Header] == COFF_Header_EXPECTED_SIZE);
+    h.Machine = to_le! IMAGE_FILE_MACHINE_I386;
+    h.NumberOfSections = to_le! @[u16] ~kNumberOfSections;
+    h.TimeDateStamp = to_le! kFakeTimeDateStamp;
+    h.PointerToSymbolTable = to_le! end_of_section_headers;
+    h.NumberOfSymbols = to_le! win_symbols_to_write(f);
+    // Should be zero for an object file.
+    h.SizeOfOptionalHeader = to_le! @[u16] 0;
+    h.Characteristics = to_le! real_file_characteristics();
+    append_reinterpret(&d, &h);
+  }
+
+  check(kNumberOfSections == 3);
+  win_write_section_header(&d, &f->data, _u8(".data"), start_of_data_raw, data_section_characteristics(f->data.max_requested_alignment));
+  win_write_section_header(&d, &f->rdata, _u8(".rdata"), start_of_read_data_raw, rdata_section_characteristics(f->rdata.max_requested_alignment));
+  win_write_section_header(&d, &f->text, _u8(".text"), start_of_text_raw, text_section_characteristics());
+  check(~count(&d) == end_of_section_headers);
+
+  append(&d, &symbols);
+  check(~count(&d) == end_of_symbols);
+
+  append(&d, &strings);
+  check(~count(&d) == end_of_strings);
+
+  append_to_alignment(&d, ~WIN_SECTION_ALIGNMENT, @[u8] 0);
+  check(~count(&d) == ceil_end_of_strings);
+
+  append(&d, &f->data.raw);
+  append_to_alignment(&d, 2, @[u8] 0);
+  check(~count(&d) == start_of_data_relocs);
+
+  win_append_relocs(&d, &f->data.relocs);
+  check(~count(&d) == end_of_data_relocs);
+
+  append_to_alignment(&d, ~WIN_SECTION_ALIGNMENT, @[u8] 0);
+  check(~count(&d) == ceil_end_of_data_relocs);
+
+  append(&d, &f->rdata.raw);
+  append_to_alignment(&d, 2, @[u8] 0);
+  check(~count(&d) == start_of_read_data_relocs);
+
+  win_append_relocs(&d, &f->rdata.relocs);
+  check(~count(&d) == end_of_read_data_relocs);
+
+  append_to_alignment(&d, ~WIN_SECTION_ALIGNMENT, @[u8] 0);
+  check(~count(&d) == ceil_end_of_read_data_relocs);
+
+  append(&d, &f->text.raw);
+  append_to_alignment(&d, 2, @[u8] 0);
+  check(~count(&d) == start_of_text_relocs);
+
+  win_append_relocs(&d, &f->text.relocs);
+  check(~count(&d) == end_of_text_relocs);
+
+  return d;
+}
+
+def IMAGE_REL_I386_DIR32 u16 = 0x0006;
+def IMAGE_REL_I386_REL32 u16 = 0x0014;
+
+func win_append_relocs(d *array[u8], relocs *array[objfile_relocation]) void {
+  nrelocs size = count(relocs);
+  for i size = 0; i < nrelocs; i = i + 1 {
+    reloc *objfile_relocation = ref(relocs, i);
+    coff_reloc COFF_Relocation;
+    coff_reloc.VirtualAddress = to_le! reloc->virtual_address;
+    coff_reloc.SymbolTableIndex = to_le! reloc->symbol_table_index.x;
+    switch reloc->type {
+    case Dir32:
+      coff_reloc.Type = to_le! IMAGE_REL_I386_DIR32;
+    case Rel32:
+      coff_reloc.Type = to_le! IMAGE_REL_I386_REL32;
+    case Diff32:
+      crash(_u8("win32 sees Diff32 reloc"));
+    }
+    append_reinterpret(d, &coff_reloc);
+  }
+}
+
+func win_write_section_header(d *array[u8], s *objfile_section, name array[u8], start_of_raw u32, Characteristics u32) void {
+  PointerToRelocations u32;
+  pointer_to_end u32;
+  win_compute_section_dimensions(s, start_of_raw, &PointerToRelocations, &pointer_to_end);
+
+  h Section_Header;
+  check(~sizeof@[Section_Header] == Section_Header_EXPECTED_SIZE);
+  name_len size = count(&name);
+  check(name_len <= 8);
+  fill(ixcast(&h.Name[0]), 8, 0);
+  bufcopy(ixcast(&h.Name[0]), data(&name), name_len);
+  // Should be set to zero for object files.
+  h.VirtualSize = to_le! @[u32] 0;
+  // For simplicity, should be set to zero for object files.
+  h.VirtualAddress = to_le! @[u32] 0;
+  h.SizeOfRawData = to_le! @[u32] ~count(&s->raw);
+  h.PointerToRawData = to_le! start_of_raw;
+  h.PointerToRelocations = to_le! PointerToRelocations;
+  // We output no COFF line numbers.
+  h.PointerToLineNumbers = to_le! @[u32] 0;
+  h.NumberOfRelocations = to_le! objfile_section_small_relocations_count(s);
+  h.NumberOfLineNumbers = to_le! @[u16] 0;
+  h.Characteristics = to_le! Characteristics;
+
+  append_reinterpret(d, &h);
+}
+
+func win_symbols_to_write(f *objfile) u32 {
+  return kNumSectionSymbolsPerSection * kNumberOfSections + ~count(&f->symbol_table);
+}
+
+func win_compute_section_dimensions(s *objfile_section, start_of_raw u32, PointerToRelocations_out *u32, pointer_to_end_out *u32) void {
+  check(start_of_raw % WIN_SECTION_ALIGNMENT == 0);
+  end_of_raw u32 = start_of_raw + ~count(&s->raw);
+  start_of_relocs u32 = ceil_aligned(end_of_raw, 2);
+  end_of_relocs u32 = start_of_relocs + @[u32] ~count(&s->relocs) * ~sizeof@[COFF_Relocation];
+  *PointerToRelocations_out = start_of_relocs;
+  *pointer_to_end_out = end_of_relocs;
+}
+
+func win_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *array[u8], strings_out *array[u8]) void {
+  symbols array[u8];
+  strings array[u8];
+
+  // We start off with a 32-bit size field.
+  append(&strings, _u8("\0\0\0\0"));
+
+  n_st size = count(&f->symbol_table);
+  for i size = 0; i < n_st; i = i + 1 {
+    rec *objfile_symbol_record = ref(&f->symbol_table, i);
+    standard COFF_symbol_standard_record;
+    name sym = rec->name;
+    name_buf string = lookup(im, name);
+
+    nameu8 array[u8] = win_string_to_u8symbol(&name_buf);
+    if count(&nameu8) <= 8 {
+      fill(ixcast(&standard.Name.u.ShortName[0]), 8, 0);
+      bufcopy(ixcast(&standard.Name.u.ShortName[0]), data(&nameu8), count(&nameu8));
+    } else {
+      /* The offset includes the leading 4 bytes -- the minimimum
+         possible offset is 4. */
+      offset u32 = strtab_add(&strings, nameu8);
+      standard.Name.u.LongName.Zeroes = to_le! @[u32] 0;
+      standard.Name.u.LongName.Offset = to_le! offset;
+    }
+
+    standard.Value = to_le! rec->value;
+    switch rec->section {
+    case SymbolSectionUndefined:
+      standard.SectionNumber = to_le! IMAGE_SYM_UNDEFINED;
+    case SymbolSectionData:
+      standard.SectionNumber = to_le! kWinDataSectionNumber;
+    case SymbolSectionRdata:
+      standard.SectionNumber = to_le! kWinRdataSectionNumber;
+    case SymbolSectionText:
+      standard.SectionNumber = to_le! kWinTextSectionNumber;
+    }
+
+    switch rec->is_function {
+    case IsFunctionNo:
+      standard.Type = to_le! kNullSymType;
+    case IsFunctionYes:
+      standard.Type = to_le! kFunctionSymType;
+    }
+
+    switch rec->is_static {
+    case IsStaticNo:
+      standard.StorageClass = IMAGE_SYM_CLASS_EXTERNAL;
+    case IsStaticYes:
+      standard.StorageClass = IMAGE_SYM_CLASS_STATIC;
+    }
+    standard.NumberOfAuxSymbols = 0;
+    append_reinterpret(&symbols, &standard);
+  }
+
+  win_append_all_section_symbols(&symbols, f);
+
+  strings_size_le le_u32 = to_le! @[u32] ~count(&strings);
+  overwrite_raw(&strings, 0, ixcast(&strings_size_le.buf[0]), 4);
+
+  *symbols_out = symbols;
+  *strings_out = strings;
+}
+
+def IMAGE_SYM_UNDEFINED u16 = 0;
+def IMAGE_SYM_CLASS_EXTERNAL u8 = 2;
+def IMAGE_SYM_CLASS_STATIC u8 = 3;
+def kNullSymType u16 = 0;
+def kFunctionSymType u16 = 0x20;
+
+def kWinDataSectionNumber u16 = 1;
+def kWinRdataSectionNumber u16 = 2;
+def kWinTextSectionNumber u16 = 3;
+
+func win_append_all_section_symbols(d *array[u8], f *objfile) void {
+  win_append_section_symbols(d, &f->data, _u8(".data"), kWinDataSectionNumber);
+  win_append_section_symbols(d, &f->rdata, _u8(".rdata"), kWinRdataSectionNumber);
+  win_append_section_symbols(d, &f->text, _u8(".text"), kWinTextSectionNumber);
+}
+
+func win_append_section_symbols(d *array[u8], s *objfile_section, name array[u8], SectionNumber u16) void {
+  if true {
+    standard COFF_symbol_standard_record;
+    check(count(&name) <= 8);
+    fill(ixcast(&standard.Name.u.ShortName[0]), 8, 0);
+    bufcopy(ixcast(&standard.Name.u.ShortName[0]), data(&name), count(&name));
+    standard.Value = to_le! @[u32] 0;
+    standard.SectionNumber = to_le! SectionNumber;
+    standard.Type = to_le! @[u16] 0;
+    standard.StorageClass = IMAGE_SYM_CLASS_STATIC;
+    standard.NumberOfAuxSymbols = 1;
+    append_reinterpret(d, &standard);
+  }
+  if true {
+    aux_sectiondef COFF_symbol_aux_sectiondef;
+    aux_sectiondef.Length = to_le! @[u32]~count(&s->raw);
+    aux_sectiondef.NumberOfRelocations = to_le! objfile_section_small_relocations_count(s);
+    aux_sectiondef.NumberOfLineNumbers = to_le! @[u16] 0;
+    aux_sectiondef.CheckSum = to_le! @[u32] 0;
+    aux_sectiondef.Number = to_le! @[u16] 0;
+    aux_sectiondef.Selection = 0;
+    // TODO: Assert that aux_sectiondef.Unused has size 3.
+    fill(ixcast(&aux_sectiondef.Unused[0]), 3, 0);
+    append_reinterpret(d, &aux_sectiondef);
+  }
+}
+
+func objfile_section_small_relocations_count(s *objfile_section) u16 {
+  // TODO: (Also in s1:) Support an extended relocations count.
+  check(count(&s->relocs) <= 0xFFFF);
+  return ~count(&s->relocs);
+}
+
+/* Checks that name doesn't have any null characters (it must be
+null-terminatable), and that it's non-empty (the first four bytes of a
+Name field can't be zero). */
+func win_string_to_u8symbol(s *string) array[u8] {
+  ret array[u8];
+  build_u8str(void, &ret, s);
+  check_no_zeros(data(&ret), count(&ret));
+  check(count(&ret) != 0);
+  return ret;
+}

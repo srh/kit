@@ -1,0 +1,215 @@
+import endian;
+import identmap;
+import x86;
+
+struct objfile {
+  data objfile_section;
+  rdata objfile_section;
+  text objfile_section;
+
+  symbol_table array[objfile_symbol_record];
+}
+
+struct sti { x u32; }
+def `~` fn[u32, sti] = wrapconvert;
+
+struct objfile_symbol_record {
+  name sym;
+  value u32;
+  section objfile_symbol_section;
+  is_function is_function;
+  is_static is_static;
+}
+
+enum objfile_symbol_section {
+  // For external symbols.
+  SymbolSectionUndefined void;
+  // For non-external symbols.
+  SymbolSectionData void;
+  SymbolSectionRdata void;
+  SymbolSectionText void;
+}
+
+// TODO: I'm not sure we need both objfile_symbol_section and section.  Likewise in s1.
+enum section {
+  SectionData void;
+  SectionRdata void;
+  SectionText void;
+}
+
+enum is_function {
+  IsFunctionNo void;
+  IsFunctionYes void;
+}
+
+enum is_static {
+  IsStaticNo void;
+  IsStaticYes void;
+}
+
+struct objfile_section {
+  raw array[u8];
+  // Relevant for .data and .rdata sections.  Not relevant for .text, which just uses 16.
+  max_requested_alignment u32;
+  relocs array[objfile_relocation];
+  diff32_count size;
+}
+
+struct objfile_relocation {
+  // Offset from beginning of section.
+  virtual_address u32;
+  // Index into the symbol table.
+  symbol_table_index sti;
+  // Only relevant for Diff32 -- the offset into the relocation's section that the
+  // relocation is relative to.
+  subtracted_offset u32;
+  // What kind of relocation should be performed?
+  type objfile_relocation_type;
+}
+
+enum objfile_relocation_type {
+  Dir32 void;
+  Rel32 void;
+  Diff32 void;
+}
+
+func mk_objfile() objfile {
+  return {mk_objfile_section(), mk_objfile_section(), mk_objfile_section(), mk_array@[objfile_symbol_record]()};
+}
+
+func mk_objfile_section() objfile_section {
+  // Just start off with max_requested_alignment = 4, that's good.
+  return {mk_array@[u8](), 4, mk_array@[objfile_relocation](), 0};
+}
+
+func append_dir32(s *objfile_section, sti sti) void {
+  append_32bit_reloc(s, sti, Dir32);
+}
+
+func append_rel32(s *objfile_section, sti sti) void {
+  append_32bit_reloc(s, sti, Rel32);
+}
+
+func append_32bit_reloc(s *objfile_section, sti sti, type objfile_relocation_type) void {
+  reloc objfile_relocation = {~count(&s->raw), sti, 0, type};
+  push(&s->relocs, reloc);
+  zero le_u32 = to_le! @[u32] 0;
+  append_raw(s, ixcast(&zero.buf[0]), 4);
+}
+
+func note_diff32(s *objfile_section, sti sti, subtracted_offset size, adjusted_offset size) void {
+  reloc objfile_relocation = {~adjusted_offset, sti, ~subtracted_offset, Diff32};
+  push(&s->relocs, reloc);
+  s->diff32_count = s->diff32_count + 1;
+}
+
+func append_raw(s *objfile_section, p * ^[0]u8, n size) void {
+  append_raw(&s->raw, p, n);
+}
+
+func overwrite_raw(s *objfile_section, offset size, p * ^[0]u8, n size) void {
+  overwrite_raw(&s->raw, offset, p, n);
+}
+
+// This is only a u32 because s1 can't statically eval a size.
+def DWORD_SIZE u32 = 4;
+def QWORD_SIZE u32 = 8;
+def DQWORD_SIZE u32 = 16;
+
+func append_to_alignment(a *array[u8], alignment size, byte u8) void {
+  n size = count(a);
+  diff size = (alignment - (n + alignment - 1) % alignment) - 1;
+  for i size = 0; i < diff; i = i + 1 {
+    push(a, byte);
+  }
+}
+
+func align_dword(s *objfile_section) void {
+  append_to_alignment(&s->raw, ~DWORD_SIZE, 0);
+  if s->max_requested_alignment < DWORD_SIZE {
+    s->max_requested_alignment = DWORD_SIZE;
+  }
+}
+
+func fillercode_align_double_quadword(f *objfile) void {
+  s *objfile_section = &f->text;
+  append_to_alignment(&s->raw, ~DQWORD_SIZE, x86_fillercode_byte);
+}
+
+func set_symbol_value(f *objfile, sti sti, value u32) void {
+  rec *objfile_symbol_record = ref(&f->symbol_table, ~sti.x);
+  check(rec->value == 0);
+  rec->value = value;
+}
+
+func `~`(sec section) objfile_symbol_section {
+  switch sec {
+  case SectionData: return SymbolSectionData;
+  case SectionRdata: return SymbolSectionRdata;
+  case SectionText: return SymbolSectionText;
+  }
+}
+
+func `==`(a section, b section) bool {
+  return enumnum(&a) == enumnum(&b);
+}
+
+func add_local_symbol(f *objfile, name sym, value u32, section section, is_static is_static) sti {
+  is_function is_function;
+  if case SectionText = section {
+    is_function = IsFunctionYes;
+  } else {
+    is_function = IsFunctionNo;
+  }
+  rec objfile_symbol_record = {name, value, ~section, is_function, is_static};
+  ret sti = ~ @[u32] ~count(&f->symbol_table);
+  push(&f->symbol_table, rec);
+  return ret;
+}
+
+func add_remote_symbol(f *objfile, name sym, is_function is_function) sti {
+  rec objfile_symbol_record = {name, 0, SymbolSectionUndefined, is_function, IsStaticNo};
+  ret sti = ~ @[u32] ~count(&f->symbol_table);
+  push(&f->symbol_table, rec);
+  return ret;
+}
+
+// TODO: Return a value in a wrapper type?
+func strtab_add(d *array[u8], buf * ^[0]u8, n size) u32 {
+  check_no_zeros(buf, n);
+  ret u32 = ~count(d);
+  append_raw(d, buf, n);
+  push(d, '\0');
+  return ret;
+}
+
+func strtab_add(d *array[u8], buf array[u8]) u32 {
+  return strtab_add(d, data(&buf), count(&buf));
+}
+
+func check_no_zeros(buf * ^[0]u8, n size) void {
+  for i size = 0; i < n; i = i + 1 {
+    if buf[i] == '\0' {
+      crash(_u8("check_no_zeros sees zero"));
+    }
+  }
+}
+
+func secsize(s *objfile_section) u32 {
+  return ~count(&s->raw);
+}
+
+func[T] append_reinterpret(arr *array[u8], p *T) void {
+  d * ^[0]u8 = cast(p);
+  check(sizeof@[T] % sizeof@[u8] == 0);
+  n size = sizeof@[T] / sizeof@[u8];
+  append_raw(arr, d, n);
+}
+
+// A general utility.
+func zeroless_string_to_u8symbol(s *string) array[u8] {
+  ret array[u8];
+  build_u8str(void, &ret, s);
+  check_no_zeros(data(&ret), count(&ret));
+  return ret;
+}
