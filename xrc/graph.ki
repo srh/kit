@@ -71,7 +71,6 @@ enum gr_node {
 
 struct gr_xnode {
   op gr_xop;
-  vs_xopped bool;
 }
 
 // The "in-degree" is the number of qnodes flowing into this (not as the first elem of a
@@ -188,8 +187,8 @@ func help_add_node(gr *frame_graph, node gr_node) gr_num {
 }
 
 // Used in dumbgen for inlining, maybe some other manipulations.
-func untracked_addx(gr *frame_graph, op gr_xop, xopped bool) gr_num {
-  return help_add_node(gr, @[gr_node]XOp({op, xopped}));
+func untracked_addx(gr *frame_graph, op gr_xop) gr_num {
+  return help_add_node(gr, @[gr_node]XOp({op}));
 }
 
 inline func addx(gs gr_statep, op gr_xop) gr_num {
@@ -271,7 +270,7 @@ func addx(gr *frame_graph, ctr *celltrack, op gr_xop) gr_num {
     }
   }
 
-  return untracked_addx(gr, op, false);
+  return untracked_addx(gr, op);
 }
 
 func add(bu *sq_builder, op gr_xop) void {
@@ -1805,8 +1804,6 @@ func gr_lambda_expr(gs gr_statep, x *ast_expr, a *ast_lambda) cr[gr_num] {
   gr_deaden(&lambda_ctr, info->return_cell);
   gr_check_empty(&lambda_ctr);
 
-  #vt_graph(gs.clq, &lambda_gr, fullbody_gn);
-
   id fn_body_id = add_fn_body(
       gs.clq->cs,
       {gs.gr->informal_name, NotComputed, NotComputed,
@@ -3311,8 +3308,6 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, scope *type_scope, type *
   gr_deaden(&ctr, retcell);
   gr_check_empty(&ctr);
 
-  #vt_graph(clq, &gr, gn);
-
   return NoFail!add_fn_body(clq->cs, {informal_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyPrim(op), {gr, gn, retcell}, argcells, InlineMust, NotComputed})});
 }
 
@@ -3388,7 +3383,6 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
         arg_cells array[cell_num];
         inline should_inline;
         #gr_magic(clq, inst_typeinfo_scope, &mag, &body_gr, &body_gn, &return_cell, &arg_cells, &inline);
-        #vt_graph(clq, &body_gr, body_gn);
         id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells, inline, NotComputed})});
       }
 
