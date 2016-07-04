@@ -805,7 +805,7 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   #check_consume_then_discard_expr(es, oo(&a->lhs), &unknown, &a->ptr_discard);
   info *ast_expr_complete_info = expr_complete_info(&oo(&a->lhs)->expr);
   param *te_typeexpr;
-  if !decompose_ref_or_ptr(&info->cu, es, &param) {
+  if !decompose_ptr(&info->cu, es, &param) {
     return ERR(_u8("Expected pointer for lhs of deref field"));
   }
   cu_param cu_typeexpr = ~ *param;
@@ -866,7 +866,7 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
   #check_consume_then_discard_expr(es, oo(&a->rhs), &ptr_pt, &a->ptr_discard);
   rhs_type *cu_typeexpr = expr_complete_type(&oo(&a->rhs)->expr);
   param *te_typeexpr;
-  if decompose_ref_or_ptr(rhs_type, es, &param) {
+  if decompose_ptr(rhs_type, es, &param) {
     // param is already complete.
     emissions array[unify_emission];
     unified_discard te_typeexpr;
@@ -1417,19 +1417,8 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   return NoFail;
 }
 
-// You really should use this, in case we decide to rearrange the order of parameters of
-// the ref type.
-func decompose_ref(t *te_typeexpr, cs *checkstate, ipse_out **te_typeexpr, param_out **te_typeexpr) bool {
-  return decompose_typeapp(t, primitive_ref_puretype(cs), ipse_out, param_out);
-}
-
-func decompose_ref_or_ptr(t *cu_typeexpr, es *framescope, param_out **te_typeexpr) bool {
-  lt *te_typeexpr;
+func decompose_ptr(t *cu_typeexpr, es *framescope, param_out **te_typeexpr) bool {
   param *te_typeexpr;
-  if decompose_ref(&t->x, es->cs, &lt, &param) {
-    *param_out = param;
-    return true;
-  }
   if decompose_typeapp(&t->x, primitive_pointer_puretype(es->cs), &param) {
     *param_out = param;
     return true;
