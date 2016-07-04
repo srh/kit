@@ -599,9 +599,6 @@ func help_check_expr_ai(es *framescope, ai allow_incomplete, x *ast_expr, pt *te
   case &Assignment(a ast_assignment):
     return check_expr_assignment(es, &a, pt, x);
 
-  case &RefOf(a ast_refof):
-    return check_expr_refof(es, &a, pt, x);
-
   case &AddressOf(a ast_addressof):
     return check_expr_addressof(es, &a, pt, x);
 
@@ -757,55 +754,6 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
     return NoFail;
   } else {
     return ERR(_u8("quick-return expression outside body"));
-  }
-}
-
-func check_expr_refof(es *framescope, a *ast_refof, pt *te_typeexpr, x *ast_expr) np {
-  ref_skeleton te_typeexpr = mk_ref_type(es->cs, TeUnknown, TeUnknown);
-  emissions_discard array[unify_emission];
-  unif_pt te_typeexpr;
-  if !unify_types(&es->tscope, pt, &ref_skeleton, &emissions_discard, &unif_pt) {
-    return ERR(_u8("RefOf expr in non-ref context"));
-  }
-  // No emissions are possible, we used TeUnknown everywhere.
-  check(empty(&emissions_discard));
-
-  pt_ipse *te_typeexpr;
-  pt_param *te_typeexpr;
-  if !decompose_ref(&unif_pt, es->cs, &pt_ipse, &pt_param) {
-    ice(_u8("RefOf sees non-ref after unifying with ref."));
-  }
-
-  // We require complete matching because addressof requires it.  Addressof says meh, the
-  // rhs should be some crystal clear lvalue anyway.
-  #check_expr_ai(es, AllowIncompleteNo, oo(&a->rhs), pt_param);
-
-  rhs_info *ast_expr_complete_info = expr_complete_info(oo(&a->rhs));
-  switch &rhs_info->lval {
-  case &IsLvalNo(desc rval_description):
-    // TODO: Support taking reference of an rvalue -- have it become a temporary that
-    // expires... when it can.
-    return ERR(_u8("Taking reference of a non-lvalue"));
-  case &IsLvalYes(desc lval_description):
-    emissions array[unify_emission];
-    unified_ipse te_typeexpr;
-    if !unify_types(&es->tscope, pt_ipse, &desc.ipse, &emissions, &unified_ipse) {
-      return ERR(_u8("Refof ipse types do not match."));
-    }
-
-    ref_type te_typeexpr = mk_ref_type(es->cs, unified_ipse, rhs_info->cu.x);
-    ref_computed cac_typeexpr;
-    #nogeneric_check_and_compute_typeexpr(es->clq, &es->tscope, &ref_type, &emissions, &ref_computed);
-    // (TODO: Make lval desc.ipse be a te_ipse, so it can't be incomplete?)
-    if !ref_computed.complete {
-      return ERR(_u8("ICE?  lval desc.ipse must have been incomplete (after complete type-check)."));
-    }
-
-    ref_props type_properties;
-    #compute_complete_type_properties(es->clq, &es->tscope, &ref_computed.te, &ref_props);
-    annotate_info(x, CompleteCheck(mk(wholeRval(add_cell(es, {LocationStatic, ~ref_computed.te, ref_props})),
-                                      ~ref_computed.te, ref_props, {freeze(&emissions)})));
-    return NoFail;
   }
 }
 
