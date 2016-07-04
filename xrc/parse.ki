@@ -1,7 +1,5 @@
 import tok;
 
-// DOTTED(): Parse AstDotted() ast_typeexpr.
-
 enum allow_blanks {
   AllowBlanksNo void;
   AllowBlanksYes void;
@@ -623,21 +621,7 @@ func triparse_ipse(p *ps, out *ast_typeexpr) triparse_result {
 
   build ast_typeexpr = AstIpse({name});
 
-  for ;; {
-    if !+try_skip_oper(p, '.') {
-      *out = build;
-      return Success;
-    }
-    if !+try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
-      return Error;
-    }
-    fieldname ast_ident;
-    if case Fail = parse_ident(p, &fieldname) {
-      return Error;
-    }
-    // TODO(): There's no way to parse a generalized exposed_type_name.
-    build = AstDotted({embox(build), mk_array(fieldname)});
-  }
+  *out = build;
   return Success;
 }
 

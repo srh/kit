@@ -140,12 +140,6 @@ func convert_typeexpr(a *ast_typeexpr) cr[te_typeexpr] {
     return NoFail!@[te_typeexpr]TeArraytype({count, param});
   case &AstIpse(b ast_ipse):
     return NoFail!@[te_typeexpr]TeIpse({b.name.value});
-  case &AstDotted(b ast_dotted):
-    parts array[sym];
-    foreach ident *ast_ident in refs(&b.fieldname) {
-      push(&parts, ident->value);
-    }
-    return NoFail!@[te_typeexpr]TeDotted({emshp(#convert_typeexpr(oo(&b.lhs))), {freeze(&parts)}});
   case &AstUnknown(b ast_unknown):
     return NoFail!@[te_typeexpr]TeUnknown;
   }
@@ -474,27 +468,6 @@ func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_sc
       *out = {true, TeIpse({a.name})};
       return NoFail;
     }
-
-  case &TeDotted(a te_dotted):
-    lhs cac_typeexpr;
-    #check_and_compute_typeexpr(clq, g, scope, parms, oo(&a.lhs), &lhs);
-
-    if !lhs.complete {
-      return ERR(_u8("Dotted type has incomplete lhs"));
-    }
-
-    lhs_props type_properties;
-    #compute_complete_type_properties(clq, scope, &lhs.te, &lhs_props);
-
-    if !isHas(find(&lhs_props.exposed_types, a.fieldname)) {
-      return ERR(_u8("Cannot find dotted type dot-name."));
-    }
-
-    // Okay, we have the exposed type.  Now what?  We need exposed types to, if they're ipse types, to have an oftype.  We'll need to have plural exposed types be a thing, too.
-    // We'll need to output the "fresh" ipse type or plural type, with an emission.
-
-    // DOTTED(): Finish implementing for check_and_compute.
-    return ERR(_u8("ICE: TeDotted check_and_compute not implemented."));
 
   case &TeUnknown:
     *out = {false, TeUnknown};
@@ -1083,9 +1056,6 @@ func compute_complete_type_properties(clq *clqueue, scope *type_scope, t *te_typ
 
   case &TeIpse(a te_ipse):
     return ERR(_u8("ICE: compute_complete_type_properties on TeIpse"));
-
-  case &TeDotted(a te_dotted):
-    return ERR(_u8("ICE: compute_complete_type_properties on TeDotted"));
 
   case &TeUnknown:
     ice(_u8("compute_type_properties called on incomplete type."));
@@ -1721,13 +1691,6 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
   case &TeIpse(a te_ipse):
     // Yes, I guess.
     return {true, true};
-
-  case &TeDotted(a te_dotted):
-    // DOTTED(): What does it imply for a dotted type to be "complete"?  Can an incomplete dotted type have an invalid exposed type name?  Will callers of this function suffer?
-    lhs complete_computed = is_complete_computed(oo(&a.lhs));
-    // Note that we _don't_ check that a.fieldname is sensible even if lhs is computed.
-    // TODO: This is_complete_computed function is, in general, just kind of weird.
-    return {lhs.complete, false};
 
   case &TeUnknown:
     return {false, false};

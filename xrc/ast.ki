@@ -7,8 +7,6 @@ import typeexpr;
 
 // ATTENTION!  "ast" types must use UNSHARED data structures.
 
-// DOTTED(): Some sort of dotted typeexpr.
-
 // This is an index into some ps-specific structure.
 struct ast_meta { x size; }
 
@@ -155,12 +153,6 @@ struct ast_ipse {
   name ast_ident;
 }
 
-struct ast_dotted {
-  lhs box[ast_typeexpr];
-  // Becomes an exposed_type_name.
-  fieldname array[ast_ident];
-}
-
 struct ast_unknown {
 }
 
@@ -170,7 +162,6 @@ enum ast_typeexpr {
   AstUnion ast_union;
   AstArraytype ast_arraytype;
   AstIpse ast_ipse;
-  AstDotted ast_dotted;
   AstUnknown ast_unknown;
 }
 

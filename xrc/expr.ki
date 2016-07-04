@@ -1685,8 +1685,6 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
     return NoFail;
   case &TeIpse(a te_ipse):
     return ERR(_u8("ICE: Looking up name field of... a ipse type?"));
-  case &TeDotted(a te_dotted):
-    return ERR(_u8("ICE: Looking up name field of... a dotted type?"));
   case &TeUnknown:
     ice(_u8("lookup_field sees incomplete type"));
     return fake();

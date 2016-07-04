@@ -26,7 +26,6 @@ func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
   if case &TeUnknown = pt {
     // In the TeUnknown case below, we assume that this short-circuiting check has been done already.
 
-    // DOTTED(): This will no longer be correct behavior with a dotted parameter (if they can make it this far).  Maybe.
     // It's worth pointing out:  This _is_ correct behavior if t is a generic parameter.
     *unified_out = *t;
     switch t {

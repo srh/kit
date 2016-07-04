@@ -22,7 +22,6 @@ enum te_typeexpr {
   TeUnion te_union;
   TeArraytype te_arraytype;
   TeIpse te_ipse;
-  TeDotted te_dotted;
   TeUnknown void;
 }
 
@@ -68,12 +67,6 @@ struct te_arraytype {
 struct te_ipse {
   name sym;
 }
-
-struct te_dotted {
-  lhs shp[te_typeexpr];
-  fieldname exposed_type_name;
-}
-// TODO(): DOTTED()
 
 struct te_vardecl {
   name sym;
@@ -143,9 +136,6 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
     if case &TeIpse(bx te_ipse) = b {
       return ax.name == bx.name;
     }
-  case &TeDotted(ax te_dotted):
-    // DOTTED: Is this actually impossible?
-    ice(_u8("idy_typeexpr_equal sees TeDotted"));
   case &TeUnknown:
     ice(_u8("idy_typeexpr_equal sees TeUnknown"));
   }
@@ -230,8 +220,6 @@ func[H] build_u8str(help H, r *array[u8], a *te_typeexpr) void {
     wrap_u8str(help, r, _u8("TeArraytype"), &b);
   case &TeIpse(b te_ipse):
     wrap_u8str(help, r, _u8("TeIpse"), &b);
-  case &TeDotted(b te_dotted):
-    wrap_u8str(help, r, _u8("TeDotted"), &b);
   case &TeUnknown:
     append(r, _u8("TeUnknown"));
   }
@@ -267,14 +255,6 @@ func[H] build_u8str(help H, r *array[u8], a *te_arraytype) void {
 
 func[H] build_u8str(help H, r *array[u8], a *te_ipse) void {
   build_u8str(help, r, &a->name);
-}
-
-func[H] build_u8str(help H, r *array[u8], a *te_dotted) void {
-  append(r, _u8("{lhs:"));
-  build_u8str(help, r, oo(&a->lhs));
-  append(r, _u8(",fieldname:"));
-  build_u8str(help, r, &a->fieldname);
-  push(r, '}');
 }
 
 func[H] build_u8str(help H, r *array[u8], a *te_vardecl) void {
@@ -321,9 +301,6 @@ func help_compute_hash(a *te_typeexpr) osize {
     }
   case &TeIpse(ax te_ipse):
     return 0x4 ^ hash_compute_hash(&ax.name);
-  case &TeDotted(ax te_dotted):
-    // DOTTED: Is this actually impossible?  (As with idy_typeexpr_equal.)
-    ice(_u8("help_compute_hash sees TeDotted"));
   case &TeUnknown:
     ice(_u8("help_compute_hash sees TeUnknown"));
   }
@@ -390,10 +367,6 @@ func pretty_u8str(im *identmap, r *array[u8], a *te_typeexpr) void {
   case &TeIpse(b te_ipse):
     push(r, '\'');
     build_u8str(im, r, &b.name);
-  case &TeDotted(b te_dotted):
-    pretty_u8str(im, r, oo(&b.lhs));
-    push(r, '.');
-    build_u8str(im, r, &b.fieldname);
   case &TeUnknown:
     push(r, '_');
   }
