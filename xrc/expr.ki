@@ -736,8 +736,7 @@ func check_expr_quickreturn(es *framescope, ai allow_incomplete, a *ast_quickret
     lval is_lval;
     switch &rhs_info->lval {
     case &IsLvalYes(desc lval_description):
-      lval = IsLvalYes({add_cell(es, {LocationVirtual, success_case_cu, success_case_props}), DeadMe,
-            enum_field_ipse(es, desc.ipse, success_case_cu)});
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, success_case_cu, success_case_props}), DeadMe});
     case &IsLvalNo(desc rval_description):
       lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, success_case_cu, success_case_props})});
     }
@@ -822,7 +821,7 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   switch cf_res {
   case InheritsLval(off check_field_offset_and_index):
     // We deref, so it's always an lval.
-    lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe, field_ipse(es, ipse, fieldtype)});
+    lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe});
     annotate(&a->info, DerefFieldName(@[ast_field_info]{off.offset, off.index}));
   case ConstantField(value u32):
     lval = wholeRval(add_cell(es, {LocationStatic, fieldtype, props}));
@@ -880,8 +879,7 @@ func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr,
   case InheritsLval(off check_field_offset_and_index):
     switch &info->lval {
     case &IsLvalYes(desc lval_description):
-      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe,
-                        field_ipse(es, desc.ipse, fieldtype)});
+      lval = IsLvalYes({add_cell(es, {LocationVirtual, fieldtype, props}), DeadMe});
     case &IsLvalNo(desc rval_description):
       lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, fieldtype, props})});
     }
@@ -915,7 +913,7 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
     props type_properties;
     #compute_complete_type_properties(es->clq, &es->tscope, param, &props);
     annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({add_cell(es, {LocationVirtual, ~ *param, props}),
-                                                           DeadMe, ipse}),
+                                                           DeadMe}),
                                       ~ *param, props, {freeze(&emissions)})));
     return NoFail;
   }
@@ -1238,7 +1236,7 @@ func check_expr_name(es *framescope, ai allow_incomplete, a *ast_name_expr, pt *
   case &OneLocalMatch(elm es_local_match):
     annotate(&a->name_info, @[ast_name_expr_info]LocalResolve({elm.varnum}));
     vi *var_info = ref_var(es, elm.varnum);
-    annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe, vi->ipse.x}),
+    annotate_info(x, CompleteCheck(mk(@[is_lval]IsLvalYes({vi->cell, DontDeadMe}),
                                       vi->type, vi->props, {elm.emissions})));
     return NoFail;
   }
@@ -1966,7 +1964,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       switch &lhs_info->lval {
       case &IsLvalYes(desc lval_description):
         lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
-                          DeadMe, field_ipse(es, desc.ipse, ~ *result_type)});
+                          DeadMe});
       case &IsLvalNo(desc rval_description):
         lval = IsLvalNo({desc.whole_num, add_cell(es, {LocationVirtual, ~ *result_type, result_props})});
       }
@@ -1975,7 +1973,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
     } else {
       // Dereferencing a pointer always makes an lvalue.
       lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
-                        DeadMe, misc_ipse(es, ~ *result_type)});  // Yes, this misc_ipse is a field_ipse of some indexee object that was pointed at.
+                        DeadMe});  // Yes, this misc_ipse is a field_ipse of some indexee object that was pointed at.
       ie_info_after nc[ast_expr_after_consume] = NotComputed;
       lhs_later ast_later_discard_info = mk_later();
       #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);
@@ -1998,7 +1996,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       switch &lhs_info->lval {
       case &IsLvalYes(desc lval_description):
         lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
-                          DeadMe, misc_ipse(es, ~ *result_type)});
+                          DeadMe});
       case &IsLvalNo(desc rval_description):
         return ERR(_u8("User-defined array indexing only works on lvalues"));
       }
@@ -2008,7 +2006,7 @@ func check_expr_index(es *framescope, a *ast_index_expr, pt *te_typeexpr, x *ast
       #check_expr_consume(es, oo(&a->rhs), &key_type);
 
       lval = IsLvalYes({add_cell(es, {LocationVirtual, ~ *result_type, result_props}),
-                        DeadMe, misc_ipse(es, ~ *result_type)});
+                        DeadMe});
       ie_info_after nc[ast_expr_after_consume] = NotComputed;
       lhs_later ast_later_discard_info = mk_later();
       #annotate_disposal_for_consume_then_discard(es, oo(&a->lhs), &ie_info_after, &lhs_later);

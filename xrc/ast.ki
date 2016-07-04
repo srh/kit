@@ -605,11 +605,6 @@ struct lval_description {
   num cell_num;
   // DeadMe if the lval cell is only carried by the lval.
   deadme lval_deadme;
-  // The lval's ipse.
-  // TODO: Maybe deadme could be obviated by the ipse field.
-  // TODO: Maybe this field should be a te_ipse.
-  // TODO: Maybe this field should be a cu_typeexpr.
-  ipse te_typeexpr;
 }
 
 enum is_lval {
