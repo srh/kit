@@ -46,8 +46,6 @@ struct te_app_pack {
   teip te_instpack;
   // Maps ipse's to the deftype inst's ipses.  e.g. ipse_mappings[3] gives the local ipse name (in this typeexpr's type_scope)
   ipse_mappings shray[sym];
-  // What emissions must happen for this type to be... a thing.
-  emittance shray[unify_emission];
 }
 
 struct te_app {
@@ -437,14 +435,8 @@ struct te_variadic_generics {
   after shray[sym];
 }
 
-struct te_ipse_generik {
-  name sym;
-  oftype te_typeexpr;
-}
-
 enum te_generik {
   TePlainGeneric sym;
-  TeIpseGeneric te_ipse_generik;
 }
 
 enum te_generics {

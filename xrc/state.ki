@@ -214,8 +214,6 @@ struct module {
 
 struct derived_method_explicit {
   ip instpair;
-  // EMISSIONS: Some(?) users of derived_method_explicit will want to use emissions (probably after they've been improved to describe funcall before/after emissions).
-  emissions emissions_info;
 }
 
 // Describes the behavior of init/copy/move/destroy methods.
@@ -330,7 +328,6 @@ struct deftype_inst_info {
 struct deftype_inst {
   parms idy_genparms;
   // Maybe this should/could be part of idy_genparms -- i think we just recompute the same value each time in match_def.  This specifies the emissions that the values of parms implicitly generates.  For example, if we have generics ['a T, T], if parms is ['$0, foo['$2]] and the oftype of '$0 is foo['$1] in scope for some reason... then we have the emission '$1 = '$2.
-  emittance shray[unify_emission];
   info nbfc[deftype_inst_info];
 }
 
@@ -597,15 +594,10 @@ struct frame_regraphed {
 struct def_inst_typeinfo {
   cu cu_typeexpr;
   props type_properties;
-  // Don't forget to combine this with parms_emittance?  SIGH!  Fuck this planet.
-  // EMISSIONS: Actually use this somehow...
-  emittance shray[unify_emission];
 }
 
 struct def_inst {
   parms idy_genparms;
-  // Emissions that are emitted just by the parms having the types that they have.
-  parms_emittance shray[unify_emission];
   // Our own copy of the def's rhs, which we can annotate.  It does not have its generics
   // replaced.  This is None if we have an extern def or primitive def.
   rhs def_inst_rhs;
@@ -618,8 +610,8 @@ struct def_inst {
   evaled_value nbfc[st_value];
 }
 
-func mk(parms idy_genparms, parms_emittance shray[unify_emission], rhs def_inst_rhs) def_inst {
-  return {parms, parms_emittance, rhs, NotComputed, DidNotCheckRhs, NotComputed, NotComputed};
+func mk(parms idy_genparms, rhs def_inst_rhs) def_inst {
+  return {parms, rhs, NotComputed, DidNotCheckRhs, NotComputed, NotComputed};
 }
 
 struct def_nonprim {
@@ -733,10 +725,10 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype_scope *type_sco
   case &MultiMatch:
     return ERR(_u8("Multiple explicit methods '"), lookup(clq->im, impl_name), _u8("'"));
   case &OneMatch(m ent_and_parms):
-    // This function is called by to_defclass_properties, which means lifetimes come from idy_repls.  There is still the question of how to handle emissions from copy constructors and the like, and that might depend on what the emissions actually are.
+    // This function is called by to_defclass_properties, which means lifetimes come from idy_repls.
     inst_id def_inst_id;
     #make_inst(clq, m.ent, fntype_scope, &m.parms, &inst_id);
-    return NoFail(@[derived_method_behavior]DerivedMethodExplicit({@[instpair]{m.ent, inst_id}, {m.emissions}}));
+    return NoFail(@[derived_method_behavior]DerivedMethodExplicit({@[instpair]{m.ent, inst_id}}));
   }
 }
 

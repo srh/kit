@@ -718,16 +718,13 @@ struct gr_statep {
   fb opt[*fullbody_state];
 }
 
-// EMISSIONS: We're just doing pointer types and stuff.  Right?  And we caught their emissions before.  So we can just swallow the emissions here?  For now.  Maybe in magic functions we'll need them.
 func gr_prim(gs gr_statep, t te_typeexpr) cu_typeexpr {
-  emissions array[unify_emission];
-  return compute_prim_with_scope(gs.clq, un(&gs.gr->scope), t, &emissions);
+  return compute_prim_with_scope(gs.clq, un(&gs.gr->scope), t);
 }
 
 func gr_prim(gs gr_statep, t te_typeexpr) cu_typrop {
-  emissions array[unify_emission];
   ret cu_typrop;
-  compute_prim_with_scope(gs.clq, un(&gs.gr->scope), t, &emissions, &ret.cu, &ret.props);
+  compute_prim_with_scope(gs.clq, un(&gs.gr->scope), t, &ret.cu, &ret.props);
   return ret;
 }
 

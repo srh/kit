@@ -190,7 +190,6 @@ struct ast_bracebody {
 
 struct ast_var_info {
   vn var_number;
-  emissions emissions_info;
 }
 
 enum ast_var_rhs {
@@ -347,8 +346,6 @@ enum ast_statement_enum {
 }
 
 struct ast_cp_info {
-  // Emissions between the swartch case type and pattern decl variable type.
-  decl_emissions emissions_info;
   ovn opt[var_number];
   tag_value enum_tag_value;
   // enum_field_offset(cs, et, tag_value) -- annotated here because getting a enum
@@ -460,10 +457,6 @@ struct ast_local_info {
   varnum var_number;
 }
 
-struct emissions_info {
-  x shray[unify_emission];
-}
-
 struct enum_constructor_info {
   constructor_tag enum_tag_value;
   ip instpair;
@@ -502,7 +495,6 @@ struct ast_array_indexing_info {
 
 struct ast_fn_indexing_info {
   ip instpair;
-  emissions emissions_info;
 }
 
 enum ast_array_fn_indexing_info {
@@ -518,8 +510,6 @@ struct ast_deref_indexing_info {
 struct ast_index_expr_info {
   deref opt[ast_deref_indexing_info];
   fn_info ast_array_fn_indexing_info;
-  // Not the only emissions info!  See fn_info for the function call.
-  result_emissions emissions_info;
 }
 
 struct ast_index_expr {
@@ -733,12 +723,10 @@ struct ast_expr_complete_info {
   lval is_lval;
   cu cu_typeexpr;
   cu_props type_properties;
-  // A general place to dump emissions for an expr node.  Idk.
-  emissions emissions_info;
 }
 
-func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties, emissions emissions_info) ast_expr_complete_info {
-  return {lval, cu, cu_props, emissions};
+func mk(lval is_lval, cu cu_typeexpr, cu_props type_properties) ast_expr_complete_info {
+  return {lval, cu, cu_props};
 }
 
 enum ast_expr_info {
@@ -818,15 +806,9 @@ func discard(expr ast_expr) ast_expr_discard {
   return {NotComputed, move(&expr)};
 }
 
-struct ast_ipse_generik {
-  name ast_ident;
-  oftype ast_typeexpr;
-}
-
 // This is named with a k to prevent typos with ast_generics.
 enum ast_generik {
   PlainGeneric ast_ident;
-  IpseGeneric ast_ipse_generik;
 }
 
 enum ast_generics {

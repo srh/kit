@@ -1,16 +1,5 @@
 import typeexpr;
 
-// DOTTED(): This file.
-
-struct unify_same_ipse {
-  name1 sym;
-  name2 sym;
-}
-
-enum unify_emission {
-  SameIpse unify_same_ipse;
-}
-
 // unify_* functions _mutate_ this -- they can set updated to true.
 struct unify_information {
   // Gets set if any _new information_ was learned during unification -- i.e. the unified output is more complete than the input.
@@ -30,12 +19,9 @@ func mk_fresh_info() unify_information {
 // (The reason is, we might not have gathered complete information about the generic
 // parameter when we've halfway-processed the type -- the caller can and should
 // reconstruct the correct values later.)
-//
-// _appends_ emissions onto emissions_app.
 func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
                           names *shray[te_generik], t *te_typeexpr,
                           info_app *unify_information,
-                          emissions_app *array[unify_emission],
                           unified_out *te_typeexpr) bool {
   if case &TeUnknown = pt {
     // In the TeUnknown case below, we assume that this short-circuiting check has been done already.
@@ -56,7 +42,7 @@ func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
     if case Has(ix size) = lookup_plain_name(names, a.value) {
       info unify_information = mk_fresh_info();
       unified te_typeexpr;
-      if !unify_types(scope, &up->tys[ix], pt, &info, emissions_app, &unified) {
+      if !unify_types(scope, &up->tys[ix], pt, &info, &unified) {
         return false;
       }
       up->tys[ix] = unified;
@@ -93,7 +79,7 @@ func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
       reserve(&unified_params, n);
       for i size = 0; i < n; i = i + 1 {
         unified te_typeexpr;
-        if !unify_under_generics(scope, up, &pa_params[i], names, &a_params[i], info_app, emissions_app, &unified) {
+        if !unify_under_generics(scope, up, &pa_params[i], names, &a_params[i], info_app, &unified) {
           return false;
         }
         push(&unified_params, unified);
@@ -118,7 +104,7 @@ func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
           return false;
         }
         unified te_typeexpr;
-        if !unify_under_generics(scope, up, &pd->type, names, &d->type, info_app, emissions_app, &unified) {
+        if !unify_under_generics(scope, up, &pd->type, names, &d->type, info_app, &unified) {
           return false;
         }
         push(&unified_fields, {d->name, unified});
@@ -146,7 +132,7 @@ func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
         unified_count = pa.count;
       }
       unified_type te_typeexpr;
-      if !unify_under_generics(scope, up, oo(&pa.param), names, oo(&a.param), info_app, emissions_app, &unified_type) {
+      if !unify_under_generics(scope, up, oo(&pa.param), names, oo(&a.param), info_app, &unified_type) {
         return false;
       }
       *unified_out = TeArraytype({unified_count, emshp(unified_type)});
@@ -158,42 +144,28 @@ func unify_under_generics(scope *type_scope, up *unif_parms, pt *te_typeexpr,
   case &TeIpse(a te_ipse):
     // NOTE: I mimicked the TeName case, and haven't fully thought out how that would
     // affect this function's callers, so treat this code with skepticism.
-    if case Has(ixtup tup[size, *te_ipse_generik]) = lookup_ipse_name(names, a.name) {
-      info unify_information;
-      unified te_typeexpr;
-      if !unify_types(scope, &up->tys[ixtup.car], pt, &info, emissions_app, &unified) {
-        return false;
+    if case &TeIpse(pa te_ipse) = pt {
+      // NOTE: Beware scopage, as with TeName, when that becomes a factor.
+      if a.name != pa.name {
+        a_oftype cu_typeexpr = scope_lookup(scope, a.name);
+        pa_oftype cu_typeexpr = scope_lookup(scope, pa.name);
+        // If a.name isn't in "names", it cannot have an oftype that references "names".  So we can just use unify_types.  I mean generally a cu_typeexpr can't reference "names", so if they types share the same local scope, ditto, we already replaced its generics and cac'd the oftype.
+
+        info unify_information = mk_fresh_info();
+        unified_oftype_discard te_typeexpr;
+        if !unify_types(scope, &a_oftype.x, &pa_oftype.x, &info, &unified_oftype_discard) {
+          return false;
+        }
+        // we're unifying complete types just to check equivalence.
+        check(!info.updated);
+      } else {
+        // Just to assert the scope actually has the name.
+        discard cu_typeexpr = scope_lookup(scope, a.name);
       }
-      up->tys[ixtup.car] = unified;
-      up->dirty[ixtup.car] |= info.updated;
       *unified_out = TeIpse({a.name});
       return true;
     } else {
-      if case &TeIpse(pa te_ipse) = pt {
-        // NOTE: Beware scopage, as with TeName, when that becomes a factor.
-        if a.name != pa.name {
-          a_oftype cu_typeexpr = scope_lookup(scope, a.name);
-          pa_oftype cu_typeexpr = scope_lookup(scope, pa.name);
-          // If a.name isn't in "names", it cannot have an oftype that references "names".  So we can just use unify_types.  I mean generally a cu_typeexpr can't reference "names", so if they types share the same local scope, ditto, we already replaced its generics and cac'd the oftype.
-
-          info unify_information = mk_fresh_info();
-          unified_oftype_discard te_typeexpr;
-          if !unify_types(scope, &a_oftype.x, &pa_oftype.x, &info, emissions_app, &unified_oftype_discard) {
-            return false;
-          }
-          // we're unifying complete types just to check equivalence.
-          check(!info.updated);
-
-          push(emissions_app, @[unify_emission]SameIpse({a.name, pa.name}));
-        } else {
-          // Just to assert the scope actually has the name.
-          discard cu_typeexpr = scope_lookup(scope, a.name);
-        }
-        *unified_out = TeIpse({a.name});
-        return true;
-      } else {
-        return false;
-      }
+      return false;
     }
 
   case &TeUnknown:
@@ -228,24 +200,21 @@ func unify_puretypes(ppta *te_puretype, pptb *te_puretype, out *te_puretype) boo
   }
 }
 
-func unify_types(scope *type_scope, pta *te_typeexpr, ptb *te_typeexpr, emissions_app *array[unify_emission], out *te_typeexpr) bool {
+func unify_types(scope *type_scope, pta *te_typeexpr, ptb *te_typeexpr, out *te_typeexpr) bool {
   info unify_information = mk_fresh_info();
-  return unify_types(scope, pta, ptb, &info, emissions_app, out);
+  return unify_types(scope, pta, ptb, &info, out);
 }
 
-func unify_types(scope *type_scope, pta *te_typeexpr, ptb *te_typeexpr, info_app *unify_information, emissions_app *array[unify_emission], out *te_typeexpr) bool {
+func unify_types(scope *type_scope, pta *te_typeexpr, ptb *te_typeexpr, info_app *unify_information, out *te_typeexpr) bool {
   names shray[te_generik];
   up unif_parms = mk_empty_unif_parms();
-  return unify_under_generics(scope, &up, pta, &names, ptb, info_app, emissions_app, out);
+  return unify_under_generics(scope, &up, pta, &names, ptb, info_app, out);
 }
 
 func unifies(complete *te_typeexpr, pt *te_typeexpr) bool {
   unified te_typeexpr;
-  emissions array[unify_emission];
-  // There shouldn't be lifetimes looking up scope (right?), since we don't care about emissions.
   scope type_scope;
-  if unify_types(&scope, complete, pt, &emissions, &unified) {
-    check(empty(&emissions));
+  if unify_types(&scope, complete, pt, &unified) {
     return true;
   } else {
     return false;
@@ -255,7 +224,6 @@ func unifies(complete *te_typeexpr, pt *te_typeexpr) bool {
 struct type_matches_precisely {
   // Complete types for all the template/generic names.
   parms_types shray[te_typeexpr];
-  emissions shray[unify_emission];
 }
 
 enum type_matches_res {
@@ -295,53 +263,30 @@ func type_matches(scope *type_scope, parms *shray[te_typeexpr], pt *te_typeexpr,
   // Since t is complete, unified is irrelevant and must be identical to t.  Might become untrue if ipses unify into a fresh ipse value.
   unified te_typeexpr;
   info unify_information = mk_fresh_info();
-  emissions array[unify_emission];
-  if !unify_under_generics(scope, &up, pt, names, t, &info, &emissions, &unified) {
+  if !unify_under_generics(scope, &up, pt, names, t, &info, &unified) {
     return TypeDoesNotMatch;
   }
-  if !verify_matches_oftypes(scope, &up, names, &emissions) {
+  if !verify_matches_oftypes(scope, &up, names) {
     // This does not kill match_def completely.  The reason is, it's oftypes getting smashed with other concrete types that would cause verify_matches_oftypes to fail.
     return TypeDoesNotMatch;
   }
   if !all_complete_computed(&up.tys).complete {
     return TypeMatchesAmbiguously;
   }
-  return TypeMatchesPrecisely({up.tys, freeze(&emissions)});
+  return TypeMatchesPrecisely({up.tys});
 }
 
-func verify_matches_oftypes(scope *type_scope, up *unif_parms, names *shray[te_generik], emissions_app *array[unify_emission]) bool {
+func verify_matches_oftypes(scope *type_scope, up *unif_parms, names *shray[te_generik]) bool {
   n size = count(names);
   check(n == count(&up->tys));
-  reloop bool = true;
-  while reloop {
-    reloop = false;
-    for i size = 0; i < n; i++ {
-      if up->dirty[i] {
-        up->dirty[i] = false;
-        switch &names[i] {
-        case &TeIpseGeneric(tig te_ipse_generik):
-          switch &up->tys[i] {
-          case &TeIpse(ti te_ipse):
-            ui_oftype cu_typeexpr = scope_lookup(scope, ti.name);
-            // As in type_matches, since oftypes are complete, unified is irrelevant and must be identical to t.
-            info unify_information = mk_fresh_info();
-            unified te_typeexpr;
-            if !unify_under_generics(scope, up, &ui_oftype.x, names, &tig.oftype, &info, emissions_app, &unified) {
-              return false;
-            }
-            check(!info.updated);
-            reloop = true;
-          case &TeUnknown:
-            void;
-          default:
-            // (A) I _thought_ this was only reachable for match_deftype, but now I think user-supplied parms to match_def could also create this fail.
-            return false;
-          }
-        case &TePlainGeneric(s sym):
-          if case &TeIpse(ti te_ipse) = &up->tys[i] {
-            // See (A) ^^, likewise.
-            return false;
-          }
+  for i size = 0; i < n; i++ {
+    if up->dirty[i] {
+      up->dirty[i] = false;
+      switch &names[i] {
+      case &TePlainGeneric(s sym):
+        if case &TeIpse(ti te_ipse) = &up->tys[i] {
+          // See (A) ^^, likewise.
+          return false;
         }
       }
     }

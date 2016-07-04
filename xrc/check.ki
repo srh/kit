@@ -248,9 +248,9 @@ func deftype_converted_rhs(np *deftype_nonprim, out **deftype_rhs_spec) np {
   }
 }
 
-func enqueue_def_inst(clq *clqueue, id def_entry_id, parms *idy_genparms, emittance *shray[unify_emission]) def_inst_id {
+func enqueue_def_inst(clq *clqueue, id def_entry_id, parms *idy_genparms) def_inst_id {
   cs *checkstate = clq->cs;
-  res id_and_created = ensure_def_inst(cs, ref_def_entry(cs, id), parms, emittance);
+  res id_and_created = ensure_def_inst(cs, ref_def_entry(cs, id), parms);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDefEntry({id, res.id, cs->instantiation_depth}));
   }
@@ -263,7 +263,7 @@ struct id_and_created {
 }
 
 // rhs is "None" for extern defs and primitive defs.
-func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms, emittance *shray[unify_emission]) id_and_created {
+func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms) id_and_created {
   if case Has(id def_inst_id) = lookup(&ent->insts, parms) {
     return {id, false};
   }
@@ -285,7 +285,7 @@ func ensure_def_inst(cs *checkstate, ent *def_entry, parms *idy_genparms, emitta
   case &DefnMagic(mag def_magic):
     rhs = InstRhsMagic(mag);
   }
-  id def_inst_id = add_inst(cs, mk(*parms, *emittance, rhs));
+  id def_inst_id = add_inst(cs, mk(*parms, rhs));
   check_insert(&ent->insts, parms, id);
   return {id, true};
 }
@@ -308,13 +308,12 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
 
     inst_scope *type_scope = ref_scope(&inst->parms);
 
-    emissions array[unify_emission];
     // Important: We check the typeexpr first.  If that typeexpr cyclically refers to
     // this def, we fail.  If there is no typeexpr, we need to compute it from the rhs
     // (and that also needs to not depend cyclically on this def's own typeexpr).
     computed cac_typeexpr;
     if case Unprinted(pm) = check_and_compute_typeexpr(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
-                                                       ent_typeexpr, &emissions, &computed) {
+                                                       ent_typeexpr, &computed) {
       inst->typeinfo = FailedComputation;
       return Unprinted(pm);
     }
@@ -330,7 +329,7 @@ func ensure_def_inst_type_computed(cs *checkstate, clq *clqueue, ent *def_entry,
       return ERR(_u8("def (instantiation) has non-trivial type"));
     }
 
-    inst->typeinfo = Computed({cu_computed, props, freeze(&emissions)});
+    inst->typeinfo = Computed({cu_computed, props});
     *out = un(&inst->typeinfo);
     return NoFail;
   case &BeganComputing:
@@ -378,7 +377,7 @@ func ensure_def_inst_checked(cs *checkstate, clq *clqueue, ent_id def_entry_id, 
 }
 
 // parms have already had generics replaced.  They should also be complete.
-func check_and_compute_parms_no_canonicalize(clq *clqueue, t_scope *type_scope, t *genparms, emissions_app *array[unify_emission], out *idy_repls) np {
+func check_and_compute_parms_no_canonicalize(clq *clqueue, t_scope *type_scope, t *genparms, out *idy_repls) np {
   switch t {
   case &NoParms:
     *out = blank_idyrepls();
@@ -388,7 +387,7 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t_scope *type_scope, 
     nogeneric_parms idy_repls = blank_idyrepls();
     params_complete bool;
     params shray[te_typeexpr];
-    #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, emissions_app, &params, &params_complete);
+    #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, &params, &params_complete);
 
     if !params_complete {
       ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
@@ -404,20 +403,17 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t_scope *type_scope, 
 }
 
 // parms have already had generics replaced.  They should also be complete.
-// Emits canonicalized emittance.
-func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_scope, t *genparms, out *idy_genparms, emittance_out *shray[unify_emission]) np {
+func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_scope, t *genparms, out *idy_genparms) np {
   switch t {
   case &NoParms:
     *out = blank_idyparms();
-    *emittance_out = mk_empty_emittance();
     return NoFail;
   case &HasParms(ps shray[te_typeexpr]):
     nogeneric_g te_generik_scope = empty_generik_scope();
     nogeneric_parms idy_repls = blank_idyrepls();
-    emissions array[unify_emission];
     params_complete bool;
     params shray[te_typeexpr];
-    #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, &emissions, &params, &params_complete);
+    #check_and_compute_typeexpr_shray(clq, nogeneric_g, t_scope, &nogeneric_parms, &ps, &params, &params_complete);
 
     if !params_complete {
       ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
@@ -433,24 +429,20 @@ func check_and_compute_parms_with_canonicalization(clq *clqueue, t_scope *type_s
       push(&cu_params, ~canonicalize_idy_ipses(&ctx, &params[i]));
     }
     *out = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&cu_params)}};
-    frozen_emittance shray[unify_emission] = freeze(&emissions);
-    *emittance_out = canonicalized_emittance(&ctx, &frozen_emittance);
     return NoFail;
   }
 }
 
-func nogeneric_check_and_compute_typeexpr(clq *clqueue, scope *type_scope, t *te_typeexpr, emissions_app *array[unify_emission], out *cac_typeexpr) np {
+func nogeneric_check_and_compute_typeexpr(clq *clqueue, scope *type_scope, t *te_typeexpr, out *cac_typeexpr) np {
   ng te_generik_scope = empty_generik_scope();
   np idy_repls = blank_idyrepls();
-  return check_and_compute_typeexpr(clq, ng, scope, &np, t, emissions_app, out);
+  return check_and_compute_typeexpr(clq, ng, scope, &np, t, out);
 }
 
 // NOTE: Generics replacement should really be a separate phase.  (Why?)  (Performance is
 // one counter-argument -- we'd create an extra intermediate te_typeexpr.)
 func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, t *te_typeexpr,
-                                emissions_app *array[unify_emission],
                                 out *cac_typeexpr) np {
-  // EMISSIONS(): n^2 array concatenation, make some better data structure for this function's emissions
   switch t {
   case &TeName(a te_name):
     computed cu_typeexpr;
@@ -459,38 +451,33 @@ func check_and_compute_typeexpr(clq *clqueue, g te_generik_scope, scope *type_sc
     return NoFail;
 
   case &TeApp(a te_app):
-    #check_and_compute_app_type(clq, g, scope, parms, &a, emissions_app, out);
+    #check_and_compute_app_type(clq, g, scope, parms, &a, out);
     return NoFail;
 
   case &TeUnion(a te_union):
     computed_fields_complete bool;
     computed_fields array[te_vardecl];
-    #help_check_and_compute_fields(clq, g, scope, parms, &a.fields, emissions_app, &computed_fields, &computed_fields_complete);
+    #help_check_and_compute_fields(clq, g, scope, parms, &a.fields, &computed_fields, &computed_fields_complete);
     *out = {computed_fields_complete, TeUnion({freeze(&computed_fields)})};
     return NoFail;
 
   case &TeArraytype(a te_arraytype):
     param cac_typeexpr;
-    #check_and_compute_typeexpr(clq, g, scope, parms, oo(&a.param), emissions_app, &param);
+    #check_and_compute_typeexpr(clq, g, scope, parms, oo(&a.param), &param);
     *out = {param.complete && isHas(&a.count), TeArraytype({a.count, emshp(param.te)})};
     return NoFail;
 
   case &TeIpse(a te_ipse):
-    if case Has(ixtup tup[size, _]) = find_ipse_generic(g, a.name) {
-      *out = {true, parms->tys[ixtup.car].x};
-      return NoFail;
+    if !ipse_in_scope(scope, a.name) {
+      return ERR(_u8("Ipse '"), lookup(clq->im, a.name), _u8(" not in scope"));
     } else {
-      if !ipse_in_scope(scope, a.name) {
-        return ERR(_u8("Ipse '"), lookup(clq->im, a.name), _u8(" not in scope"));
-      } else {
-        *out = {true, TeIpse({a.name})};
-        return NoFail;
-      }
+      *out = {true, TeIpse({a.name})};
+      return NoFail;
     }
 
   case &TeDotted(a te_dotted):
     lhs cac_typeexpr;
-    #check_and_compute_typeexpr(clq, g, scope, parms, oo(&a.lhs), emissions_app, &lhs);
+    #check_and_compute_typeexpr(clq, g, scope, parms, oo(&a.lhs), &lhs);
 
     if !lhs.complete {
       return ERR(_u8("Dotted type has incomplete lhs"));
@@ -554,7 +541,6 @@ func fake_eval_arraytype_count(x *ast_expr, count_out *u32) np {
 }
 
 func help_check_and_compute_fields(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, a *shray[te_vardecl],
-                                   emissions_app *array[unify_emission],
                                    computed_fields_out *array[te_vardecl],
                                    computed_fields_complete_out *bool) np {
   all_complete bool = true;
@@ -567,7 +553,7 @@ func help_check_and_compute_fields(clq *clqueue, g te_generik_scope, scope *type
       }
     }
     computed cac_typeexpr;
-    #check_and_compute_typeexpr(clq, g, scope, parms, &decl->type, emissions_app, &computed);
+    #check_and_compute_typeexpr(clq, g, scope, parms, &decl->type, &computed);
     all_complete = all_complete & computed.complete;
     push(&all_computed, {decl->name, computed.te});
   }
@@ -590,19 +576,15 @@ func check_and_compute_name_type(clq *clqueue, g te_generik_scope, scope *type_s
 
   md matched_deftype = #match_deftype(clq->cs, fake_ast_meta(), a->value, scope, None);
   check(isNone(&md.learned_params));
-  // There should be no emissions, because this is a name type, no ipses involved.
-  check(empty(&md.emissions));
 
   np idy_genparms = blank_idyparms();
-  inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &np,
-                                                 &md.emissions /* which is empty */);
+  inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &np);
   *computed_out = ~ @[te_typeexpr]TeName({a->value, Has({md.ent_id, inst_id})});
   return NoFail;
 }
 
 func check_and_compute_typeexpr_shray(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls,
                                       t *shray[te_typeexpr],
-                                      emissions_app *array[unify_emission],
                                       computed_out *shray[te_typeexpr],
                                       computed_complete_out *bool) np {
   complete bool = true;
@@ -611,7 +593,7 @@ func check_and_compute_typeexpr_shray(clq *clqueue, g te_generik_scope, scope *t
   reserve(&computed, n);
   for i size = 0; i < n; i = i + 1 {
     c cac_typeexpr;
-    #check_and_compute_typeexpr(clq, g, scope, parms, ref(t, i), emissions_app, &c);
+    #check_and_compute_typeexpr(clq, g, scope, parms, ref(t, i), &c);
     push(&computed, c.te);
     complete = complete & c.complete;
   }
@@ -621,18 +603,15 @@ func check_and_compute_typeexpr_shray(clq *clqueue, g te_generik_scope, scope *t
 }
 
 func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_scope, parms *idy_repls, a *te_app,
-                                emissions_app *array[unify_emission],
                                 out *cac_typeexpr) np {
   if case &Has(pack te_app_pack) = &a->pack {
     *out = {true, TeApp(*a)};
-    append(emissions_app, &pack.emittance);
     return NoFail;
   }
 
-  emissions1 array[unify_emission];
   params_complete_discard bool;
   params1 shray[te_typeexpr];
-  #check_and_compute_typeexpr_shray(clq, g, scope, parms, &a->params, &emissions1, &params1, &params_complete_discard);
+  #check_and_compute_typeexpr_shray(clq, g, scope, parms, &a->params, &params1, &params_complete_discard);
 
   switch &a->typefunc {
   case &TePureName(value sym):
@@ -640,10 +619,9 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
 
     // TODO: We could make unify_under_generics retain computedness and prove that we don't have to re-cac the params -- just run all_complete_computed on them.
     // TODO: Also have unify_under_generics look at instpacks?  Using their ipse_mappings too.
-    emissions2 array[unify_emission] = mk_copy(&md.emissions);
     params_complete bool;
     cac_params shray[te_typeexpr];
-    #check_and_compute_typeexpr_shray(clq, g, scope, parms, unHas(&md.learned_params), &emissions2, &cac_params, &params_complete);
+    #check_and_compute_typeexpr_shray(clq, g, scope, parms, unHas(&md.learned_params), &cac_params, &params_complete);
 
     if params_complete {
       // TODO: This is quite duplicated with check_and_compute_parms.  With the changes
@@ -656,18 +634,14 @@ func check_and_compute_app_type(clq *clqueue, g te_generik_scope, scope *type_sc
         push(&canonical, ~canonicalize_idy_ipses(&ctx, param));
       }
       hp idy_genparms = {emshp(canonicalized_scope), count(&ipse_names), {freeze(&canonical)}};
-      emissions2_sh shray[_] = freeze(&emissions2);
-      append(emissions_app, &emissions2_sh);
-      inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &hp, &emissions2_sh);
-      *out = {true, TeApp({TePureName(value), cac_params, Has({{md.ent_id, inst_id}, freeze(&ipse_names), emissions2_sh})})};
+      inst_id deftype_inst_id = enqueue_deftype_inst(clq, md.ent_id, &hp);
+      *out = {true, TeApp({TePureName(value), cac_params, Has({{md.ent_id, inst_id}, freeze(&ipse_names)})})};
     } else {
       *out = {false, TeApp({TePureName(value), cac_params, None})};
-      append(emissions_app, &md.emissions);
     }
     return NoFail;
   case &TePureUnknown:
     *out = {false, TeApp({TePureUnknown, params1, None})};
-    append(emissions_app, &emissions1);
     return NoFail;
   }
 }
@@ -678,11 +652,10 @@ enum triresult {
   NotAny void;
 }
 
-func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typeexpr]], emissions_out *array[unify_emission], learned_params_out *opt[shray[te_typeexpr]]) triresult {
+func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typeexpr]], learned_params_out *opt[shray[te_typeexpr]]) triresult {
   switch a {
   case &TeNoGenerics:
     if case None = params {
-      *emissions_out = mk_array();
       *learned_params_out = None;
       return Success;
     } else {
@@ -696,12 +669,9 @@ func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typee
       }
 
       up unif_parms = mk_unif_parms(p);
-      // Also emit newly learned type information?
-      emissions array[unify_emission];
-      if !verify_matches_oftypes(scope, &up, &sh, &emissions) {
+      if !verify_matches_oftypes(scope, &up, &sh) {
         return NotAny;
       }
-      swap(emissions_out, &emissions);
       *learned_params_out = Has(up.tys);
       return Success;
     } else {
@@ -716,7 +686,6 @@ func arity_matches(scope *type_scope, a *te_generics, params opt[*shray[te_typee
         }
 
         cp array[te_typeexpr] = mk_copy(p);
-        *emissions_out = mk_array();
         *learned_params_out = Has(freeze(&cp));
         return Success;
       } else {
@@ -735,7 +704,6 @@ func[T] ERR_no_match(cs *checkstate, m ast_meta, name sym, params opt[*shray[te_
 struct matched_deftype {
   ent_id deftype_entry_id;
   learned_params opt[shray[te_typeexpr]];
-  emissions shray[unify_emission];
 }
 
 func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, params opt[*shray[te_typeexpr]]) cr[matched_deftype] {
@@ -746,13 +714,12 @@ func match_deftype(cs *checkstate, m ast_meta, name sym, scope *type_scope, para
       id deftype_entry_id = arr[i];
       ent *deftype_entry = ref_deftype_entry(cs, id);
       learned opt[shray[te_typeexpr]];
-      emissions array[unify_emission];
-      switch arity_matches(scope, &ent->generics, params, &emissions, &learned) {
+      switch arity_matches(scope, &ent->generics, params, &learned) {
       case Success:
         if case &Has(md matched_deftype) = &match {
           return ERR(_u8("Multiple deftypes named '"), lookup(cs->im, name), _u8("' match arity"));
         }
-        match = Has({id, learned, freeze(&emissions)});
+        match = Has({id, learned});
       case NotThis:
         void;
       case NotAny:
@@ -774,10 +741,6 @@ func find_plain_generic(g te_generik_scope, name sym) opt[size] {
   return lookup_plain_name(&g.sh, name);
 }
 
-func find_ipse_generic(g te_generik_scope, name sym) opt[tup[size, *te_ipse_generik]] {
-  return lookup_ipse_name(&g.sh, name);
-}
-
 func lookup_plain_generic(g te_generik_scope, parms *idy_repls, name sym, out *cu_typeexpr) bool {
   if case Has(ix size) = find_plain_generic(g, name) {
     *out = *ref(&parms->tys, ix);
@@ -791,9 +754,8 @@ func ensure_def_checked(cs *checkstate, id def_entry_id) np {
   switch &ent->generics {
   case &TeNoGenerics:
     parms idy_genparms = blank_idyparms();
-    parms_emittance shray[unify_emission] = mk_empty_emittance();
     clq clqueue = mk(cs);
-    discard_inst_id def_inst_id = enqueue_def_inst(&clq, id, &parms, &parms_emittance);
+    discard_inst_id def_inst_id = enqueue_def_inst(&clq, id, &parms);
     return finish_checking(cs, &clq);
   case &TeHasGenerics(ig):
     discard *te_typeexpr;
@@ -811,9 +773,9 @@ func subsequent_depth(cs *checkstate, parms *idy_repls) u32 {
   }
 }
 
-func enqueue_deftype_inst(clq *clqueue, id deftype_entry_id, parms *idy_genparms, emittance *shray[unify_emission]) deftype_inst_id {
+func enqueue_deftype_inst(clq *clqueue, id deftype_entry_id, parms *idy_genparms) deftype_inst_id {
   cs *checkstate = clq->cs;
-  res type_id_and_created = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms, emittance);
+  res type_id_and_created = ensure_deftype_inst(cs, ref_deftype_entry(cs, id), parms);
   if res.created {
     push(&clq->entries, @[clqueue_entry]ClqDeftypeEntry({id, res.id, cs->instantiation_depth}));
   }
@@ -825,15 +787,15 @@ struct type_id_and_created {
   created bool;
 }
 
-func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *idy_genparms, emittance *shray[unify_emission]) type_id_and_created {
+func ensure_deftype_inst(cs *checkstate, ent *deftype_entry, parms *idy_genparms) type_id_and_created {
   if case Has(id deftype_inst_id) = lookup(&ent->insts, parms) {
     return {id, false};
   }
   inst deftype_inst;
   if case &Has(info deftype_inst_info) = &ent->default_info {
-    inst = {*parms, *emittance, Computed(info)};
+    inst = {*parms, Computed(info)};
   } else {
-    inst = {*parms, *emittance, NotComputed};
+    inst = {*parms, NotComputed};
   }
   id deftype_inst_id = add_deftype_inst(cs, inst);
   check_insert(&ent->insts, parms, id);
@@ -1161,9 +1123,8 @@ func make_magic_inst(clq *clqueue, magic_name sym, arity size, scope *type_scope
 
 func make_inst(clq *clqueue, ent def_entry_id, parms_scope *type_scope, parms *genparms, inst_out *def_inst_id) np {
   idy_parms idy_genparms;
-  emittance shray[unify_emission];
-  #check_and_compute_parms_with_canonicalization(clq, parms_scope, parms, &idy_parms, &emittance);
-  inst_id def_inst_id = enqueue_def_inst(clq, ent, &idy_parms, &emittance);
+  #check_and_compute_parms_with_canonicalization(clq, parms_scope, parms, &idy_parms);
+  inst_id def_inst_id = enqueue_def_inst(clq, ent, &idy_parms);
   *inst_out = inst_id;
   return NoFail;
 }
@@ -1235,7 +1196,7 @@ func inst_type(cs *checkstate, ent_id deftype_entry_id, inst_id deftype_inst_id)
   for i size = 0; i < nmappings; i++ {
     push(&ipse_mappings, make_canonicalized_ipse_name(cs->im, i));
   }
-  return ~@[te_typeexpr]TeApp({TePureName(ent->name), freeze(&te_params), Has({{ent_id, inst_id}, freeze(&ipse_mappings), inst->emittance})});
+  return ~@[te_typeexpr]TeApp({TePureName(ent->name), freeze(&te_params), Has({{ent_id, inst_id}, freeze(&ipse_mappings)})});
 }
 
 func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id deftype_inst_id) np {
@@ -1255,13 +1216,10 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
 
       switch ent_rhs {
       case &ClassexprRhsSpec(crs classexpr_rhs_spec):
-        // EMISSIONS(): Use this.
-        rhs_emissions array[unify_emission];
         rhs_fields array[te_vardecl];
         rhs_fields_complete bool;
         if case Unprinted(pm) = help_check_and_compute_fields(
             clq, flatten(&ent->generics), ref_scope(&inst->parms), &inst->parms.repls, &crs.drs.fields,
-            &rhs_emissions,
             &rhs_fields, &rhs_fields_complete) {
           inst->info = FailedComputation;
           return Unprinted(pm);
@@ -1282,14 +1240,11 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
       case &DefstructRhsSpec(drs structspec):
         inst_scope *type_scope = ref_scope(&inst->parms);
 
-        // EMISSIONS(): Use this.
-        rhs_emissions array[unify_emission];
         rhs_fields array[te_vardecl];
         rhs_fields_complete bool;
 
         if case Unprinted(pm) = help_check_and_compute_fields(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
                                                               &drs.fields,
-                                                              &rhs_emissions,
                                                               &rhs_fields,
                                                               &rhs_fields_complete) {
           inst->info = FailedComputation;
@@ -1313,14 +1268,11 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
       case &DefenumRhsSpec(drs enumspec):
         inst_scope *type_scope = ref_scope(&inst->parms);
 
-        // EMISSIONS(): Use this.
-        rhs_emissions array[unify_emission];
         rhs_constructors array[te_vardecl];
         rhs_constructors_complete bool;
 
         if case Unprinted(pm) = help_check_and_compute_fields(clq, flatten(&ent->generics), inst_scope, &inst->parms.repls,
                                                               &drs.constructors,
-                                                              &rhs_emissions,
                                                               &rhs_constructors,
                                                               &rhs_constructors_complete) {
           inst->info = FailedComputation;
@@ -1355,11 +1307,6 @@ func ensure_deftype_inst_checked(clq *clqueue, ent_id deftype_entry_id, id defty
   }
 }
 
-// Just to give the creation of empty emittances a name.
-func mk_empty_emittance() shray[unify_emission] {
-  return mk_shray();
-}
-
 func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) np {
   ent *deftype_entry = ref_deftype_entry(cs, id);
   if case &Has(np deftype_nonprim) = &ent->nonprim {
@@ -1368,9 +1315,8 @@ func ensure_deftype_checked(cs *checkstate, id deftype_entry_id) np {
     switch &np.tl->generics {
     case &NoGenerics:
       parms idy_genparms = blank_idyparms();
-      emittance shray[unify_emission] = mk_empty_emittance();
       clq clqueue = mk(cs);
-      discard_id deftype_inst_id = enqueue_deftype_inst(&clq, id, &parms, &emittance);
+      discard_id deftype_inst_id = enqueue_deftype_inst(&clq, id, &parms);
       return finish_checking(cs, &clq);
     case &HasGenerics(ig):
       // We declare success -- we check non-generic defs.
@@ -1567,15 +1513,12 @@ func convert_generik(cs *checkstate, a *ast_generik) cr[te_generik] {
   switch a {
   case &PlainGeneric(b ast_ident):
     return NoFail!TePlainGeneric(b.value);
-  case &IpseGeneric(b ast_ipse_generik):
-    return NoFail!@[te_generik]TeIpseGeneric({b.name.value, #convert_typeexpr(&b.oftype)});
   }
 }
 
 func generik_human_name(a *ast_generik) *ast_ident {
   switch a {
   case &PlainGeneric(an ast_ident): return &an;
-  case &IpseGeneric(an ast_ipse_generik): return &an.name;
   }
 }
 
@@ -1606,8 +1549,6 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id) cr[deftype_entr
       return Unprinted(pm);
     case NoFail(md matched_deftype):
       // It's fine to ignore md.learned, we passed TeUnknown for all params.
-      // Also that means there will be no emissions.
-      check(empty(&md.emissions));
       ent->ent_id = Computed(md.ent_id);
       return NoFail(md.ent_id);
     }
@@ -1623,7 +1564,6 @@ func get_accessible_deftype(cs *checkstate, aid access_entry_id) cr[deftype_entr
 struct ent_and_parms {
   ent def_entry_id;
   parms genparms;
-  emissions shray[unify_emission];
 }
 
 enum match_def_res {
@@ -1657,7 +1597,7 @@ func match_def(cs *checkstate, name sym, scope *type_scope, gp *genparms, pt *te
         *res_out = MultiMatch;
         return NoFail;
       case EntryMatchesPrecisely(emp entry_matches_precisely):
-        push(&matches, {id, emp.parms, emp.emissions});
+        push(&matches, {id, emp.parms});
       }
     }
     num_matches size = count(&matches);
@@ -1680,7 +1620,6 @@ func match_def(cs *checkstate, name sym, scope *type_scope, gp *genparms, pt *te
 struct entry_matches_precisely {
   // Complete types.
   parms genparms;
-  emissions shray[unify_emission];
 }
 
 enum entry_matches_res {
@@ -1697,10 +1636,10 @@ func from_type_matches_res(hasparms bool, x *type_matches_res) entry_matches_res
     return EntryMatchesAmbigously;
   case &TypeMatchesPrecisely(a type_matches_precisely):
     if hasparms {
-      return EntryMatchesPrecisely({HasParms(a.parms_types), a.emissions});
+      return EntryMatchesPrecisely({HasParms(a.parms_types)});
     } else {
       check(count(&a.parms_types) == 0);
-      return EntryMatchesPrecisely({NoParms, a.emissions});
+      return EntryMatchesPrecisely({NoParms});
     }
   }
 }
@@ -1811,23 +1750,6 @@ func lookup_plain_name(arr *shray[te_generik], x sym) opt[size] {
     case &TePlainGeneric(b sym):
       if b == x {
         return Has(i);
-      }
-    case &TeIpseGeneric(b te_ipse_generik):
-      void;
-    }
-  }
-  return None;
-}
-
-func lookup_ipse_name(arr *shray[te_generik], x sym) opt[tup[size, *te_ipse_generik]] {
-  n size = count(arr);
-  for i size = 0; i < n; i = i + 1 {
-    switch &arr[i] {
-    case &TePlainGeneric(b sym):
-      void;
-    case &TeIpseGeneric(b te_ipse_generik):
-      if b.name == x {
-        return Has({i, &b});
       }
     }
   }
