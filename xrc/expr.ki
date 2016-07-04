@@ -20,10 +20,6 @@ struct framescope {
   // These var_numbers are always in increasing order.
   current_vars array[var_number];
 
-  // Used for auto-generating $frame_1, $frame_2, ... ipses.
-  // And $var_abc_1, $var_abc_2, ...
-  ipse_gen_counter size;
-
   // The return type... if we're in a body that has a return type -- used for QuickReturn
   // expressions.
   return_type opt[*cu_typeexpr];
@@ -34,7 +30,6 @@ struct framescope {
 func mk(ds *defscope, scope *type_scope, return_type opt[*cu_typeexpr]) framescope {
   return {ds, ds->cs, ds->im, ds->clq, clone_scope(scope),
           mk_array@[var_info](), mk_array@[var_number](),
-          0,
           return_type,
           init_frame_graph_empty(ds->def_informal_name, NotComputed)};
 }
