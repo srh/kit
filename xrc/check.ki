@@ -138,8 +138,6 @@ func convert_typeexpr(a *ast_typeexpr) cr[te_typeexpr] {
     param shp[te_typeexpr];
     *oo(&param) = #convert_typeexpr(oo(&b.param));
     return NoFail!@[te_typeexpr]TeArraytype({count, param});
-  case &AstIpse(b ast_ipse):
-    return NoFail!@[te_typeexpr]TeIpse({b.name.value});
   case &AstUnknown(b ast_unknown):
     return NoFail!@[te_typeexpr]TeUnknown;
   }

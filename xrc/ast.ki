@@ -149,10 +149,6 @@ struct ast_arraytype {
   param box[ast_typeexpr];
 }
 
-struct ast_ipse {
-  name ast_ident;
-}
-
 struct ast_unknown {
 }
 
@@ -161,7 +157,6 @@ enum ast_typeexpr {
   AstApp ast_typeapp;
   AstUnion ast_union;
   AstArraytype ast_arraytype;
-  AstIpse ast_ipse;
   AstUnknown ast_unknown;
 }
 
