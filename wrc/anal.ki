@@ -9,7 +9,7 @@ In a function body, cells fit in exactly ONE leaf node of this tree of categorie
    - constant offset subcells
    - computed offset subcells -- location depends on another cell
  - not a subcell
-   - static cells -- these can be statically located, have a static ipse
+   - static cells -- these can be statically located
      - outer cells -- pre-existing, locations taken as given
     //  - globals (these do not exist yet)
         - outer func paramlist & return cell

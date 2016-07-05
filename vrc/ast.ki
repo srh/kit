@@ -770,7 +770,6 @@ func discard(expr ast_expr) ast_expr_discard {
   return {NotComputed, expr};
 }
 
-// Variadic generics doesn't support ipse generics (for no particular reason, other than that we have no need for it) yet.  NOTE: type_from_inst assumes the fact that this doesn't support ipse generics.
 struct ast_variadic_generics {
   before array[ast_ident];
   variadic_name ast_ident;
