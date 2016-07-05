@@ -12,8 +12,6 @@ struct frame_graph {
   informal_name sym;
   cells array[cell_info];
   ops array[gr_node];
-  // This was the exprscope's type scope, or something like that -- it gets initialized before we start graphing.
-  scope nc[type_scope];
 }
 
 /* A cell location is tricky: the location of an expr's return value
@@ -166,8 +164,8 @@ func init_frame_graph_from_incomplete(incomplete_graph *opt[frame_graph]) frame_
   return ret;
 }
 
-func init_frame_graph_empty(informal_name sym, scope nc[type_scope]) frame_graph {
-  return {informal_name, mk_array@[cell_info](), mk_array@[gr_node](), move(&scope)};
+func init_frame_graph_empty(informal_name sym) frame_graph {
+  return {informal_name, mk_array@[cell_info](), mk_array@[gr_node]()};
 }
 
 func add_cellp(gr *frame_graph, info *cell_info) cell_num {
@@ -719,12 +717,12 @@ struct gr_statep {
 }
 
 func gr_prim(gs gr_statep, t te_typeexpr) cu_typeexpr {
-  return compute_prim_with_scope(gs.clq, un(&gs.gr->scope), t);
+  return compute_prim_with_scope(gs.clq, t);
 }
 
 func gr_prim(gs gr_statep, t te_typeexpr) cu_typrop {
   ret cu_typrop;
-  compute_prim_with_scope(gs.clq, un(&gs.gr->scope), t, &ret.cu, &ret.props);
+  compute_prim_with_scope(gs.clq, t, &ret.cu, &ret.props);
   return ret;
 }
 
@@ -2399,7 +2397,7 @@ func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechan
 }
 
 // TODO: There's a lot of duplicated code in the splay-out of this function.
-func gr_magic(clq *clqueue, scope *type_scope, mag *def_magic, gr_out *frame_graph, gn_out *gr_num,
+func gr_magic(clq *clqueue, mag *def_magic, gr_out *frame_graph, gn_out *gr_num,
               return_cell_out *cell_num, arg_cells_out *array[cell_num], inline_out *should_inline) np {
   switch mag {
   case &MagicBzero(mb magic_bzero):
@@ -2415,12 +2413,12 @@ func gr_magic(clq *clqueue, scope *type_scope, mag *def_magic, gr_out *frame_gra
     *inline_out = InlineMust;
     return NoFail;
   case &MagicCtor(wmc which_magic_ctor):
-    #gr_magic_ctor(clq, scope, wmc.wc, &wmc.mc, gr_out, gn_out, return_cell_out, arg_cells_out);
+    #gr_magic_ctor(clq, wmc.wc, &wmc.mc, gr_out, gn_out, return_cell_out, arg_cells_out);
     *inline_out = InlineYawn;
     return NoFail;
   case &MagicEnumConstruct(mec magic_enum_construct):
     arg_cell cell_num;
-    #gr_magic_enum_construct(clq, scope, &mec, gr_out, gn_out, return_cell_out, &arg_cell);
+    #gr_magic_enum_construct(clq, &mec, gr_out, gn_out, return_cell_out, &arg_cell);
     *arg_cells_out = mk_array(arg_cell);
     *inline_out = InlineMust;
     return NoFail;
@@ -2492,7 +2490,7 @@ func gr_basics_cleanup(gs gr_statep, bas *gr_basics, bu *sq_builder) void {
 
 func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num,
                          return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
-  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_nopdestroy")), Computed(mk_global()));
+  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_nopdestroy")));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -2509,7 +2507,7 @@ func gr_magic_nopdestroy(clq *clqueue, gr_out *frame_graph, gn_out *gr_num,
 
 func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_out *gr_num,
                       return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
-  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_memcopy")), Computed(mk_global()));
+  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_memcopy")));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -2526,7 +2524,7 @@ func gr_magic_memcopy(clq *clqueue, mm *magic_memcopy, gr_out *frame_graph, gn_o
 
 func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *gr_num,
                     return_cell_out *cell_num, arg_cells_out *array[cell_num]) void {
-  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_bzero")), Computed(mk_global()));
+  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_bzero")));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -2543,24 +2541,24 @@ func gr_magic_bzero(clq *clqueue, mb *magic_bzero, gr_out *frame_graph, gn_out *
 
 // Note that generally these magic ops have "holes" in active-tracking.  If constructors
 // could throw exceptions, we wouldn't unwind properly.  Same with assignment.
-func gr_magic_ctor(clq *clqueue, scope *type_scope, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num,
+func gr_magic_ctor(clq *clqueue, wc which_ctor, mc *magic_ctor, gr_out *frame_graph, gn_out *gr_num,
                    return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   info *magic_ctor_info = un(&mc->info);
   switch info {
   case &MagicStructInfo(msi magic_struct_info):
-    return gr_magic_struct_info(clq, scope, wc, &msi, gr_out, gn_out, return_cell_out, arg_cells_out);
+    return gr_magic_struct_info(clq, wc, &msi, gr_out, gn_out, return_cell_out, arg_cells_out);
   case &MagicEnumInfo(mei magic_enum_info):
-    return gr_magic_enum_info(clq, scope, wc, &mei, gr_out, gn_out, return_cell_out, arg_cells_out);
+    return gr_magic_enum_info(clq, wc, &mei, gr_out, gn_out, return_cell_out, arg_cells_out);
   case &MagicArraytypeInfo(mai magic_arraytype_info):
-    return gr_magic_arraytype_info(clq, scope, wc, &mai, gr_out, gn_out, return_cell_out, arg_cells_out);
+    return gr_magic_arraytype_info(clq, wc, &mai, gr_out, gn_out, return_cell_out, arg_cells_out);
   }
 }
 
-func gr_magic_arraytype_info(clq *clqueue, scope *type_scope, wc which_ctor, mai *magic_arraytype_info,
+func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_info,
                              gr_out *frame_graph, gn_out *gr_num,
                              return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   cs *checkstate = clq->cs;
-  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_arraytype")), Computed(*scope));
+  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_arraytype")));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -2721,7 +2719,7 @@ func gr_magic_arraytype_info(clq *clqueue, scope *type_scope, wc which_ctor, mai
   return NoFail;
 }
 
-func gr_magic_enum_info(clq *clqueue, scope *type_scope, wc which_ctor, mei *magic_enum_info,
+func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info,
                         gr_out *frame_graph, gn_out *gr_num,
                         return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   cs *checkstate = clq->cs;
@@ -2736,7 +2734,7 @@ func gr_magic_enum_info(clq *clqueue, scope *type_scope, wc which_ctor, mei *mag
   case CtorDestroy:
     init_padding = false;
   }
-  gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_info")), Computed(*scope));
+  gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_enum_info")));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -2920,7 +2918,7 @@ func gr_magic_enum_info(clq *clqueue, scope *type_scope, wc which_ctor, mei *mag
   return NoFail;
 }
 
-func gr_magic_struct_info(clq *clqueue, scope *type_scope, wc which_ctor, msi *magic_struct_info, gr_out *frame_graph,
+func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, gr_out *frame_graph,
                           gn_out *gr_num, return_cell_out *cell_num, arg_cells_out *array[cell_num]) np {
   cs *checkstate = clq->cs;
   // Destructors go in reverse order (which means we prepend them in the reverse of
@@ -2933,7 +2931,7 @@ func gr_magic_struct_info(clq *clqueue, scope *type_scope, wc which_ctor, msi *m
     init_padding = false;
   }
 
-  gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_struct_info")), Computed(*scope));
+  gr frame_graph = init_frame_graph_empty(intern(cs->im, _s("magic_struct_info")));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -3101,9 +3099,9 @@ func postpadding_offset_and_count(psd *partial_struct_data, i size, offset_out *
   *count_out = end - begin;
 }
 
-func gr_magic_enum_construct(clq *clqueue, scope *type_scope, mec *magic_enum_construct, gr_out *frame_graph,
+func gr_magic_enum_construct(clq *clqueue, mec *magic_enum_construct, gr_out *frame_graph,
                              gn_out *gr_num, return_cell_out *cell_num, arg_cell_out *cell_num) np {
-  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_enum_construct")), Computed(*scope));
+  gr frame_graph = init_frame_graph_empty(intern(clq->im, _s("magic_enum_construct")));
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -3243,8 +3241,8 @@ func gr_destroy_ctor(gs gr_statep, argnum cell_num, cd *ctor_desc, dad deadact_a
   return done(&bu);
 }
 
-func add_prim_fn_body(clq *clqueue, informal_name sym, scope *type_scope, type *cu_typeexpr, op primitive_op) cr[fn_body_id] {
-  gr frame_graph = init_frame_graph_empty(informal_name, Computed(*scope));
+func add_prim_fn_body(clq *clqueue, informal_name sym, type *cu_typeexpr, op primitive_op) cr[fn_body_id] {
+  gr frame_graph = init_frame_graph_empty(informal_name);
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};
@@ -3258,7 +3256,7 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, scope *type_scope, type *
   for i size = 0; i < nfn_params; i = i + 1 {
     ty *te_typeexpr = ref(typarams, i);
     props type_properties;
-    if case Unprinted(pm) = compute_complete_type_properties(clq, scope, ty, &props) {
+    if case Unprinted(pm) = compute_complete_type_properties(clq, ty, &props) {
       dump_err_printed(pm);
       ice(_u8("add_prim_fn_body typrops"));
     }
@@ -3267,7 +3265,7 @@ func add_prim_fn_body(clq *clqueue, informal_name sym, scope *type_scope, type *
   }
   retty *te_typeexpr = ref(typarams, ntyparams - 1);
   retprops type_properties;
-  if case Unprinted(pm) = compute_complete_type_properties(clq, scope, retty, &retprops) {
+  if case Unprinted(pm) = compute_complete_type_properties(clq, retty, &retprops) {
     dump_err_printed(pm);
     ice(_u8("add_prim_fn_body retprops"));
   }
@@ -3299,22 +3297,19 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
 
   ent *def_entry = ref_def_entry(clq->cs, ent_id);
   inst *def_inst = ref_inst(clq->cs, inst_id);
-  inst_typeinfo_scope *type_scope = ref_scope(&inst->parms);
   inst_typeinfo *def_inst_typeinfo = un(&inst->typeinfo);
   switch &inst->graph {
   case &NotComputed:
     inst->graph = BeganComputing;
     switch &inst->rhs {
     case &InstRhsPrim(op primitive_op):
-      id fn_body_id = #add_prim_fn_body(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, op);
-      frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
+      id fn_body_id = #add_prim_fn_body(clq, ent->def_name, &inst_typeinfo->cu, op);
+      frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
       inst->graph = Computed(move(&frg));
       return NoFail;
     case &InstRhsExtern:
       id fn_body_id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]ExternFnBody({ent->def_name})});
-      // inst_typeinfo_scope'll be the global anyway, so we do that explicitly.
-      scope type_scope = mk_global();
-      frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
+      frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
       inst->graph = Computed(move(&frg));
       return NoFail;
     case &InstRhsExpr(dire def_inst_rhs_expr):
@@ -3347,12 +3342,12 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
       switch &nonmag {
       case &NonMagicCtor(wnmc which_non_magic_ctor):
         info *non_magic_ctor_info = un(&wnmc.nmc.info);
-        frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstDef(info->ip));
+        frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typeinfo->cu, &inst_typeinfo->props, ConstDef(info->ip));
         inst->graph = Computed(move(&frg));
         return NoFail;
       case &NonMagicProp(nmp non_magic_prop):
         info u32 = *un(&nmp.info);
-        frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, @[gr_const]ConstInt(~info));
+        frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typeinfo->cu, &inst_typeinfo->props, @[gr_const]ConstInt(~info));
         inst->graph = Computed(move(&frg));
         return NoFail;
       }
@@ -3365,11 +3360,11 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
         return_cell cell_num;
         arg_cells array[cell_num];
         inline should_inline;
-        #gr_magic(clq, inst_typeinfo_scope, &mag, &body_gr, &body_gn, &return_cell, &arg_cells, &inline);
+        #gr_magic(clq, &mag, &body_gr, &body_gn, &return_cell, &arg_cells, &inline);
         id = add_fn_body(clq->cs, {ent->def_name, NotComputed, NotComputed, @[fn_body_entry_enum]GraphedFnBody({FnBodyMagic(&mag), {body_gr, body_gn, return_cell}, arg_cells, inline, NotComputed})});
       }
 
-      frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, inst_typeinfo_scope, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
+      frg frame_regraphed = mk_const_frame_regraphed(clq, ent->def_name, &inst_typeinfo->cu, &inst_typeinfo->props, ConstFnBody(id));
       inst->graph = Computed(move(&frg));
       return NoFail;
     }
@@ -3383,10 +3378,10 @@ func ensure_def_inst_graphed(clq *clqueue, ent_id def_entry_id, inst_id def_inst
   }
 }
 
-func mk_const_frame_regraphed(clq *clqueue, informal_name sym, scope *type_scope, type *cu_typeexpr,
+func mk_const_frame_regraphed(clq *clqueue, informal_name sym, type *cu_typeexpr,
                               props *type_properties, c gr_const) frame_regraphed {
   // I don't think we _actually_ use clq for anything.
-  gr frame_graph = init_frame_graph_empty(informal_name, Computed(*scope));
+  gr frame_graph = init_frame_graph_empty(informal_name);
   ctr celltrack = mk_celltrack();
   curseg gr_current_segment = {None};
   gs gr_statep = {clq, &gr, &ctr, &curseg, None};

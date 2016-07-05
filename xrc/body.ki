@@ -44,9 +44,9 @@ struct bodystate {
   statements array[statement_info];
 }
 
-func mk(ds *defscope, scope *type_scope, return_type *cu_typeexpr) bodystate {
+func mk(ds *defscope, return_type *cu_typeexpr) bodystate {
   return {
-    mk(ds, scope, Has(return_type)),
+    mk(ds, Has(return_type)),
     ds,
     ds->cs,
     ds->im,
@@ -371,16 +371,16 @@ func check_pattern_var(es *framescope, patt *ast_constructor_pattern, expected_t
   converted te_typeexpr = #convert_typeexpr(&vd->type);
 
   cac cac_typeexpr;
-  #check_and_compute_typeexpr(es->clq, es->ds->generics, &es->tscope, es->ds->repls, &converted, &cac);
+  #check_and_compute_typeexpr(es->clq, es->ds->generics, es->ds->repls, &converted, &cac);
 
   unified te_typeexpr;
-  if !unify_types(&es->tscope, &cac.te, expected_type, &unified) {
+  if !unify_types(&cac.te, expected_type, &unified) {
     return MERR(es->cs, patt->meta, _u8("constructor variable type mismatch"));
   }
 
   *cu_expected_type_out = ~ *expected_type;
   expected_type_props type_properties;
-  #compute_type_properties(es->clq, &es->tscope, cu_expected_type_out, &expected_type_props);
+  #compute_type_properties(es->clq, cu_expected_type_out, &expected_type_props);
   *varcell_out = add_cell(es, {LocationVirtual, *cu_expected_type_out, expected_type_props});
   return NoFail;
 }
@@ -517,7 +517,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   converted te_typeexpr = #convert_typeexpr(&a->decl.type);
 
   computed cac_typeexpr;
-  #check_and_compute_typeexpr(bs->clq, bs->ds->generics, &bs->es.tscope, bs->ds->repls, &converted, &computed);
+  #check_and_compute_typeexpr(bs->clq, bs->ds->generics, bs->ds->repls, &converted, &computed);
   cu_computed cu_typeexpr;
 
   complete_type *cu_typeexpr;
@@ -538,7 +538,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
     cu_computed = ~computed.te;
     complete_type = &cu_computed;
     cu_props type_properties;
-    #compute_type_properties(bs->clq, &bs->es.tscope, complete_type, &cu_props);
+    #compute_type_properties(bs->clq, complete_type, &cu_props);
     note_initter = true;
     cell = add_cell(&bs->es, {LocationStatic, *complete_type, cu_props});
   }

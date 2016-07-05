@@ -460,46 +460,13 @@ enum genparms {
 }
 
 struct idy_genparms {
-  // When we create an instantiation, some of the types in "repls" could have ipse
-  // parameters.  We don't want the actual template instantiation to use actual realized
-  // values for those ipse parameters -- they'd be stuff like "the ipse of the
-  // variable x" and such -- so they're renamed, ordered by first appearance in the
-  // left-to-right traversal of repls, and named with the deterministic sequence '$0, '$1,
-  // '$2, and so on (or something like that).
-  //
-  // The canonicalization of the order prevents many spurious template instantiations from
-  // happening -- for example, if you have a func[T, U] and T = foo['a], U = bar['b], we
-  // will only have one instantiation for foo['$0], bar['$1].  However, we could also have
-  // an instantiation for foo['$0], bar['$0], where the ipse parameters are equal.  In
-  // general we can have up to B_n instantiations, where B_n is the nth Bell number, the
-  // number of ways to divide a set up into non-empty equivalence classes.  Thus, we have
-  // this to-do comment:
-  //
-  // The canonicalization also happens for the ipse types that replace ipse type
-  // parameters.  So all ipse types in repls are of a canonicalized ipse vaulue.
-  //
-  //   TODO: Improve this by noting which equivalences are actually used/required, avoid
-  //   all duplicate implementations, thus precisely create the set of instantiations that
-  //   are needed.
-  //
-  // The implementation of that feature might get hairy, especially if function lookup
-  // gets more complicated.  So it makes sense to put off implementing that feature.
-  // (Also, in general, if we get rid of commonplace template instantiation, it might end
-  // up moot.)
-
-  // This is behind a shp because while it's not going to get mutated, it is not efficiently deep- copyable.  This scope covers '$0, etc, i.e. any types in idy_repls.
-  scope shp[type_scope];
-
-  // The number of distinct ipse types used in repls.
-  num_ipse_types_used size;
-
   // If the te_generics is TeNoGenerics, this is of course empty.
   // Entries that line up with ipse parameters will be some canonicalized ipse.
   repls idy_repls;
 }
 
 inline func blank_idyparms() idy_genparms {
-  return {emshp(mk_global()), 0, {mk_shray()}};
+  return {{mk_shray()}};
 }
 
 struct idy_repls {
@@ -510,14 +477,8 @@ inline func blank_idyrepls() idy_repls {
   return {mk_shray()};
 }
 
-func ref_scope(parms *idy_genparms) *type_scope {
-  return oo(&parms->scope);
-}
-
 func hash_compute_hash(x *idy_genparms) osize {
-  // We don't hash x->scope.  (a) it's OK to under-traverse a hash function, (b) idy_genparms equality logic would involve dynamically looking up the oftype, not comparing the actual scopes, (c) it's provably unnecessary, I think, to compare oftypes.
-
-  accum osize = hash_compute_hash(&x->num_ipse_types_used);
+  accum osize = 0x1234;
   n size = count(&x->repls.tys);
   p * ^[0]cu_typeexpr = data(&x->repls.tys);
   for i size = 0; i < n; i = i + 1 {
@@ -528,8 +489,7 @@ func hash_compute_hash(x *idy_genparms) osize {
 
 // Only to be used for idy_genparms values for the same def entry or deftype entry (i.e. genparms that are for the same te_generics).
 func hash_equal(x *idy_genparms, y *idy_genparms) bool {
-  // We don't directly compare scopes.  That would probably be correct, but another form of correct behavior would be to lookup oftypes of ipses when we see them in repls.tys.  However, it's provably true (I think) that oftypes will match, because these idy_genparms values must be for the same def entry or deftype entry.  It's also very annoying to match the oftypes -- you need to mark them and avoid retraversing them to avoid exponential behavior (I think oftypes have to be acyclic) or infinite behavior.
-  return x->num_ipse_types_used == y->num_ipse_types_used && idy_typeexpr_list_equal(&x->repls.tys, &y->repls.tys);
+  return idy_typeexpr_list_equal(&x->repls.tys, &y->repls.tys);
 }
 
 enum def_inst_type_status {
@@ -714,10 +674,10 @@ func is_defwise_trivial(props *type_properties) bool {
   return isTrivial(props->move_behavior) && isTrivial(props->copy_behavior) && isTrivial(props->destroy_behavior);
 }
 
-func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype_scope *type_scope, fntype *te_typeexpr, impl_name sym) cr[derived_method_behavior] {
+func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, impl_name sym) cr[derived_method_behavior] {
   res match_def_res;
   gp genparms = NoParms;
-  #match_def(clq->cs, impl_name, fntype_scope, &gp, fntype, &res);
+  #match_def(clq->cs, impl_name, &gp, fntype, &res);
 
   switch &res {
   case &NoMatch:
@@ -727,7 +687,7 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype_scope *type_sco
   case &OneMatch(m ent_and_parms):
     // This function is called by to_defclass_properties, which means lifetimes come from idy_repls.
     inst_id def_inst_id;
-    #make_inst(clq, m.ent, fntype_scope, &m.parms, &inst_id);
+    #make_inst(clq, m.ent, &m.parms, &inst_id);
     return NoFail(@[derived_method_behavior]DerivedMethodExplicit({@[instpair]{m.ent, inst_id}}));
   }
 }
@@ -735,31 +695,29 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype_scope *type_sco
 // TODO(): This blindly returns back exposed_types of its inner struct.  Update this
 // to... not do that.
 // We call this before we've set the inst's info -- so we _have_ to take structspec as a param.  It's _good_ that we don't make the caller pass the type itself -- we can see here that it's constructed straight from the ent, which means we know that there are no "strange" (read: scoped to some function body) lifetime types involved, just the idy_repls -- see the emissions in lookup_explicit_method_or_lack_thereof.
-// st is scoped to the inst, so i_scope (in the fn body) is its scope.
 func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *structspec, out *type_properties) np {
   cs *checkstate = clq->cs;
-  i_scope *type_scope = ref_scope(&ref_deftype_inst(clq->cs, inst_id)->parms);
   type cu_typeexpr = inst_type(cs, ent_id, inst_id);
   switch a {
   case DefaultMoveCopyDestroy:
     props type_properties;
-    #compute_complete_struct_properties(clq, i_scope, st, &type, ComputeMove | ComputeCopy | ComputeDestroy, &props);
+    #compute_complete_struct_properties(clq, st, &type, ComputeMove | ComputeCopy | ComputeDestroy, &props);
     ptrtype te_typeexpr = ptr_type(cs, type.x);
     fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
-    init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_initsym);
+    init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
     *out = {props.flat_size, props.flat_alignment,
             init_behavior,
             props.move_behavior, props.copy_behavior, props.destroy_behavior, props.is_scalar, props.is_pow2, props.exposed_types};
     return NoFail;
   case DefaultMove:
     props type_properties;
-    #compute_complete_struct_properties(clq, i_scope, st, &type, ComputeMove, &props);
+    #compute_complete_struct_properties(clq, st, &type, ComputeMove, &props);
     ptrtype te_typeexpr = ptr_type(cs, type.x);
     fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
     fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-    init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_initsym);
-    copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype2, cs->im->cym.do_copysym);
-    destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_destroysym);
+    init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
+    copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym);
+    destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym);
     *out = {props.flat_size, props.flat_alignment,
             init_behavior,
             props.move_behavior,
@@ -769,14 +727,14 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
     return NoFail;
   case NoDefaults:
     props type_properties;
-    #compute_complete_struct_properties(clq, i_scope, st, &type, ComputeNone, &props);
+    #compute_complete_struct_properties(clq, st, &type, ComputeNone, &props);
     ptrtype te_typeexpr = ptr_type(cs, type.x);
     fntype1 te_typeexpr = fn_type(cs, ptrtype, primitive_void_type(cs));
     fntype2 te_typeexpr = fn_type(cs, ptrtype, ptrtype, primitive_void_type(cs));
-    init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_initsym);
-    move_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype2, cs->im->cym.do_movesym);
-    copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype2, cs->im->cym.do_copysym);
-    destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, i_scope, &fntype1, cs->im->cym.do_destroysym);
+    init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
+    move_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_movesym);
+    copy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype2, cs->im->cym.do_copysym);
+    destroy_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_destroysym);
     props.is_scalar = IsScalarNo;
     *out = {props.flat_size, props.flat_alignment,
             init_behavior,
