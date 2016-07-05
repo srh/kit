@@ -311,8 +311,6 @@ func help_check_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], s *
 
 struct swartch_checkobj {
   swartch_type *cu_typeexpr;
-  swartch_ipse te_typeexpr;
-  switchable_type_ipse te_typeexpr;
   // Will be initialized to a complete type.
   enum_type *enumspec;
   is_deref bool;
@@ -324,12 +322,10 @@ func check_swartch(es *framescope, a *ast_expr_consume, later *ast_later_discard
 
   swartch_type *cu_typeexpr = expr_complete_type(&a->expr);
   checkobj_out->swartch_type = swartch_type;
-  checkobj_out->swartch_ipse = unnamed_ipse(es);
   switchable_type *te_typeexpr;
-  is_deref bool = decompose_ref_or_ptr(&swartch_type->x, es->cs, &checkobj_out->switchable_type_ipse, &switchable_type);
+  is_deref bool = decompose_ptr(&swartch_type->x, es->cs, &switchable_type);
   if !is_deref {
     switchable_type = &swartch_type->x;
-    checkobj_out->switchable_type_ipse = checkobj_out->swartch_ipse;
   }
   // switchable_type is complete, because swartch type is.
   et *enumspec;

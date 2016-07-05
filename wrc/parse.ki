@@ -534,9 +534,6 @@ func help_triparse_typeexpr(p *ps, ab allow_blanks, al allow_ipses, out *ast_typ
   if +try_parse_oper(p, '*', &oper) {
     return success_or_fail(parse_rest_of_pointer(p, ab, oper, out));
   }
-  if +try_parse_oper(p, '&', &oper) {
-    return success_or_fail(parse_rest_of_reference(p, ab, oper, out));
-  }
   if +try_skip_oper(p, '^') {
     if ! +try_skip_token(p, @[tokval]Grouper(LBracket)) {
       return Error;
@@ -619,18 +616,6 @@ func parse_rest_of_pointer(p *ps, ab allow_blanks, oper ast_ident, out *ast_type
   *out = App({embox(Name(oper)),
               mk_array(arg)});
   return Success;
-}
-
-func parse_rest_of_reference(p *ps, ab allow_blanks, oper ast_ident, out *ast_typeexpr) parse_result {
-  ipse_arg ast_ipse;
-  if case Success = triparse_ipse(p, &ipse_arg) {
-    arg ast_typeexpr;
-    #help_parse_typeexpr(p, ab, AllowIpsesNo, &arg);
-    *out = App({embox(Name(oper)), mk_array(Ipse(ipse_arg), arg)});
-    return Success;
-  } else {
-    return Fail;
-  }
 }
 
 func triparse_ipse(p *ps, out *ast_ipse) triparse_result {

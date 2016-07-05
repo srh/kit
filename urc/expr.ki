@@ -18,9 +18,6 @@ struct framescope {
   // These var_numbers are always in increasing order.
   current_vars array[var_number];
 
-  // Used for auto-generating $frame_1, $frame_2, ... ipses.
-  ipse_gen_counter size;
-
   // The return type... if we're in a body that has a return type -- used for QuickReturn expressions.
   return_type opt[*cu_typeexpr];
 
@@ -30,7 +27,6 @@ struct framescope {
 func mk(ds *defscope, return_type opt[*cu_typeexpr]) framescope {
   return {ds, ds->cs, ds->im, ds->clq,
           mk_array@[var_info](), mk_array@[var_number](),
-          0,
           return_type,
           init_frame_graph_empty(ds->def_informal_name)};
 }
@@ -826,9 +822,8 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
     return Printed(pm);
   }
   info *ast_expr_complete_info = expr_complete_info(&oo(&a->lhs)->expr);
-  ipse te_typeexpr;
   param *te_typeexpr;
-  if !decompose_ref_or_ptr(&info->cu.x, es->cs, &ipse, &param) {
+  if !decompose_ptr(&info->cu.x, es->cs, &param) {
     return ERR(_u8("Expected pointer for lhs of deref field"));
   }
   cu_param cu_typeexpr = ~ *param;
@@ -855,29 +850,6 @@ func check_expr_deref_field(es *framescope, a *ast_deref_field, pt *te_typeexpr,
   }
   annotate_info(x, CompleteCheck(mk(lval, fieldtype, props)));
   return NoFail;
-}
-
-// Right now fields have the same ipse as what they're part of -- they're part of the same object!  So, having equal ipses does not mean you're the same object.
-func field_ipse(outer_ipse te_typeexpr) te_typeexpr {
-  return outer_ipse;
-}
-
-// This is halfway B.S. the same way that field_ipse is.
-func enum_field_ipse(outer_ipse te_typeexpr) te_typeexpr {
-  return outer_ipse;
-}
-
-// Varnames aren't supposed to shadow, so... we have user-friendly ipse names.  (Note that vars could shadow generic ipse parameters, for now, so we add the $var_ prefix.)
-func varname_ipse(im *identmap, name sym) te_typeexpr {
-  n sym = intern(im, _s("$var_") + lookup(im, name));
-  return TeIpse({n});
-}
-
-// TODO: Most uses of this will get replaced by some rval ipse getter.  (We'll set rval ipses with this value, though.)
-func unnamed_ipse(es *framescope) te_typeexpr {
-  n sym = intern(es->im, _s("$frame_") + from_u8(to_u8str(void, es->ipse_gen_counter)));
-  es->ipse_gen_counter = es->ipse_gen_counter + 1;
-  return TeIpse({n});
 }
 
 func check_expr_local_field(es *framescope, a *ast_local_field, pt *te_typeexpr, x *ast_expr) np {
@@ -929,9 +901,8 @@ func check_expr_deref(es *framescope, a *ast_deref, pt *te_typeexpr, x *ast_expr
     return Printed(pm);
   }
   rhs_type *cu_typeexpr = expr_complete_type(&oo(&a->rhs)->expr);
-  ipse te_typeexpr;
   param *te_typeexpr;
-  if decompose_ref_or_ptr(&rhs_type->x, es->cs, &ipse, &param) {
+  if decompose_ptr(&rhs_type->x, es->cs, &param) {
     // param is already complete.
     unified_discard te_typeexpr;
     if !unify_types(pt, param, &unified_discard) {
@@ -1588,22 +1559,9 @@ func check_numeric_literal(es *framescope, ai allow_incomplete, pt *te_typeexpr,
   return NoFail;
 }
 
-// You really should use this, in case we decide to rearrange the order of parameters of the ref type.
-func decompose_ref(t *te_typeexpr, cs *checkstate, ipse_out **te_typeexpr, param_out **te_typeexpr) bool {
-  return decompose_typeapp(t, primitive_ref_puretype(cs), ipse_out, param_out);
-}
-
-// Writes a fake ipse in the case of pointer, a real ipse in the case of a reference.
-func decompose_ref_or_ptr(t *te_typeexpr, cs *checkstate, ipse_out *te_typeexpr, param_out **te_typeexpr) bool {
-  lt *te_typeexpr;
+func decompose_ptr(t *te_typeexpr, cs *checkstate, param_out **te_typeexpr) bool {
   param *te_typeexpr;
-  if decompose_ref(t, cs, &lt, &param) {
-    *ipse_out = *lt;
-    *param_out = param;
-    return true;
-  }
   if decompose_typeapp(t, primitive_pointer_puretype(cs), &param) {
-    *ipse_out = fake_ipse(cs);
     *param_out = param;
     return true;
   }
