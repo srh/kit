@@ -227,7 +227,7 @@ func type_matches(parms *shray[te_typeexpr], pt *te_typeexpr, names *shray[te_ge
   // typeexprs as we compare the whole type, in order to make sure we don't match
   // conflicting information about a generic parameter.
   up unif_parms = mk_unif_parms(parms);
-  // Since t is complete, unified is irrelevant and must be identical to t.  Might become untrue if ipses unify into a fresh ipse value.
+  // Since t is complete, unified is irrelevant and must be identical to t.
   unified te_typeexpr;
   info unify_information = mk_fresh_info();
   if !unify_under_generics(&up, pt, names, t, &info, &unified) {

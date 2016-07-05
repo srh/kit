@@ -461,7 +461,6 @@ enum genparms {
 
 struct idy_genparms {
   // If the te_generics is TeNoGenerics, this is of course empty.
-  // Entries that line up with ipse parameters will be some canonicalized ipse.
   repls idy_repls;
 }
 

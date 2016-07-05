@@ -366,8 +366,6 @@ func help_pretty_vardecl(im *identmap, r *array[u8], a *shray[te_vardecl]) void 
   }
 }
 
-// Variadic generics doesn't support ipse generics (for no particular reason, other
-// than that we have no need for it) yet.
 struct te_variadic_generics {
   before shray[sym];
   variadic_name sym;

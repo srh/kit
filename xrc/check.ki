@@ -629,7 +629,6 @@ func arity_matches(a *te_generics, params opt[*shray[te_typeexpr]], learned_para
       return NotThis;
     }
   case &TeVariadicGenerics(vg te_variadic_generics):
-    // Variadics don't support ipse generics yet.
     if case Has(p *shray[te_typeexpr]) = params {
       if count(&vg.before) + count(&vg.after) <= count(p) {
         cp array[te_typeexpr] = mk_copy(p);
