@@ -436,12 +436,6 @@ func parse_generics_if_present(p *ps, out *ast_generics) parse_result {
 }
 
 func parse_generik(p *ps, out *ast_generik) parse_result {
-  if +try_skip_token(p, @[tokval]Grouper(SingleQuote)) {
-    name ast_ident;
-    #parse_ident(p, &name);
-    *out = IpseGeneric(name);
-    return Success;
-  }
   name ast_ident;
   #parse_ident(p, &name);
   *out = PlainGeneric(name);

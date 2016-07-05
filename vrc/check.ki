@@ -511,10 +511,6 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
     }
 
     case &TeIpse(a te_ipse):
-      if case Has(ix size) = find_ipse_generic(g, a.name) {
-        *out = {true, ref(&parms->tys, ix)->x};
-        return NoFail;
-      }
       // Assume it's a valid ipse in scope, because what else can we do, keep track of that?
       // TODO: Make sure that user-defined ipses we see are well-scoped... if it still seems worth it.
       *out = {true, TeIpse({a.name})};
@@ -719,19 +715,6 @@ func find_plain_generic(g *ast_generics, name sym) opt[size] {
     return None;
   case &HasGenerics(a array[ast_generik]):
     return lookup_plain_name(&a, name);
-  case &VariadicGenerics(a ast_variadic_generics):
-    // We can't see variadic generics because there's no "RHS type" of a fn.
-    ice(_u8("find_generic sees variadic generic."));
-    return fake();
-  }
-}
-
-func find_ipse_generic(g *ast_generics, name sym) opt[size] {
-  switch g {
-  case &NoGenerics:
-    return None;
-  case &HasGenerics(a array[ast_generik]):
-    return lookup_ipse_name(&a, name);
   case &VariadicGenerics(a ast_variadic_generics):
     // We can't see variadic generics because there's no "RHS type" of a fn.
     ice(_u8("find_generic sees variadic generic."));
@@ -1425,7 +1408,6 @@ func check_generics_unique(cs *checkstate, a *ast_generics) np {
 func generik_human_name(a *ast_generik) *ast_ident {
   switch a {
   case &PlainGeneric(an ast_ident): return &an;
-  case &IpseGeneric(an ast_ident): return &an;
   }
 }
 
@@ -1797,25 +1779,15 @@ func unify_under_generics(pt *te_typeexpr,
 
     case &TeIpse(a te_ipse):
       // NOTE: I mimicked the TeName case, and haven't fully thought out how that would affect this function's callers, so treat this code with skepticism.
-      if case Has(ix size) = lookup_ipse_name(names, a.name) {
-        unified te_typeexpr;
-        if !unify_types(ref(unif_parms, ix), pt, &unified) {
+      if case &TeIpse(pa te_ipse) = pt {
+        // NOTE: The TeName case says something about scopage for its analogue of this comparison.
+        if a.name != pa.name {
           return false;
         }
-        *ref(unif_parms, ix) = unified;
         *unified_out = TeIpse({a.name});
         return true;
       } else {
-        if case &TeIpse(pa te_ipse) = pt {
-          // NOTE: The TeName case says something about scopage for its analogue of this comparison.
-          if a.name != pa.name {
-            return false;
-          }
-          *unified_out = TeIpse({a.name});
-          return true;
-        } else {
-          return false;
-        }
+        return false;
       }
 
     case &TeUnknown: {
@@ -1832,21 +1804,6 @@ func lookup_plain_name(arr *array[ast_generik], x sym) opt[size] {
   for i size = 0; i < n; i = i + 1 {
     switch ref(arr, i) {
     case &PlainGeneric(b ast_ident):
-      if b.value == x {
-        return Has(i);
-      }
-    case &IpseGeneric(b ast_ident): { }
-    }
-  }
-  return None;
-}
-
-func lookup_ipse_name(arr *array[ast_generik], x sym) opt[size] {
-  n size = count(arr);
-  for i size = 0; i < n; i = i + 1 {
-    switch ref(arr, i) {
-    case &PlainGeneric(b ast_ident): { }
-    case &IpseGeneric(b ast_ident):
       if b.value == x {
         return Has(i);
       }

@@ -781,7 +781,6 @@ struct ast_variadic_generics {
 // This is named with a k to prevent typos with ast_generics.
 enum ast_generik {
   PlainGeneric ast_ident;
-  IpseGeneric ast_ident;
 }
 
 enum ast_generics {
