@@ -398,26 +398,12 @@ enum genparms {
 }
 
 struct idy_genparms {
-  // When we create an instantiation, some of the types in "repls" could have ipse parameters.  We don't want the actual template instantiation to use actual realized values for those ipse parameters -- they'd be stuff like "the ipse of the variable x" and such -- so they're renamed, ordered by first appearance in the left-to-right traversal of repls, and named with the deterministic sequence '$0, '$1, '$2, and so on (or something like that).
-  //
-  // The canonicalization of the order prevents many spurious template instantiations from happening -- for example, if you have a func[T, U] and T = foo['a], U = bar['b], we will only have one instantiation for foo['$0], bar['$1].  However, we could also have an instantiation for foo['$0], bar['$0], where the ipse parameters are equal.  In general we can have up to B_n instantiations, where B_n is the nth Bell number, the number of ways to divide a set up into non-empty equivalence classes.  Thus, we have this to-do comment:
-  //
-  // The canonicalization also happens for the ipse types that replace ipse type parameters.  So all ipse types in repls are of a canonicalized ipse vaulue.
-  //
-  //   TODO: Improve this by noting which equivalences are actually used/required, avoid all duplicate implementations, thus precisely create the set of instantiations that are needed.
-  //
-  // The implementation of that feature might get hairy, especially if function lookup gets more complicated.  So it makes sense to put off implementing that feature.  (Also, in general, if we get rid of commonplace template instantiation, it might end up moot.)
-
-  // The number of distinct ipse types used in repls.
-  num_ipse_types_used size;
-
   // If the ast_generics is NoGenerics, this is of course empty.
-  // Entries that line up with ipse parameters will be some canonicalized ipse.
   repls idy_repls;
 }
 
 inline func blank_idyparms() idy_genparms {
-  return {0, {mk_shray()}};
+  return {{mk_shray()}};
 }
 
 struct idy_repls {
@@ -429,7 +415,7 @@ inline func blank_idyrepls() idy_repls {
 }
 
 func hash_compute_hash(x *idy_genparms) osize {
-  accum osize = hash_compute_hash(&x->num_ipse_types_used);
+  accum osize = 0x1234;
   n size = count(&x->repls.tys);
   p * ^[0]cu_typeexpr = data(&x->repls.tys);
   for i size = 0; i < n; i = i + 1 {
@@ -439,7 +425,7 @@ func hash_compute_hash(x *idy_genparms) osize {
 }
 
 func hash_equal(x *idy_genparms, y *idy_genparms) bool {
-  return x->num_ipse_types_used == y->num_ipse_types_used && idy_typeexpr_list_equal(&x->repls.tys, &y->repls.tys);
+  return idy_typeexpr_list_equal(&x->repls.tys, &y->repls.tys);
 }
 
 enum def_inst_type_status {

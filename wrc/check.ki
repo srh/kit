@@ -2,7 +2,6 @@ import ast;
 import deferred;
 import expr;
 import kitutil;
-import ipse;
 import parse;
 import tok;
 import typeexpr;
@@ -422,6 +421,16 @@ func check_and_compute_parms_no_canonicalize(clq *clqueue, t *genparms, out *idy
   }
 }
 
+func mapconvert(x *shray[te_typeexpr]) shray[cu_typeexpr] {
+  bu array[cu_typeexpr];
+  n size = count(x);
+  for i size = 0; i < n; i = i + 1 {
+    push(&bu, ~*ref(x, i));
+  }
+  return freeze(&bu);
+}
+
+
 // parms have already had generics replaced.  They should also be complete.
 func check_and_compute_parms(clq *clqueue, t *genparms, out *idy_genparms) np {
   switch t {
@@ -440,16 +449,8 @@ func check_and_compute_parms(clq *clqueue, t *genparms, out *idy_genparms) np {
         ice(_u8("check_and_compute_parms sees incomplete typeexpr"));
       }
 
-      ipse_names array[sym];
-      cu_params array[cu_typeexpr];
-      n size = count(&params);
-      reserve(&cu_params, n);
-      for i size = 0; i < n; i = i + 1 {
-        canonicalized te_typeexpr;
-        canonicalize_idy_ipses(clq->im, &ipse_names, &params[i], &canonicalized);
-        push(&cu_params, ~canonicalized);
-      }
-      *out = {count(&ipse_names), {freeze(&cu_params)}};
+      cu_params shray[cu_typeexpr] = mapconvert(&params);
+      *out = {{cu_params}};
       return NoFail;
     }
   }
@@ -611,15 +612,8 @@ func check_and_compute_app_type(clq *clqueue, g *ast_generics, parms *idy_repls,
 
       if params_complete {
         // TODO: This is quite duplicated with check_and_compute_parms.  With the changes we're making we should definitely dedup this code.
-        ipse_names array[sym];
-        canonical array[cu_typeexpr];
-        n size = count(&params);
-        for i size = 0; i < n; i = i + 1 {
-          canonicalized te_typeexpr;
-          canonicalize_idy_ipses(clq->im, &ipse_names, ref(&params, i), &canonicalized);
-          push(&canonical, ~canonicalized);
-        }
-        hp idy_genparms = {count(&ipse_names), {freeze(&canonical)}};
+        canonical shray[cu_typeexpr] = mapconvert(&params);
+        hp idy_genparms = {{canonical}};
         inst_id deftype_inst_id = enqueue_deftype_inst(clq, id, &hp);
         *out = {true, TeApp({TePureName(value), params, Has({id, inst_id})})};
       } else {

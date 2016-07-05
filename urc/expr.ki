@@ -1149,10 +1149,8 @@ func annotate_disposal_for_consume_then_discard(es *framescope, a *ast_expr, aft
 
 func make_comparecells(es *framescope, dest cell_num) instpair {
   if case Has(ent def_entry_id) = es->cs->prims.ptr_eq {
-    ipse_names array[sym];
-    canonical te_typeexpr;
-    canonicalize_idy_ipses(es->im, &ipse_names, &ref_cell(es, dest)->type.x, &canonical);
-    parms idy_genparms = {count(&ipse_names), {mk_shray(~canonical)}};
+    canonical cu_typeexpr = ref_cell(es, dest)->type;
+    parms idy_genparms = {{mk_shray(canonical)}};
     inst_id def_inst_id = enqueue_def_inst(es->clq, ent, &parms);
     return {ent, inst_id};
   } else {
