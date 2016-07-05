@@ -953,8 +953,6 @@ func oper_arr(tv tokval) smallstr {
 func build_unop_expr(im *identmap, m ast_meta, op ast_ident, rhs ast_expr) ast_expr {
   if op.value == im->cym.addressofsym {
     return mk(m, @[ast_expr_enum]AddressOf({embox(rhs)}));
-  } else if op.value == im->cym.refofsym {
-    return mk(m, @[ast_expr_enum]RefOf({embox(rhs)}));
   } else if op.value == im->cym.derefsym {
     return mk(m, @[ast_expr_enum]Deref({mk_later(), embox(consume(move(&rhs)))}));
   } else if op.value == im->cym.quickreturnsym {

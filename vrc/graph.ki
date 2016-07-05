@@ -1149,8 +1149,6 @@ func gr_expr(gs gr_statep, x *ast_expr, bu *sq_builder) np {
     return gr_logical_conjunction(gs, x, &a, bu);
   case &Assignment(a ast_assignment):
     return gr_assignment(gs, x, &a, bu);
-  case &RefOf(a ast_refof):
-    return gr_mk_refof(gs, x, &a, bu);
   case &AddressOf(a ast_addressof):
     return gr_mk_addressof(gs, x, &a, bu);
   case &Deref(a ast_deref):
@@ -1582,19 +1580,6 @@ func gr_mk_deref(gs gr_statep, x *ast_expr, a *ast_deref, bu *sq_builder) np {
 }
 
 func gr_mk_addressof(gs gr_statep, x *ast_expr, a *ast_addressof, bu *sq_builder) np {
-  // This is a total copy/paste of gr_mk_refof.
-  #gr_expr(gs, oo(&a->rhs), bu);
-  desc *lval_description = ellval_desc(oo(&a->rhs));
-  add(bu, @[gr_xop]GrAddressof({rval_cell(x), desc->num}));
-  add(bu, @[gr_xop]GrActiveXop({Activate(rval_cell(x)), Nothing}));
-  if case DeadMe = desc->deadme {
-    add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->rhs))}));
-  }
-  return NoFail;
-}
-
-func gr_mk_refof(gs gr_statep, x *ast_expr, a *ast_refof, bu *sq_builder) np {
-  // This is a total copy/paste of gr_mk_addressof.
   #gr_expr(gs, oo(&a->rhs), bu);
   desc *lval_description = ellval_desc(oo(&a->rhs));
   add(bu, @[gr_xop]GrAddressof({rval_cell(x), desc->num}));
