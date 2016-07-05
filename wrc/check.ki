@@ -490,12 +490,6 @@ func check_and_compute_typeexpr(clq *clqueue, g *ast_generics, parms *idy_repls,
       return NoFail;
     }
 
-    case &TeIpse(a te_ipse):
-      // Assume it's a valid ipse in scope, because what else can we do, keep track of that?
-      // TODO: Make sure that user-defined ipses we see are well-scoped... if it still seems worth it.
-      *out = {true, TeIpse({a.name})};
-      return NoFail;
-
     case &TeUnknown: {
       *out = {false, TeUnknown};
       return NoFail;
@@ -986,10 +980,6 @@ func compute_complete_type_properties(clq *clqueue, t *te_typeexpr, out *type_pr
         return fake();
       }
     }
-
-    case &TeIpse(a te_ipse):
-      // Presumably this should be an ICE.
-      return ERR(_u8("ICE: compute_complete_type_properties on TeIpse"));
 
     case &TeUnknown: {
       ice(_u8("compute_type_properties called on incomplete type."));
@@ -1630,9 +1620,6 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
         return {false, false};
       }
     }
-    case &TeIpse(a te_ipse):
-      // Yes, I guess.
-      return {true, true};
 
     case &TeUnknown: {
       return {false, false};
@@ -1764,19 +1751,6 @@ func unify_under_generics(pt *te_typeexpr,
         return false;
       }
     }
-
-    case &TeIpse(a te_ipse):
-      // NOTE: I mimicked the TeName case, and haven't fully thought out how that would affect this function's callers, so treat this code with skepticism.
-      if case &TeIpse(pa te_ipse) = pt {
-        // NOTE: The TeName case says something about scopage for its analogue of this comparison.
-        if a.name != pa.name {
-          return false;
-        }
-        *unified_out = TeIpse({a.name});
-        return true;
-      } else {
-        return false;
-      }
 
     case &TeUnknown: {
       // Right now, the only callers are type_matches and unify_types.  From type_matches, t is complete, and from unify_types, there are no generic names.

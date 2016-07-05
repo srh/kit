@@ -39,14 +39,6 @@ func canonicalize_idy_ipses(im *identmap, ipse_names *array[sym], t *te_typeexpr
     param shp[te_typeexpr];
     canonicalize_idy_ipses(im, ipse_names, oo(&a.param), oo(&param));
     *out = TeArraytype({count, param});
-  case &TeIpse(a te_ipse):
-    if case Has(ix size) = find(ipse_names, a.name) {
-      *out = TeIpse({make_canonicalized_ipse_name(im, ix)});
-    } else {
-      n size = count(ipse_names);
-      push(ipse_names, a.name);
-      *out = TeIpse({make_canonicalized_ipse_name(im, n)});
-    }
   case &TeUnknown:
     ice(_u8("canonicalize_idy_ipses sees TeUnknown."));
   }
