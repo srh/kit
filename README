@@ -56,7 +56,7 @@ The current directory structure is:
    vrc - s3, implemented in proto-Kit.  Compiles s3 and s4.
    wrc - s4, implemented in proto-Kit.  Compiles s4 and s5.
    xrc - s5, implemented in proto-Kit.  Compiles s5 and s6.
-   yrc - s6, implemented in proto-Kit.  Compiles s6.
+   src - s6, implemented in proto-Kit.  Compiles s6.
    examples - examples to run, disorganized junk
 
   ABOUT THE VERSIONS
