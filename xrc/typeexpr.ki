@@ -42,8 +42,6 @@ struct te_name {
 
 struct te_app_pack {
   teip te_instpack;
-  // Maps ipse's to the deftype inst's ipses.  e.g. ipse_mappings[3] gives the local ipse name (in this typeexpr's type_scope)
-  ipse_mappings shray[sym];
 }
 
 struct te_app {
@@ -86,17 +84,6 @@ func idy_typeexpr_equal(a *cu_typeexpr, b *cu_typeexpr) bool {
   return help_idy_typeexpr_equal(&a->x, &b->x);
 }
 
-func help_idy_typeexpr_ipse_mappings_equal(x *shray[sym], y *shray[sym]) bool {
-  n size = count(x);
-  check(n == count(y));
-  for i size = 0; i < n; i++ {
-    if x[i] != y[i] {
-      return false;
-    }
-  }
-  return true;
-}
-
 // Must be called on complete, concrete types.
 func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
   switch a {
@@ -113,7 +100,7 @@ func help_idy_typeexpr_equal(a *te_typeexpr, b *te_typeexpr) bool {
     if case &TeApp(bx te_app) = b {
       if case &Has(p te_app_pack) = &ax.pack {
         if case &Has(q te_app_pack) = &bx.pack {
-          return p.teip.inst_id.x == q.teip.inst_id.x && help_idy_typeexpr_ipse_mappings_equal(&p.ipse_mappings, &q.ipse_mappings);
+          return p.teip.inst_id.x == q.teip.inst_id.x;
         }
       }
       ice(_u8("idy_typeexpr_equal on non-pack-having app typeexpr"));
@@ -274,7 +261,7 @@ func help_compute_hash(a *te_typeexpr) osize {
     ice(_u8("help_compute_hash on non-pack-having name typeexpr"));
   case &TeApp(ax te_app):
     if case &Has(p te_app_pack) = &ax.pack {
-      return (@[osize]~p.teip.inst_id.x * 0x3001) ^ help_compute_hash(&p.ipse_mappings);
+      return @[osize]~p.teip.inst_id.x * 0x3001;
     }
     ice(_u8("help_compute_hash on non-pack-having app typeexpr"));
   case &TeUnion(ax te_union):
@@ -430,11 +417,6 @@ func scope_lookup(scope *type_scope, name sym) cu_typeexpr {
     return fake();
   }
 }
-
-func ipse_in_scope(scope *type_scope, name sym) bool {
-  return member(&scope->oftypes, &name);
-}
-
 
 // For now, the only name shadowing possible is that the "names" shray[te_generik] param of unify_under_generics scopes some names of "t" te_typeexpr.  We actually check that such template lists cannot shadow the global scope -- but they could have the same names as those in the "pt" te_typeexpr param of unify_under_generics.  That is fine.
 //

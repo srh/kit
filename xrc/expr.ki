@@ -1497,11 +1497,10 @@ func check_field(es *framescope, t *cu_typeexpr, a *ast_fieldname, pt *te_typeex
 func structural_structspec(ds *defscope, t *te_typeexpr, st_out *structspec) structural_rhs_result {
   switch t {
   case &TeName(a te_name):
-    ipse_mappings shray[sym];  // empty
-    return help_structural_structspec(ds, unHas(&a.pack), &ipse_mappings, st_out);
+    return help_structural_structspec(ds, unHas(&a.pack), st_out);
   case &TeApp(a te_app):
     hp *te_app_pack = unHas(&a.pack);
-    return help_structural_structspec(ds, &hp->teip, &hp->ipse_mappings, st_out);
+    return help_structural_structspec(ds, &hp->teip, st_out);
   default:
     return NotAccessible;
   }
@@ -1511,11 +1510,10 @@ func structural_structspec(ds *defscope, t *te_typeexpr, st_out *structspec) str
 func structural_enumspec(ds *defscope, t *te_typeexpr, et_out *enumspec) structural_rhs_result {
   switch t {
   case &TeName(a te_name):
-    ipse_mappings shray[sym]; // empty
-    return help_structural_enumspec(ds, unHas(&a.pack), &ipse_mappings, et_out);
+    return help_structural_enumspec(ds, unHas(&a.pack), et_out);
   case &TeApp(a te_app):
     hp *te_app_pack = unHas(&a.pack);
-    return help_structural_enumspec(ds, &hp->teip, &hp->ipse_mappings, et_out);
+    return help_structural_enumspec(ds, &hp->teip, et_out);
   default:
     return NotAccessible;
   }
@@ -1558,7 +1556,6 @@ enum structural_rhs_result {
   NotAccessible void;
 }
 
-// Note that the caller will need to use its ipse_mappings to map the rhs type's ipses to the caller's ipses.
 func help_structural_rhs_info(ds *defscope, pack *te_instpack,
                               rhs_info_out **deftype_inst_rhs_info) structural_rhs_result {
   accessible_result bool;
@@ -1586,17 +1583,7 @@ func help_structural_rhs_info(ds *defscope, pack *te_instpack,
   }
 }
 
-func map_enumspec_ipses(im *identmap, ipse_mappings *shray[sym], inn *enumspec, out *enumspec) void {
-  constructors shray[te_vardecl] = map_vardecl_ipses(im, ipse_mappings, &inn->constructors);
-  *out = {constructors, inn->success_case_ix};
-}
-
-func map_structspec_ipses(im *identmap, ipse_mappings *shray[sym], inn *structspec, out *structspec) void {
-  fields shray[te_vardecl] = map_vardecl_ipses(im, ipse_mappings, &inn->fields);
-  *out = {fields};
-}
-
-func help_structural_enumspec(ds *defscope, pack *te_instpack, ipse_mappings *shray[sym], et_out *enumspec) structural_rhs_result {
+func help_structural_enumspec(ds *defscope, pack *te_instpack, et_out *enumspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
@@ -1606,7 +1593,7 @@ func help_structural_enumspec(ds *defscope, pack *te_instpack, ipse_mappings *sh
     case &RhsStructInfo(ri structspec):
       return NotAccessible;
     case &RhsEnumInfo(ri enumspec):
-      map_enumspec_ipses(ds->im, ipse_mappings, &ri, et_out);
+      *et_out = ri;
       return Success;
     }
   case NotAccessible:
@@ -1614,7 +1601,7 @@ func help_structural_enumspec(ds *defscope, pack *te_instpack, ipse_mappings *sh
   }
 }
 
-func help_structural_structspec(ds *defscope, pack *te_instpack, ipse_mappings *shray[sym], st_out *structspec) structural_rhs_result {
+func help_structural_structspec(ds *defscope, pack *te_instpack, st_out *structspec) structural_rhs_result {
   rhs_info *deftype_inst_rhs_info;
   switch help_structural_rhs_info(ds, pack, &rhs_info) {
   case Error(pm):
@@ -1622,7 +1609,7 @@ func help_structural_structspec(ds *defscope, pack *te_instpack, ipse_mappings *
   case Success:
     switch rhs_info {
     case &RhsStructInfo(ri structspec):
-      map_structspec_ipses(ds->im, ipse_mappings, &ri, st_out);
+      *st_out = ri;
       return Success;
     case &RhsEnumInfo(ri enumspec):
       return NotAccessible;
@@ -1632,10 +1619,10 @@ func help_structural_structspec(ds *defscope, pack *te_instpack, ipse_mappings *
   }
 }
 
-func lookup_name_field(es *framescope, pack *te_instpack, ipse_mappings *shray[sym], fieldname *ast_ident,
+func lookup_name_field(es *framescope, pack *te_instpack, fieldname *ast_ident,
                        fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   st structspec;
-  switch help_structural_structspec(es->ds, pack, ipse_mappings, &st) {
+  switch help_structural_structspec(es->ds, pack, &st) {
   case Error(pm):
     return Unprinted(pm);
   case Success:
@@ -1658,11 +1645,10 @@ func help_lookup_name_field(es *framescope, t *cu_typeexpr, fieldname *ast_ident
                             fieldtype_out *cu_typeexpr, res_out *check_field_result) np {
   switch &t->x {
   case &TeName(a te_name):
-    ipse_mappings shray[sym];  // empty
-    return lookup_name_field(es, unHas(&a.pack), &ipse_mappings, fieldname, fieldtype_out, res_out);
+    return lookup_name_field(es, unHas(&a.pack), fieldname, fieldtype_out, res_out);
   case &TeApp(a te_app):
     hp *te_app_pack = unHas(&a.pack);
-    return lookup_name_field(es, &hp->teip, &hp->ipse_mappings, fieldname, fieldtype_out, res_out);
+    return lookup_name_field(es, &hp->teip, fieldname, fieldtype_out, res_out);
   case &TeUnion(a te_union):
     // The offset's what it would be for a struct.
     offset_discard u32;
