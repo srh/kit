@@ -397,7 +397,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
   swartch_vp varpopper;
   init_vp(&swartch_vp, &bs->es);
   swartch_vn var_number;
-  #es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, ~chk.swartch_ipse, chk.swartch_type, VarSelfContained, &swartch_vn);
+  #es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, chk.swartch_type, VarSelfContained, &swartch_vn);
   for i size = 0; i < ncases; i = i + 1 {
     cas *ast_switch_case = ref(&a->cases, i);
     for j size = 0; j < i; j = j + 1 {
@@ -424,7 +424,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
           #check_pattern_var(&bs->es, &patt, expected_type, &vd, &cu_expected_type, &cell);
 
           vn var_number;
-          #es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~chk.switchable_type_ipse, &cu_expected_type, VarOverlay, &vn);
+          #es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), &cu_expected_type, VarOverlay, &vn);
           ovn = Has(vn);
         } else {
           voidtp cu_typrop = compute_prim(bs->clq, primitive_void_type(bs->cs));
@@ -489,7 +489,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
     #check_consume_then_discard_expr(&bs->es, oo(&cond.expr), &boolean.x, &cond.discard);
     connect_statements(bs, loopnum, exitnum);
     cond_vn var_number;
-    #es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, ~unnamed_ipse(&bs->es), &boolean, VarSelfContained, &cond_vn);
+    #es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, &boolean, VarSelfContained, &cond_vn);
   }
   if case &Has(incr box[ast_expr_discard]) = &a->increment {
     unknown te_typeexpr = TeUnknown;
@@ -542,7 +542,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   }
 
   vn var_number;
-  #es_push_var(&bs->es, vp, cell, Has(&a->decl.name), ~varname_ipse(bs->im, a->decl.name.value), complete_type, VarSelfContained, &vn);
+  #es_push_var(&bs->es, vp, cell, Has(&a->decl.name), complete_type, VarSelfContained, &vn);
   annotate(&a->info, {vn});
   #es_note_var_destroyer(&bs->es, vn);
   if note_initter {
@@ -643,7 +643,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
       // We need return statements in the "then" or "else" block to mark the boolean condition dead.  (It would be a smarter graph if we just marked it dead immediately after the branch, but... this way makes the code here handle all cases equivalently.)
       swartch_vn var_number;
-      #es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_ipse(es), &booltype, VarSelfContained, &swartch_vn);
+      #es_push_var(es, swartch_vp, result_cell(oo(&b)), None, &booltype, VarSelfContained, &swartch_vn);
       annotate(&cd->virtual_cell_dead, None);
       return NoFail;
     }
@@ -656,7 +656,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
       et *enumspec = chk.enum_type;
       if true {
         swartch_vn var_number;
-        #es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_ipse, chk.swartch_type, VarSelfContained, &swartch_vn);
+        #es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, chk.swartch_type, VarSelfContained, &swartch_vn);
       }
 
       expected_type *te_typeexpr;
@@ -675,7 +675,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
         annotate(&cd->virtual_cell_dead, Has(cell));
         vn var_number;
-        #es_push_var(es, cond_vp, cell, Has(&vd.name), ~chk.switchable_type_ipse, &cu_expected_type, VarOverlay, &vn);
+        #es_push_var(es, cond_vp, cell, Has(&vd.name), &cu_expected_type, VarOverlay, &vn);
 
         ovn = Has(vn);
       } else {

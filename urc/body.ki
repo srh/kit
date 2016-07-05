@@ -454,7 +454,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
   swartch_vp varpopper;
   init_vp(&swartch_vp, &bs->es);
   swartch_vn var_number;
-  if case Printed(pm) = es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, ~chk.swartch_ipse, chk.swartch_type, VarSelfContained, &swartch_vn) {
+  if case Printed(pm) = es_push_var(&bs->es, &swartch_vp, result_cell(oo(&a->swartch)), None, chk.swartch_type, VarSelfContained, &swartch_vn) {
     return Printed(pm);
   }
   for i size = 0; i < ncases; i = i + 1 {
@@ -487,7 +487,7 @@ func check_switch_statement(bs *bodystate, vp *varpopper, obp opt[*breakpack], a
           }
 
           vn var_number;
-          if case Printed(pm) = es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), ~chk.switchable_type_ipse, &cu_expected_type, VarOverlay, &vn) {
+          if case Printed(pm) = es_push_var(&bs->es, &case_vp, cell, Has(&vd.name), &cu_expected_type, VarOverlay, &vn) {
             return Printed(pm);
           }
           ovn = Has(vn);
@@ -562,7 +562,7 @@ func check_for_statement(bs *bodystate, vp *varpopper, a *ast_for_statement, num
     }
     connect_statements(bs, loopnum, exitnum);
     cond_vn var_number;
-    if case Printed(pm) = es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, ~unnamed_ipse(&bs->es), &boolean, VarSelfContained, &cond_vn) {
+    if case Printed(pm) = es_push_var(&bs->es, &cond_vp, result_cell(oo(&cond.expr)), None, &boolean, VarSelfContained, &cond_vn) {
       return Printed(pm);
     }
   }
@@ -632,7 +632,7 @@ func check_var_statement(bs *bodystate, vp *varpopper, a *ast_var_statement) np 
   }
 
   vn var_number;
-  if case Printed(pm) = es_push_var(&bs->es, vp, cell, Has(&a->decl.name), ~varname_ipse(bs->im, a->decl.name.value), complete_type, VarSelfContained, &vn) {
+  if case Printed(pm) = es_push_var(&bs->es, vp, cell, Has(&a->decl.name), complete_type, VarSelfContained, &vn) {
     return Printed(pm);
   }
   annotate(&a->info, {vn});
@@ -746,7 +746,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
       // We need return statements in the "then" or "else" block to mark the boolean condition dead.  (It would be a smarter graph if we just marked it dead immediately after the branch, but... this way makes the code here handle all cases equivalently.)
       swartch_vn var_number;
-      if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b)), None, ~unnamed_ipse(es), &booltype, VarSelfContained, &swartch_vn) {
+      if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b)), None, &booltype, VarSelfContained, &swartch_vn) {
         return Printed(pm);
       }
       annotate(&cd->virtual_cell_dead, None);
@@ -763,7 +763,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
       et *enumspec = chk.enum_type;
       if true {
         swartch_vn var_number;
-        if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, ~chk.swartch_ipse, chk.swartch_type, VarSelfContained, &swartch_vn) {
+        if case Printed(pm) = es_push_var(es, swartch_vp, result_cell(oo(&b.rhs)), None, chk.swartch_type, VarSelfContained, &swartch_vn) {
           return Printed(pm);
         }
       }
@@ -788,7 +788,7 @@ func check_condition(es *framescope, swartch_vp *varpopper, cond_vp *varpopper, 
 
         annotate(&cd->virtual_cell_dead, Has(cell));
         vn var_number;
-        if case Printed(pm) = es_push_var(es, cond_vp, cell, Has(&vd.name), ~chk.switchable_type_ipse, &cu_expected_type, VarOverlay, &vn) {
+        if case Printed(pm) = es_push_var(es, cond_vp, cell, Has(&vd.name), &cu_expected_type, VarOverlay, &vn) {
           return Printed(pm);
         }
 

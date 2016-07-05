@@ -89,7 +89,6 @@ struct var_info {
   props type_properties;
   cell cell_num;
   name opt[sym];
-  ipse cu_typeexpr;
   // Can a goto statement enter this var's scope and construct the var?  True if the var is self-contained.  I.e. true if the variable is not bound by a case-pattern.  (Also true for lambda parameters, out of general principle.)  This also means the var needs to be destructed by return statements and gotos that leave its scope.  NOTE: What about default cases of switch statements?  You shouldn't be able to goto into one of those?  But you should be able to goto into the else block of an "if case" -- this needs to be fixed?  Should the swartch get destroyed?  Are we treating the "destroy later" of the condition properly?
   binding var_binding;
   initter opt[ctor_desc];
@@ -139,7 +138,7 @@ func do_destroy(vp *varpopper) void {
   vp->es = null;
 }
 
-func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], ipse cu_typeexpr, computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) np {
+func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ident], computed_type *cu_typeexpr, binding var_binding, vn_out *var_number) np {
   osymname opt[sym];
   if case Has(ident *ast_ident) = name {
     osymname = Has(ident->value);
@@ -152,7 +151,7 @@ func es_push_var(es *framescope, vp *varpopper, cell cell_num, name opt[*ast_ide
   props type_properties;
   #compute_type_properties(es->clq, computed_type, &props);
   num var_number = ~count(&es->all_vars);
-  push(&es->all_vars, {num, *computed_type, props, cell, osymname, ipse, binding, None, None});
+  push(&es->all_vars, {num, *computed_type, props, cell, osymname, binding, None, None});
   push(&es->current_vars, num);
   push(&vp->nums, num);
   *vn_out = num;
@@ -1320,7 +1319,7 @@ func help_check_lambda_body(bs *bodystate, a *ast_lambda, computed_params *shray
     push(&arg_cells, cell);
     vn var_number;
     name *ast_ident = &ref(&a->args, i)->name;
-    #es_push_var(&bs->es, &vp, cell, Has(name), ~varname_ipse(bs->im, name->value), &cu_param, VarSelfContained, &vn);
+    #es_push_var(&bs->es, &vp, cell, Has(name), &cu_param, VarSelfContained, &vn);
     #es_note_var_destroyer(&bs->es, vn);
   }
 
