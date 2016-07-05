@@ -86,12 +86,6 @@ func[H] build_u8str(help H, r *array[u8], a *ast_arraytype) void {
   push(r, '}');
 }
 
-func[H] build_u8str(help H, r *array[u8], a *ast_ipse) void {
-  append(r, _u8("{name:"));
-  build_u8str(help, r, &a->name);
-  push(r, '}');
-}
-
 func[H] build_u8str(help H, r *array[u8], a *ast_unknown) void {
   append(r, _u8("ast_unknown"));
   // Do nothing.
