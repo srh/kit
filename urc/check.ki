@@ -198,9 +198,6 @@ func convert_typeexpr(cs *checkstate, a *ast_typeexpr, out *te_typeexpr) np {
       *out = TeArraytype({count, param});
       return NoFail;
     }
-    case &Ipse(b ast_ipse):
-      *out = TeIpse({b.name.value});
-      return NoFail;
 
     case &Unknown(b ast_unknown): {
       *out = TeUnknown;
