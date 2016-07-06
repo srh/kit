@@ -1,3 +1,4 @@
+import stdlib;
 
 struct le_u32 {
   buf ^[4]u8;
