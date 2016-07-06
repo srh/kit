@@ -7,8 +7,6 @@ import typeexpr;
 
 // ATTENTION!  "ast" types must use UNSHARED data structures.
 
-// DOTTED(): Some sort of dotted typeexpr.
-
 // This is an index into some ps-specific structure.
 struct ast_meta { x size; }
 
