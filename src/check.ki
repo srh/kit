@@ -1795,6 +1795,7 @@ func is_complete_computed(t *te_typeexpr) complete_computed {
   }
 }
 
+// Right now we only use .computed for the sake of assertions (and intermediate calculations of is_complete_computed).
 struct complete_computed {
   complete bool;
   computed bool;
