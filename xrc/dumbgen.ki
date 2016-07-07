@@ -856,9 +856,9 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
 func x86_load_cell_address(f *objfile, h *frame, dest u8, c cell_num) void {
   switch get_loc(h, c) {
   case DirectLoc(off i32):
-    x86_lea32(f, X86_EAX, X86_EBP, off);
+    x86_lea32(f, dest, X86_EBP, off);
   case IndirectLoc(off i32):
-    x86_load32(f, X86_EAX, X86_EBP, off);
+    x86_load32(f, dest, X86_EBP, off);
   }
 }
 
