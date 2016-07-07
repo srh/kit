@@ -92,6 +92,10 @@ func appendtext(f *objfile, x0 u8, x1 u8, x2 u8, x3 u16) void {
   append_raw(&f->text, ixcast(&b[0]), 5);
 }
 
+func appendtext(f *objfile, x0 reg_rm_encoded) void {
+  append_raw(&f->text, ixcast(&x0.buf[0]), ~x0.length);
+}
+
 func appendtext(f *objfile, x0 u8, x1 reg_rm_encoded) void {
   append_raw(&f->text, ixcast(&x0), 1);
   append_raw(&f->text, ixcast(&x1.buf[0]), ~x1.length);
@@ -137,7 +141,7 @@ func x86_pop32(f *objfile, reg u8) void {
 }
 
 func x86_ret(f *objfile) void {
-  appendtext(f, 0xC3);
+  appendtext(f, @[u8]0xC3);
 }
 
 func x86_retn(f *objfile, x u16) void {
@@ -215,7 +219,7 @@ func x86_mov_stiptr(plat *platform_info, f *objfile, dest u8, symbol_table_index
 }
 
 func x86_int3(f *objfile) void {
-  appendtext(f, 0xCC);
+  appendtext(f, @[u8]0xCC);
 }
 
 func x86_shr_imm_w32(f *objfile, dest u8, imm u8) void {
@@ -289,7 +293,7 @@ func x86_prefix(f *objfile, opnum u8, oz oz) void {
     appendtext(f, opnum ^ 1);
     return;
   case OZ_16:
-    appendtext(f, 0x66);
+    appendtext(f, @[u8]0x66);
   case OZ_32:
     void;
   }
@@ -368,7 +372,7 @@ func x86_cwd_w16(f *objfile) void {
 }
 
 func x86_cdq_w32(f *objfile) void {
-  appendtext(f, 0x99);
+  appendtext(f, @[u8]0x99);
 }
 
 func x86_cmp(f *objfile, lhs u8, rhs u8, oz oz) void {
@@ -479,17 +483,17 @@ func x86_store32_partial_destructively(f *objfile, dest_addr u8, dest_disp i32, 
   if size == 0 {
     // Do nothing.
   } else if size == 4 {
-    x86_store32(f, dest_addr, dest_disp, src);
+    x86_store(f, dest_addr, dest_disp, src, OZ_32);
   } else if size == 1 {
     check(src == X86_EAX || src == X86_ECX || src == X86_EDX || src == X86_EBX);
-    x86_store8(f, dest_addr, dest_disp, src);
+    x86_store(f, dest_addr, dest_disp, src, OZ_8);
   } else if size == 2 {
-    x86_store16(f, dest_addr, dest_disp, src);
+    x86_store(f, dest_addr, dest_disp, src, OZ_16);
   } else if size == 3 {
     // Heh!  In s1 we didn't implement this case.
-    x86_store16(f, dest_addr, dest_disp, src);
+    x86_store(f, dest_addr, dest_disp, src, OZ_16);
     x86_shr_imm_w32(f, src, 16);
-    x86_store8(f, dest_addr, dest_disp + 2, src);
+    x86_store(f, dest_addr, dest_disp + 2, src, OZ_8);
   } else {
     ice(_u8("x86_store32_partial_destructively with bad size"));
   }
@@ -647,16 +651,9 @@ func x86_placeholder_lea32(f *objfile, srcdest u8) size {
   return precount + 1 + reg_rm_reloc;
 }
 
-func x86_store32(f *objfile, dest_addr u8, dest_disp i32, src u8) void {
-  appendtext(f, 0x89, encode_reg_rm(src, dest_addr, dest_disp));
-}
-
-func x86_store16(f *objfile, dest_addr u8, dest_disp i32, src u8) void {
-  appendtext(f, 0x66, 0x89, encode_reg_rm(src, dest_addr, dest_disp));
-}
-
-func x86_store8(f *objfile, dest_addr u8, dest_disp i32, src u8) void {
-  appendtext(f, 0x88, encode_reg_rm(src, dest_addr, dest_disp));
+func x86_store(f *objfile, dest_addr u8, dest_disp i32, src u8, oz oz) void {
+  x86_prefix(f, 0x89, oz);
+  appendtext(f, encode_reg_rm(src, dest_addr, dest_disp));
 }
 
 func x86_store_imm32(f *objfile, dest_addr u8, dest_disp i32, value u32) void {
@@ -672,7 +669,7 @@ func x86_store_imm8(f *objfile, dest_addr u8, dest_disp i32, value u8) void {
 }
 
 func x86_call(f *objfile, symbol_table_index sti) void {
-  appendtext(f, 0xE8);
+  appendtext(f, @[u8]0xE8);
   append_rel32(&f->text, symbol_table_index);
 }
 
@@ -696,7 +693,7 @@ func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
 
   while size >= 4 {
     x86_load32(f, X86_EAX, src_addr, src_disp);
-    x86_store32(f, dest_addr, dest_disp, X86_EAX);
+    x86_store(f, dest_addr, dest_disp, X86_EAX, OZ_32);
     src_disp = src_disp + 4;
     dest_disp = dest_disp + 4;
     size = size - 4;
@@ -704,7 +701,7 @@ func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
 
   if size >= 2 {
     x86_movzx16(f, X86_EAX, src_addr, src_disp);
-    x86_store16(f, dest_addr, dest_disp, X86_EAX);
+    x86_store(f, dest_addr, dest_disp, X86_EAX, OZ_16);
     src_disp = src_disp + 2;
     dest_disp = dest_disp + 2;
     size = size - 2;
@@ -712,7 +709,7 @@ func x86_memcopy(f *objfile, dest cell_loc, src cell_loc, size u32) void {
 
   if size == 1 {
     x86_movzx8(f, X86_EAX, src_addr, src_disp);
-    x86_store8(f, dest_addr, dest_disp, X86_EAX);
+    x86_store(f, dest_addr, dest_disp, X86_EAX, OZ_8);
   }
 }
 
@@ -759,10 +756,10 @@ func x86_prep_loc_use(f *objfile, loc cell_loc, avail_reg u8, addr_reg_out *u8, 
 func x86_store32(f *objfile, dest cell_loc, src u8, scratch u8) void {
   switch dest {
   case DirectLoc(off i32):
-    x86_store32(f, X86_EBP, off, src);
+    x86_store(f, X86_EBP, off, src, OZ_32);
   case IndirectLoc(off i32):
     x86_load32(f, scratch, X86_EBP, off);
-    x86_store32(f, scratch, 0, src);
+    x86_store(f, scratch, 0, src, OZ_32);
   }
 }
 

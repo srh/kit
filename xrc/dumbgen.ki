@@ -692,7 +692,7 @@ func universal_cc_write_to_retcell(f *objfile, h *frame, c cell_num) void {
     x86_store32_partial_destructively(f, dest_addr, dest_disp, X86_EAX, retsize);
   } else if retsize <= 8 {
     check(h->cs->plat.opsys != Linux32);
-    x86_store32(f, dest_addr, dest_disp, X86_EAX);
+    x86_store(f, dest_addr, dest_disp, X86_EAX, OZ_32);
     x86_store32_partial_destructively(f, dest_addr, dest_disp + 4, X86_EDX, retsize - 4);
   } else {
     ice(_u8("return size is too big for non-hidden return param"));
@@ -734,7 +734,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
             if hrp {
               hrp_bottom i32 = framelist_bottom - 4;
               x86_load_cell_address(f, h, X86_EAX, a.retcell);
-              x86_store32(f, X86_EBP, hrp_bottom, X86_EAX);
+              x86_store(f, X86_EBP, hrp_bottom, X86_EAX, OZ_32);
               callsite_bottom = hrp_bottom;
             } else {
               callsite_bottom = framelist_bottom;
@@ -784,7 +784,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
         case &GrDeref(a gr_deref):
           x86_load32(f, X86_EAX, get_ptr_loc(h, a.pointer));
           x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
-          x86_store32(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX);
+          x86_store(f, X86_EBP, unIndirect(get_loc(h, a.name)), X86_EAX, OZ_32);
         case &GrSubcell(a gr_subcell):
           switch get_loc(h, a.name) {
           case DirectLoc(off i32):
@@ -792,7 +792,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp
           case IndirectLoc(off i32):
             x86_load_cell_address(f, h, X86_EAX, a.partof);
             x86_add_offset(f, h, X86_EAX, a.offset, X86_ECX, X86_EDX);
-            x86_store32(f, X86_EBP, off, X86_EAX);
+            x86_store(f, X86_EBP, off, X86_EAX, OZ_32);
           }
 
         // These cases do nothing here -- they're for static eval, book-keeping, etc.
@@ -973,7 +973,7 @@ func x86_gen_write_value(f *objfile, h *frame, dest_loc cell_loc, value *st_valu
     symbol_table_index sti = *un(&ref_fn_body(h->cs, sref->cdr.fnid)->symbol_table_index);
     x86_mov_stiptr(&h->cs->plat, f, X86_ECX, symbol_table_index);
     check(st_symbolref_size(&h->cs->plat, &sref->cdr) == 4);
-    x86_store32(f, dest_addr, dest_disp + ~sref->car, X86_ECX);
+    x86_store(f, dest_addr, dest_disp + ~sref->car, X86_ECX, OZ_32);
     w = sref->car + 4;
   }
 
