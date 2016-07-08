@@ -1787,10 +1787,6 @@ func compute_void(clq *clqueue) cu_typrop { return compute_prim(clq, primitive_v
 func compute_size(clq *clqueue) cu_typeexpr { return compute_prim(clq, primitive_size_type(clq->cs)); }
 
 func compute_prim(clq *clqueue, t te_typeexpr) cu_typeexpr {
-  return compute_prim_with_scope(clq, t);
-}
-
-func compute_prim_with_scope(clq *clqueue, t te_typeexpr) cu_typeexpr {
   cac cac_typeexpr;
   if case Unprinted(pm) = nogeneric_check_and_compute_typeexpr(clq, &t, &cac) {
     ice(_u8("compute_prim encounters uncomputable type: "), pm.msg);
@@ -1806,11 +1802,7 @@ func compute_prim(clq *clqueue, t te_typeexpr) cu_typrop {
 }
 
 func compute_prim(clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
-  compute_prim_with_scope(clq, t, out, props_out);
-}
-
-func compute_prim_with_scope(clq *clqueue, t te_typeexpr, out *cu_typeexpr, props_out *type_properties) void {
-  type cu_typeexpr = compute_prim_with_scope(clq, t);
+  type cu_typeexpr = compute_prim(clq, t);
   if case Unprinted(pm) = compute_type_properties(clq, &type, props_out) {
     ice(_u8("compute_prim fails to compute type properties: "), pm.msg);
   }
