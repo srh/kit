@@ -84,7 +84,7 @@ void x64_super_prefix(struct objfile *f, uint8_t opnum, enum oz oz,
     pushtext(f, opnum ^ 1);
     return;
   }
-  int rex = (reg > X64_RDI ? kREXR : 0)
+  uint8_t rex = (reg > X64_RDI ? kREXR : 0)
     | (oz == OZ_64 ? kREXW : 0)
     | (base > X64_RDI ? kREXB : 0);
   if (rex) {
@@ -492,7 +492,7 @@ void ia_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
 void x64_mov_imm64(struct objfile *f, enum x64_reg dest, int64_t imm64) {
   uint8_t b[10];
   b[0] = kREXW | (dest <= X64_RDI ? 0 : kREXB);
-  b[1] = 0xB8 + dest;
+  b[1] = 0xB8 + (dest & 7);
   write_le_i64(b + 2, imm64);
   apptext(f, b, 10);
 }
