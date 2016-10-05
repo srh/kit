@@ -378,21 +378,8 @@ func adjust_xop_for_inline(op_addend size, cm *array[cell_num], xop *gr_xop) gr_
     case StandardApply:
       act = StandardApply;
     }
-    semantic gr_apply_semantic;
-    switch a.semantic {
-    case NoSemantic:
-      semantic = NoSemantic;
-    case MoveSemantic(bs gr_apply_bi_semantic):
-      semantic = MoveSemantic({get(cm, bs.dest.x), get(cm, bs.src.x)});
-    case CopySemantic(bs gr_apply_bi_semantic):
-      semantic = CopySemantic({get(cm, bs.dest.x), get(cm, bs.src.x)});
-    case InitSemantic(us gr_apply_uni_semantic):
-      semantic = InitSemantic({get(cm, us.cell.x)});
-    case DestroySemantic(us gr_apply_uni_semantic):
-      semantic = DestroySemantic({get(cm, us.cell.x)});
-    }
 
-    return GrApply({get(cm, a.funcell.x), help_adjust_params(cm, &a.params), get(cm, a.retcell.x), act, semantic});
+    return GrApply({get(cm, a.funcell.x), help_adjust_params(cm, &a.params), get(cm, a.retcell.x), act});
   case &GrPrimApply(a gr_prim_apply):
     return GrPrimApply({a.primop, help_adjust_params(cm, &a.params), get(cm, a.retcell.x)});
   case &GrMemCopy(a gr_memcopy):

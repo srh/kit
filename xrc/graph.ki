@@ -512,30 +512,11 @@ enum gr_apply_active_change {
   StandardApply void;
 }
 
-struct gr_apply_bi_semantic {
-  dest cell_num;
-  src cell_num;
-}
-
-struct gr_apply_uni_semantic {
-  cell cell_num;
-}
-
-enum gr_apply_semantic {
-  NoSemantic void;
-  MoveSemantic gr_apply_bi_semantic;
-  CopySemantic gr_apply_bi_semantic;
-  InitSemantic gr_apply_uni_semantic;
-  DestroySemantic gr_apply_uni_semantic;
-}
-
 struct gr_apply {
   funcell cell_num;
   params shray[cell_num];
   retcell cell_num;
   act gr_apply_active_change;
-  // A stop-gap that says if the apply is a constructor.
-  semantic gr_apply_semantic;
 }
 
 struct gr_prim_apply {
@@ -1871,8 +1852,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
       #gr_expr_and_consume(gs, oo(&a->lhs), &di.lhs_after, bu);
       #gr_live_and_expr_consume(gs, oo(&a->rhs), bu);
 
-      // TODO(): There might be some semantic here.
-      add(bu, @[gr_xop]GrApply({funcell, mk_shray(result_cell(&di.lhs_after), result_cell(oo(&a->rhs))), result_ptr_cell, StandardApply, NoSemantic}));
+      add(bu, @[gr_xop]GrApply({funcell, mk_shray(result_cell(&di.lhs_after), result_cell(oo(&a->rhs))), result_ptr_cell, StandardApply}));
       // Now I have a result pointer.  Ho ho ho!
     } else {
       collection_ptrtype cu_typrop = computed_ptr_type(gs, &ref_cell(gs.gr, value_cell(oo(&a->lhs)))->type);
@@ -1896,8 +1876,7 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
         add(bu, @[gr_xop]GrVirtualDead({ellval_cell(oo(&a->lhs))}));
       }
 
-      // TODO(): There might be some semantic here.
-      add(bu, @[gr_xop]GrApply({funcell, mk_shray(collection_ptr_cell, result_cell(oo(&a->rhs))), result_ptr_cell, StandardApply, NoSemantic}));
+      add(bu, @[gr_xop]GrApply({funcell, mk_shray(collection_ptr_cell, result_cell(oo(&a->rhs))), result_ptr_cell, StandardApply}));
       // Now I have a result pointer.  Ho ho ho!
     }
     add(bu, @[gr_xop]GrDeref({ellval_cell(x), result_ptr_cell, OffsetConst({0, NoField})}));
@@ -1999,7 +1978,7 @@ func gr_assignment(gs gr_statep, x *ast_expr, a *ast_assignment, bu *sq_builder)
     add(bu, @[gr_xop]GrLive({srcptr}));
     add(bu, @[gr_xop]GrAddressof({srcptr, value_cell(oo(&a->rhs))}));
     add(bu, @[gr_xop]GrActiveXop({Activate(funcell), Nothing}));
-    add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result, StandardApply, NoSemantic}));
+    add(bu, @[gr_xop]GrApply({funcell, mk_shray(destptr, srcptr), cmp_result, StandardApply}));
 
     postbranch_save gr_savetrack = save_celltrack(gs.ctr);
 
@@ -2113,7 +2092,7 @@ func gr_funcall(gs gr_statep, x *ast_expr, a *ast_funcall, bu *sq_builder) np {
     #gr_live_and_expr_consume(gs, param, bu);
     push(&paramcells, result_cell(param));
   }
-  add(bu, @[gr_xop]GrApply({result_cell(oo(&a->fun)), freeze(&paramcells), rval_cell(x), StandardApply, NoSemantic}));
+  add(bu, @[gr_xop]GrApply({result_cell(oo(&a->fun)), freeze(&paramcells), rval_cell(x), StandardApply}));
   return NoFail;
 }
 
@@ -2320,11 +2299,11 @@ func gr_uni_fun(gs gr_statep, ip instpair, arg cell_num, statechange uni_fun_sta
 
   switch statechange {
   case NothingButDestroy:
-    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, StandardApply, DestroySemantic({arg})}));
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, StandardApply}));
   case Activate:
-    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, TwoExtraOps({Activate(arg), Nothing}), InitSemantic({arg})}));
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, TwoExtraOps({Activate(arg), Nothing})}));
   case Deactivate:
-    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, TwoExtraOps({Deactivate(arg), Nothing}), DestroySemantic({arg})}));
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(argptrcell), retvoid, TwoExtraOps({Deactivate(arg), Nothing})}));
   }
   add(&bu, @[gr_xop]GrActiveXop({Deactivate(retvoid), Nothing}));
   add(&bu, @[gr_xop]GrDead({retvoid}));
@@ -2381,13 +2360,13 @@ func gr_bi_fun(gs gr_statep, ip instpair, dest cell_num, src cell_num, statechan
 
   switch statechange {
   case BiMove:
-    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TwoExtraOps({Activate(dest), Deactivate(src)}), MoveSemantic({dest, src})}));
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TwoExtraOps({Activate(dest), Deactivate(src)})}));
   case BiCopy:
-    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TwoExtraOps({Activate(dest), Nothing}), CopySemantic({dest, src})}));
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TwoExtraOps({Activate(dest), Nothing})}));
   case BiDeactivateSrcButMove:
-    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TwoExtraOps({Deactivate(src), Nothing}), MoveSemantic({dest, src})}));
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TwoExtraOps({Deactivate(src), Nothing})}));
   case BiNothingButCopy:
-    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TwoExtraOps({Nothing, Nothing}), CopySemantic({dest, src})}));
+    add(&bu, @[gr_xop]GrApply({funcell, mk_shray(destptrcell, srcptrcell), retvoid, TwoExtraOps({Nothing, Nothing})}));
   }
 
   add(&bu, @[gr_xop]GrActiveXop({Deactivate(retvoid), Nothing}));
@@ -2682,7 +2661,7 @@ func gr_magic_arraytype_info(clq *clqueue, wc which_ctor, mai *magic_arraytype_i
         add(&vd_bu, @[gr_xop]GrVirtualDead({ec}));
       }
 
-      add(&vd_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell, TwoExtraOps({Nothing, Nothing}), NoSemantic}));
+      add(&vd_bu, @[gr_xop]GrApply({func_cell, freeze(&elemptrcells), elemretcell, TwoExtraOps({Nothing, Nothing})}));
       add(&vd_bu, @[gr_xop]GrActiveXop({Deactivate(elemretcell), Nothing}));
       add(&vd_bu, @[gr_xop]GrDead({elemretcell}));
       vd gr_num = done(&vd_bu);
@@ -2830,9 +2809,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info,
         add(&sub_bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 
-      // TODO(): Really there should be a specific semantic here, if this graph is to be
-      // checked at all...
-      add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, StandardApply, NoSemantic}));
+      add(&sub_bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, StandardApply}));
       add(&sub_bu, @[gr_xop]GrActiveXop({Deactivate(fieldretcell), Nothing}));
       add(&sub_bu, @[gr_xop]GrDead({fieldretcell}));
     } else {
@@ -3013,8 +2990,7 @@ func gr_magic_struct_info(clq *clqueue, wc which_ctor, msi *magic_struct_info, g
         add(&bu, @[gr_xop]GrVirtualDead({get(&fieldcella, j)}));
       }
 
-      // TODO(): Really there is to be a semantic here.
-      add(&bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, StandardApply, NoSemantic}));
+      add(&bu, @[gr_xop]GrApply({func_cell, freeze(&fieldptrcella), fieldretcell, StandardApply}));
       add(&bu, @[gr_xop]GrActiveXop({Deactivate(fieldretcell), Nothing}));
       add(&bu, @[gr_xop]GrDead({fieldretcell}));
     } else {
