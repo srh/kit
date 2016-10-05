@@ -268,23 +268,6 @@ func combine_pow2(x pow2_turtles, y pow2_turtles) pow2_turtles {
   }
 }
 
-struct exposed_type_name {
-  // TODO: Make the one-element case not allocate.
-  parts shray[sym];
-}
-
-func `==`(x exposed_type_name, y exposed_type_name) bool {
-  return shray_equal(&x.parts, &y.parts);
-}
-
-func mk_exposed_type_name(only_part sym) exposed_type_name {
-  return {mk_shray(only_part)};
-}
-
-func[H] build_u8str(help H, r *array[u8], x *exposed_type_name) void {
-  build_shray_u8str(help, r, &x->parts);
-}
-
 struct type_properties {
   flat_size u32;
   flat_alignment u32;
@@ -294,7 +277,6 @@ struct type_properties {
   destroy_behavior derived_method_behavior;
   is_scalar type_scalarity;
   is_pow2 pow2_turtles;
-  exposed_types shray[exposed_type_name];
 }
 
 struct cu_typrop {
@@ -331,20 +313,9 @@ struct deftype_inst {
   info nbfc[deftype_inst_info];
 }
 
-struct exposer {
-  outer_name sym;
-  inner_name exposed_type_name;
-}
-
 struct classexpr_rhs_spec {
   disposition ast_defclass_disposition;
   drs structspec;
-  exposers shray[exposer];
-}
-
-// TODO(): Remove.
-func bogus_exposers() shray[exposer] {
-  return mk_shray();
 }
 
 enum deftype_rhs_spec {
@@ -691,8 +662,6 @@ func lookup_explicit_method_or_lack_thereof(clq *clqueue, fntype *te_typeexpr, i
   }
 }
 
-// TODO(): This blindly returns back exposed_types of its inner struct.  Update this
-// to... not do that.
 // We call this before we've set the inst's info -- so we _have_ to take structspec as a param.  It's _good_ that we don't make the caller pass the type itself -- we can see here that it's constructed straight from the ent, which means we know that there are no "strange" (read: scoped to some function body) lifetime types involved, just the idy_repls -- see the emissions in lookup_explicit_method_or_lack_thereof.
 func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id deftype_inst_id, a ast_defclass_disposition, st *structspec, out *type_properties) np {
   cs *checkstate = clq->cs;
@@ -706,7 +675,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
     init_behavior var = #lookup_explicit_method_or_lack_thereof(clq, &fntype1, cs->im->cym.do_initsym);
     *out = {props.flat_size, props.flat_alignment,
             init_behavior,
-            props.move_behavior, props.copy_behavior, props.destroy_behavior, props.is_scalar, props.is_pow2, props.exposed_types};
+            props.move_behavior, props.copy_behavior, props.destroy_behavior, props.is_scalar, props.is_pow2};
     return NoFail;
   case DefaultMove:
     props type_properties;
@@ -722,7 +691,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
             props.move_behavior,
             copy_behavior,
             destroy_behavior,
-            props.is_scalar, props.is_pow2, props.exposed_types};
+            props.is_scalar, props.is_pow2};
     return NoFail;
   case NoDefaults:
     props type_properties;
@@ -740,7 +709,7 @@ func to_defclass_properties(clq *clqueue, ent_id deftype_entry_id, inst_id defty
             move_behavior,
             copy_behavior,
             destroy_behavior,
-            props.is_scalar, props.is_pow2, props.exposed_types};
+            props.is_scalar, props.is_pow2};
     return NoFail;
   }
 }
