@@ -2043,29 +2043,29 @@ void help_x64_gen_load_register(struct objfile *f, enum x64_reg dest,
   if (size == 0) {
     return;
   } else if (size == 8) {
-    x64_gen_load(f, dest, src_addr, src_disp, OZ_64);
+    x64_gen_movzx(f, dest, src_addr, src_disp, OZ_64);
     return;
   } else if (size > 4) {
     help_x64_gen_load_register(f, spare2, src_addr, int32_add(src_disp, 4),
                                uint32_sub(size, 4), dest);
-    x64_gen_load(f, dest, src_addr, src_disp, OZ_32);
+    x64_gen_movzx(f, dest, src_addr, src_disp, OZ_32);
     x64_gen_shl_imm(f, spare2, 32, OZ_64);
     x64_gen_or(f, dest, spare2, OZ_64);
     return;
   } else if (size == 4) {
-    x64_gen_load(f, dest, src_addr, src_disp, OZ_32);
+    x64_gen_movzx(f, dest, src_addr, src_disp, OZ_32);
     return;
   } else if (size == 3) {
-    x64_gen_load(f, spare2, src_addr, int32_add(src_disp, 2), OZ_8);
-    x64_gen_load(f, dest, src_addr, src_disp, OZ_16);
+    x64_gen_movzx(f, spare2, src_addr, int32_add(src_disp, 2), OZ_8);
+    x64_gen_movzx(f, dest, src_addr, src_disp, OZ_16);
     x64_gen_shl_imm(f, spare2, 16, OZ_32);
     x64_gen_or(f, dest, spare2, OZ_32);
     return;
   } else if (size == 2) {
-    x64_gen_load(f, dest, src_addr, src_disp, OZ_16);
+    x64_gen_movzx(f, dest, src_addr, src_disp, OZ_16);
   } else {
     CHECK(size == 1);
-    x64_gen_load(f, dest, src_addr, src_disp, OZ_8);
+    x64_gen_movzx(f, dest, src_addr, src_disp, OZ_8);
   }
 }
 

@@ -171,11 +171,10 @@ void ia_gen_mov(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz
   pushtext(f, mod_reg_rm(MOD11, dest, src));
 }
 
-/* TODO(): Rename x64_gen_movzx */
 /* oz depicts the source operand -- the dest is always the full
 register, which gets zero-extended */
-void x64_gen_load(struct objfile *f, enum x64_reg dest,
-                  enum x64_reg src_addr, int32_t src_disp, enum oz oz) {
+void x64_gen_movzx(struct objfile *f, enum x64_reg dest,
+                   enum x64_reg src_addr, int32_t src_disp, enum oz oz) {
   CHECK(src_addr <= X64_RDI);
   int regnum = dest & 7;
   if (oz <= OZ_16) {
@@ -230,6 +229,7 @@ void ia_gen_lea(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
 register, which gets zero-extended. */
 void ia_gen_movzx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                   int32_t src_disp, enum oz src_oz) {
+  CHECK(src_addr <= X64_RDI);
   if (src_oz <= OZ_16) {
     uint8_t pref[2];
     pref[0] = 0x0F;
@@ -272,7 +272,7 @@ void ia_gen_movsx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
     }
   } else {
     CHECK(objfile_arch(f) == TARGET_ARCH_X64);
-    x64_gen_load(f, map_x64_reg(dest), map_x64_reg(src_addr), src_disp, OZ_64);
+    ia_gen_movzx(f, dest, src_addr, src_disp, OZ_64);
   }
 }
 

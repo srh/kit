@@ -107,8 +107,8 @@ void ia_gen_mov(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz
 
 void x64_gen_store(struct objfile *f, enum x64_reg dest_addr, int32_t dest_disp,
                    enum x64_reg src, enum oz oz);
-void x64_gen_load(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
-                  int32_t src_disp, enum oz oz);
+void x64_gen_movzx(struct objfile *f, enum x64_reg dest, enum x64_reg src_addr,
+                   int32_t src_disp, enum oz oz);
 void ia_gen_movzx8_reg8(struct objfile *f, enum gp_reg dest, enum x86_reg8 src);
 void ia_gen_lea(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                 int32_t src_disp);
