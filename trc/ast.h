@@ -195,7 +195,6 @@ struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a);
 
 struct ast_typeexpr ast_unknown_garbage(void);
 struct ast_typeexpr ast_numeric_garbage(void);
-struct ast_typeexpr ast_strinit_garbage(size_t exprs_count);
 
 struct ast_var_info {
   int info_valid;
