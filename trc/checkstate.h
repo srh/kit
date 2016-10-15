@@ -5,6 +5,7 @@
 
 #include "databuf.h"
 #include "platform.h"
+#include "slice.h"
 #include "table.h"
 
 struct identmap;
@@ -66,6 +67,10 @@ struct typetrav_symbol_info {
   struct ast_typeexpr type;
 };
 
+GEN_SLICE_HDR(import, struct import);
+GEN_SLICE_HDR(sti, struct sti);
+GEN_SLICE_HDR(typetrav_symbol_info_ptr, struct typetrav_symbol_info *);
+
 struct checkstate {
   struct identmap *im;
   struct common_idents cm;
@@ -75,9 +80,7 @@ struct checkstate {
   enum target_platform platform;
   enum target_arch arch;
 
-  struct import *imports;
-  size_t imports_count;
-  size_t imports_limit;
+  struct import_slice imports;
 
   /* TODO: Rename this, it adds 1 for every file. */
   size_t total_filesize;
@@ -91,9 +94,7 @@ struct checkstate {
   /* sli = string literal */
   struct identmap sli_values;
 
-  struct sti *sli_symbol_table_indexes;
-  size_t sli_symbol_table_indexes_count;
-  size_t sli_symbol_table_indexes_limit;
+  struct sti_slice sli_symbol_table_indexes;
 
   /* Used for type traversal functions.  This is bad. */
   struct identmap typetrav_values;
@@ -101,9 +102,7 @@ struct checkstate {
   /* TODO: We don't need to keep around the ast_typeexpr for symbol
   infos that have been generated. */
   /* This is an array of pointers because we grow it while we use it. */
-  struct typetrav_symbol_info **typetrav_symbol_infos;
-  size_t typetrav_symbol_infos_count;
-  size_t typetrav_symbol_infos_limit;
+  struct typetrav_symbol_info_ptr_slice typetrav_symbol_infos;
   size_t typetrav_symbol_infos_first_ungenerated;
 };
 

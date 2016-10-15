@@ -33,6 +33,8 @@ struct def_instantiation {
   struct sti symbol_table_index;
 };
 
+GEN_SLICE_HDR(def_instantiation_ptr, struct def_instantiation *);
+
 struct ast_expr *di_annotated_rhs(struct def_instantiation *inst);
 void di_set_annotated_rhs(struct def_instantiation *inst,
                           struct ast_expr annotated_rhs);
@@ -48,6 +50,11 @@ struct defclass_ident {
   ident_value name;
   struct generics_arity arity;
 };
+
+GEN_SLICE_HDR(defclass_ident, struct defclass_ident);
+
+struct def_entry;
+GEN_SLICE_HDR(def_entry_ptr, struct def_entry *);
 
 struct def_entry {
   ident_value name;
@@ -68,17 +75,13 @@ struct def_entry {
   int is_export;
   struct ast_def *def;
 
-  struct def_instantiation **instantiations;
-  size_t instantiations_count;
-  size_t instantiations_limit;
+  struct def_instantiation_ptr_slice instantiations;
 
   /* Names of things whose value each def references at compile-time
   evaluation.  We could do this per-instantiation but right now that's
   irrelevant because there's no specialization.  These references must
   form an acyclic graph -- or the user's program is invalid. */
-  struct def_entry **static_references;
-  size_t static_references_count;
-  size_t static_references_limit;
+  struct def_entry_ptr_slice static_references;
 
   int known_acyclic;
   int acyclicity_being_chased;
@@ -86,7 +89,6 @@ struct def_entry {
 
 void def_entry_note_static_reference(struct def_entry *ent,
                                      struct def_entry *referent);
-
 
 enum typeexpr_trait {
   TYPEEXPR_TRAIT_LACKED,
@@ -119,6 +121,8 @@ struct deftype_instantiation {
   struct ast_deftype_rhs concrete_rhs;
 };
 
+GEN_SLICE_HDR(deftype_instantiation_ptr, struct deftype_instantiation *);
+
 struct deftype_entry {
   ident_value name;
   struct generics_arity arity;
@@ -128,9 +132,7 @@ struct deftype_entry {
   /* Equal to arity.value, if it has a value. */
   size_t flatly_held_count;
 
-  struct deftype_instantiation **instantiations;
-  size_t instantiations_count;
-  size_t instantiations_limit;
+  struct deftype_instantiation_ptr_slice instantiations;
 
   int has_been_checked;
   int is_being_checked;
@@ -141,21 +143,19 @@ struct deftype_entry {
   struct ast_deftype *deftype;
 };
 
+GEN_SLICE_HDR(deftype_entry_ptr, struct deftype_entry *);
+
 int deftype_entry_param_is_flatly_held(struct deftype_entry *entry,
                                        size_t which_generic);
 
 struct name_table {
   struct arena arena;
 
-  struct def_entry **defs;
-  size_t defs_count;
-  size_t defs_limit;
+  struct def_entry_ptr_slice defs;
 
   struct identmap defs_by_name;
 
-  struct deftype_entry **deftypes;
-  size_t deftypes_count;
-  size_t deftypes_limit;
+  struct deftype_entry_ptr_slice deftypes;
 
   struct identmap deftypes_by_name;
 

@@ -161,8 +161,8 @@ int is_primitive_but_not_sizeof_alignof(struct def_entry *ent) {
 struct sti add_data_string(struct checkstate *cs, struct objfile *f,
                            const void *data, uint32_t length) {
   ident_value index = identmap_intern(&cs->sli_values, data, length);
-  CHECK(index <= cs->sli_symbol_table_indexes_count);
-  if (index == cs->sli_symbol_table_indexes_count) {
+  CHECK(index <= cs->sli_symbol_table_indexes.count);
+  if (index == cs->sli_symbol_table_indexes.count) {
     char name[] = "string_literal$";
     void *gen_name;
     size_t gen_name_count;
@@ -178,13 +178,11 @@ struct sti add_data_string(struct checkstate *cs, struct objfile *f,
     free(gen_name);
 
     objfile_section_append_raw(objfile_data(f), data, length);
-    SLICE_PUSH(cs->sli_symbol_table_indexes,
-               cs->sli_symbol_table_indexes_count,
-               cs->sli_symbol_table_indexes_limit,
-               symbol_table_index);
+    sti_slice_push(&cs->sli_symbol_table_indexes,
+                   symbol_table_index);
   }
 
-  return cs->sli_symbol_table_indexes[index];
+  return cs->sli_symbol_table_indexes.ptr[index];
 }
 
 int add_def_symbols(struct checkstate *cs, struct objfile *f,
@@ -200,9 +198,9 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
   identmap_lookup(cs->im, ent->name, &name, &name_count);
 
   if (ent->is_extern) {
-    if (ent->instantiations_count > 0) {
+    if (ent->instantiations.count > 0) {
       /* "extern" defs can't be templatized. */
-      CHECK(ent->instantiations_count == 1);
+      CHECK(ent->instantiations.count == 1);
 
       void *c_name;
       size_t c_name_count;
@@ -217,18 +215,18 @@ int add_def_symbols(struct checkstate *cs, struct objfile *f,
                                     IS_FUNCTION_YES : IS_FUNCTION_NO);
       free(c_name);
 
-      CHECK(ent->instantiations_count == 1);
-      struct def_instantiation *inst = ent->instantiations[0];
+      CHECK(ent->instantiations.count == 1);
+      struct def_instantiation *inst = ent->instantiations.ptr[0];
       di_set_symbol_table_index(inst, symbol_table_index);
     }
 
     return 1;
   }
 
-  CHECK(!(ent->is_export && ent->instantiations_count > 1));
+  CHECK(!(ent->is_export && ent->instantiations.count > 1));
 
-  for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
-    struct def_instantiation *inst = ent->instantiations[i];
+  for (size_t i = 0, e = ent->instantiations.count; i < e; i++) {
+    struct def_instantiation *inst = ent->instantiations.ptr[i];
 
     struct databuf namebuf;
     databuf_init(&namebuf);
@@ -428,15 +426,24 @@ void vardata_destroy(struct vardata *vd) {
   vd->loc.tag = (enum loc_tag)-1;
 }
 
+GEN_SLICE_HDR(vardata, struct vardata);
+GEN_SLICE_IMPL(vardata, struct vardata);
+
 struct targetdata {
   int target_known;
   size_t target_offset;
 };
 
+GEN_SLICE_HDR(targetdata, struct targetdata);
+GEN_SLICE_IMPL(targetdata, struct targetdata);
+
 struct jmpdata {
   size_t target_number;
   size_t jmp_location;
 };
+
+GEN_SLICE_HDR(jmpdata, struct jmpdata);
+GEN_SLICE_IMPL(jmpdata, struct jmpdata);
 
 struct reset_esp_data {
   /* The .text offset where we need to place an addend. */
@@ -449,23 +456,18 @@ struct reset_esp_data {
   int downward;
 };
 
+GEN_SLICE_HDR(reset_esp_data, struct reset_esp_data);
+GEN_SLICE_IMPL(reset_esp_data, struct reset_esp_data);
+
 struct frame {
   /* Contains all the variables declared within the function. */
-  struct vardata *vardata;
-  size_t vardata_count;
-  size_t vardata_limit;
+  struct vardata_slice vardata;
 
-  struct targetdata *targetdata;
-  size_t targetdata_count;
-  size_t targetdata_limit;
+  struct targetdata_slice targetdata;
 
-  struct jmpdata *jmpdata;
-  size_t jmpdata_count;
-  size_t jmpdata_limit;
+  struct jmpdata_slice jmpdata;
 
-  struct reset_esp_data *espdata;
-  size_t espdata_count;
-  size_t espdata_limit;
+  struct reset_esp_data_slice espdata;
 
   int calling_info_valid;
   size_t arg_count;
@@ -500,21 +502,13 @@ struct frame {
 };
 
 void frame_init(struct frame *h, enum target_platform platform) {
-  h->vardata = NULL;
-  h->vardata_count = 0;
-  h->vardata_limit = 0;
+  h->vardata = vardata_slice_initializer();
 
-  h->targetdata = NULL;
-  h->targetdata_count = 0;
-  h->targetdata_limit = 0;
+  h->targetdata = targetdata_slice_initializer();
 
-  h->jmpdata = NULL;
-  h->jmpdata_count = 0;
-  h->jmpdata_limit = 0;
+  h->jmpdata = jmpdata_slice_initializer();
 
-  h->espdata = NULL;
-  h->espdata_count = 0;
-  h->espdata_limit = 0;
+  h->espdata = reset_esp_data_slice_initializer();
 
   h->calling_info_valid = 0;
 
@@ -530,20 +524,10 @@ void frame_init(struct frame *h, enum target_platform platform) {
 }
 
 void frame_destroy(struct frame *h) {
-  SLICE_FREE(h->vardata, h->vardata_count, vardata_destroy);
-  h->vardata_limit = 0;
-  free(h->targetdata);
-  h->targetdata = NULL;
-  h->targetdata_count = 0;
-  h->targetdata_limit = 0;
-  free(h->jmpdata);
-  h->jmpdata = NULL;
-  h->jmpdata_count = 0;
-  h->jmpdata_limit = 0;
-  free(h->espdata);
-  h->espdata = NULL;
-  h->espdata_count = 0;
-  h->espdata_limit = 0;
+  vardata_slice_destroy(&h->vardata, vardata_destroy);
+  targetdata_slice_destroy_prim(&h->targetdata);
+  jmpdata_slice_destroy_prim(&h->jmpdata);
+  reset_esp_data_slice_destroy_prim(&h->espdata);
   h->platform = (enum target_platform)-1;
   h->arch = (enum target_arch)-1;
 }
@@ -573,16 +557,16 @@ size_t frame_arg_count(struct frame *h) {
 }
 
 size_t frame_add_target(struct frame *h) {
-  size_t ret = h->targetdata_count;
+  size_t ret = h->targetdata.count;
   struct targetdata td;
   td.target_known = 0;
-  SLICE_PUSH(h->targetdata, h->targetdata_count, h->targetdata_limit, td);
+  targetdata_slice_push(&h->targetdata, td);
   return ret;
 }
 
 void frame_define_target(struct frame *h, size_t target_number,
                          uint32_t target_offset) {
-  struct targetdata *td = &h->targetdata[target_number];
+  struct targetdata *td = &h->targetdata.ptr[target_number];
   CHECK(!td->target_known);
   td->target_known = 1;
   td->target_offset = target_offset;
@@ -800,7 +784,7 @@ void x86_note_param_locations(struct checkstate *cs, struct frame *h,
     struct vardata vd;
     vardata_init(&vd, expr->u.lambda.params[i].name.value,
                  1, &params[i], loc);
-    SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+    vardata_slice_push(&h->vardata, vd);
 
     vars_pushed = size_add(vars_pushed, 1);
   }
@@ -887,7 +871,7 @@ void x64_note_param_locations(struct checkstate *cs, struct objfile *f,
     struct vardata vd;
     vardata_init(&vd, expr->u.lambda.params[i].name.value,
                  1, &params[i], param_loc);
-    SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+    vardata_slice_push(&h->vardata, vd);
 
     vars_pushed = size_add(vars_pushed, 1);
   }
@@ -917,8 +901,8 @@ int lookup_vardata_by_name(struct frame *h, ident_value name, size_t *index_out)
   destroyed when returning -- they aren't unique so it would not make
   sense to look for their name. */
   CHECK(name != IDENT_VALUE_INVALID);
-  for (size_t i = 0, e = h->vardata_count; i < e; i++) {
-    if (h->vardata[i].name_if_valid == name) {
+  for (size_t i = 0, e = h->vardata.count; i < e; i++) {
+    if (h->vardata.ptr[i].name_if_valid == name) {
       *index_out = i;
       return 1;
     }
@@ -1003,7 +987,7 @@ void gen_placeholder_jcc(struct objfile *f, struct frame *h,
   jd.target_number = target_number;
   /* x86/x64 */
   jd.jmp_location = 2 + objfile_section_size(objfile_text(f));
-  SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
+  jmpdata_slice_push(&h->jmpdata, jd);
 
   uint8_t b[6] = { 0x0F, 0, 0, 0, 0, 0 };
   b[1] = code;
@@ -1022,7 +1006,7 @@ void gen_placeholder_stack_adjustment(struct objfile *f,
   red.reset_esp_offset = size_add(objfile_section_size(objfile_text(f)), 1);
   red.ebp_offset = h->stack_offset;
   red.downward = downward;
-  SLICE_PUSH(h->espdata, h->espdata_count, h->espdata_limit, red);
+  reset_esp_data_slice_push(&h->espdata, red);
 
   apptext(f, b, 5);
 }
@@ -1614,8 +1598,8 @@ struct sti lookup_or_make_typetrav_sti(
     id = identmap_intern(&cs->typetrav_values, name.buf, name.count);
     databuf_destroy(&name);
   }
-  CHECK(id <= cs->typetrav_symbol_infos_count);
-  if (id == cs->typetrav_symbol_infos_count) {
+  CHECK(id <= cs->typetrav_symbol_infos.count);
+  if (id == cs->typetrav_symbol_infos.count) {
     struct databuf namebuf;
     databuf_init(&namebuf);
     switch (tf) {
@@ -1652,10 +1636,9 @@ struct sti lookup_or_make_typetrav_sti(
     info->symbol_table_index = symbol_table_index;
     info->func = tf;
     ast_typeexpr_init_copy(&info->type, type);
-    SLICE_PUSH(cs->typetrav_symbol_infos, cs->typetrav_symbol_infos_count,
-               cs->typetrav_symbol_infos_limit, info);
+    typetrav_symbol_info_ptr_slice_push(&cs->typetrav_symbol_infos, info);
   }
-  return cs->typetrav_symbol_infos[id]->symbol_table_index;
+  return cs->typetrav_symbol_infos.ptr[id]->symbol_table_index;
 }
 
 void gen_typetrav_func(struct checkstate *cs, struct objfile *f, struct frame *h,
@@ -1769,13 +1752,13 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
                         objfile_section_size(objfile_text(f)));
   }
 
-  CHECK(frame_arg_count(h) == h->vardata_count);
+  CHECK(frame_arg_count(h) == h->vardata.count);
   for (size_t i = 0, e = frame_arg_count(h); i < e; i++) {
-    struct vardata *vd = &h->vardata[size_sub(h->vardata_count, 1)];
+    struct vardata *vd = &h->vardata.ptr[size_sub(h->vardata.count, 1)];
     if (vd->destroy_when_unwound) {
       gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
     }
-    SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+    vardata_slice_pop(&h->vardata, vardata_destroy);
   }
 
   int hidden_return_param = frame_hidden_return_param(h);
@@ -3948,7 +3931,7 @@ void gen_placeholder_jmp(struct objfile *f, struct frame *h, size_t target_numbe
   struct jmpdata jd;
   jd.target_number = target_number;
   jd.jmp_location = 1 + objfile_section_size(objfile_text(f));
-  SLICE_PUSH(h->jmpdata, h->jmpdata_count, h->jmpdata_limit, jd);
+  jmpdata_slice_push(&h->jmpdata, jd);
   /* x86/x64 */
   /* E9 jmp instruction */
   uint8_t b[5] = { 0xE9, 0, 0, 0, 0 };
@@ -4455,7 +4438,8 @@ int gen_expr(struct checkstate *cs, struct objfile *f,
       size_t vi;
       int found_vi = lookup_vardata_by_name(h, a->u.name.ident.value, &vi);
       CHECK(found_vi);
-      expr_return_set(cs, f, h, er, h->vardata[vi].loc, h->vardata[vi].concrete_type,
+      expr_return_set(cs, f, h, er, h->vardata.ptr[vi].loc,
+                      h->vardata.ptr[vi].concrete_type,
                       temp_none());
     }
     return 1;
@@ -4531,9 +4515,9 @@ void gen_return(struct checkstate *cs, struct objfile *f, struct frame *h) {
   }
 
   CHECK(h->calling_info_valid);
-  for (size_t i = h->vardata_count; i > h->arg_count; ) {
+  for (size_t i = h->vardata.count; i > h->arg_count; ) {
     i--;
-    struct vardata *vd = &h->vardata[i];
+    struct vardata *vd = &h->vardata.ptr[i];
     if (vd->destroy_when_unwound) {
       gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
     }
@@ -4584,7 +4568,7 @@ int gen_swartch(struct checkstate *cs, struct objfile *f,
     struct vardata vd;
     vardata_init(&vd, IDENT_VALUE_INVALID,
                  1, swartch_type, swartch_loc);
-    SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+    vardata_slice_push(&h->vardata, vd);
   }
 
   out->type = swartch_type;
@@ -4621,7 +4605,7 @@ int gen_casebody(struct checkstate *cs, struct objfile *f,
 
     /* We don't destroy the variable -- the swartch gets push/popped instead. */
     vardata_init(&vd, constructor->decl_.name.value, 0, var_type, var_loc);
-    SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+    vardata_slice_push(&h->vardata, vd);
   }
 
   if (!gen_bracebody(cs, f, h, body)) {
@@ -4629,7 +4613,7 @@ int gen_casebody(struct checkstate *cs, struct objfile *f,
   }
 
   if (constructor->has_decl) {
-    SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+    vardata_slice_pop(&h->vardata, vardata_destroy);
   }
   return 1;
 }
@@ -4682,7 +4666,7 @@ void pop_cstate_vardata(struct frame *h, struct condition_state *cstate) {
     /* No vardata. */
   } break;
   case AST_CONDITION_PATTERN: {
-    SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+    vardata_slice_pop(&h->vardata, vardata_destroy);
   } break;
   }
 }
@@ -4799,7 +4783,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
                  1,
                  ast_var_statement_type(&s->u.var_statement),
                  var_loc);
-    SLICE_PUSH(h->vardata, h->vardata_count, h->vardata_limit, vd);
+    vardata_slice_push(&h->vardata, vd);
     (*vars_pushed_ref)++;
   } break;
   case AST_STATEMENT_IFTHEN: {
@@ -4926,10 +4910,10 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
 
     /* TODO: Dedup with code in gen_bracebody. */
     for (size_t i = 0; i < vars_pushed; i++) {
-      struct vardata *vd = &h->vardata[size_sub(h->vardata_count, 1)];
+      struct vardata *vd = &h->vardata.ptr[size_sub(h->vardata.count, 1)];
       gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
       frame_pop(h, vd->loc.size);
-      SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+      vardata_slice_pop(&h->vardata, vardata_destroy);
     }
   } break;
   case AST_STATEMENT_SWITCH: {
@@ -5003,7 +4987,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     ungen_swartch(cs, f, h, &facts);
 
     /* Pop swartch vardata. */
-    SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+    vardata_slice_pop(&h->vardata, vardata_destroy);
     frame_restore_offset(h, saved_offset);
   } break;
   default:
@@ -5026,10 +5010,10 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
   }
 
   for (size_t i = 0; i < vars_pushed; i++) {
-    struct vardata *vd = &h->vardata[size_sub(h->vardata_count, 1)];
+    struct vardata *vd = &h->vardata.ptr[size_sub(h->vardata.count, 1)];
     gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
     frame_pop(h, vd->loc.size);
-    SLICE_POP(h->vardata, h->vardata_count, vardata_destroy);
+    vardata_slice_pop(&h->vardata, vardata_destroy);
   }
 
   CHECK(h->stack_offset == initial_stack_offset);
@@ -5037,18 +5021,18 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
 }
 
 void tie_jmps(struct objfile *f, struct frame *h) {
-  for (size_t i = 0, e = h->jmpdata_count; i < e; i++) {
-    struct jmpdata jd = h->jmpdata[i];
-    CHECK(jd.target_number < h->targetdata_count);
-    struct targetdata td = h->targetdata[jd.target_number];
+  for (size_t i = 0, e = h->jmpdata.count; i < e; i++) {
+    struct jmpdata jd = h->jmpdata.ptr[i];
+    CHECK(jd.target_number < h->targetdata.count);
+    struct targetdata td = h->targetdata.ptr[jd.target_number];
     CHECK(td.target_known);
     replace_placeholder_jump(f, jd.jmp_location, td.target_offset);
   }
 }
 
 void tie_stack_adjustments(struct objfile *f, struct frame *h) {
-  for (size_t i = 0, e = h->espdata_count; i < e; i++) {
-    struct reset_esp_data red = h->espdata[i];
+  for (size_t i = 0, e = h->espdata.count; i < e; i++) {
+    struct reset_esp_data red = h->espdata.ptr[i];
     replace_placeholder_stack_adjustment(
         f, red.reset_esp_offset,
         red.downward
@@ -5177,8 +5161,8 @@ int build_def(struct checkstate *cs, struct objfile *f,
     return 1;
   }
 
-  for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
-    if (!build_instantiation(cs, f, ent->instantiations[i])) {
+  for (size_t i = 0, e = ent->instantiations.count; i < e; i++) {
+    if (!build_instantiation(cs, f, ent->instantiations.ptr[i])) {
       return 0;
     }
   }
@@ -5190,8 +5174,8 @@ void build_typetrav_defs(struct checkstate *cs,
                          struct objfile *f) {
   /* cs.typetrav_symbol_infos_count is a moving target -- we see more
   typetravs to generate when we generate the first. */
-  while (cs->typetrav_symbol_infos_first_ungenerated < cs->typetrav_symbol_infos_count) {
-    struct typetrav_symbol_info *info = cs->typetrav_symbol_infos[cs->typetrav_symbol_infos_first_ungenerated];
+  while (cs->typetrav_symbol_infos_first_ungenerated < cs->typetrav_symbol_infos.count) {
+    struct typetrav_symbol_info *info = cs->typetrav_symbol_infos.ptr[cs->typetrav_symbol_infos_first_ungenerated];
     /* x86/x64: 16 byte function pointer alignment. */
     objfile_fillercode_align_double_quadword(f);
     objfile_set_symbol_value(f, info->symbol_table_index,
@@ -5284,15 +5268,15 @@ int build_module(struct identmap *im,
   struct objfile *objfile = NULL;
   objfile_alloc(&objfile, platform);
 
-  for (size_t i = 0, e = cs.nt.defs_count; i < e; i++) {
-    if (!add_def_symbols(&cs, objfile, cs.nt.defs[i])) {
+  for (size_t i = 0, e = cs.nt.defs.count; i < e; i++) {
+    if (!add_def_symbols(&cs, objfile, cs.nt.defs.ptr[i])) {
       DBG("(Adding def symbol failed.)\n");
       goto cleanup_objfile;
     }
   }
 
-  for (size_t i = 0, e = cs.nt.defs_count; i < e; i++) {
-    if (!build_def(&cs, objfile, cs.nt.defs[i])) {
+  for (size_t i = 0, e = cs.nt.defs.count; i < e; i++) {
+    if (!build_def(&cs, objfile, cs.nt.defs.ptr[i])) {
       DBG("(Building def failed.)\n");
       goto cleanup_objfile;
     }

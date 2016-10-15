@@ -41,6 +41,8 @@ void ast_ident_destroy(struct ast_ident *a) {
   a->value = IDENT_VALUE_INVALID;
 }
 
+GEN_SLICE_IMPL(ast_ident, struct ast_ident);
+
 
 void ast_numeric_literal_init(struct ast_numeric_literal *a,
                               struct ast_meta meta,
@@ -227,6 +229,9 @@ void ast_vardecl_destroy(struct ast_vardecl *a) {
   ast_ident_destroy(&a->name);
   ast_typeexpr_destroy(&a->type);
 }
+
+GEN_SLICE_IMPL(ast_vardecl_ptr, struct ast_vardecl *);
+GEN_SLICE_IMPL(ast_vardecl, struct ast_vardecl);
 
 void ast_bracebody_init(struct ast_bracebody *a,
                         struct ast_meta meta,
@@ -627,6 +632,8 @@ void ast_statement_alloc_move(struct ast_statement movee,
   *out = p;
 }
 
+GEN_SLICE_IMPL(ast_statement, struct ast_statement);
+
 void ast_case_pattern_info_init(struct ast_case_pattern_info *a) {
   a->info_valid = 0;
 }
@@ -779,6 +786,7 @@ void ast_cased_statement_destroy(struct ast_cased_statement *a) {
   ast_bracebody_destroy(&a->body);
 }
 
+GEN_SLICE_IMPL(ast_cased_statement, struct ast_cased_statement);
 
 int is_magic_unop(enum ast_unop unop) {
   return unop == AST_UNOP_DEREFERENCE || unop == AST_UNOP_ADDRESSOF;
@@ -1416,6 +1424,8 @@ void ast_expr_alloc_init_copy(struct ast_expr *c, struct ast_expr **out) {
   *out = a;
 }
 
+GEN_SLICE_IMPL(ast_expr, struct ast_expr);
+
 void ast_exprcatch_init(struct ast_exprcatch *a) {
   a->info_valid = 0;
   a->behavior = (enum ast_exprcatch_behavior)-1;
@@ -1486,6 +1496,8 @@ void ast_exprcall_alloc_init_copy(struct ast_exprcall *c,
   ast_exprcall_init_copy(a, c);
   *out = a;
 }
+
+GEN_SLICE_IMPL(ast_exprcall, struct ast_exprcall);
 
 void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
                       struct ast_ident name, struct ast_typeexpr *params,
@@ -1669,6 +1681,7 @@ struct ast_typeexpr ast_numeric_garbage(void) {
   return ret;
 }
 
+GEN_SLICE_IMPL(ast_typeexpr, struct ast_typeexpr);
 
 void ast_generics_init_no_params(struct ast_generics *a) {
   a->has_type_params = 0;
@@ -1906,6 +1919,8 @@ void ast_toplevel_destroy(struct ast_toplevel *a) {
   }
   a->tag = (enum ast_toplevel_tag)-1;
 }
+
+GEN_SLICE_IMPL(ast_toplevel, struct ast_toplevel);
 
 void ast_file_destroy(struct ast_file *a) {
   SLICE_FREE(a->toplevels, a->toplevels_count, ast_toplevel_destroy);

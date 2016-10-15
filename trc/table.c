@@ -7,6 +7,12 @@
 #include "print.h"
 #include "typecheck.h"
 
+GEN_SLICE_IMPL(def_entry_ptr, struct def_entry *);
+GEN_SLICE_IMPL(deftype_entry_ptr, struct deftype_entry *);
+GEN_SLICE_IMPL(def_instantiation_ptr, struct def_instantiation *);
+GEN_SLICE_IMPL(deftype_instantiation_ptr, struct deftype_instantiation *);
+GEN_SLICE_IMPL(defclass_ident, struct defclass_ident);
+
 struct defs_by_name_node {
   struct def_entry *ent;
   struct defs_by_name_node *next;
@@ -119,13 +125,9 @@ void def_entry_init(struct def_entry *e, ident_value name,
   e->is_export = is_export;
   e->def = def;
 
-  e->instantiations = NULL;
-  e->instantiations_count = 0;
-  e->instantiations_limit = 0;
+  e->instantiations = def_instantiation_ptr_slice_initializer();
 
-  e->static_references = NULL;
-  e->static_references_count = 0;
-  e->static_references_limit = 0;
+  e->static_references = def_entry_ptr_slice_initializer();
 
   e->known_acyclic = 0;
   e->acyclicity_being_chased = 0;
@@ -149,14 +151,12 @@ void def_entry_destroy(struct def_entry *e) {
   e->is_extern = 0;
   e->def = NULL;
 
-  SLICE_FREE(e->instantiations, e->instantiations_count,
-             def_instantiation_free);
-  e->instantiations_limit = 0;
+  def_instantiation_ptr_slice_destroy(&e->instantiations,
+                                      def_instantiation_free);
 
-  free(e->static_references);
-  e->static_references = NULL;
-  e->static_references_count = 0;
-  e->static_references_limit = 0;
+  /* These are unowned pointers, unlike another def_entry_ptr slice,
+  which passes def_entry_ptr_destroy to its slice destructor. */
+  def_entry_ptr_slice_destroy_prim(&e->static_references);
 
   e->known_acyclic = 0;
   e->acyclicity_being_chased = 0;
@@ -170,13 +170,12 @@ void def_entry_ptr_destroy(struct def_entry **ptr) {
 
 void def_entry_note_static_reference(struct def_entry *ent,
                                      struct def_entry *reference) {
-  for (size_t i = 0, e = ent->static_references_count; i < e; i++) {
-    if (ent->static_references[i] == reference) {
+  for (size_t i = 0, e = ent->static_references.count; i < e; i++) {
+    if (ent->static_references.ptr[i] == reference) {
       return;
     }
   }
-  SLICE_PUSH(ent->static_references, ent->static_references_count,
-             ent->static_references_limit, reference);
+  def_entry_ptr_slice_push(&ent->static_references, reference);
 }
 
 void deftype_instantiation_init(struct deftype_instantiation *inst,
@@ -218,9 +217,7 @@ void deftype_entry_init(struct deftype_entry *e,
     e->flatly_held_count = arity.value;
   }
 
-  e->instantiations = NULL;
-  e->instantiations_count = 0;
-  e->instantiations_limit = 0;
+  e->instantiations = deftype_instantiation_ptr_slice_initializer();
 
   e->has_been_checked = 0;
   e->is_being_checked = 0;
@@ -253,9 +250,7 @@ void deftype_entry_init_primitive(struct deftype_entry *e,
     e->flatly_held_count = 0;
   }
 
-  e->instantiations = NULL;
-  e->instantiations_count = 0;
-  e->instantiations_limit = 0;
+  e->instantiations = deftype_instantiation_ptr_slice_initializer();
 
   e->has_been_checked = 1;
   e->is_being_checked = 0;
@@ -281,8 +276,8 @@ void deftype_entry_destroy(struct deftype_entry *e) {
   e->flatly_held = NULL;
   e->flatly_held_count = 0;
 
-  SLICE_FREE(e->instantiations, e->instantiations_count, deftype_instantiation_free);
-  e->instantiations_limit = 0;
+  deftype_instantiation_ptr_slice_destroy(&e->instantiations,
+                                          deftype_instantiation_free);
 
   e->has_been_checked = 0;
   e->is_being_checked = 0;
@@ -300,15 +295,11 @@ void deftype_entry_ptr_destroy(struct deftype_entry **ptr) {
 void name_table_init(struct name_table *t, enum target_arch arch) {
   arena_init(&t->arena);
 
-  t->defs = NULL;
-  t->defs_count = 0;
-  t->defs_limit = 0;
+  t->defs = def_entry_ptr_slice_initializer();
 
   identmap_init(&t->defs_by_name);
 
-  t->deftypes = NULL;
-  t->deftypes_count = 0;
-  t->deftypes_limit = 0;
+  t->deftypes = deftype_entry_ptr_slice_initializer();
 
   identmap_init(&t->deftypes_by_name);
 
@@ -320,13 +311,11 @@ void name_table_destroy(struct name_table *t) {
 
   identmap_destroy(&t->deftypes_by_name);
 
-  SLICE_FREE(t->deftypes, t->deftypes_count, deftype_entry_ptr_destroy);
-  t->deftypes_limit = 0;
+  deftype_entry_ptr_slice_destroy(&t->deftypes, deftype_entry_ptr_destroy);
 
   identmap_destroy(&t->defs_by_name);
 
-  SLICE_FREE(t->defs, t->defs_count, def_entry_ptr_destroy);
-  t->defs_limit = 0;
+  def_entry_ptr_slice_destroy(&t->defs, def_entry_ptr_destroy);
 
   arena_destroy(&t->arena);
 }
@@ -404,7 +393,7 @@ int name_table_help_add_def(struct identmap *im,
                  private_to, private_to_count,
                  is_primitive, primitive_op,
                  is_extern, is_export, def);
-  SLICE_PUSH(t->defs, t->defs_count, t->defs_limit, new_entry);
+  def_entry_ptr_slice_push(&t->defs, new_entry);
 
   ident_value dbn_id = identmap_intern(&t->defs_by_name, &name, sizeof(name));
   struct defs_by_name_node *node = ARENA_TYPED(&t->arena,
@@ -507,7 +496,7 @@ int name_table_help_add_deftype_entry(struct identmap *im,
     }
   }
 
-  SLICE_PUSH(t->deftypes, t->deftypes_count, t->deftypes_limit, entry);
+  deftype_entry_ptr_slice_push(&t->deftypes, entry);
   struct deftypes_by_name_node *new_node
     = ARENA_TYPED(&t->arena, struct deftypes_by_name_node);
   new_node->next = old_node;
@@ -934,8 +923,8 @@ struct def_instantiation *def_entry_insert_instantiation(
     struct ast_typeexpr *concrete_type) {
   CHECK(materialized_count == (ent->generics.has_type_params ?
                                ent->generics.params_count : 0));
-  for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
-    struct def_instantiation *inst = ent->instantiations[i];
+  for (size_t i = 0, e = ent->instantiations.count; i < e; i++) {
+    struct def_instantiation *inst = ent->instantiations.ptr[i];
     if (typelists_equal(im, inst->substitutions, inst->substitutions_count,
                         materialized, materialized_count)) {
       return inst;
@@ -950,8 +939,7 @@ struct def_instantiation *def_entry_insert_instantiation(
   struct def_instantiation *inst = malloc(sizeof(*inst));
   CHECK(inst);
   def_instantiation_init(inst, ent, &copy, &copy_count, concrete_type);
-  SLICE_PUSH(ent->instantiations, ent->instantiations_count,
-             ent->instantiations_limit, inst);
+  def_instantiation_ptr_slice_push(&ent->instantiations, inst);
   return inst;
 }
 
@@ -1185,8 +1173,8 @@ int name_table_lookup_deftype_inst(struct identmap *im,
     return 0;
   }
 
-  for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
-    struct deftype_instantiation *inst = ent->instantiations[i];
+  for (size_t i = 0, e = ent->instantiations.count; i < e; i++) {
+    struct deftype_instantiation *inst = ent->instantiations.ptr[i];
     if (typelists_equal(im, inst->substitutions, inst->substitutions_count,
                         generics_or_null, generics_count)) {
       *ent_out = ent;
@@ -1202,7 +1190,7 @@ int name_table_lookup_deftype_inst(struct identmap *im,
   struct deftype_instantiation *inst = malloc(sizeof(*inst));
   CHECK(inst);
   deftype_instantiation_init(inst, copy, copy_count);
-  SLICE_PUSH(ent->instantiations, ent->instantiations_count, ent->instantiations_limit, inst);
+  deftype_instantiation_ptr_slice_push(&ent->instantiations, inst);
 
   *ent_out = ent;
   *inst_out = inst;

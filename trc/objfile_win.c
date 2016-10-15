@@ -292,7 +292,7 @@ void win_append_section_symbols(
 
 uint32_t win_symbols_to_write(struct objfile *f) {
   return uint32_add(uint32_mul(kNumSectionSymbolsPerSection, kNumberOfSections),
-                    size_to_uint32(f->symbol_table_count));
+                    size_to_uint32(f->symbol_table.count));
 }
 
 uint32_t win_symbols_filesize(struct objfile *f) {
@@ -315,7 +315,7 @@ void win_compute_section_dimensions(struct objfile_section *s,
   uint32_t end_of_raw = uint32_add(start_of_raw, s->raw.count);
   uint32_t start_of_relocs = uint32_ceil_aligned(end_of_raw, 2);
   uint32_t end_of_relocs
-    = uint32_add(start_of_relocs, uint32_mul(s->relocs_count,
+    = uint32_add(start_of_relocs, uint32_mul(s->relocs.count,
                                              sizeof(struct COFF_Relocation)));
   *PointerToRelocations_out = start_of_relocs;
   *pointer_to_end_out = end_of_relocs;
@@ -402,9 +402,9 @@ void win_write_symbols_and_strings(struct identmap *im,
   /* We start off with a 32-bit size field. */
   databuf_append(strings, "\0\0\0\0", 4);
 
-  struct objfile_symbol_record *symbol_table = f->symbol_table;
+  struct objfile_symbol_record *symbol_table = f->symbol_table.ptr;
 
-  for (size_t i = 0, e = f->symbol_table_count; i < e; i++) {
+  for (size_t i = 0, e = f->symbol_table.count; i < e; i++) {
     struct COFF_symbol_standard_record standard;
     ident_value name = symbol_table[i].name;
     const void *name_buf;
@@ -535,7 +535,7 @@ void win_flatten(struct identmap *im, struct objfile *f, struct databuf **out) {
   append_zeros_to_align(d, 2);
   CHECK(d->count == start_of_data_relocs);
 
-  win_append_relocs(d, f->data.relocs, f->data.relocs_count);
+  win_append_relocs(d, f->data.relocs.ptr, f->data.relocs.count);
   CHECK(d->count == end_of_data_relocs);
 
   append_zeros_to_align(d, WIN_SECTION_ALIGNMENT);
@@ -545,7 +545,7 @@ void win_flatten(struct identmap *im, struct objfile *f, struct databuf **out) {
   append_zeros_to_align(d, 2);
   CHECK(d->count == start_of_read_data_relocs);
 
-  win_append_relocs(d, f->rdata.relocs, f->rdata.relocs_count);
+  win_append_relocs(d, f->rdata.relocs.ptr, f->rdata.relocs.count);
   CHECK(d->count == end_of_read_data_relocs);
 
   append_zeros_to_align(d, WIN_SECTION_ALIGNMENT);
@@ -555,7 +555,7 @@ void win_flatten(struct identmap *im, struct objfile *f, struct databuf **out) {
   append_zeros_to_align(d, 2);
   CHECK(d->count == start_of_text_relocs);
 
-  win_append_relocs(d, f->text.relocs, f->text.relocs_count);
+  win_append_relocs(d, f->text.relocs.ptr, f->text.relocs.count);
   CHECK(d->count == end_of_text_relocs);
 
   *out = d;

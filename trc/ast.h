@@ -7,6 +7,7 @@
 #include "arity.h"
 #include "identmap.h"
 #include "pos.h"
+#include "slice.h"
 
 struct def_instantiation;
 
@@ -29,6 +30,8 @@ void ast_ident_init(struct ast_ident *a, struct ast_meta meta,
                     ident_value value);
 void ast_ident_init_copy(struct ast_ident *a, struct ast_ident *c);
 void ast_ident_destroy(struct ast_ident *a);
+
+GEN_SLICE_HDR(ast_ident, struct ast_ident);
 
 enum ast_numeric_literal_tag {
   AST_NUMERIC_LITERAL_DEC,
@@ -196,6 +199,8 @@ struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a);
 struct ast_typeexpr ast_unknown_garbage(void);
 struct ast_typeexpr ast_numeric_garbage(void);
 
+GEN_SLICE_HDR(ast_typeexpr, struct ast_typeexpr);
+
 struct ast_var_info {
   int info_valid;
   struct ast_typeexpr concrete_type;
@@ -216,6 +221,9 @@ void ast_vardecl_init(struct ast_vardecl *a, struct ast_meta meta,
                       struct ast_ident name, struct ast_typeexpr type);
 void ast_vardecl_init_copy(struct ast_vardecl *a, struct ast_vardecl *c);
 void ast_vardecl_destroy(struct ast_vardecl *a);
+
+GEN_SLICE_HDR(ast_vardecl_ptr, struct ast_vardecl *);
+GEN_SLICE_HDR(ast_vardecl, struct ast_vardecl);
 
 struct ast_expr;
 
@@ -457,6 +465,8 @@ void ast_statement_destroy(struct ast_statement *a);
 void ast_statement_alloc_move(struct ast_statement movee,
                               struct ast_statement **out);
 
+GEN_SLICE_HDR(ast_statement, struct ast_statement);
+
 struct ast_cased_statement {
   struct ast_meta meta;
   struct ast_case_pattern pattern;
@@ -471,6 +481,8 @@ void ast_cased_statement_init(struct ast_cased_statement *a,
 void ast_cased_statement_init_copy(struct ast_cased_statement *a,
                                    struct ast_cased_statement *c);
 void ast_cased_statement_destroy(struct ast_cased_statement *a);
+
+GEN_SLICE_HDR(ast_cased_statement, struct ast_cased_statement);
 
 struct ast_lambda {
   struct ast_meta meta;
@@ -780,6 +792,8 @@ struct pos ast_expr_pos_end(struct ast_expr *a);
 void ast_expr_alloc_move(struct ast_expr movee, struct ast_expr **out);
 void ast_expr_alloc_init_copy(struct ast_expr *c, struct ast_expr **out);
 
+GEN_SLICE_HDR(ast_expr, struct ast_expr);
+
 enum ast_exprcatch_behavior {
   /* The value an ast_expr returns, which is a whole_thing temporary,
   should be constructed in-place. */
@@ -816,6 +830,8 @@ void ast_exprcall_alloc_move(struct ast_exprcall a,
                              struct ast_exprcall **out);
 void ast_exprcall_alloc_init_copy(struct ast_exprcall *c,
                                   struct ast_exprcall **out);
+
+GEN_SLICE_HDR(ast_exprcall, struct ast_exprcall);
 
 struct ast_generics {
   int has_type_params;  /* 0 or 1 -- meta & params is uninitialized if 0. */
@@ -960,6 +976,8 @@ struct ast_toplevel {
 };
 
 void ast_toplevel_destroy(struct ast_toplevel *a);
+
+GEN_SLICE_HDR(ast_toplevel, struct ast_toplevel);
 
 struct ast_file {
   struct ast_toplevel *toplevels;

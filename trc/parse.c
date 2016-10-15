@@ -724,21 +724,19 @@ int parse_params_list(struct ps *p,
   if (!try_skip_char(p, '(')) {
     return 0;
   }
-  struct ast_vardecl *params = NULL;
-  size_t params_count = 0;
-  size_t params_limit = 0;
+  struct ast_vardecl_slice params = SLICE_INITIALIZER;
 
   for (;;) {
     if (!skip_ws(p)) {
       goto fail;
     }
     if (try_skip_char(p, ')')) {
-      *params_out = params;
-      *params_count_out = params_count;
+      *params_out = params.ptr;
+      *params_count_out = params.count;
       return 1;
     }
 
-    if (params_count != 0) {
+    if (params.count != 0) {
       if (!(try_skip_char(p, ',') && skip_ws(p))) {
         goto fail;
       }
@@ -748,11 +746,11 @@ int parse_params_list(struct ps *p,
     if (!parse_vardecl(p, &vardecl)) {
       goto fail;
     }
-    SLICE_PUSH(params, params_count, params_limit, vardecl);
+    ast_vardecl_slice_push(&params, vardecl);
   }
 
  fail:
-  SLICE_FREE(params, params_count, ast_vardecl_destroy);
+  ast_vardecl_slice_destroy(&params, ast_vardecl_destroy);
   return 0;
 }
 
@@ -1064,34 +1062,32 @@ int parse_cased_statement(struct ps *p, struct ast_cased_statement *out) {
       goto fail_pattern;
     }
   } else {
-    struct ast_statement *statements = NULL;
-    size_t statements_count = 0;
-    size_t statements_limit = 0;
+    struct ast_statement_slice statements = SLICE_INITIALIZER;
     for (;;) {
       struct ps_savestate save = ps_save(p);
       if (try_skip_keyword(p, "case") || try_skip_keyword(p, "default") || try_skip_char(p, '}')) {
         /* Require at least one naked statement, so that it doesn't
         look like fall-through. */
-        if (statements_count == 0) {
+        if (statements.count == 0) {
           goto fail_statements;
         }
 
         ps_restore(p, save);
         ast_bracebody_init(&body, ast_meta_make(bracebody_start, ps_pos(p)),
-                           statements, statements_count);
+                           statements.ptr, statements.count);
         goto success_body;
       }
       struct ast_statement statement;
       if (!parse_statement(p, &statement)) {
         goto fail_statements;
       }
-      SLICE_PUSH(statements, statements_count, statements_limit, statement);
+      ast_statement_slice_push(&statements, statement);
       if (!skip_ws(p)) {
         goto fail_statements;
       }
     }
   fail_statements:
-    SLICE_FREE(statements, statements_count, ast_statement_destroy);
+    ast_statement_slice_destroy(&statements, ast_statement_destroy);
     goto fail_pattern;
   }
 
@@ -1117,9 +1113,7 @@ int parse_rest_of_switch_statement(struct ps *p, struct pos pos_start,
     goto fail_swartch;
   }
 
-  struct ast_cased_statement *cases = NULL;
-  size_t cases_count = 0;
-  size_t cases_limit = 0;
+  struct ast_cased_statement_slice cases = SLICE_INITIALIZER;
 
   for (;;) {
     if (!skip_ws(p)) {
@@ -1127,18 +1121,18 @@ int parse_rest_of_switch_statement(struct ps *p, struct pos pos_start,
     }
     if (try_skip_char(p, '}')) {
       ast_switch_statement_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                                swartch, cases, cases_count);
+                                swartch, cases.ptr, cases.count);
       return 1;
     }
     struct ast_cased_statement cas;
     if (!parse_cased_statement(p, &cas)) {
       goto fail_cases;
     }
-    SLICE_PUSH(cases, cases_count, cases_limit, cas);
+    ast_cased_statement_slice_push(&cases, cas);
   }
 
  fail_cases:
-  SLICE_FREE(cases, cases_count, ast_cased_statement_destroy);
+  ast_cased_statement_slice_destroy(&cases, ast_cased_statement_destroy);
  fail_swartch:
   ast_expr_destroy(&swartch);
  fail:
@@ -1323,16 +1317,14 @@ int parse_statement(struct ps *p, struct ast_statement *out) {
 }
 
 int parse_rest_of_bracebody(struct ps *p, struct pos pos_start, struct ast_bracebody *out) {
-  struct ast_statement *statements = NULL;
-  size_t statements_count = 0;
-  size_t statements_limit = 0;
+  struct ast_statement_slice statements = SLICE_INITIALIZER;
   for (;;) {
     if (!skip_ws(p)) {
       goto fail;
     }
     if (try_skip_char(p, '}')) {
       ast_bracebody_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                         statements, statements_count);
+                         statements.ptr, statements.count);
       return 1;
     }
 
@@ -1341,11 +1333,11 @@ int parse_rest_of_bracebody(struct ps *p, struct pos pos_start, struct ast_brace
       goto fail;
     }
 
-    SLICE_PUSH(statements, statements_count, statements_limit, statement);
+    ast_statement_slice_push(&statements, statement);
   }
 
  fail:
-  SLICE_FREE(statements, statements_count, ast_statement_destroy);
+  ast_statement_slice_destroy(&statements, ast_statement_destroy);
   return 0;
 }
 
@@ -1421,9 +1413,7 @@ enum tri triparse_numeric_literal(struct ps *p, struct ast_numeric_literal *out)
   }
   ps_step(p);
 
-  int8_t *digits = NULL;
-  size_t digits_count = 0;
-  size_t digits_limit = 0;
+  struct int8_slice digits = SLICE_INITIALIZER;
 
   enum ast_numeric_literal_tag tag;
   if (first_digit == '0') {
@@ -1437,11 +1427,11 @@ enum tri triparse_numeric_literal(struct ps *p, struct ast_numeric_literal *out)
       int32_t ch;
       int8_t ch_value;
       while ((ch = ps_peek(p)), is_hex_digit(ch, &ch_value)) {
-        SLICE_PUSH(digits, digits_count, digits_limit, ch_value);
+        int8_slice_push(&digits, ch_value);
         ps_step(p);
       }
     } else {
-      SLICE_PUSH(digits, digits_count, digits_limit, first_digit_value);
+      int8_slice_push(&digits, first_digit_value);
       tag = AST_NUMERIC_LITERAL_DEC;
 
       int8_t ch_value_discard;
@@ -1451,13 +1441,13 @@ enum tri triparse_numeric_literal(struct ps *p, struct ast_numeric_literal *out)
       }
     }
   } else {
-    SLICE_PUSH(digits, digits_count, digits_limit, first_digit_value);
+    int8_slice_push(&digits, first_digit_value);
     tag = AST_NUMERIC_LITERAL_DEC;
 
     int32_t ch;
     int8_t ch_value;
     while ((ch = ps_peek(p)), is_decimal_digit(ch, &ch_value)) {
-      SLICE_PUSH(digits, digits_count, digits_limit, ch_value);
+      int8_slice_push(&digits, ch_value);
       ps_step(p);
     }
   }
@@ -1467,12 +1457,12 @@ enum tri triparse_numeric_literal(struct ps *p, struct ast_numeric_literal *out)
   }
 
   ast_numeric_literal_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                           tag, digits, digits_count);
+                           tag, digits.ptr, digits.count);
   ps_count_leaf(p);
   return TRI_SUCCESS;
 
  fail:
-  free(digits);
+  int8_slice_destroy_prim(&digits);
   return TRI_ERROR;
  quickfail:
   return TRI_QUICKFAIL;
@@ -1481,20 +1471,18 @@ enum tri triparse_numeric_literal(struct ps *p, struct ast_numeric_literal *out)
 int parse_rest_of_arglist(struct ps *p,
                           struct ast_exprcall **args_out,
                           size_t *args_count_out) {
-  struct ast_exprcall *args = NULL;
-  size_t args_count = 0;
-  size_t args_limit = 0;
+  struct ast_exprcall_slice args = SLICE_INITIALIZER;
 
   for (;;) {
     if (!skip_ws(p)) {
       goto fail;
     }
     if (try_skip_char(p, ')')) {
-      *args_out = args;
-      *args_count_out = args_count;
+      *args_out = args.ptr;
+      *args_count_out = args.count;
       return 1;
     }
-    if (args_count != 0) {
+    if (args.count != 0) {
       if (!try_skip_char(p, ',')) {
         goto fail;
       }
@@ -1511,11 +1499,11 @@ int parse_rest_of_arglist(struct ps *p,
     struct ast_exprcall exprcall;
     ast_exprcall_init(&exprcall, expr);
 
-    SLICE_PUSH(args, args_count, args_limit, exprcall);
+    ast_exprcall_slice_push(&args, exprcall);
   }
 
  fail:
-  SLICE_FREE(args, args_count, ast_exprcall_destroy);
+  ast_exprcall_slice_destroy(&args, ast_exprcall_destroy);
   return 0;
 }
 
@@ -1666,10 +1654,7 @@ int parse_rest_of_char_literal(struct ps *p, struct pos pos_start,
 
 int parse_rest_of_string_literal(struct ps *p, struct pos pos_start,
                                  struct ast_string_literal *out) {
-  uint8_t *values = NULL;
-  size_t values_count = 0;
-  size_t values_limit = 0;
-
+  struct uint8_slice values = SLICE_INITIALIZER;
   struct pos pos_end;
 
   for (;;) {
@@ -1678,7 +1663,7 @@ int parse_rest_of_string_literal(struct ps *p, struct pos pos_start,
       if (!parse_string_char(p, &value)) {
         return 0;
       }
-      SLICE_PUSH(values, values_count, values_limit, value);
+      uint8_slice_push(&values, value);
     }
 
     ps_step(p);
@@ -1704,7 +1689,7 @@ int parse_rest_of_string_literal(struct ps *p, struct pos pos_start,
   }
 
   ast_string_literal_init(out, ast_meta_make(pos_start, pos_end),
-                          values, values_count);
+                          values.ptr, values.count);
   return 1;
 }
 
@@ -1712,9 +1697,7 @@ int parse_rest_of_strinit(struct ps *p, struct pos pos_start,
                           struct ast_strinit *out) {
   /* TODO: This is a copy/paste of parse_rest_of_arglist, except it
   uses exprcall and ')'. */
-  struct ast_expr *args = NULL;
-  size_t args_count = 0;
-  size_t args_limit = 0;
+  struct ast_expr_slice args = SLICE_INITIALIZER;
 
   for (;;) {
     if (!skip_ws(p)) {
@@ -1722,10 +1705,10 @@ int parse_rest_of_strinit(struct ps *p, struct pos pos_start,
     }
     if (try_skip_char(p, '}')) {
       ast_strinit_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                       args, args_count);
+                       args.ptr, args.count);
       return 1;
     }
-    if (args_count != 0) {
+    if (args.count != 0) {
       if (!try_skip_char(p, ',')) {
         goto fail;
       }
@@ -1739,11 +1722,11 @@ int parse_rest_of_strinit(struct ps *p, struct pos pos_start,
       goto fail;
     }
 
-    SLICE_PUSH(args, args_count, args_limit, expr);
+    ast_expr_slice_push(&args, expr);
   }
 
  fail:
-  SLICE_FREE(args, args_count, ast_expr_destroy);
+  ast_expr_slice_destroy(&args, ast_expr_destroy);
   return 0;
 }
 
@@ -2045,16 +2028,14 @@ int parse_braced_fields(struct ps *p,
   if (!try_skip_char(p, '{')) {
     return 0;
   }
-  struct ast_vardecl *fields = NULL;
-  size_t fields_count = 0;
-  size_t fields_limit = 0;
+  struct ast_vardecl_slice fields = SLICE_INITIALIZER;
   for (;;) {
     if (!skip_ws(p)) {
       goto fail;
     }
     if (try_skip_char(p, '}')) {
-      *fields_out = fields;
-      *fields_count_out = fields_count;
+      *fields_out = fields.ptr;
+      *fields_count_out = fields.count;
       return 1;
     }
 
@@ -2068,11 +2049,11 @@ int parse_braced_fields(struct ps *p,
       goto fail;
     }
 
-    SLICE_PUSH(fields, fields_count, fields_limit, field);
+    ast_vardecl_slice_push(&fields, field);
   }
 
  fail:
-  SLICE_FREE(fields, fields_count, ast_vardecl_destroy);
+  ast_vardecl_slice_destroy(&fields, ast_vardecl_destroy);
   return 0;
 }
 
@@ -2162,21 +2143,19 @@ int parse_rest_of_type_param_list(struct ps *p,
                                   enum allow_blanks allow_blanks,
                                   struct ast_typeexpr **params_out,
                                   size_t *params_count_out) {
-  struct ast_typeexpr *params = NULL;
-  size_t params_count = 0;
-  size_t params_limit = 0;
+  struct ast_typeexpr_slice params = SLICE_INITIALIZER;
 
   for (;;) {
     if (!skip_ws(p)) {
       goto fail;
     }
     if (try_skip_char(p, ']')) {
-      *params_out = params;
-      *params_count_out = params_count;
+      *params_out = params.ptr;
+      *params_count_out = params.count;
       return 1;
     }
 
-    if (params_count != 0) {
+    if (params.count != 0) {
       if (!try_skip_char(p, ',')) {
         goto fail;
       }
@@ -2190,11 +2169,11 @@ int parse_rest_of_type_param_list(struct ps *p,
     if (!help_parse_typeexpr(p, allow_blanks, &typeexpr, &pos_end_discard)) {
       goto fail;
     }
-    SLICE_PUSH(params, params_count, params_limit, typeexpr);
+    ast_typeexpr_slice_push(&params, typeexpr);
   }
 
  fail:
-  SLICE_FREE(params, params_count, ast_typeexpr_destroy);
+  ast_typeexpr_slice_destroy(&params, ast_typeexpr_destroy);
   return 0;
 }
 
@@ -2293,9 +2272,7 @@ int parse_type_params_if_present(struct ps *p,
     return 1;
   }
 
-  struct ast_ident *params = NULL;
-  size_t params_count = 0;
-  size_t params_limit = 0;
+  struct ast_ident_slice params = SLICE_INITIALIZER;
   for (;;) {
     if (!skip_ws(p)) {
       goto fail;
@@ -2303,11 +2280,11 @@ int parse_type_params_if_present(struct ps *p,
     if (try_skip_char(p, ']')) {
       ast_generics_init_has_params(out,
                                    ast_meta_make(pos_start, ps_pos(p)),
-                                   params, params_count);
+                                   params.ptr, params.count);
       return 1;
     }
 
-    if (params_count != 0) {
+    if (params.count != 0) {
       if (!try_skip_char(p, ',')) {
         goto fail;
       }
@@ -2319,11 +2296,11 @@ int parse_type_params_if_present(struct ps *p,
     if (!parse_ident(p, &param)) {
       goto fail;
     }
-    SLICE_PUSH(params, params_count, params_limit, param);
+    ast_ident_slice_push(&params, param);
   }
 
  fail:
-  SLICE_FREE(params, params_count, ast_ident_destroy);
+  ast_ident_slice_destroy(&params, ast_ident_destroy);
   return 0;
 }
 
@@ -2580,16 +2557,14 @@ int parse_rest_of_defenum(struct ps *p, struct pos pos_start,
 int parse_toplevels(struct ps *p, int32_t until_ch,
                     struct ast_toplevel **toplevels_out,
                     size_t *toplevels_count_out) {
-  struct ast_toplevel *toplevels = NULL;
-  size_t toplevels_count = 0;
-  size_t toplevels_limit = 0;
+  struct ast_toplevel_slice toplevels = SLICE_INITIALIZER;
   for (;;) {
     if (!skip_ws(p)) {
       goto fail;
     }
     if (ps_peek(p) == until_ch) {
-      *toplevels_out = toplevels;
-      *toplevels_count_out = toplevels_count;
+      *toplevels_out = toplevels.ptr;
+      *toplevels_count_out = toplevels.count;
       return 1;
     }
 
@@ -2597,10 +2572,10 @@ int parse_toplevels(struct ps *p, int32_t until_ch,
     if (!parse_toplevel(p, &toplevel)) {
       goto fail;
     }
-    SLICE_PUSH(toplevels, toplevels_count, toplevels_limit, toplevel);
+    ast_toplevel_slice_push(&toplevels, toplevel);
   }
  fail:
-  SLICE_FREE(toplevels, toplevels_count, ast_toplevel_destroy);
+  ast_toplevel_slice_destroy(&toplevels, ast_toplevel_destroy);
   return 0;
 }
 

@@ -206,10 +206,10 @@ void osx32_append_relocations_and_mutate_output(
     struct section_addrs addrs,
     enum section sect,
     uint32_t segment_file_offset) {
-  for (size_t i = 0, e = s->relocs_count; i < e; i++) {
-    struct objfile_relocation *reloc = &s->relocs[i];
+  for (size_t i = 0, e = s->relocs.count; i < e; i++) {
+    struct objfile_relocation *reloc = &s->relocs.ptr[i];
     struct objfile_symbol_record *symbol
-      = &f->symbol_table[uint32_to_size(reloc->symbol_table_index.value)];
+      = &f->symbol_table.ptr[uint32_to_size(reloc->symbol_table_index.value)];
     switch (reloc->type) {
     case OBJFILE_RELOCATION_TYPE_DIR32:
       /* Globals use call/pop to get eip. */
@@ -338,8 +338,8 @@ void osx32_write_symbols_and_strings(struct identmap *im, struct objfile *f,
   CHECK(strings);
   databuf_init(strings);
 
-  for (size_t i = 0, e = f->symbol_table_count; i < e; i++) {
-    struct objfile_symbol_record *rec = &f->symbol_table[i];
+  for (size_t i = 0, e = f->symbol_table.count; i < e; i++) {
+    struct objfile_symbol_record *rec = &f->symbol_table.ptr[i];
     struct mach32_nlist el;
     const void *name_buf;
     size_t name_count;
@@ -435,18 +435,18 @@ void osx32_flatten(struct identmap *im, struct objfile *f, struct databuf **out)
                                                    MACH32_RELOC_ALIGNMENT);
   /* OS X diff32 relocs use two pairs, so we count them twice (with
   the 3 size_add's you see here). */
-  const uint32_t text_nreloc = size_to_uint32(size_add(f->text.relocs_count,
+  const uint32_t text_nreloc = size_to_uint32(size_add(f->text.relocs.count,
                                                        f->text.diff32_count));
 
   STATIC_CHECK(MACH32_RELOC_SIZE == sizeof(struct mach32_relocation_info));
   STATIC_CHECK(MACH32_RELOC_SIZE == sizeof(struct mach32_scattered_relocation_info));
   const uint32_t rdata_reloff
     = uint32_add(text_reloff, uint32_mul(text_nreloc, MACH32_RELOC_SIZE));
-  const uint32_t rdata_nreloc = size_to_uint32(size_add(f->rdata.relocs_count,
+  const uint32_t rdata_nreloc = size_to_uint32(size_add(f->rdata.relocs.count,
                                                         f->rdata.diff32_count));
   const uint32_t data_reloff
     = uint32_add(rdata_reloff, uint32_mul(rdata_nreloc, MACH32_RELOC_SIZE));
-  const uint32_t data_nreloc = size_to_uint32(size_add(f->data.relocs_count,
+  const uint32_t data_nreloc = size_to_uint32(size_add(f->data.relocs.count,
                                                        f->data.diff32_count));
   const uint32_t end_of_relocs
     = uint32_add(data_reloff, uint32_mul(data_nreloc, MACH32_RELOC_SIZE));
@@ -457,7 +457,7 @@ void osx32_flatten(struct identmap *im, struct objfile *f, struct databuf **out)
   struct databuf *symbols;
   struct databuf *strings;
   osx32_write_symbols_and_strings(im, f, addrs, &symbols, &strings);
-  const uint32_t nsyms = size_to_uint32(f->symbol_table_count);
+  const uint32_t nsyms = size_to_uint32(f->symbol_table.count);
 
   const uint32_t stroff
     = uint32_add(symoff, uint32_mul(nsyms, sizeof(struct mach32_nlist)));

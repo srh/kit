@@ -19,6 +19,10 @@ void import_destroy(struct import *imp) {
   imp->buf_count = 0;
 }
 
+GEN_SLICE_IMPL(import, struct import);
+GEN_SLICE_IMPL(sti, struct sti);
+GEN_SLICE_IMPL(typetrav_symbol_info_ptr, struct typetrav_symbol_info *);
+
 struct common_idents compute_common_idents(struct identmap *im) {
   struct common_idents ret;
   ret.ptr = identmap_intern_c_str(im, PTR_TYPE_NAME);
@@ -49,23 +53,18 @@ struct common_idents compute_common_idents(struct identmap *im) {
 
 void checkstate_destroy(struct checkstate *cs) {
   cs->typetrav_symbol_infos_first_ungenerated = 0;
-  SLICE_FREE(cs->typetrav_symbol_infos, cs->typetrav_symbol_infos_count,
-             typetrav_symbol_info_ptr_destroy);
-  cs->typetrav_symbol_infos_limit = 0;
+  typetrav_symbol_info_ptr_slice_destroy(&cs->typetrav_symbol_infos,
+                                         typetrav_symbol_info_ptr_destroy);
   identmap_destroy(&cs->typetrav_values);
 
-  free(cs->sli_symbol_table_indexes);
-  cs->sli_symbol_table_indexes = NULL;
-  cs->sli_symbol_table_indexes_count = 0;
-  cs->sli_symbol_table_indexes_limit = 0;
+  sti_slice_destroy_prim(&cs->sli_symbol_table_indexes);
   identmap_destroy(&cs->sli_values);
 
   name_table_destroy(&cs->nt);
   cs->kit_name_counter = 0;
   CHECK(cs->template_instantiation_recursion_depth == 0);
   cs->total_filesize = 0;
-  SLICE_FREE(cs->imports, cs->imports_count, import_destroy);
-  cs->imports_limit = 0;
+  import_slice_destroy(&cs->imports, import_destroy);
   cs->arch = (enum target_arch)-1;
   cs->platform = (enum target_platform)-1;
   cs->loader = NULL;
@@ -83,39 +82,33 @@ void checkstate_init(struct checkstate *cs, struct identmap *im,
   cs->platform = platform;
   enum target_arch arch = platform_arch(platform);
   cs->arch = arch;
-  cs->imports = NULL;
-  cs->imports_count = 0;
-  cs->imports_limit = 0;
+  cs->imports = import_slice_initializer();
   cs->total_filesize = 0;
   cs->template_instantiation_recursion_depth = 0;
   cs->kit_name_counter = 0;
   name_table_init(&cs->nt, arch);
 
   identmap_init(&cs->sli_values);
-  cs->sli_symbol_table_indexes = 0;
-  cs->sli_symbol_table_indexes_count = 0;
-  cs->sli_symbol_table_indexes_limit = 0;
+  cs->sli_symbol_table_indexes = sti_slice_initializer();
 
   identmap_init(&cs->typetrav_values);
-  cs->typetrav_symbol_infos = 0;
-  cs->typetrav_symbol_infos_count = 0;
-  cs->typetrav_symbol_infos_limit = 0;
+  cs->typetrav_symbol_infos = typetrav_symbol_info_ptr_slice_initializer();
   cs->typetrav_symbol_infos_first_ungenerated = 0;
 }
 
 size_t checkstate_find_g_o_import(struct checkstate *cs, size_t global_offset) {
-  CHECK(cs->imports_count > 0);
+  CHECK(cs->imports.count > 0);
   /* b->global_offset_base <= global_offset, and e->global_offset_base
   > global_offset (if e is in range. */
   size_t b = 0;
-  size_t e = cs->imports_count;
+  size_t e = cs->imports.count;
 
   for (;;) {
     size_t m = b + (e - b) / 2;
     if (m == b) {
       return b;
     }
-    if (cs->imports[m].global_offset_base <= global_offset) {
+    if (cs->imports.ptr[m].global_offset_base <= global_offset) {
       b = m;
     } else {
       e = m;
@@ -126,18 +119,18 @@ size_t checkstate_find_g_o_import(struct checkstate *cs, size_t global_offset) {
 ident_value checkstate_g_o_import_name(struct checkstate *cs,
                                        size_t global_offset) {
   size_t ix = checkstate_find_g_o_import(cs, global_offset);
-  return cs->imports[ix].import_name;
+  return cs->imports.ptr[ix].import_name;
 }
 
 ident_value checkstate_g_o_import_filepath(struct checkstate *cs,
                                            size_t global_offset) {
   size_t ix = checkstate_find_g_o_import(cs, global_offset);
-  return cs->imports[ix].import_filepath;
+  return cs->imports.ptr[ix].import_filepath;
 }
 
 size_t checkstate_g_o_line(struct checkstate *cs, size_t global_offset) {
   size_t ix = checkstate_find_g_o_import(cs, global_offset);
-  struct import *imp = &cs->imports[ix];
+  struct import *imp = &cs->imports.ptr[ix];
   size_t offset = size_sub(global_offset, imp->global_offset_base);
 
   CHECK(offset <= imp->buf_count);
@@ -146,7 +139,7 @@ size_t checkstate_g_o_line(struct checkstate *cs, size_t global_offset) {
 
 size_t checkstate_g_o_column(struct checkstate *cs, size_t global_offset) {
   size_t ix = checkstate_find_g_o_import(cs, global_offset);
-  struct import *imp = &cs->imports[ix];
+  struct import *imp = &cs->imports.ptr[ix];
   size_t offset = size_sub(global_offset, imp->global_offset_base);
 
   CHECK(offset <= imp->buf_count);

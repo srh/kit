@@ -183,7 +183,7 @@ void linux32_write_symbols_and_strings(struct identmap *im, struct objfile *f,
 
   /* Maps from f->symbol_table's indexes to symbols indexes, because
   they get reordered (and index zero cannot be used). */
-  uint32_t *sti_map = malloc_mul(sizeof(*sti_map), f->symbol_table_count);
+  uint32_t *sti_map = malloc_mul(sizeof(*sti_map), f->symbol_table.count);
 
   {
     /* Add index zero symbol entry. */
@@ -198,8 +198,8 @@ void linux32_write_symbols_and_strings(struct identmap *im, struct objfile *f,
     symbols_count = uint32_add(symbols_count, 1);
   }
 
-  struct objfile_symbol_record *symbol_table = f->symbol_table;
-  for (size_t i = 0, e = f->symbol_table_count; i < e; i++) {
+  struct objfile_symbol_record *symbol_table = f->symbol_table.ptr;
+  for (size_t i = 0, e = f->symbol_table.count; i < e; i++) {
     if (symbol_table[i].is_static) {
       linux32_push_symbol(im, &symbol_table[i], symbols, strings);
       sti_map[i] = symbols_count;
@@ -209,7 +209,7 @@ void linux32_write_symbols_and_strings(struct identmap *im, struct objfile *f,
 
   const uint32_t end_locals = symbols_count;
 
-  for (size_t i = 0, e = f->symbol_table_count; i < e; i++) {
+  for (size_t i = 0, e = f->symbol_table.count; i < e; i++) {
     if (!symbol_table[i].is_static) {
       linux32_push_symbol(im, &symbol_table[i], symbols, strings);
       sti_map[i] = symbols_count;
@@ -236,7 +236,7 @@ void linux32_section_headers(uint32_t prev_end_offset,
                              struct elf32_Section_Header *sh_out,
                              uint32_t *end_out) {
   uint32_t rel_offset = uint32_ceil_aligned(prev_end_offset, kRel_Section_Alignment);
-  uint32_t rel_size = uint32_mul(s->relocs_count, sizeof(struct elf32_Rel));
+  uint32_t rel_size = uint32_mul(s->relocs.count, sizeof(struct elf32_Rel));
   uint32_t rel_end = uint32_add(rel_offset, rel_size);
   uint32_t sh_alignment = s->max_requested_alignment;
   uint32_t sh_offset = uint32_ceil_aligned(rel_end, sh_alignment);
@@ -272,8 +272,8 @@ void linux32_section_headers(uint32_t prev_end_offset,
 void linux32_append_relocations_and_mutate_section(
     uint32_t *sti_map, size_t sti_map_count,
     struct databuf *d, struct objfile_section *s) {
-  struct objfile_relocation *relocs = s->relocs;
-  for (size_t i = 0, e = s->relocs_count; i < e; i++) {
+  struct objfile_relocation *relocs = s->relocs.ptr;
+  for (size_t i = 0, e = s->relocs.count; i < e; i++) {
     CHECK(relocs[i].type != OBJFILE_RELOCATION_TYPE_DIFF32);
     struct elf32_Rel rel;
     rel.r_offset = to_le_u32(relocs[i].virtual_address);
@@ -515,7 +515,7 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   append_zeros_to_align(d, kRel_Section_Alignment);
   CHECK(d->count == from_le_u32(sh_rel_data.sh_offset));
   linux32_append_relocations_and_mutate_section(
-      sti_map, f->symbol_table_count, d, &f->data);
+      sti_map, f->symbol_table.count, d, &f->data);
   append_zeros_to_align(d, f->data.max_requested_alignment);
   CHECK(d->count == from_le_u32(sh_data.sh_offset));
   databuf_append(d, f->data.raw.buf, f->data.raw.count);
@@ -523,7 +523,7 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   append_zeros_to_align(d, kRel_Section_Alignment);
   CHECK(d->count == from_le_u32(sh_rel_rodata.sh_offset));
   linux32_append_relocations_and_mutate_section(
-      sti_map, f->symbol_table_count, d, &f->rdata);
+      sti_map, f->symbol_table.count, d, &f->rdata);
   append_zeros_to_align(d, f->rdata.max_requested_alignment);
   CHECK(d->count == from_le_u32(sh_rodata.sh_offset));
   databuf_append(d, f->rdata.raw.buf, f->rdata.raw.count);
@@ -531,7 +531,7 @@ void linux32_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   append_zeros_to_align(d, kRel_Section_Alignment);
   CHECK(d->count == from_le_u32(sh_rel_text.sh_offset));
   linux32_append_relocations_and_mutate_section(
-      sti_map, f->symbol_table_count, d, &f->text);
+      sti_map, f->symbol_table.count, d, &f->text);
   append_zeros_to_align(d, f->text.max_requested_alignment);
   CHECK(d->count == from_le_u32(sh_text.sh_offset));
   databuf_append(d, f->text.raw.buf, f->text.raw.count);

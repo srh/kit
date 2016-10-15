@@ -823,13 +823,9 @@ int resolve_import_filename_and_parse(struct checkstate *cs,
 }
 
 struct import_chase_state {
-  ident_value *names;
-  size_t names_count;
-  size_t names_limit;
+  struct ident_value_slice names;
 
-  struct defclass_ident *accessible;
-  size_t accessible_count;
-  size_t accessible_limit;
+  struct defclass_ident_slice accessible;
 };
 
 void defclass_ident_destroy(struct defclass_ident *dci) {
@@ -955,8 +951,7 @@ int chase_through_toplevels(struct checkstate *cs,
     struct ast_toplevel *toplevel = &toplevels[i];
     switch (toplevel->tag) {
     case AST_TOPLEVEL_IMPORT: {
-      SLICE_PUSH(ics->names, ics->names_count, ics->names_limit,
-                 toplevel->u.import.name.value);
+      ident_value_slice_push(&ics->names, toplevel->u.import.name.value);
     } break;
     case AST_TOPLEVEL_DEF: {
       if (!toplevel->u.def.has_typeexpr) {
@@ -973,8 +968,8 @@ int chase_through_toplevels(struct checkstate *cs,
                               toplevel->u.def.name.value,
                               &toplevel->u.def.generics,
                               ast_def_typeexpr(&toplevel->u.def),
-                              ics->accessible,
-                              ics->accessible_count,
+                              ics->accessible.ptr,
+                              ics->accessible.count,
                               toplevel->u.def.is_export,
                               &toplevel->u.def)) {
         return 0;
@@ -1010,11 +1005,11 @@ int chase_through_toplevels(struct checkstate *cs,
       struct defclass_ident dci;
       dci.name = toplevel->u.access.name.value;
       dci.arity = toplevel->u.access.arity;
-      SLICE_PUSH(ics->accessible, ics->accessible_count, ics->accessible_limit, dci);
+      defclass_ident_slice_push(&ics->accessible, dci);
       int success = chase_through_toplevels(cs, ics,
                                             toplevel->u.access.toplevels,
                                             toplevel->u.access.toplevels_count);
-      SLICE_POP(ics->accessible, ics->accessible_count, defclass_ident_destroy);
+      defclass_ident_slice_pop(&ics->accessible, defclass_ident_destroy);
       if (!success) {
         return 0;
       }
@@ -1029,15 +1024,15 @@ int chase_through_toplevels(struct checkstate *cs,
 
 int chase_imports(struct checkstate *cs, ident_value name) {
   int ret = 0;
-  struct import_chase_state ics = { NULL, 0, 0, NULL, 0, 0 };
+  struct import_chase_state ics = { SLICE_INITIALIZER, SLICE_INITIALIZER };
 
-  SLICE_PUSH(ics.names, ics.names_count, ics.names_limit, name);
+  ident_value_slice_push(&ics.names, name);
 
-  while (ics.names_count) {
-    name = ics.names[--ics.names_count];
+  while (ics.names.count) {
+    name = ics.names.ptr[--ics.names.count];
 
-    for (size_t i = 0, e = cs->imports_count; i < e; i++) {
-      if (cs->imports[i].import_name == name) {
+    for (size_t i = 0, e = cs->imports.count; i < e; i++) {
+      if (cs->imports.ptr[i].import_name == name) {
         goto continue_outer;
       }
     }
@@ -1062,7 +1057,7 @@ int chase_imports(struct checkstate *cs, ident_value name) {
     imp.file = heap_file;
     imp.buf = buf;
     imp.buf_count = buf_count;
-    SLICE_PUSH(cs->imports, cs->imports_count, cs->imports_limit, imp);
+    import_slice_push(&cs->imports, imp);
 
     if (!chase_through_toplevels(cs, &ics, heap_file->toplevels, heap_file->toplevels_count)) {
       goto cleanup;
@@ -1074,16 +1069,16 @@ int chase_imports(struct checkstate *cs, ident_value name) {
 
   ret = 1;
  cleanup:
-  free(ics.names);
-  free(ics.accessible);
+  ident_value_slice_destroy_prim(&ics.names);
+  defclass_ident_slice_destroy_prim(&ics.accessible);
   return ret;
 }
 
 int lookup_import(struct checkstate *cs, ident_value name,
                   struct ast_file **file_out) {
-  for (size_t i = 0, e = cs->imports_count; i < e; i++) {
-    if (cs->imports[i].import_name == name) {
-      *file_out = cs->imports[i].file;
+  for (size_t i = 0, e = cs->imports.count; i < e; i++) {
+    if (cs->imports.ptr[i].import_name == name) {
+      *file_out = cs->imports.ptr[i].file;
       return 1;
     }
   }
@@ -1859,6 +1854,14 @@ struct varpair {
   struct ast_vardecl *decl;
 };
 
+void varpair_destroy(struct varpair *v) {
+  /* Do nothing substantial.  Wipe for safety? */
+  v->decl = NULL;
+}
+
+GEN_SLICE_HDR(varpair, struct varpair);
+GEN_SLICE_IMPL(varpair, struct varpair);
+
 struct exprscope {
   struct checkstate *cs;
   struct ast_generics *generics;
@@ -1879,9 +1882,7 @@ struct exprscope {
   struct def_entry *entry_or_null;
 
   /* A stack of variables that are in scope. */
-  struct varpair *vars;
-  size_t vars_count;
-  size_t vars_limit;
+  struct varpair_slice vars;
 
   /* A counter for uniquely numbering temporaries. */
   size_t temp_counter;
@@ -1906,9 +1907,7 @@ void exprscope_init(struct exprscope *es,
   es->accessible_count = accessible_count;
   es->computation = computation;
   es->entry_or_null = entry_or_null;
-  es->vars = NULL;
-  es->vars_count = 0;
-  es->vars_limit = 0;
+  es->vars = varpair_slice_initializer();
   es->temp_counter = 0;
 }
 
@@ -1920,10 +1919,7 @@ void exprscope_destroy(struct exprscope *es) {
   es->accessible = NULL;
   es->accessible_count = 0;
   es->computation = STATIC_COMPUTATION_YES;
-  free(es->vars);
-  es->vars = NULL;
-  es->vars_count = 0;
-  es->vars_limit = 0;
+  varpair_slice_destroy_prim(&es->vars);
   es->temp_counter = SIZE_MAX;
 }
 
@@ -1941,8 +1937,8 @@ void exprscope_note_static_reference(struct exprscope *es,
 }
 
 int check_var_shadowing(struct exprscope *es, struct ast_ident *name) {
-  for (size_t i = 0, e = es->vars_count; i < e; i++) {
-    if (es->vars[i].decl->name.value == name->value) {
+  for (size_t i = 0, e = es->vars.count; i < e; i++) {
+    if (es->vars.ptr[i].decl->name.value == name->value) {
       METERR(es->cs, name->meta, "Variable name %.*s shadows local.\n",
              IM_P(es->cs->im, name->value));
       return 0;
@@ -1968,15 +1964,13 @@ int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var) {
 
   struct varpair pair;
   pair.decl = var;
-  SLICE_PUSH(es->vars, es->vars_count, es->vars_limit, pair);
+  varpair_slice_push(&es->vars, pair);
 
   return 1;
 }
 
 void exprscope_pop_var(struct exprscope *es) {
-  CHECK(es->vars_count > 0);
-  --es->vars_count;
-  es->vars[es->vars_count].decl = NULL;
+  varpair_slice_pop(&es->vars, varpair_destroy);
 }
 
 int help_unify_directionally(struct identmap *im,
@@ -2263,9 +2257,9 @@ int exprscope_lookup_name(struct exprscope *es,
                           int report_multi_match,
                           enum match_result *match_result_out) {
   if (!name->has_params) {
-    for (size_t i = es->vars_count; i > 0; ) {
+    for (size_t i = es->vars.count; i > 0; ) {
       i--;
-      struct ast_vardecl *decl = es->vars[i].decl;
+      struct ast_vardecl *decl = es->vars.ptr[i].decl;
       if (decl->name.value != name->ident.value) {
         continue;
       }
@@ -3291,9 +3285,7 @@ the end", i.e. there isn't a return statement in every branch. */
 int check_expr_bracebody(struct bodystate *bs,
                          struct ast_bracebody *x,
                          enum fallthrough *fallthrough_out) {
-  struct ast_vardecl **vardecls_pushed = NULL;
-  size_t vardecls_pushed_count = 0;
-  size_t vardecls_pushed_limit = 0;
+  struct ast_vardecl_ptr_slice vardecls_pushed = SLICE_INITIALIZER;
   int ret = 0;
 
   enum fallthrough reachable = FALLTHROUGH_FROMTHETOP;
@@ -3309,18 +3301,18 @@ int check_expr_bracebody(struct bodystate *bs,
 
     reachable = compose_fallthrough(reachable, fallthrough);
     if (vardecl_to_push_or_null) {
-      SLICE_PUSH(vardecls_pushed, vardecls_pushed_count, vardecls_pushed_limit,
-                 vardecl_to_push_or_null);
+      ast_vardecl_ptr_slice_push(&vardecls_pushed,
+                                 vardecl_to_push_or_null);
     }
   }
 
   *fallthrough_out = reachable;
   ret = 1;
  fail:
-  for (size_t i = 0; i < vardecls_pushed_count; i++) {
+  for (size_t i = 0; i < vardecls_pushed.count; i++) {
     exprscope_pop_var(bs->es);
   }
-  SLICE_FREE(vardecls_pushed, vardecls_pushed_count, free_ast_vardecl);
+  ast_vardecl_ptr_slice_destroy(&vardecls_pushed, free_ast_vardecl);
   return ret;
 }
 
@@ -4192,27 +4184,25 @@ void replace_name_expr_params(struct exprscope *es,
 }
 
 struct ast_numeric_literal numeric_literal_from_u32(uint32_t value) {
-  int8_t *digits = NULL;
-  size_t digits_count = 0;
-  size_t digits_limit = 0;
+  struct int8_slice digits = SLICE_INITIALIZER;
 
   if (value == 0) {
-    SLICE_PUSH(digits, digits_count, digits_limit, 0);
+    int8_slice_push(&digits, 0);
   } else {
     do {
       int8_t units = value % 10;
-      SLICE_PUSH(digits, digits_count, digits_limit, units);
+      int8_slice_push(&digits, units);
       value = value / 10;
     } while (value != 0);
-    for (size_t i = 0, j = digits_count - 1; i < j; i++, j--) {
-      int8_t tmp = digits[i];
-      digits[i] = digits[j];
-      digits[j] = tmp;
+    for (size_t i = 0, j = digits.count - 1; i < j; i++, j--) {
+      int8_t tmp = digits.ptr[i];
+      digits.ptr[i] = digits.ptr[j];
+      digits.ptr[j] = tmp;
     }
   }
   struct ast_numeric_literal ret;
   ast_numeric_literal_init(&ret, ast_meta_make_garbage(), AST_NUMERIC_LITERAL_DEC,
-                           digits, digits_count);
+                           digits.ptr, digits.count);
   return ret;
 }
 
@@ -5265,8 +5255,8 @@ int eval_static_value(struct checkstate *cs,
 int compute_static_values(struct checkstate *cs, struct def_entry *ent) {
   int is_primitive = ent->is_primitive;
   CHECK(is_primitive || ent->def != NULL);
-  for (size_t i = 0, e = ent->instantiations_count; i < e; i++) {
-    struct def_instantiation *inst = ent->instantiations[i];
+  for (size_t i = 0, e = ent->instantiations.count; i < e; i++) {
+    struct def_instantiation *inst = ent->instantiations.ptr[i];
 
     if (is_primitive) {
       switch (ent->primitive_op.tag) {
@@ -5317,8 +5307,8 @@ int chase_def_entry_acyclicity(struct checkstate *cs, struct def_entry *ent) {
     return 0;
   }
   ent->acyclicity_being_chased = 1;
-  for (size_t i = 0, e = ent->static_references_count; i < e; i++) {
-    if (!chase_def_entry_acyclicity(cs, ent->static_references[i])) {
+  for (size_t i = 0, e = ent->static_references.count; i < e; i++) {
+    if (!chase_def_entry_acyclicity(cs, ent->static_references.ptr[i])) {
       return 0;
     }
   }
@@ -5337,8 +5327,8 @@ int chase_def_entry_acyclicity(struct checkstate *cs, struct def_entry *ent) {
 }
 
 int check_def_acyclicity(struct checkstate *cs) {
-  for (size_t i = 0, e = cs->nt.defs_count; i < e; i++) {
-    struct def_entry *ent = cs->nt.defs[i];
+  for (size_t i = 0, e = cs->nt.defs.count; i < e; i++) {
+    struct def_entry *ent = cs->nt.defs.ptr[i];
     if (!chase_def_entry_acyclicity(cs, ent)) {
       return 0;
     }
@@ -5356,15 +5346,15 @@ int chase_modules_and_typecheck(struct checkstate *cs,
   }
 
   // We check types first so that we don't go checking their traits (in a def) before we've figured out the type's flatness.
-  for (size_t i = 0, e = cs->imports_count; i < e; i++) {
-    struct ast_file *file = cs->imports[i].file;
+  for (size_t i = 0, e = cs->imports.count; i < e; i++) {
+    struct ast_file *file = cs->imports.ptr[i].file;
     if (!check_toplevels_typewise(cs, file->toplevels, file->toplevels_count)) {
       goto fail;
     }
   }
 
-  for (size_t i = 0, e = cs->imports_count; i < e; i++) {
-    struct ast_file *file = cs->imports[i].file;
+  for (size_t i = 0, e = cs->imports.count; i < e; i++) {
+    struct ast_file *file = cs->imports.ptr[i].file;
     if (!check_toplevels_defwise(cs, file->toplevels, file->toplevels_count)) {
       goto fail;
     }

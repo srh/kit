@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "arena.h"
+#include "slice.h"
 #include "util.h"
 
 struct identmap_data;
@@ -11,6 +12,8 @@ struct identmap_data;
 typedef size_t ident_value;
 #define IDENT_VALUE_INVALID SIZE_MAX
 #define PRIident_value PRIz
+
+GEN_SLICE_HDR(ident_value, ident_value);
 
 struct identmap {
   ident_value *table;

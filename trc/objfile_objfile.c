@@ -18,9 +18,7 @@ void objfile_section_init(struct objfile_section *s) {
   /* Just start it off with 4, that's good. */
   s->max_requested_alignment = 4;
 
-  s->relocs = NULL;
-  s->relocs_count = 0;
-  s->relocs_limit = 0;
+  s->relocs = objfile_relocation_slice_initializer();
 
   s->diff32_count = 0;
 }
@@ -28,10 +26,7 @@ void objfile_section_init(struct objfile_section *s) {
 void objfile_section_destroy(struct objfile_section *s) {
   databuf_destroy(&s->raw);
   s->max_requested_alignment = 0;
-  free(s->relocs);
-  s->relocs = NULL;
-  s->relocs_count = 0;
-  s->relocs_limit = 0;
+  objfile_relocation_slice_destroy_prim(&s->relocs);
 }
 
 void objfile_init(struct objfile *f, enum target_platform platform) {
@@ -39,9 +34,7 @@ void objfile_init(struct objfile *f, enum target_platform platform) {
   objfile_section_init(&f->rdata);
   objfile_section_init(&f->text);
 
-  f->symbol_table = NULL;
-  f->symbol_table_count = 0;
-  f->symbol_table_limit = 0;
+  f->symbol_table = objfile_symbol_record_slice_initializer();
 
   f->platform = platform;
   f->arch = platform_arch(platform);
@@ -52,10 +45,7 @@ void objfile_destroy(struct objfile *f) {
   objfile_section_destroy(&f->rdata);
   objfile_section_destroy(&f->text);
 
-  free(f->symbol_table);
-  f->symbol_table = NULL;
-  f->symbol_table_count = 0;
-  f->symbol_table_limit = 0;
+  objfile_symbol_record_slice_destroy_prim(&f->symbol_table);
 
   f->platform = (enum target_platform)-1;
   f->arch = (enum target_arch)-1;
@@ -127,7 +117,7 @@ struct sti objfile_add_local_symbol(struct objfile *f,
                                     enum section section,
                                     enum is_static is_static) {
   struct sti ret;
-  ret.value = size_to_uint32(f->symbol_table_count);
+  ret.value = size_to_uint32(f->symbol_table.count);
   struct objfile_symbol_record rec;
   rec.name = name;
   rec.value = value;
@@ -137,7 +127,7 @@ struct sti objfile_add_local_symbol(struct objfile *f,
   rec.section = (enum objfile_symbol_section)section;
   rec.is_function = section == SECTION_TEXT ? IS_FUNCTION_YES : IS_FUNCTION_NO;
   rec.is_static = is_static;
-  SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, rec);
+  objfile_symbol_record_slice_push(&f->symbol_table, rec);
   return ret;
 }
 
@@ -145,14 +135,14 @@ struct sti objfile_add_remote_symbol(struct objfile *f,
                                      ident_value name,
                                      enum is_function is_function) {
   struct sti ret;
-  ret.value = size_to_uint32(f->symbol_table_count);
+  ret.value = size_to_uint32(f->symbol_table.count);
   struct objfile_symbol_record rec;
   rec.name = name;
   rec.value = 0;
   rec.section = OBJFILE_SYMBOL_SECTION_UNDEFINED;
   rec.is_function = is_function;
   rec.is_static = IS_STATIC_NO;
-  SLICE_PUSH(f->symbol_table, f->symbol_table_count, f->symbol_table_limit, rec);
+  objfile_symbol_record_slice_push(&f->symbol_table, rec);
   return ret;
 }
 
@@ -199,11 +189,11 @@ void objfile_fillercode_align_double_quadword(struct objfile *f) {
 void objfile_set_symbol_value(struct objfile *f,
                               struct sti SymbolTableIndex,
                               uint32_t value) {
-  CHECK(SymbolTableIndex.value < f->symbol_table_count);
+  CHECK(SymbolTableIndex.value < f->symbol_table.count);
   /* We should only be assigning this once, I think -- and we set it
   to zero before assigning it. */
-  CHECK(f->symbol_table[SymbolTableIndex.value].value == 0);
-  f->symbol_table[SymbolTableIndex.value].value = value;
+  CHECK(f->symbol_table.ptr[SymbolTableIndex.value].value == 0);
+  f->symbol_table.ptr[SymbolTableIndex.value].value = value;
 }
 
 void objfile_section_append_32bit_reloc(struct objfile_section *s,
@@ -215,7 +205,7 @@ void objfile_section_append_32bit_reloc(struct objfile_section *s,
   reloc.symbol_table_index = symbol_table_index;
   reloc.subtracted_offset = 0;  /* garbage, only used for DIFF32 */
   reloc.type = type;
-  SLICE_PUSH(s->relocs, s->relocs_count, s->relocs_limit, reloc);
+  objfile_relocation_slice_push(&s->relocs, reloc);
   struct le_u32 zero = to_le_u32(0);
   objfile_section_append_raw(s, &zero, sizeof(zero));
 }
@@ -241,7 +231,7 @@ void objfile_section_note_diff32(struct objfile_section *s,
   reloc.symbol_table_index = symbol_table_index;
   reloc.subtracted_offset = size_to_uint32(subtracted_offset);
   reloc.type = OBJFILE_RELOCATION_TYPE_DIFF32;
-  SLICE_PUSH(s->relocs, s->relocs_count, s->relocs_limit, reloc);
+  objfile_relocation_slice_push(&s->relocs, reloc);
   s->diff32_count = uint32_add(s->diff32_count, 1);
 }
 

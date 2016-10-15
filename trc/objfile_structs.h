@@ -7,6 +7,7 @@
 #include "databuf.h"
 #include "identmap.h"
 #include "objfile_objfile.h"
+#include "slice.h"
 #include "util.h"
 
 enum objfile_relocation_type {
@@ -28,6 +29,8 @@ struct objfile_relocation {
   enum objfile_relocation_type type;
 };
 
+GEN_SLICE_HDR(objfile_relocation, struct objfile_relocation);
+
 struct objfile_section {
   struct databuf raw;
 
@@ -35,9 +38,7 @@ struct objfile_section {
   which just sets this to 16. */
   size_t max_requested_alignment;
 
-  struct objfile_relocation *relocs;
-  size_t relocs_count;
-  size_t relocs_limit;
+  struct objfile_relocation_slice relocs;
 
   /* How many diff32 relocs we have.  Diff relocs (in mach-o) use two
   entries, we use this value to compute nreloc on OS X. */
@@ -63,14 +64,14 @@ struct objfile_symbol_record {
   enum is_static is_static;
 };
 
+GEN_SLICE_HDR(objfile_symbol_record, struct objfile_symbol_record);
+
 struct objfile {
   struct objfile_section data;
   struct objfile_section rdata;
   struct objfile_section text;
 
-  struct objfile_symbol_record *symbol_table;
-  size_t symbol_table_count;
-  size_t symbol_table_limit;
+  struct objfile_symbol_record_slice symbol_table;
 
   /* Nothing in objfile code (besides objfile_platform and objfile_arch) should use these. */
   enum target_platform platform;
