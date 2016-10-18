@@ -229,7 +229,7 @@ void ia_gen_lea(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
 register, which gets zero-extended. */
 void ia_gen_movzx(struct objfile *f, enum gp_reg dest, enum gp_reg src_addr,
                   int32_t src_disp, enum oz src_oz) {
-  CHECK(src_addr <= X64_RDI);
+  CHECK((enum x64_reg)src_addr <= X64_RDI);
   if (src_oz <= OZ_16) {
     uint8_t pref[2];
     pref[0] = 0x0F;
