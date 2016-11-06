@@ -584,9 +584,15 @@ enum def_inst_rhs {
   InstRhsMagic def_magic;
 }
 
+struct ee_num {
+  entry sq_num;
+  exit sq_num;
+}
+
 struct frame_regraphed {
   gr frame_graph;
-  sn sq_num;
+  // The entry point and sole exit point of the graph.
+  ee ee_num;
   // This cell is something that ought to be verifiable by looking at fg and finding which
   // rigid/flex cells aren't "dead" -- there should just be one: this one.  For a
   // top-level-expr it's the value the expr produces, and for a fullbody it's the return

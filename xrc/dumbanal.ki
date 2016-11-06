@@ -1,30 +1,19 @@
 import state;
 
-func dumbly_analyze_returning_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num) np {
-  mbmut genexpr_result = #dumbly_analyze_expression(h, gr, ctr, gn);
-  switch &mbmut {
-  case &Terminal:
-    return NoFail;
-  case &NonTerminal:
-    return ERR(_u8("ICE: Expecting terminal expression, for gn "), gn.x, _u8(" in "),
-               lookup(h->im, gr->informal_name));
-  }
-}
-
 enum genexpr_result {
   Terminal void;
   NonTerminal void;
 }
 
-func dumbly_analyze_xnode(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num,
-                          gnc *gn_annot, xn *gr_xnode) cr[genexpr_result] {
+func dumbly_analyze_xnode(h *frame, gr *frame_graph, ctr *celltrack, sn sq_num,
+                          snc *sn_annot, xn *gr_xnode) void {
   switch &xn->op {
   case &GrApply(a gr_apply):
     // Retcell needs to be live _before_ the funcall happens.
     expect_live(ctr, a.retcell);
 
-    note_lower_paramlists(h, gn, ctr);
-    annotate_ref(&gnc->app_time_live, ctr);
+    note_lower_paramlists(h, sn, ctr);
+    annotate_ref(&snc->app_time_live, ctr);
 
     nparams size = count(&a.params);
 
@@ -45,7 +34,6 @@ func dumbly_analyze_xnode(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num,
     for i size = 0; i < nparams; i = i + 1 {
       deaden(ctr, get(&a.params, i));
     }
-    return NoFail(Terminal);
 
   case &GrPrimApply(a gr_prim_apply):
     expect_live(ctr, a.retcell);
@@ -59,72 +47,60 @@ func dumbly_analyze_xnode(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num,
     for i size = 0; i < nparams; i = i + 1 {
       deaden(ctr, get(&a.params, i));
     }
-    return NoFail(Terminal);
 
   case &GrMemCopy(a gr_memcopy):
     expect_live(ctr, a.dest);
     expect_live(ctr, a.src);
-    return NoFail(Terminal);
 
   case &GrWriteConst(a gr_writeconst):
     expect_live(ctr, a.dest);
-    return NoFail(Terminal);
 
   case &GrAddressof(a gr_addressof):
     expect_live(ctr, a.addressee);
     expect_live(ctr, a.dest);
     gr_activate(ctr, a.dest);
-    return NoFail(Terminal);
 
   case &GrDeref(a gr_deref):
     expect_live(ctr, a.pointer);
     check(!isLocationStatic(ref_cell(gr, a.name)->location));
     create(h, ctr, a.name);
-    return NoFail(Terminal);
 
   case &GrSubcell(a gr_subcell):
     expect_live(ctr, a.partof);
     check(!isLocationStatic(ref_cell(gr, a.name)->location));
     create(h, ctr, a.name);
-    return NoFail(Terminal);
 
   case &GrLive(a gr_live):
     create(h, ctr, a.cell);
-    return NoFail(Terminal);
 
   case &GrAssertLive(a gr_assert_live):
     expect_live(ctr, a.cell);
-    return NoFail(Terminal);
 
   case &GrDead(a gr_dead):
     deaden(ctr, a.cell);
-    return NoFail(Terminal);
 
   case &GrVirtualDead(a gr_virtual_dead):
     deaden(ctr, a.cell);
-    return NoFail(Terminal);
 
   case &GrActiveXop(a gr_active_xop):
     gr_track_active_op(ctr, a.op1);
     gr_track_active_op(ctr, a.op2);
-    return NoFail(Terminal);
 
   case &GrManyActiveXop(a gr_many_active_xop):
     nops size = count(&a.ops);
     for i size = 0; i < nops; i = i + 1 {
       gr_track_active_op(ctr, get(&a.ops, i));
     }
-    return NoFail(Terminal);
   }
 }
 
-func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num) cr[genexpr_result] {
+func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, sn sq_num) cr[genexpr_result] {
   for ;; {
-    gnc *gn_annot = ref_annot(h, gn);
+    gnc *sn_annot = ref_annot(h, sn);
     if case &Computed(checksum celltrack_checksum) = &gnc->plainly_live {
       // TODO: We should also check that we're part of the same sequential _family_ of exprs.
       if !matches_checksum(ctr, &checksum) {
-        return ERR(_u8("ICE: Inconsistent liveness/active state when revisiting node ("), gn.x,
+        return ERR(_u8("ICE: Inconsistent liveness/active state when revisiting node ("), sn.x.x,
                    _u8("), celltrack="), *ctr);
       }
       return NoFail(NonTerminal);
@@ -132,12 +108,9 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
 
     annotate(&gnc->plainly_live, get_checksum(ctr));
 
-    node *gr_node = ref_node(gr, gn);
-    switch node {
-    case &XOp(xn gr_xnode):
-      return dumbly_analyze_xnode(h, gr, ctr, gn, gnc, &xn);
-    case &QOp(qn gr_qnode):
-      switch &qn.op {
+    qn *gr_qnode = ref_qnode(gr, sn);
+    if true {
+      switch &qn->op {
       case &GrBranch(a gr_branch):
         expect_live(ctr, a.src);
 
@@ -147,7 +120,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
         for i size = 0; i < ntargets; i++ {
           target *gr_branch_target = branch_target_ref(&a, i);
           new_live celltrack = *ctr;
-          casmut genexpr_result = #dumbly_analyze_expression(h, gr, &new_live, target->sn.x);
+          casmut genexpr_result = #dumbly_analyze_expression(h, gr, &new_live, target->sn);
           combine_branch_mut(&new_live, &combined_mut, casmut, &end_ctr);
         }
 
@@ -156,12 +129,13 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
         return NoFail(combined_mut);
 
       case &GrSequence(a gr_sequence):
-        #dumbly_analyze_returning_expression(h, gr, ctr, a.first);
-        gn = a.second.x;
+        xn *gr_xnode = ref_xnode(gr, a.first);
+        dumbly_analyze_xnode(h, gr, ctr, sn, gnc, xn);
+        sn = a.second;
         // Loop around.
 
       case &GrJmp(a gr_jmp):
-        gn = a.next.x;
+        sn = a.next;
         // Loop around.
 
       case &GrQNop:
@@ -171,22 +145,22 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
   }
 }
 
-func note_lower_paramlists(h *frame, our_gn gr_num, live_at_app_time *celltrack) void {
-  paramlists array[gr_num];
+func note_lower_paramlists(h *frame, our_sn sq_num, live_at_app_time *celltrack) void {
+  paramlists array[sq_num];
   nall size = count(&live_at_app_time->all);
   for i size = 0; i < nall; i = i + 1 {
     c cell_num = ref(&live_at_app_time->all, i)->cell;
-    if case Has(gn gr_num) = ref(&h->bas->celldisp, c.x)->paramlist {
-      if gn != our_gn {
-        push(&paramlists, gn);
-        discard bool = try_insert(&ref_annot(h, gn)->higher_paramlists, &our_gn, void);
+    if case Has(sn sq_num) = ref(&h->bas->celldisp, c.x)->paramlist {
+      if sn != our_sn {
+        push(&paramlists, sn);
+        discard bool = try_insert(&ref_annot(h, sn)->higher_paramlists, &our_sn, void);
       }
     }
   }
 
   sort(&paramlists);
   dedup_sorted(&paramlists);
-  annotate_move(&ref_annot(h, our_gn)->lower_paramlists, &paramlists);
+  annotate_move(&ref_annot(h, our_sn)->lower_paramlists, &paramlists);
 }
 
 func combine_branch_mut(new_live *celltrack, onto *genexpr_result, case_mut genexpr_result, end_ctr *celltrack) void {
@@ -232,6 +206,6 @@ func note_conflicting(h *frame, all *array[celltrack_entry], c cell_num) void {
   }
 }
 
-func ref_annot(h *frame, gn gr_num) *gn_annot {
-  return ref(&h->by_gn, gn.x);
+func ref_annot(h *frame, sn sq_num) *sn_annot {
+  return ref(&h->by_sn, sn.x.x);
 }
