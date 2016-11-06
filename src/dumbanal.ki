@@ -16,6 +16,107 @@ enum genexpr_result {
   NonTerminal void;
 }
 
+func dumbly_analyze_xnode(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num,
+                          gnc *gn_annot, xn *gr_xnode) cr[genexpr_result] {
+  switch &xn->op {
+  case &GrApply(a gr_apply):
+    // Retcell needs to be live _before_ the funcall happens.
+    expect_live(ctr, a.retcell);
+
+    note_lower_paramlists(h, gn, ctr);
+    annotate_ref(&gnc->app_time_live, ctr);
+
+    nparams size = count(&a.params);
+
+    switch a.act {
+    case TwoExtraOps(ops gr_active_xop):
+      gr_track_active_op(ctr, ops.op1);
+      gr_track_active_op(ctr, ops.op2);
+    case StandardApply:
+      void;
+    }
+    gr_deactivate(ctr, a.funcell);
+    for i size = 0; i < nparams; i = i + 1 {
+      gr_deactivate(ctr, get(&a.params, i));
+    }
+    gr_activate(ctr, a.retcell);
+
+    deaden(ctr, a.funcell);
+    for i size = 0; i < nparams; i = i + 1 {
+      deaden(ctr, get(&a.params, i));
+    }
+    return NoFail(Terminal);
+
+  case &GrPrimApply(a gr_prim_apply):
+    expect_live(ctr, a.retcell);
+
+    nparams size = count(&a.params);
+    for i size = 0; i < nparams; i = i + 1 {
+      gr_deactivate(ctr, get(&a.params, i));
+    }
+    gr_activate(ctr, a.retcell);
+
+    for i size = 0; i < nparams; i = i + 1 {
+      deaden(ctr, get(&a.params, i));
+    }
+    return NoFail(Terminal);
+
+  case &GrMemCopy(a gr_memcopy):
+    expect_live(ctr, a.dest);
+    expect_live(ctr, a.src);
+    return NoFail(Terminal);
+
+  case &GrWriteConst(a gr_writeconst):
+    expect_live(ctr, a.dest);
+    return NoFail(Terminal);
+
+  case &GrAddressof(a gr_addressof):
+    expect_live(ctr, a.addressee);
+    expect_live(ctr, a.dest);
+    gr_activate(ctr, a.dest);
+    return NoFail(Terminal);
+
+  case &GrDeref(a gr_deref):
+    expect_live(ctr, a.pointer);
+    check(!isLocationStatic(ref_cell(gr, a.name)->location));
+    create(h, ctr, a.name);
+    return NoFail(Terminal);
+
+  case &GrSubcell(a gr_subcell):
+    expect_live(ctr, a.partof);
+    check(!isLocationStatic(ref_cell(gr, a.name)->location));
+    create(h, ctr, a.name);
+    return NoFail(Terminal);
+
+  case &GrLive(a gr_live):
+    create(h, ctr, a.cell);
+    return NoFail(Terminal);
+
+  case &GrAssertLive(a gr_assert_live):
+    expect_live(ctr, a.cell);
+    return NoFail(Terminal);
+
+  case &GrDead(a gr_dead):
+    deaden(ctr, a.cell);
+    return NoFail(Terminal);
+
+  case &GrVirtualDead(a gr_virtual_dead):
+    deaden(ctr, a.cell);
+    return NoFail(Terminal);
+
+  case &GrActiveXop(a gr_active_xop):
+    gr_track_active_op(ctr, a.op1);
+    gr_track_active_op(ctr, a.op2);
+    return NoFail(Terminal);
+
+  case &GrManyActiveXop(a gr_many_active_xop):
+    nops size = count(&a.ops);
+    for i size = 0; i < nops; i = i + 1 {
+      gr_track_active_op(ctr, get(&a.ops, i));
+    }
+    return NoFail(Terminal);
+  }
+}
 
 func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_num) cr[genexpr_result] {
   for ;; {
@@ -34,105 +135,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, gn gr_
     node *gr_node = ref_node(gr, gn);
     switch node {
     case &XOp(xn gr_xnode):
-      switch &xn.op {
-      case &GrApply(a gr_apply):
-        // Retcell needs to be live _before_ the funcall happens.
-        expect_live(ctr, a.retcell);
-
-        note_lower_paramlists(h, gn, ctr);
-        annotate_ref(&gnc->app_time_live, ctr);
-
-        nparams size = count(&a.params);
-
-        switch a.act {
-        case TwoExtraOps(ops gr_active_xop):
-          gr_track_active_op(ctr, ops.op1);
-          gr_track_active_op(ctr, ops.op2);
-        case StandardApply:
-          void;
-        }
-        gr_deactivate(ctr, a.funcell);
-        for i size = 0; i < nparams; i = i + 1 {
-          gr_deactivate(ctr, get(&a.params, i));
-        }
-        gr_activate(ctr, a.retcell);
-
-        deaden(ctr, a.funcell);
-        for i size = 0; i < nparams; i = i + 1 {
-          deaden(ctr, get(&a.params, i));
-        }
-        return NoFail(Terminal);
-
-      case &GrPrimApply(a gr_prim_apply):
-        expect_live(ctr, a.retcell);
-
-        nparams size = count(&a.params);
-        for i size = 0; i < nparams; i = i + 1 {
-          gr_deactivate(ctr, get(&a.params, i));
-        }
-        gr_activate(ctr, a.retcell);
-
-        for i size = 0; i < nparams; i = i + 1 {
-          deaden(ctr, get(&a.params, i));
-        }
-        return NoFail(Terminal);
-
-      case &GrMemCopy(a gr_memcopy):
-        expect_live(ctr, a.dest);
-        expect_live(ctr, a.src);
-        return NoFail(Terminal);
-
-      case &GrWriteConst(a gr_writeconst):
-        expect_live(ctr, a.dest);
-        return NoFail(Terminal);
-
-      case &GrAddressof(a gr_addressof):
-        expect_live(ctr, a.addressee);
-        expect_live(ctr, a.dest);
-        gr_activate(ctr, a.dest);
-        return NoFail(Terminal);
-
-      case &GrDeref(a gr_deref):
-        expect_live(ctr, a.pointer);
-        check(!isLocationStatic(ref_cell(gr, a.name)->location));
-        create(h, ctr, a.name);
-        return NoFail(Terminal);
-
-      case &GrSubcell(a gr_subcell):
-        expect_live(ctr, a.partof);
-        check(!isLocationStatic(ref_cell(gr, a.name)->location));
-        create(h, ctr, a.name);
-        return NoFail(Terminal);
-
-      case &GrLive(a gr_live):
-        create(h, ctr, a.cell);
-        return NoFail(Terminal);
-
-      case &GrAssertLive(a gr_assert_live):
-        expect_live(ctr, a.cell);
-        return NoFail(Terminal);
-
-      case &GrDead(a gr_dead):
-        deaden(ctr, a.cell);
-        return NoFail(Terminal);
-
-      case &GrVirtualDead(a gr_virtual_dead):
-        deaden(ctr, a.cell);
-        return NoFail(Terminal);
-
-      case &GrActiveXop(a gr_active_xop):
-        gr_track_active_op(ctr, a.op1);
-        gr_track_active_op(ctr, a.op2);
-        return NoFail(Terminal);
-
-      case &GrManyActiveXop(a gr_many_active_xop):
-        nops size = count(&a.ops);
-        for i size = 0; i < nops; i = i + 1 {
-          gr_track_active_op(ctr, get(&a.ops, i));
-        }
-        return NoFail(Terminal);
-      }
-
+      return dumbly_analyze_xnode(h, gr, ctr, gn, gnc, &xn);
     case &QOp(qn gr_qnode):
       switch &qn.op {
       case &GrBranch(a gr_branch):
