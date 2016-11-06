@@ -39,10 +39,10 @@ func ensure_def_inst_valtracked(clq *clqueue, ent_id def_entry_id, inst_id def_i
 }
 
 func vt_regraphed(clq *clqueue, fg *frame_regraphed) np {
-  return vt_graph(clq, &fg->gr, fg->gn);
+  return vt_graph(clq, &fg->gr, fg->sn);
 }
 
-func vt_graph(clq *clqueue, gr *frame_graph, gn gr_num) np {
+func vt_graph(clq *clqueue, gr *frame_graph, sn sq_num) np {
   // DBG(_u8!"valtracking for graph ", lookup(clq->im, gr->informal_name));
   /* This uses a different traversal algorithm than some other graph-traversing code.
   Metadata that tells us about the AST's structure make us revisit alternate branches more
@@ -52,7 +52,7 @@ func vt_graph(clq *clqueue, gr *frame_graph, gn gr_num) np {
 
   track vt_track = mk_track(gr);
 
-  #vt_inner_expr({clq, gr, &track}, ~gn);
+  #vt_inner_expr({clq, gr, &track}, sn);
   return NoFail;
 }
 

@@ -259,7 +259,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
                 push(&gr->ops, adjust_op_for_inline(op_addend, &cell_mapping, get(&eg.graph.gr.ops, j)));
               }
 
-              base_op_adjusted gr_num = ~(eg.graph.gn.x + op_addend);
+              base_op_adjusted gr_num = ~(eg.graph.sn.x.x + op_addend);
 
               // Now we overwrite the apply op.  A GrApply always needs the return cell to
               // be live before it's called.  So we add GrAssertLive to verify that's the

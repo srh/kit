@@ -132,7 +132,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
     gr_activate(&ctr, get(&g->argcells, i));
   }
 
-  mut genexpr_result = #dumbly_analyze_expression(&h, &g->graph.gr, &ctr, g->graph.gn);
+  mut genexpr_result = #dumbly_analyze_expression(&h, &g->graph.gr, &ctr, g->graph.sn.x);
 
   switch &mut {
   case &Terminal:
@@ -148,7 +148,7 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
 
   #dumbly_layout_frame_cells(g, &h);
 
-  dumbly_gen_machine_code(f, &h, g->graph.gn);
+  dumbly_gen_machine_code(f, &h, g->graph.sn);
 
   return NoFail;
 }
@@ -605,10 +605,10 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
   return NoFail;
 }
 
-func dumbly_gen_machine_code(f *objfile, h *frame, entry_gn gr_num) void {
+func dumbly_gen_machine_code(f *objfile, h *frame, entry_sn sq_num) void {
   dumbly_gen_function_intro(f, h);
   bodyaft jmp_targetnum = frame_create_target(h);
-  dumbly_gen_function_body(f, h, entry_gn, bodyaft);
+  dumbly_gen_function_body(f, h, entry_sn, bodyaft);
   frame_define_target(h, bodyaft, secsize(&f->text));
   dumbly_gen_function_exit(f, h);
 }
@@ -705,9 +705,9 @@ struct dumbgen_stackent {
   jmp_necessary bool;
 }
 
-func dumbly_gen_function_body(f *objfile, h *frame, entry_gn gr_num, bodyaft jmp_targetnum) void {
+func dumbly_gen_function_body(f *objfile, h *frame, entry_sn sq_num, bodyaft jmp_targetnum) void {
   stack array[dumbgen_stackent];
-  push(&stack, @[dumbgen_stackent]{entry_gn, bodyaft, false});
+  push(&stack, @[dumbgen_stackent]{entry_sn.x, bodyaft, false});
   while case Has(se dumbgen_stackent) = popval(&stack) {
     gn gr_num = se.gn;
     annot *gn_annot = ref_annot(h, gn);

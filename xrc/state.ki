@@ -513,7 +513,7 @@ enum def_inst_rhs {
 
 struct frame_regraphed {
   gr frame_graph;
-  gn gr_num;
+  sn sq_num;
   // This cell is something that ought to be verifiable by looking at fg and finding which
   // rigid/flex cells aren't "dead" -- there should just be one: this one.  For a
   // top-level-expr it's the value the expr produces, and for a fullbody it's the return
