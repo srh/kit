@@ -492,6 +492,16 @@ inline func ref_qnode(gr *frame_graph, sn sq_num) *gr_qnode {
   }
 }
 
+inline func ref_xnode(gr *frame_graph, gn gr_num) *gr_xnode {
+  switch ref_node(gr, gn) {
+  case &XOp(xn gr_xnode):
+    return &xn;
+  case &QOp(qn gr_qnode):
+    ice(_u8("ref_xnode sees a qop."));
+    return fake();
+  }
+}
+
 enum gr_active_op {
   // A legit value, used when we have less than two ops in gr_active_xop.
   Nothing void;
