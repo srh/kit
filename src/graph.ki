@@ -280,12 +280,7 @@ func add(bu *sq_builder, op gr_xop) void {
 }
 
 func incr_indegree(gr *frame_graph, sn sq_num) void {
-  switch ref_node(gr, sn.x) {
-  case &XOp(xn gr_xnode):
-    ice(_u8!"incr_indegree sees XOp");
-  case &QOp(qn gr_qnode):
-    qn.indegree.x++;
-  }
+  ref_qnode(gr, sn)->indegree.x++;
 }
 
 func incr_indegree_for_adding_qop(gr *frame_graph, op *gr_qop) void {
@@ -316,18 +311,8 @@ func addq(gs gr_statep, op gr_qop) sq_num {
   return addq(gs.gr, partof(gs), op);
 }
 
-func access_qnode(gr *frame_graph, ix sq_num) *gr_qnode {
-  switch ref_node(gr, ix.x) {
-  case &XOp(xn gr_xnode):
-    ice(_u8("ref_qnop sees XOp"));
-    return fake();
-  case &QOp(qn gr_qnode):
-    return &qn;
-  }
-}
-
 func access_qnop(gr *frame_graph, ix sq_num) *gr_qnode {
-  qn *gr_qnode = access_qnode(gr, ix);
+  qn *gr_qnode = ref_qnode(gr, ix);
   if case &GrQNop = &qn->op {
     return qn;
   } else {
@@ -337,7 +322,7 @@ func access_qnop(gr *frame_graph, ix sq_num) *gr_qnode {
 }
 
 func help_mut_qnop_node(gr *frame_graph, ix sq_num, newop gr_qop) void {
-  qn *gr_qnode = access_qnode(gr, ix);
+  qn *gr_qnode = ref_qnode(gr, ix);
   incr_indegree_for_adding_qop(gr, &newop);
   qn->op = newop;
 }
@@ -358,7 +343,7 @@ func begin_segment(bu *sq_builder) segmarker {
   beg sq_num = nopq(bu->gr, garbage_seg());
   end sq_num = nopq(bu->gr, EndSeg(beg));
 
-  qn *gr_qnode = access_qnode(bu->gr, beg);
+  qn *gr_qnode = ref_qnode(bu->gr, beg);
   osn opt[sq_num] = bu->curseg->osn;
   qn->seginfo = BeginSeg({osn, end});
   append(bu, JmpForward, beg, beg);
@@ -493,6 +478,16 @@ inline func ref_cell(gr *frame_graph, c cell_num) *cell_info {
 
 inline func ref_node(gr *frame_graph, gn gr_num) *gr_node {
   return ref(&gr->ops, gn.x);
+}
+
+inline func ref_qnode(gr *frame_graph, sn sq_num) *gr_qnode {
+  switch ref_node(gr, sn.x) {
+  case &XOp(xn gr_xnode):
+    ice(_u8("ref_qnode sees an xop."));
+    return fake();
+  case &QOp(qn gr_qnode):
+    return &qn;
+  }
 }
 
 enum gr_active_op {
