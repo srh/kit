@@ -152,15 +152,14 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
        {None, None, None, false, None, NoConstDisp, mk_array@[cell_num](), mk_array@[cell_num]()});
 
   for i size = bas->gns_analyzed; i < n_ops; i = i + 1 {
-    if case &QOp(qn gr_qnode) = ref(&gr->ops, i) {
-      switch &qn.op {
-      case &GrBranch(a gr_branch):
-        mark_cell_value_used(bas, a.src);
-      case &GrSequence(a gr_sequence):
-        help_basic_analyze_xnode(cs, bas, gr, ~i, &a.first);
-      default:
-        void;
-      }
+    qn *gr_qnode = ref(&gr->ops, i);
+    switch &qn->op {
+    case &GrBranch(a gr_branch):
+      mark_cell_value_used(bas, a.src);
+    case &GrSequence(a gr_sequence):
+      help_basic_analyze_xnode(cs, bas, gr, ~i, &a.first);
+    default:
+      void;
     }
   }
   bas->gns_analyzed = n_ops;
@@ -300,7 +299,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
           // We set it to QNop first, then use jmp_qnop_node, to reuse
           // indegree-updating logic.  seqer gets its indegree incremented from 0 to
           // 1.
-          *ref(&gr->ops, sn.x) = QOp({GrQNop, @[gr_qnode_indegree]{0}, garbage_seg()});
+          *ref(&gr->ops, sn.x) = {GrQNop, @[gr_qnode_indegree]{0}, garbage_seg()};
           jmp_qnop_node(gr, sn, seqer, JmpForward);
 
           // And since there's no apply op, we update the arg/funcell cell_disps.
@@ -420,9 +419,8 @@ func adjust_xop_for_inline(op_addend size, cm *array[cell_num], xop *gr_xop) gr_
   }
 }
 
-func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_node {
-  switch node {
-  case QOp(qn gr_qnode):
+func adjust_op_for_inline(op_addend size, cm *array[cell_num], qn gr_qnode) gr_qnode {
+  // TODO: De-indent.
     switch &qn.op {
     case &GrBranch(a gr_branch):
       newcases array[gr_branch_pair];
@@ -437,20 +435,19 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
       } else {
         defaultcase = None;
       }
-      return QOp({GrBranch({get(cm, a.src.x), freeze(&newcases), defaultcase,
-                            @[gr_branch_info]{adjust(op_addend, a.info.disposition)}}),
-                  qn.indegree, garbage_seg()});
+      return {GrBranch({get(cm, a.src.x), freeze(&newcases), defaultcase,
+                        @[gr_branch_info]{adjust(op_addend, a.info.disposition)}}),
+              qn.indegree, garbage_seg()};
     case &GrSequence(a gr_sequence):
-      return QOp({GrSequence({{adjust_xop_for_inline(op_addend, cm, &a.first.op), a.first.vs_xopped},
-                              adjust(op_addend, a.second)}),
-                  qn.indegree, garbage_seg()});
+      return {GrSequence({{adjust_xop_for_inline(op_addend, cm, &a.first.op), a.first.vs_xopped},
+                          adjust(op_addend, a.second)}),
+              qn.indegree, garbage_seg()};
     case &GrJmp(a gr_jmp):
-      return QOp({GrJmp({adjust(op_addend, a.next), adjust_disposition_for_inline(op_addend, a.disposition)}),
-                  qn.indegree, garbage_seg()});
+      return {GrJmp({adjust(op_addend, a.next), adjust_disposition_for_inline(op_addend, a.disposition)}),
+              qn.indegree, garbage_seg()};
     case &GrQNop:
-      return QOp({GrQNop, qn.indegree, garbage_seg()});
+      return {GrQNop, qn.indegree, garbage_seg()};
     }
-  }
 }
 
 func help_adjust_params(cm *array[cell_num], params *shray[cell_num]) shray[cell_num] {

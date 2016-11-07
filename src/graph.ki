@@ -11,7 +11,7 @@ import check;
 struct frame_graph {
   informal_name sym;
   cells array[cell_info];
-  ops array[gr_node];
+  ops array[gr_qnode];
   // This was the exprscope's type scope, or something like that -- it gets initialized before we start graphing.
   scope nc[type_scope];
 }
@@ -62,10 +62,6 @@ struct cell_info {
 
 func location(info *cell_info) cell_location {
   return info->location;
-}
-
-enum gr_node {
-  QOp gr_qnode;
 }
 
 struct gr_xnode {
@@ -160,7 +156,7 @@ func init_frame_graph_from_incomplete(incomplete_graph *opt[frame_graph]) frame_
 }
 
 func init_frame_graph_empty(informal_name sym, scope nc[type_scope]) frame_graph {
-  return {informal_name, mk_array@[cell_info](), mk_array@[gr_node](), move(&scope)};
+  return {informal_name, mk_array@[cell_info](), mk_array@[gr_qnode](), move(&scope)};
 }
 
 func add_cellp(gr *frame_graph, info *cell_info) cell_num {
@@ -173,7 +169,7 @@ inline func add_cell(gr *frame_graph, info cell_info) cell_num {
   return add_cellp(gr, &info);
 }
 
-func help_add_node(gr *frame_graph, node gr_node) size {
+func help_add_node(gr *frame_graph, node gr_qnode) size {
   ret size = count(&gr->ops);
   pushref(&gr->ops, &node);
   return ret;
@@ -296,7 +292,7 @@ func incr_indegree_for_adding_qop(gr *frame_graph, op *gr_qop) void {
 
 func addq(gr *frame_graph, seginfo gr_seginfo, op gr_qop) sq_num {
   incr_indegree_for_adding_qop(gr, &op);
-  return ~help_add_node(gr, @[gr_node]QOp({op, @[gr_qnode_indegree]{0}, seginfo}));
+  return ~help_add_node(gr, @[gr_qnode]{op, @[gr_qnode_indegree]{0}, seginfo});
 }
 
 func addq(gs gr_statep, op gr_qop) sq_num {
@@ -461,10 +457,7 @@ inline func ref_cell(gr *frame_graph, c cell_num) *cell_info {
 }
 
 inline func ref_qnode(gr *frame_graph, sn sq_num) *gr_qnode {
-  switch ref(&gr->ops, sn.x) {
-  case &QOp(qn gr_qnode):
-    return &qn;
-  }
+  return ref(&gr->ops, sn.x);
 }
 
 func ref_grsequence(gr *frame_graph, sn sq_num) *gr_sequence {
