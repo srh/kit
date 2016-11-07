@@ -467,14 +467,6 @@ func mut_connect(gs gr_statep, bu *sq_builder, outflow *tracked_target, disposit
   return help_mut_connect(bu, outflow->sn, disposition);
 }
 
-// last(.) is used to identify the label target for gr_label_statement.
-func last(bu *sq_builder) sq_num {
-  return bu->last;
-}
-func front(bu *sq_builder) sq_num {
-  return bu->first;
-}
-
 func done(bu *sq_builder) ee_num {
   bu->gr = null;
   bu->ctr = null;
