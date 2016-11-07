@@ -101,7 +101,7 @@ func vt_xops(c cgt, ft *vt_freshtrack, sn sq_num) np {
       }
       return NoFail;
     case &GrSequence(a gr_sequence):
-      #vs_xop(c, a.first, ref_xnode(c.gr, a.first));
+      #vs_xop(c, ref_xnode(c.gr, a.first));
       sn = a.second;
       // loop around
     case &GrJmp(a gr_jmp):
@@ -135,7 +135,7 @@ func vt_abnormal_excursion(c cgt, ft *vt_freshtrack, sn sq_num) np {
     case &GrBranch(a gr_branch):
       ice(_u8("vt_abnormal_excursion sees a branch"));
     case &GrSequence(a gr_sequence):
-      #vs_xop(c, a.first, ref_xnode(c.gr, a.first));
+      #vs_xop(c, ref_xnode(c.gr, a.first));
       sn = a.second;
     case &GrJmp(a gr_jmp):
       switch a.disposition {

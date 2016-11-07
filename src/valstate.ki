@@ -215,7 +215,7 @@ func add_supp(hp *vs_unify_half_pairage, supp *vs_support) np {
   return NoFail;
 }
 
-func vs_xop(c cgt, gn gr_num, xn *gr_xnode) np {
+func vs_xop(c cgt, xn *gr_xnode) np {
   xn->vs_xopped = true;
   vs *vt_state = &c.track->current;
 

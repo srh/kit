@@ -534,7 +534,7 @@ func st_eval_xnode(clq *clqueue, env *st_env, fg *frame_regraphed, xn *gr_xnode)
 }
 
 func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np {
-  // A stack of gr_num's to evaluate, in order.
+  // A stack of sq_num's to evaluate, in popping order.
   stack array[sq_num];
   push(&stack, fg->ee.entry);
   while case Has(sn sq_num) = popval(&stack) {

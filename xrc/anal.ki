@@ -39,7 +39,7 @@ We should find that some restrictions are upheld:
 */
 
 struct subcell_disp {
-  subcell_opnum gr_num;
+  subcell_opnum sq_num;
   partof cell_num;
   offset gr_offset;
 }
@@ -57,7 +57,7 @@ struct cell_disp {
   prim_paramlist opt[sq_num];
   // If the cell's a funcell of a GrApply, tells what paramlist it's applying.  Or tells
   // what paramlist it used to apply, if the function got inlined.
-  funcell opt[gr_num];
+  funcell opt[sq_num];
   // If the cell's value is used, outside of a funcell.
   value_used bool;
   // If the cell's a subcell of another, tells what it's a subcell of.
@@ -91,15 +91,15 @@ func basic_analyze_fn_body(cs *checkstate, g *graphed_fn_body, bas_out *basic_an
 }
 
 func help_basic_analyze_xnode(cs *checkstate, bas *basic_analyze_state, gr *frame_graph,
-                              sn sq_num, gn gr_num, xn *gr_xnode) void {
+                              sn sq_num, xn *gr_xnode) void {
   switch &xn->op {
   case &GrApply(a gr_apply):
     push(&bas->paramlists, sn);
     funcell_cd *cell_disp = ref(&bas->celldisp, a.funcell.x);
-    if case &Has(other_gn gr_num) = &funcell_cd->funcell {
-      ice(_u8("two-timing funcell "), a.funcell.x, _u8(" for "), other_gn.x, _u8(" and "), gn.x);
+    if case &Has(other_sn sq_num) = &funcell_cd->funcell {
+      ice(_u8("two-timing funcell "), a.funcell.x, _u8(" for "), other_sn.x, _u8(" and "), sn.x);
     } else {
-      funcell_cd->funcell = Has(gn);
+      funcell_cd->funcell = Has(sn);
     }
     nparams size = count(&a.params);
     for j size = 0; j < nparams; j = j + 1 {
@@ -134,7 +134,7 @@ func help_basic_analyze_xnode(cs *checkstate, bas *basic_analyze_state, gr *fram
     mark_cell_not_const(bas, a.dest);
     mark_cell_not_const(bas, a.addressee);
   case &GrSubcell(a gr_subcell):
-    set(&ref(&bas->celldisp, a.name.x)->subcell, {gn, a.partof, a.offset});
+    set(&ref(&bas->celldisp, a.name.x)->subcell, {sn, a.partof, a.offset});
     push(&ref(&bas->celldisp, a.partof.x)->subcelled, a.name);
     check(ref(&gr->cells, a.name.x)->location == LocationVirtual);
     mark_cell_not_const(bas, a.partof);
@@ -158,7 +158,7 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
         mark_cell_value_used(bas, a.src);
       case &GrSequence(a gr_sequence):
         xn *gr_xnode = ref_xnode(gr, a.first);
-        help_basic_analyze_xnode(cs, bas, gr, ~i, a.first, xn);
+        help_basic_analyze_xnode(cs, bas, gr, ~i, xn);
       default:
         void;
       }
