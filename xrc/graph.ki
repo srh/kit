@@ -63,7 +63,6 @@ func location(info *cell_info) cell_location {
 }
 
 enum gr_node {
-  XOp gr_xnode;
   QOp gr_qnode;
 }
 
@@ -108,22 +107,6 @@ struct gr_qnode {
   // This info becomes garbage when we do inlining.
   // TODO: Might as well keep this info up-to-date.
   seginfo gr_seginfo;
-}
-
-struct gr_num { x size; }
-def `~` fn[size, gr_num] = wrapconvert;
-func `==`(x gr_num, y gr_num) bool { return x.x == y.x; }
-func `!=`(x gr_num, y gr_num) bool { return x.x != y.x; }
-func `<`(x gr_num, y gr_num) bool { return x.x < y.x; }
-inline func hash_compute_hash(n *gr_num) osize {
-  return hash_compute_hash(&n->x);
-}
-inline func hash_equal(x *gr_num, y *gr_num) bool {
-  return x->x == y->x;
-}
-
-func[H] build_u8str(help H, r *array[u8], gn *gr_num) void {
-  build_u8str(help, r, &gn->x);
 }
 
 func[H] build_u8str(help H, r *array[u8], gn *sq_num) void {
@@ -194,15 +177,15 @@ func help_add_node(gr *frame_graph, node gr_node) size {
 }
 
 // Used in dumbgen for inlining, maybe some other manipulations.
-func untracked_addx(gr *frame_graph, op gr_xop) gr_num {
-  return ~help_add_node(gr, @[gr_node]XOp({op}));
+inline func untracked_addx(gr *frame_graph, op gr_xop) gr_xnode {
+  return {op};
 }
 
-inline func addx(gs gr_statep, op gr_xop) gr_num {
+inline func addx(gs gr_statep, op gr_xop) gr_xnode {
   return addx(gs.gr, gs.ctr, op);
 }
 
-func addx(gr *frame_graph, ctr *celltrack, op gr_xop) gr_num {
+func addx(gr *frame_graph, ctr *celltrack, op gr_xop) gr_xnode {
   switch &op {
   case &GrApply(a gr_apply):
     gr_expect_live(ctr, a.retcell);
@@ -281,7 +264,7 @@ func addx(gr *frame_graph, ctr *celltrack, op gr_xop) gr_num {
 }
 
 func add(bu *sq_builder, op gr_xop) void {
-  num gr_num = addx(bu->gr, bu->ctr, op);
+  num gr_xnode = addx(bu->gr, bu->ctr, op);
   add(bu, num);
 }
 
@@ -385,17 +368,17 @@ inline func partof(gs gr_statep) gr_seginfo {
   return partof(gs.curseg);
 }
 
-func add(bu *sq_builder, gn gr_num) void {
+func add(bu *sq_builder, xn gr_xnode) void {
   gr *frame_graph = bu->gr;
   check(gr != null);
   next sq_num = nopq(gr, partof(bu->curseg));
-  help_mut_qnop_node(gr, bu->last, @[gr_qop]GrSequence({gn, next}));
+  help_mut_qnop_node(gr, bu->last, @[gr_qop]GrSequence({xn, next}));
   bu->last = next;
 }
 
-func addo(bu *sq_builder, ogn opt[gr_num]) void {
-  if case Has(gn gr_num) = ogn {
-    add(bu, gn);
+func addo(bu *sq_builder, ogn opt[gr_xnode]) void {
+  if case Has(xn gr_xnode) = ogn {
+    add(bu, xn);
   }
 }
 
@@ -419,9 +402,9 @@ func seqqgar(gr *frame_graph, gsq gr_sequence) sq_num {
   return seqq(gr, garbage_seg(), gsq);
 }
 
-func seqq(gs gr_statep, gn gr_num, outflow *tracked_target) sq_num {
+func seqq(gs gr_statep, xn gr_xnode, outflow *tracked_target) sq_num {
   note_celltrack(&outflow->note, gs.ctr);
-  return seqq(gs.gr, partof(gs), {gn, outflow->sn});
+  return seqq(gs.gr, partof(gs), {xn, outflow->sn});
 }
 
 func jmp_qnop_node(gr *frame_graph, ix sq_num, outflow sq_num, disposition gr_jmp_disposition) void {
@@ -474,27 +457,10 @@ inline func ref_cell(gr *frame_graph, c cell_num) *cell_info {
   return ref(&gr->cells, c.x);
 }
 
-inline func ref_node(gr *frame_graph, gn gr_num) *gr_node {
-  return ref(&gr->ops, gn.x);
-}
-
 inline func ref_qnode(gr *frame_graph, sn sq_num) *gr_qnode {
-  switch ref_node(gr, {sn.x}) {
-  case &XOp(xn gr_xnode):
-    ice(_u8("ref_qnode sees an xop."));
-    return fake();
+  switch ref(&gr->ops, sn.x) {
   case &QOp(qn gr_qnode):
     return &qn;
-  }
-}
-
-inline func ref_xnode(gr *frame_graph, gn gr_num) *gr_xnode {
-  switch ref_node(gr, gn) {
-  case &XOp(xn gr_xnode):
-    return &xn;
-  case &QOp(qn gr_qnode):
-    ice(_u8("ref_xnode sees a qop."));
-    return fake();
   }
 }
 
@@ -646,7 +612,7 @@ struct gr_branch {
 }
 
 struct gr_sequence {
-  first gr_num;
+  first gr_xnode;
   second sq_num;
 }
 
@@ -1259,7 +1225,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_targe
         thenseq sq_num = mut_connect_untracked(&case_bu, then_target.sn, JmpForward);
         push(&cases, {@[gr_const]ConstInt(~tag.x), {thenseq, then_target.disposition}});
       } else {
-        tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
+        tagdead gr_xnode = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
         elseseq sq_num = seqq(gs.gr, partof(gs), {tagdead, else_target.sn});
         if !saved_elsecase {
           *elsetrack_out = save_celltrack(gs.ctr);
@@ -1273,7 +1239,7 @@ func gr_condition(gs gr_statep, fb *fullbody_state, a *ast_condition, then_targe
       // this function's API doesn't have a way to tell the caller the elsecase is not
       // reachable.
       restore_celltrack(gs.ctr, &postcond_save);
-      tagdead gr_num = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
+      tagdead gr_xnode = addx(gs, @[gr_xop]GrVirtualDead({info->deconstruct.tag_cell}));
       *elsetrack_out = save_celltrack(gs.ctr);
     }
 
@@ -1333,7 +1299,6 @@ func gr_unwinding(gs gr_statep, destructions *array[var_destruction], bu *sq_bui
   n size = count(destructions);
   for i size = n; i > 0; {
     i = i - 1;
-    gn gr_num;
     switch get(destructions, i) {
     case VarSelfContainedDestruction(da destroy_action):
       gr_destroy_action(gs, &da, DeadactAfterDestroyYes, bu);
@@ -1790,7 +1755,6 @@ func gr_index_expr(gs gr_statep, x *ast_expr, a *ast_index_expr, bu *sq_builder)
       name cell_num = value_cell(x);
       flat_size u32 = ref_cell(gs.gr, name)->props.flat_size;
       add(bu, @[gr_xop]GrSubcell({name, value_cell(oo(&a->lhs)), OffsetComputed({flat_size, result_cell(oo(&a->rhs))})}));
-      gp gr_num;
       // TODO: Dedup with local_field code?
       switch &expr_complete_info(oo(&a->lhs))->lval {
       case &IsLvalYes(desc lval_description):
@@ -2025,7 +1989,6 @@ func gr_logical_conjunction(gs gr_statep, x *ast_expr, a *ast_logical_conjunctio
 
   lhs_sn sq_num = mut_connect(gs, &lhs_bu, &end_nopq, JmpForward);
 
-  cases array[tup[gr_const, gr_num]];
   short_circuit_case gr_const;
   eval_rhs_case gr_const;
   if a->is_logical_or {
@@ -2175,7 +2138,7 @@ enum deadact_after_destroy {
   DeadactAfterDestroyNo void;
 }
 
-func gr_maybe_virtualdead(gs gr_statep, c cell_num) opt[gr_num] {
+func gr_maybe_virtualdead(gs gr_statep, c cell_num) opt[gr_xnode] {
   switch location(ref_cell(gs.gr, c)) {
   case LocationVirtual:
     return Has(addx(gs, @[gr_xop]GrVirtualDead({c})));
@@ -2802,7 +2765,7 @@ func gr_magic_enum_info(clq *clqueue, wc which_ctor, mei *magic_enum_info,
     note_celltrack(&join_target.note, gs.ctr);
     push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), {join_target.sn, ForwardTarget}});
   } else {
-    ztgn gr_num = addx(gs, @[gr_xop]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))}));
+    ztgn var = addx(gs, @[gr_xop]GrWriteConst({get(&pointeecells, 0), ConstInt(bigu(0))}));
     ztseq sq_num = seqq(gs, ztgn, &join_target);
     push(&cases_gn, {@[gr_const]ConstInt(bigu(0)), {ztseq, ForwardTarget}});
   }

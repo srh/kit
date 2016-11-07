@@ -157,8 +157,7 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
       case &GrBranch(a gr_branch):
         mark_cell_value_used(bas, a.src);
       case &GrSequence(a gr_sequence):
-        xn *gr_xnode = ref_xnode(gr, a.first);
-        help_basic_analyze_xnode(cs, bas, gr, ~i, xn);
+        help_basic_analyze_xnode(cs, bas, gr, ~i, &a.first);
       default:
         void;
       }
@@ -221,18 +220,18 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
   new_paramlists array[sq_num];
   for i size = 0; i < nparamlists; i = i + 1 {
     sn sq_num = get(&bas->paramlists, i);
+    // (We avoid retaining references into arrays that we'll modify -- so we copy out the gr_sequence.)
     gsq gr_sequence = *ref_grsequence(gr, sn);
-    // (We avoid retaining references into arrays that we'll modify -- so we copy out the gr_apply.)
-    a gr_apply = *as_gr_apply(ref_xnode(gr, gsq.first));
+    a *gr_apply = as_gr_apply(&gsq.first);
     // TODO: Remove vestigial funcell (if nothing ever reads it) after inlining.  (Somehow.)
-    if case Has(fnid fn_body_id) = is_const_funcell(cs, bas, a.funcell) {
+    if case Has(fnid fn_body_id) = is_const_funcell(cs, bas, a->funcell) {
       ent *fn_body_entry = ref_fn_body(cs, fnid);
       switch &ent->u {
       case &GraphedFnBody(eg graphed_fn_body):
         switch eg.inline {
         case InlineMust:
           #basic_and_inline(cs, &eg);
-          nparams size = count(&a.params);
+          nparams size = count(&a->params);
           check(count(&eg.argcells) == nparams);
           // Okay, we're inlining.
           nec size = count(&eg.graph.gr.cells);
@@ -242,10 +241,10 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
             mapped cell_num;
             if case Has(k size) = find(&eg.argcells, ~j) {
               // TODO: Assert that the cell types in g and eg are equal?  The sizes?
-              mapped = get(&a.params, k);
+              mapped = get(&a->params, k);
             } else if eg.graph.cell == ~j {
               // TODO: Assert that the cell types in g and eg are equal?  The sizes?
-              mapped = a.retcell;
+              mapped = a->retcell;
             } else {
               egi *cell_info = ref(&eg.graph.gr.cells, j);
               mapped = add_cell(gr, {egi->location, egi->type, egi->props});
@@ -266,12 +265,12 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
           // Now we overwrite the apply op.  A GrApply always needs the return cell to
           // be live before it's called.  So we add GrAssertLive to verify that's the
           // case.
-          funcell_inactive_op gr_num =
-            untracked_addx(gr, @[gr_xop]GrActiveXop({Deactivate(a.funcell), Nothing}));
-          funcell_dead_op gr_num = untracked_addx(gr, @[gr_xop]GrDead({a.funcell}));
+          funcell_inactive_op gr_xnode =
+            untracked_addx(gr, @[gr_xop]GrActiveXop({Deactivate(a->funcell), Nothing}));
+          funcell_dead_op gr_xnode = untracked_addx(gr, @[gr_xop]GrDead({a->funcell}));
 
           post_seqer sq_num;
-          switch a.act {
+          switch a->act {
           case StandardApply:
             post_seqer = gsq.second;
           case TwoExtraOps(ops gr_active_xop):
@@ -283,18 +282,18 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
           seqer sq_num =
             seqqgar(gr, {funcell_inactive_op,
                          seqqgar(gr, {funcell_dead_op,
-                                      seqqgar(gr, {untracked_addx(gr, @[gr_xop]GrAssertLive({a.retcell})),
+                                      seqqgar(gr, {untracked_addx(gr, @[gr_xop]GrAssertLive({a->retcell})),
                                                    entry_op_adjusted})})});
 
           jmp_qnop_node(gr, exit_op_adjusted, post_seqer, JmpForward);
 
-          // Note that our GrActiveXop(a.act) above makes our active tracking correct
+          // Note that our GrActiveXop(a->act) above makes our active tracking correct
           // but it also describes another "hole" in the exception safety -- one that
           // still exists if we don't inline functions (in particular, constructors)
           // too.
 
 
-          // TODO: It'd be nice if we could undo the mark_cell_not_const of a.retcell
+          // TODO: It'd be nice if we could undo the mark_cell_not_const of a->retcell
           // (that happened when we processed GrApply in help_basic_analyze before).
 
           // We set it to QNop first, then use jmp_qnop_node, to reuse
@@ -305,9 +304,9 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
 
           // And since there's no apply op, we update the arg/funcell cell_disps.
           // Actually, we don't update the funcell disp, so that we don't allocate/write its cell needlessly.
-          // unSet(&ref(&bas->celldisp, a.funcell.x)->funcell);
+          // unSet(&ref(&bas->celldisp, a->funcell.x)->funcell);
           for j size = 0; j < nparams; j = j + 1 {
-            unSet(&ref(&bas->celldisp, get(&a.params, j).x)->paramlist);
+            unSet(&ref(&bas->celldisp, get(&a->params, j).x)->paramlist);
           }
 
           help_basic_analyze(cs, bas, gr);
@@ -335,10 +334,6 @@ func adjust_active_op_for_inline(cm *array[cell_num], op gr_active_op) gr_active
   case Deactivate(c cell_num):
     return Deactivate(get(cm, c.x));
   }
-}
-
-inline func adjust(op_addend size, gn gr_num) gr_num {
-  return ~(gn.x + op_addend);
 }
 
 inline func adjust(op_addend size, sn sq_num) sq_num {
@@ -413,8 +408,6 @@ func adjust_xop_for_inline(op_addend size, cm *array[cell_num], xop *gr_xop) gr_
 
 func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_node {
   switch node {
-  case XOp(xn gr_xnode):
-    return XOp({adjust_xop_for_inline(op_addend, cm, &xn.op)});
   case QOp(qn gr_qnode):
     switch &qn.op {
     case &GrBranch(a gr_branch):
@@ -434,7 +427,8 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
                             @[gr_branch_info]{adjust(op_addend, a.info.disposition)}}),
                   qn.indegree, garbage_seg()});
     case &GrSequence(a gr_sequence):
-      return QOp({GrSequence({adjust(op_addend, a.first), adjust(op_addend, a.second)}),
+      return QOp({GrSequence({{adjust_xop_for_inline(op_addend, cm, &a.first.op)},
+                              adjust(op_addend, a.second)}),
                   qn.indegree, garbage_seg()});
     case &GrJmp(a gr_jmp):
       return QOp({GrJmp({adjust(op_addend, a.next), adjust_disposition_for_inline(op_addend, a.disposition)}),

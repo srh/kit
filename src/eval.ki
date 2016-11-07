@@ -567,8 +567,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
       }
 
     case &GrSequence(a gr_sequence):
-      xn *gr_xnode = ref_xnode(&fg->gr, a.first);
-      #st_eval_xnode(clq, env, fg, xn);
+      #st_eval_xnode(clq, env, fg, &a.first);
       push(&stack, a.second);
 
     case &GrJmp(a gr_jmp):

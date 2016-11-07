@@ -157,8 +157,7 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
       case &GrBranch(a gr_branch):
         mark_cell_value_used(bas, a.src);
       case &GrSequence(a gr_sequence):
-        xn *gr_xnode = ref_xnode(gr, a.first);
-        help_basic_analyze_xnode(cs, bas, gr, ~i, xn);
+        help_basic_analyze_xnode(cs, bas, gr, ~i, &a.first);
       default:
         void;
       }
@@ -221,10 +220,10 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
   new_paramlists array[sq_num];
   for i size = 0; i < nparamlists; i = i + 1 {
     sn sq_num = get(&bas->paramlists, i);
+    // (We avoid retaining references into arrays that we'll modify -- so we copy out the gr_sequence.)
     gsq gr_sequence = *ref_grsequence(gr, sn);
-    // (We avoid retaining references into arrays that we'll modify -- so we copy out the gr_apply.)
-    xn gr_xnode = *ref_xnode(gr, gsq.first);
-    a *gr_apply = as_gr_apply(&xn);
+    xn *gr_xnode = &gsq.first;
+    a *gr_apply = as_gr_apply(xn);
     // TODO: Remove vestigial funcell (if nothing ever reads it) after inlining.  (Somehow.)
     if case Has(fnid fn_body_id) = is_const_funcell(cs, bas, a->funcell) {
       ent *fn_body_entry = ref_fn_body(cs, fnid);
@@ -267,9 +266,9 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
           // Now we overwrite the apply op.  A GrApply always needs the return cell to
           // be live before it's called.  So we add GrAssertLive to verify that's the
           // case.
-          funcell_inactive_op gr_num =
-            untracked_addx(gr, @[gr_xop]GrActiveXop({Deactivate(a->funcell), Nothing}), xn.vs_xopped);
-          funcell_dead_op gr_num = untracked_addx(gr, @[gr_xop]GrDead({a->funcell}), xn.vs_xopped);
+          funcell_inactive_op gr_xnode =
+            untracked_addx(gr, @[gr_xop]GrActiveXop({Deactivate(a->funcell), Nothing}), xn->vs_xopped);
+          funcell_dead_op gr_xnode = untracked_addx(gr, @[gr_xop]GrDead({a->funcell}), xn->vs_xopped);
 
           post_seqer sq_num;
           switch a->act {
@@ -277,14 +276,14 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
             post_seqer = gsq.second;
           case TwoExtraOps(ops gr_active_xop):
             post_seqer = seqqgar(gr,
-                                 {untracked_addx(gr, @[gr_xop]GrActiveXop(ops), xn.vs_xopped),
+                                 {untracked_addx(gr, @[gr_xop]GrActiveXop(ops), xn->vs_xopped),
                                   gsq.second});
           }
 
           seqer sq_num =
             seqqgar(gr, {funcell_inactive_op,
                          seqqgar(gr, {funcell_dead_op,
-                                      seqqgar(gr, {untracked_addx(gr, @[gr_xop]GrAssertLive({a->retcell}), xn.vs_xopped),
+                                      seqqgar(gr, {untracked_addx(gr, @[gr_xop]GrAssertLive({a->retcell}), xn->vs_xopped),
                                                    entry_op_adjusted})})});
 
           jmp_qnop_node(gr, exit_op_adjusted, post_seqer, JmpForward);
@@ -336,10 +335,6 @@ func adjust_active_op_for_inline(cm *array[cell_num], op gr_active_op) gr_active
   case Deactivate(c cell_num):
     return Deactivate(get(cm, c.x));
   }
-}
-
-inline func adjust(op_addend size, gn gr_num) gr_num {
-  return ~(gn.x + op_addend);
 }
 
 inline func adjust(op_addend size, sn sq_num) sq_num {
@@ -427,8 +422,6 @@ func adjust_xop_for_inline(op_addend size, cm *array[cell_num], xop *gr_xop) gr_
 
 func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_node {
   switch node {
-  case XOp(xn gr_xnode):
-    return XOp({adjust_xop_for_inline(op_addend, cm, &xn.op), xn.vs_xopped});
   case QOp(qn gr_qnode):
     switch &qn.op {
     case &GrBranch(a gr_branch):
@@ -448,7 +441,8 @@ func adjust_op_for_inline(op_addend size, cm *array[cell_num], node gr_node) gr_
                             @[gr_branch_info]{adjust(op_addend, a.info.disposition)}}),
                   qn.indegree, garbage_seg()});
     case &GrSequence(a gr_sequence):
-      return QOp({GrSequence({adjust(op_addend, a.first), adjust(op_addend, a.second)}),
+      return QOp({GrSequence({{adjust_xop_for_inline(op_addend, cm, &a.first.op), a.first.vs_xopped},
+                              adjust(op_addend, a.second)}),
                   qn.indegree, garbage_seg()});
     case &GrJmp(a gr_jmp):
       return QOp({GrJmp({adjust(op_addend, a.next), adjust_disposition_for_inline(op_addend, a.disposition)}),

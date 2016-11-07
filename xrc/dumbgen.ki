@@ -165,12 +165,12 @@ func as_gr_apply(xn *gr_xnode) *gr_apply {
 }
 
 func paramlist_cells(gr *frame_graph, sn sq_num) *shray[cell_num] {
-  xn *gr_xnode = ref_xnode(gr, ref_grsequence(gr, sn)->first);
+  xn *gr_xnode = &ref_grsequence(gr, sn)->first;
   return &as_gr_apply(xn)->params;
 }
 
 func paramlist_retcell(gr *frame_graph, sn sq_num) cell_num {
-  xn *gr_xnode = ref_xnode(gr, ref_grsequence(gr, sn)->first);
+  xn *gr_xnode = &ref_grsequence(gr, sn)->first;
   return as_gr_apply(xn)->retcell;
 }
 
@@ -452,7 +452,7 @@ func is_const_primop_int_cell(h *frame, c cell_num) opt[bigint] {
   disp *cell_disp = ref(&h->bas->celldisp, c.x);
   if case Has(sn sq_num) = disp->prim_paramlist {
     // TODO: Why don't we crash if we don't get a GrPrimApply?
-    xn *gr_xnode = ref_xnode(h->gr, ref_grsequence(h->gr, sn)->first);
+    xn *gr_xnode = &ref_grsequence(h->gr, sn)->first;
     if case &GrPrimApply(a gr_prim_apply) = &xn->op {
       if case &HasConstValue(gc gr_const) = &disp->const_value {
         switch &gc {
@@ -840,8 +840,7 @@ func dumbly_gen_function_body(f *objfile, h *frame, entry_sn sq_num, bodyaft jmp
             x86_gen_crash(f, h);
           }
         case &GrSequence(a gr_sequence):
-          xn *gr_xnode = ref_xnode(h->gr, a.first);
-          dumbly_gen_xnode(f, h, sn, xn);
+          dumbly_gen_xnode(f, h, sn, &a.first);
           push(&stack, @[dumbgen_stackent]{a.second, se.jmpaft, se.jmp_necessary});
         case &GrJmp(a gr_jmp):
           push(&stack, @[dumbgen_stackent]{a.next, se.jmpaft, se.jmp_necessary});

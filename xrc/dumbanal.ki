@@ -129,8 +129,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, sn sq_
         return NoFail(combined_mut);
 
       case &GrSequence(a gr_sequence):
-        xn *gr_xnode = ref_xnode(gr, a.first);
-        dumbly_analyze_xnode(h, gr, ctr, sn, gnc, xn);
+        dumbly_analyze_xnode(h, gr, ctr, sn, gnc, &a.first);
         sn = a.second;
         // Loop around.
 
