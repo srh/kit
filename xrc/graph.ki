@@ -286,12 +286,7 @@ func add(bu *sq_builder, op gr_xop) void {
 }
 
 func incr_indegree(gr *frame_graph, sn sq_num) void {
-  switch ref_node(gr, sn.x) {
-  case &XOp(xn gr_xnode):
-    ice(_u8!"incr_indegree sees XOp");
-  case &QOp(qn gr_qnode):
-    qn.indegree.x++;
-  }
+  ref_qnode(gr, sn)->indegree.x++;
 }
 
 func incr_indegree_for_adding_qop(gr *frame_graph, op *gr_qop) void {

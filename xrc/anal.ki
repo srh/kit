@@ -223,7 +223,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
     sn sq_num = get(&bas->paramlists, i);
     gsq gr_sequence = *ref_grsequence(gr, sn);
     // (We avoid retaining references into arrays that we'll modify -- so we copy out the gr_apply.)
-    a gr_apply = *as_gr_apply(ref_node(gr, gsq.first));
+    a gr_apply = *as_gr_apply(ref_xnode(gr, gsq.first));
     // TODO: Remove vestigial funcell (if nothing ever reads it) after inlining.  (Somehow.)
     if case Has(fnid fn_body_id) = is_const_funcell(cs, bas, a.funcell) {
       ent *fn_body_entry = ref_fn_body(cs, fnid);

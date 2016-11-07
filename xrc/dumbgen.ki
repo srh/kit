@@ -155,24 +155,23 @@ func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) 
   return NoFail;
 }
 
-func as_gr_apply(nod *gr_node) *gr_apply {
-  if case &XOp(xn gr_xnode) = nod {
-    if case &GrApply(a gr_apply) = &xn.op {
-      return &a;
-    }
+func as_gr_apply(xn *gr_xnode) *gr_apply {
+  if case &GrApply(a gr_apply) = &xn->op {
+    return &a;
+  } else {
+    ice(_u8("as_gr_apply called on non-GrApply"));
+    return fake();
   }
-  ice(_u8("as_gr_apply called on non-GrApply"));
-  return fake();
 }
 
 func paramlist_cells(gr *frame_graph, sn sq_num) *shray[cell_num] {
-  node *gr_node = ref_node(gr, ref_grsequence(gr, sn)->first);
-  return &as_gr_apply(node)->params;
+  xn *gr_xnode = ref_xnode(gr, ref_grsequence(gr, sn)->first);
+  return &as_gr_apply(xn)->params;
 }
 
 func paramlist_retcell(gr *frame_graph, sn sq_num) cell_num {
-  node *gr_node = ref_node(gr, ref_grsequence(gr, sn)->first);
-  return as_gr_apply(node)->retcell;
+  xn *gr_xnode = ref_xnode(gr, ref_grsequence(gr, sn)->first);
+  return as_gr_apply(xn)->retcell;
 }
 
 enum tmp_offsets_val {
@@ -453,17 +452,16 @@ func is_const_primop_int_cell(h *frame, c cell_num) opt[bigint] {
   disp *cell_disp = ref(&h->bas->celldisp, c.x);
   if case Has(sn sq_num) = disp->prim_paramlist {
     // TODO: Why don't we crash if we don't get a GrPrimApply?
-    if case &XOp(xn gr_xnode) = ref_node(h->gr, ref_grsequence(h->gr, sn)->first) {
-      if case &GrPrimApply(a gr_prim_apply) = &xn.op {
-        if case &HasConstValue(gc gr_const) = &disp->const_value {
-          switch &gc {
-          case &ConstInt(b bigint):
-            return Has(b);
-          // TODO: For some (all) of these other cases, we could produce a const st_value.
-          case &ConstDef(ip instpair): void;
-          case &ConstFnBody(fnid fn_body_id): void;
-          case &ConstBytes(b shray[u8]): void;
-          }
+    xn *gr_xnode = ref_xnode(h->gr, ref_grsequence(h->gr, sn)->first);
+    if case &GrPrimApply(a gr_prim_apply) = &xn->op {
+      if case &HasConstValue(gc gr_const) = &disp->const_value {
+        switch &gc {
+        case &ConstInt(b bigint):
+          return Has(b);
+        // TODO: For some (all) of these other cases, we could produce a const st_value.
+        case &ConstDef(ip instpair): void;
+        case &ConstFnBody(fnid fn_body_id): void;
+        case &ConstBytes(b shray[u8]): void;
         }
       }
     }

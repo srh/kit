@@ -101,7 +101,7 @@ func vt_xops(c cgt, ft *vt_freshtrack, sn sq_num) np {
       }
       return NoFail;
     case &GrSequence(a gr_sequence):
-      #vt_single_xop(c, a.first);
+      #vs_xop(c, a.first, ref_xnode(c.gr, a.first));
       sn = a.second;
       // loop around
     case &GrJmp(a gr_jmp):
@@ -135,7 +135,7 @@ func vt_abnormal_excursion(c cgt, ft *vt_freshtrack, sn sq_num) np {
     case &GrBranch(a gr_branch):
       ice(_u8("vt_abnormal_excursion sees a branch"));
     case &GrSequence(a gr_sequence):
-      #vt_single_xop(c, a.first);
+      #vs_xop(c, a.first, ref_xnode(c.gr, a.first));
       sn = a.second;
     case &GrJmp(a gr_jmp):
       switch a.disposition {
@@ -150,18 +150,6 @@ func vt_abnormal_excursion(c cgt, ft *vt_freshtrack, sn sq_num) np {
     case &GrQNop:
       ice(_u8("vt_abnormal_excursion sees a QNop (is it final_node?)"));
     }
-  }
-}
-
-// Returns true if we reached the end of the single xop.  If true, c.track->current means
-// something.  If false, it doesn't!
-func vt_single_xop(c cgt, gn gr_num) np {
-  switch ref_node(c.gr, gn) {
-  case &XOp(xn gr_xnode):
-    return vs_xop(c, gn, &xn);
-  case &QOp(qn gr_qnode):
-    crash(_u8("vt_single_xop sees a sub-qop-expr"));
-    return fake();
   }
 }
 
