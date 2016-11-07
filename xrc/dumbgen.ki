@@ -567,12 +567,12 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
   for i size = 0; i < nparamlists; i = i + 1 {
     sn sq_num = get(&h->bas->paramlists, i);
     // Nodes without lower_paramlists are unreachable.  So we don't need to worry about those!
-    if case &Computed(arr array[sq_num]) = &ref(&h->by_sn, sn.x.x)->lower_paramlists {
-      nlower size = count(un(&ref(&h->by_sn, sn.x.x)->lower_paramlists));
+    if case &Computed(arr array[sq_num]) = &ref(&h->by_sn, sn.x)->lower_paramlists {
+      nlower size = count(un(&ref(&h->by_sn, sn.x)->lower_paramlists));
       if nlower == 0 {
         check_insert(&zeroset, &sn, void);
       }
-      *ref(&backmap, sn.x.x) = nlower;
+      *ref(&backmap, sn.x) = nlower;
       nreachable_paramlists = nreachable_paramlists + 1;
     }
   }
@@ -590,13 +590,13 @@ func dumbly_linearize_paramlist_ordering(h *frame, paramlist_ordering_out *array
     it hash_iter[sq_num, void] = iter(&ref_annot(h, sn)->higher_paramlists);
     while case Has(p *tup[sq_num, void]) = next(&it) {
       upn sq_num = p->car;
-      bucket size = get(&backmap, upn.x.x);
+      bucket size = get(&backmap, upn.x);
       check(bucket > 0);
       nextbucket size = bucket - 1;
       if nextbucket == 0 {
         check_insert(&zeroset, &upn, void);
       }
-      *ref(&backmap, upn.x.x) = nextbucket;
+      *ref(&backmap, upn.x) = nextbucket;
     }
   }
 

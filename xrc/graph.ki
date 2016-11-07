@@ -130,17 +130,17 @@ func[H] build_u8str(help H, r *array[u8], gn *sq_num) void {
   build_u8str(help, r, &gn->x.x);
 }
 
-struct sq_num { x gr_num; }
-def `~` fn[gr_num, sq_num] = wrapconvert;
-func `==`(x sq_num, y sq_num) bool { return x.x.x == y.x.x; }
-func `!=`(x sq_num, y sq_num) bool { return x.x.x != y.x.x; }
-func `<`(x sq_num, y sq_num) bool { return x.x.x < y.x.x; }
+struct sq_num { x size; }
+def `~` fn[size, sq_num] = wrapconvert;
+func `==`(x sq_num, y sq_num) bool { return x.x == y.x; }
+func `!=`(x sq_num, y sq_num) bool { return x.x != y.x; }
+func `<`(x sq_num, y sq_num) bool { return x.x < y.x; }
 
 inline func hash_compute_hash(n *sq_num) osize {
-  return hash_compute_hash(&n->x.x);
+  return hash_compute_hash(&n->x);
 }
 inline func hash_equal(x *sq_num, y *sq_num) bool {
-  return x->x.x == y->x.x;
+  return x->x == y->x;
 }
 
 enum gr_xop {
@@ -187,15 +187,15 @@ inline func add_cell(gr *frame_graph, info cell_info) cell_num {
   return add_cellp(gr, &info);
 }
 
-func help_add_node(gr *frame_graph, node gr_node) gr_num {
-  ret gr_num = ~count(&gr->ops);
+func help_add_node(gr *frame_graph, node gr_node) size {
+  ret size = count(&gr->ops);
   pushref(&gr->ops, &node);
   return ret;
 }
 
 // Used in dumbgen for inlining, maybe some other manipulations.
 func untracked_addx(gr *frame_graph, op gr_xop) gr_num {
-  return help_add_node(gr, @[gr_node]XOp({op}));
+  return ~help_add_node(gr, @[gr_node]XOp({op}));
 }
 
 inline func addx(gs gr_statep, op gr_xop) gr_num {
@@ -479,7 +479,7 @@ inline func ref_node(gr *frame_graph, gn gr_num) *gr_node {
 }
 
 inline func ref_qnode(gr *frame_graph, sn sq_num) *gr_qnode {
-  switch ref_node(gr, sn.x) {
+  switch ref_node(gr, {sn.x}) {
   case &XOp(xn gr_xnode):
     ice(_u8("ref_qnode sees an xop."));
     return fake();

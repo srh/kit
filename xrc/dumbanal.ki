@@ -100,7 +100,7 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, sn sq_
     if case &Computed(checksum celltrack_checksum) = &gnc->plainly_live {
       // TODO: We should also check that we're part of the same sequential _family_ of exprs.
       if !matches_checksum(ctr, &checksum) {
-        return ERR(_u8("ICE: Inconsistent liveness/active state when revisiting node ("), sn.x.x,
+        return ERR(_u8("ICE: Inconsistent liveness/active state when revisiting node ("), sn.x,
                    _u8("), celltrack="), *ctr);
       }
       return NoFail(NonTerminal);
@@ -207,5 +207,5 @@ func note_conflicting(h *frame, all *array[celltrack_entry], c cell_num) void {
 }
 
 func ref_annot(h *frame, sn sq_num) *sn_annot {
-  return ref(&h->by_sn, sn.x.x);
+  return ref(&h->by_sn, sn.x);
 }

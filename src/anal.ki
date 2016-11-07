@@ -158,7 +158,7 @@ func help_basic_analyze(cs *checkstate, bas *basic_analyze_state, gr *frame_grap
         mark_cell_value_used(bas, a.src);
       case &GrSequence(a gr_sequence):
         xn *gr_xnode = ref_xnode(gr, a.first);
-        help_basic_analyze_xnode(cs, bas, gr, ~(@[gr_num]~i), a.first, xn);
+        help_basic_analyze_xnode(cs, bas, gr, ~i, a.first, xn);
       default:
         void;
       }
@@ -261,8 +261,8 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
             push(&gr->ops, adjust_op_for_inline(op_addend, &cell_mapping, get(&eg.graph.gr.ops, j)));
           }
 
-          entry_op_adjusted sq_num = {~(eg.graph.ee.entry.x.x + op_addend)};
-          exit_op_adjusted sq_num = {~(eg.graph.ee.exit.x.x + op_addend)};
+          entry_op_adjusted sq_num = {~(eg.graph.ee.entry.x + op_addend)};
+          exit_op_adjusted sq_num = {~(eg.graph.ee.exit.x + op_addend)};
 
           // Now we overwrite the apply op.  A GrApply always needs the return cell to
           // be live before it's called.  So we add GrAssertLive to verify that's the
@@ -301,7 +301,7 @@ func help_basic_inline_inlinables(cs *checkstate, bas *basic_analyze_state, g *g
           // We set it to QNop first, then use jmp_qnop_node, to reuse
           // indegree-updating logic.  seqer gets its indegree incremented from 0 to
           // 1.
-          *ref(&gr->ops, sn.x.x) = QOp({GrQNop, @[gr_qnode_indegree]{0}, garbage_seg()});
+          *ref(&gr->ops, sn.x) = QOp({GrQNop, @[gr_qnode_indegree]{0}, garbage_seg()});
           jmp_qnop_node(gr, sn, seqer, JmpForward);
 
           // And since there's no apply op, we update the arg/funcell cell_disps.
@@ -343,7 +343,7 @@ inline func adjust(op_addend size, gn gr_num) gr_num {
 }
 
 inline func adjust(op_addend size, sn sq_num) sq_num {
-  return ~ adjust(op_addend, sn.x);
+  return ~(sn.x + op_addend);
 }
 
 func adjust(op_addend size, disposition gr_branch_disposition) gr_branch_disposition {

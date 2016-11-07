@@ -61,8 +61,8 @@ func vt_inner_expr(c cgt, outer_sn sq_num) np {
   ft vt_freshtrack = {mk_array@[sq_num](), None};
   fr freshness = #vt_unify(c, &ft, outer_sn);
   while case Has(sn sq_num) = popval(&ft.fresh) {
-    if c.track->annot[sn.x.x].fr == Fresh {
-      c.track->current = *unHas(&c.track->annot[sn.x.x].savestate);
+    if c.track->annot[sn.x].fr == Fresh {
+      c.track->current = *unHas(&c.track->annot[sn.x].savestate);
       #vt_xops(c, &ft, sn);
     }
   }
@@ -82,7 +82,7 @@ func vt_xops(c cgt, ft *vt_freshtrack, sn sq_num) np {
         return NoFail;
       }
     }
-    c.track->annot[sn.x.x].fr = Stale;
+    c.track->annot[sn.x].fr = Stale;
     switch &qn->op {
     case &GrBranch(a gr_branch):
       ntargets size = branch_target_count(&a);
@@ -130,7 +130,7 @@ func vt_abnormal_excursion(c cgt, ft *vt_freshtrack, sn sq_num) np {
         return NoFail;
       }
     }
-    c.track->annot[sn.x.x].fr = Stale;
+    c.track->annot[sn.x].fr = Stale;
     switch &qn->op {
     case &GrBranch(a gr_branch):
       ice(_u8("vt_abnormal_excursion sees a branch"));
@@ -154,15 +154,15 @@ func vt_abnormal_excursion(c cgt, ft *vt_freshtrack, sn sq_num) np {
 }
 
 func vt_unify(c cgt, ft *vt_freshtrack, sn sq_num) cr[freshness] {
-  old_fr freshness = c.track->annot[sn.x.x].fr;
-  fr freshness = #unify_vt_state(&c.track->annot[sn.x.x].savestate, &c.track->current);
+  old_fr freshness = c.track->annot[sn.x].fr;
+  fr freshness = #unify_vt_state(&c.track->annot[sn.x].savestate, &c.track->current);
   switch old_fr {
   case Fresh:
     return NoFail(Fresh);
   case Stale:
     switch fr {
     case Fresh:
-      c.track->annot[sn.x.x].fr = Fresh;
+      c.track->annot[sn.x].fr = Fresh;
       push(&ft->fresh, sn);
       return NoFail(Fresh);
     case Stale:
