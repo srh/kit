@@ -109,37 +109,35 @@ func dumbly_analyze_expression(h *frame, gr *frame_graph, ctr *celltrack, sn sq_
     annotate(&gnc->plainly_live, get_checksum(ctr));
 
     qn *gr_qnode = ref_qnode(gr, sn);
-    if true {
-      switch &qn->op {
-      case &GrBranch(a gr_branch):
-        expect_live(ctr, a.src);
+    switch &qn->op {
+    case &GrBranch(a gr_branch):
+      expect_live(ctr, a.src);
 
-        end_ctr celltrack;
-        combined_mut genexpr_result = NonTerminal;
-        ntargets size = branch_target_count(&a);
-        for i size = 0; i < ntargets; i++ {
-          target *gr_branch_target = branch_target_ref(&a, i);
-          new_live celltrack = *ctr;
-          casmut genexpr_result = #dumbly_analyze_expression(h, gr, &new_live, target->sn);
-          combine_branch_mut(&new_live, &combined_mut, casmut, &end_ctr);
-        }
-
-        // Yes this is empty of it's NonTerminal -- it doesn't matter.
-        *ctr = end_ctr;
-        return NoFail(combined_mut);
-
-      case &GrSequence(a gr_sequence):
-        dumbly_analyze_xnode(h, gr, ctr, sn, gnc, &a.first);
-        sn = a.second;
-        // Loop around.
-
-      case &GrJmp(a gr_jmp):
-        sn = a.next;
-        // Loop around.
-
-      case &GrQNop:
-        return NoFail(Terminal);
+      end_ctr celltrack;
+      combined_mut genexpr_result = NonTerminal;
+      ntargets size = branch_target_count(&a);
+      for i size = 0; i < ntargets; i++ {
+        target *gr_branch_target = branch_target_ref(&a, i);
+        new_live celltrack = *ctr;
+        casmut genexpr_result = #dumbly_analyze_expression(h, gr, &new_live, target->sn);
+        combine_branch_mut(&new_live, &combined_mut, casmut, &end_ctr);
       }
+
+      // Yes this is empty of it's NonTerminal -- it doesn't matter.
+      *ctr = end_ctr;
+      return NoFail(combined_mut);
+
+    case &GrSequence(a gr_sequence):
+      dumbly_analyze_xnode(h, gr, ctr, sn, gnc, &a.first);
+      sn = a.second;
+      // Loop around.
+
+    case &GrJmp(a gr_jmp):
+      sn = a.next;
+      // Loop around.
+
+    case &GrQNop:
+      return NoFail(Terminal);
     }
   }
 }
