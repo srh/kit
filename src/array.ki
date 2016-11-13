@@ -261,20 +261,6 @@ inline func[T] append(a *array[T], b array[T]) void {
   return append(a, &b);
 }
 
-func[T] sorted_has_dups(a *array[T]) bool {
-  p *T = data(a);
-  n size = count(a);
-  for i size = 1; i < n; i = i + 1 {
-    if !(p[i - 1] < p[i]) {
-      if p[i] < p[i - 1] {
-        crash(_u8("sorted_has_dups sees non-sorted"));
-      }
-      return true;
-    }
-  }
-  return false;
-}
-
 func[T] dedup_sorted(a *array[T]) void {
   p * ^[0]T = data(a);
   n size = count(a);
@@ -293,25 +279,6 @@ func[T] dedup_sorted(a *array[T]) void {
     }
   }
   truncate(a, w);
-}
-
-func[T] sorted_intersect(a *array[T], b *array[T]) bool {
-  p *T = data(a);
-  an size = count(a);
-  q *T = data(b);
-  bn size = count(b);
-  i size = 0;
-  j size = 0;
-  while i < an && j < bn {
-    if p[i] < q[j] {
-      i = i + 1;
-    } else if p[j] < q[i] {
-      j = j + 1;
-    } else {
-      return true;
-    }
-  }
-  return false;
 }
 
 func[T] reverse(a *array[T]) array[T] {
