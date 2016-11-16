@@ -1,4 +1,4 @@
-import anal;
+import basicanal;
 import check;
 import dumbgen;
 import io;

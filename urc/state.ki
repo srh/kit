@@ -1,4 +1,4 @@
-import anal;
+import basicanal;
 import ast;
 import box;
 import deferred;
