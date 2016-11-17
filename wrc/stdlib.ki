@@ -269,7 +269,7 @@ func check(x bool) void {
 }
 
 func crash() void {
-  debugstr("ICE: no message");
+  debugstr("ICE: no message\n");
   abort();
 }
 
