@@ -361,7 +361,8 @@ struct graphed_fn_body {
   // TODO: I think this should go _outside_ graphed_fn_body.
   // How should/shouldn't we inline this?
   inline should_inline;
-  // Whether we've inlined (or begun inlining) graph.  This is used for all fn bodies -- it's about the def inlining other functions, not about stuff inlining this fn body (which is what "inline" is about) -- but it's only useful to prevent recursive inlining.
+  // Whether we've basicanalyzed/applied inlining to graph.  This is Computed if we
+  // have done so, and we use this to prevent recursive inlining.
   inline_state nbfc[basic_analyze_state];
 }
 

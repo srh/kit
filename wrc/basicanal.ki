@@ -189,7 +189,7 @@ func basic_and_inline(cs *checkstate, g *graphed_fn_body) np {
       g->inline_state = FailedComputation;
       return Printed(pm);
     }
-    g->inline_state = Computed(bas);
+    g->inline_state = Computed(move(&bas));
     return NoFail;
   case &BeganComputing:
     g->inline_state = FailedComputation;
