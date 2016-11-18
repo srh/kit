@@ -373,7 +373,7 @@ func st_eval_def(clq *clqueue, ent_id def_entry_id, inst_id def_inst_id, out **s
   }
 }
 
-func st_eval_xnode(clq *clqueue, env *st_env, fg *frame_regraphed, xn *gr_xnode) np {
+func st_eval_xnode(clq *clqueue, env *st_env, gr *frame_graph, xn *gr_xnode) np {
   switch &xn->op {
   case &GrApply(a gr_apply):
     funref st_obj_ref = cell_obj_ref(env, a.funcell, "in I");
@@ -395,7 +395,7 @@ func st_eval_xnode(clq *clqueue, env *st_env, fg *frame_regraphed, xn *gr_xnode)
       if !is_full_oref(env, param_oref) {
         ice(_u8("Function parameter cell is sub-object (offset="), param_oref.offset,
             _u8(", count="), param_oref.count,
-            _u8(", type="), to_u8str(clq->im, ref(&fg->gr.cells, c.x)->type), _u8(")"));
+            _u8(", type="), to_u8str(clq->im, ref(&gr->cells, c.x)->type), _u8(")"));
       }
       push(&paramorefs, param_oref);
       *ref(&env->framecells, c.x) = None;
@@ -416,7 +416,7 @@ func st_eval_xnode(clq *clqueue, env *st_env, fg *frame_regraphed, xn *gr_xnode)
         // TODO: Kind of code duplication with GrApply case.
         ice(_u8("Primitive op parameter cell is sub-object (offset="), param_oref.offset,
             _u8(", count="), param_oref.count,
-            _u8(", type="), to_u8str(clq->im, ref(&fg->gr.cells, c.x)->type), _u8(")"));
+            _u8(", type="), to_u8str(clq->im, ref(&gr->cells, c.x)->type), _u8(")"));
       }
       push(&paramorefs, param_oref);
       *ref(&env->framecells, c.x) = None;
@@ -457,7 +457,7 @@ func st_eval_xnode(clq *clqueue, env *st_env, fg *frame_regraphed, xn *gr_xnode)
     #obj_read(env, pointer_obj, &pointer_value);
     pointer st_pointer;
     #st_value_as_pointer(&env->plat, &pointer_value, &pointer);
-    info *cell_info = ref_cell(&fg->gr, a.name);
+    info *cell_info = ref_cell(gr, a.name);
     deref_size u32 = info->props.flat_size;
     // We add offset to pointer.offset.
     offset u32;
@@ -479,7 +479,7 @@ func st_eval_xnode(clq *clqueue, env *st_env, fg *frame_regraphed, xn *gr_xnode)
     if offset > partof_obj.count {
       return ERR(_u8("Subcell index out of range (for cell)"));
     }
-    info *cell_info = ref_cell(&fg->gr, a.name);
+    info *cell_info = ref_cell(gr, a.name);
     deref_size u32 = info->props.flat_size;
     new_offset u32 = partof_obj.offset + offset;
     if case &Has(referee_val st_value) = ref(&env->pool->objects, partof_obj.num.x) {
@@ -495,7 +495,7 @@ func st_eval_xnode(clq *clqueue, env *st_env, fg *frame_regraphed, xn *gr_xnode)
     if isHas(ref(&env->framecells, a.cell.x)) {
       return ERR(_u8("GrLive sees already-live cell "), to_u8str(a.cell.x));
     }
-    info *cell_info = ref_cell(&fg->gr, a.cell);
+    info *cell_info = ref_cell(gr, a.cell);
     if !isLocationStatic(location(info)) {
       return ERR(_u8("GrLive on non-static cell"));
     }
@@ -567,7 +567,7 @@ func st_eval_frame_regraphed(clq *clqueue, env *st_env, fg *frame_regraphed) np 
       }
 
     case &GrSequence(a gr_sequence):
-      #st_eval_xnode(clq, env, fg, &a.first);
+      #st_eval_xnode(clq, env, &fg->gr, &a.first);
       push(&stack, a.second);
 
     case &GrJmp(a gr_jmp):
