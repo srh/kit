@@ -291,13 +291,6 @@ func st_nums(env *st_env, paramorefs *array[st_obj_ref], op_arity u32, op_size u
   ret array[bigint];
   nparams size = count(&vals);
   for i size = 0; i < nparams; i = i + 1 {
-    oref st_obj_ref = get(paramorefs, i);
-    if oref.count != op_size {
-      ice(_u8("st_nums bad operand size"));
-    }
-    val st_value;
-    #obj_read(env, oref, &val);
-
     num bigint;
     switch repr {
     case Unsigned:
