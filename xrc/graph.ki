@@ -106,7 +106,7 @@ struct gr_qnode {
 }
 
 func[H] build_u8str(help H, r *array[u8], gn *sq_num) void {
-  build_u8str(help, r, &gn->x.x);
+  build_u8str(help, r, &gn->x);
 }
 
 struct sq_num { x size; }
