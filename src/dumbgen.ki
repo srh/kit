@@ -451,7 +451,6 @@ func is_static_subcell(h *frame, c cell_num) opt[tup[cell_num, u32]] {
 func is_const_primop_int_cell(h *frame, c cell_num) opt[bigint] {
   disp *cell_disp = ref(&h->bas->celldisp, c.x);
   if case Has(sn sq_num) = disp->prim_paramlist {
-    // TODO: Why don't we crash if we don't get a GrPrimApply?
     xn *gr_xnode = &ref_grsequence(h->gr, sn)->first;
     if case &GrPrimApply(a gr_prim_apply) = &xn->op {
       if case &HasConstValue(gc gr_const) = &disp->const_value {
@@ -464,6 +463,8 @@ func is_const_primop_int_cell(h *frame, c cell_num) opt[bigint] {
         case &ConstBytes(b shray[u8]): void;
         }
       }
+    } else {
+      ice(_u8("non-GrPrimApply op for prim_paramlist cell"));
     }
   }
   return None;
