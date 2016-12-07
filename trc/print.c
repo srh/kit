@@ -63,7 +63,7 @@ void sprint_typeexpr(struct databuf *b, struct identmap *im, struct ast_typeexpr
   } break;
   case AST_TYPEEXPR_APP: {
     sprint_ident(b, im, &a->u.app.name);
-    sprint_type_param_list(b, im, a->u.app.params, a->u.app.params_count);
+    sprint_type_param_list(b, im, a->u.app.params.ptr, a->u.app.params.count);
   } break;
   case AST_TYPEEXPR_STRUCTE: {
     databuf_append_c_str(b, "struct");

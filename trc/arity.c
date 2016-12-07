@@ -17,7 +17,7 @@ struct generics_arity param_list_arity(size_t arity) {
 }
 
 struct generics_arity params_arity(struct ast_generics *a) {
-  return make_arity(a->has_type_params ? a->params_count : ARITY_NO_PARAMLIST);
+  return make_arity(a->has_type_params ? a->params.count : ARITY_NO_PARAMLIST);
 }
 
 int arity_no_paramlist(struct generics_arity arity) {

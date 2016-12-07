@@ -6,7 +6,7 @@
 #include "arith.h"
 #include "util.h"
 
-/* Generates a slice type and utility func declarations. */
+/* Generates a "slice" type (growable array) and utility func declarations. */
 #define GEN_SLICE_HDR(name, typ) \
   struct name##_slice { \
     typ *ptr; \
@@ -57,8 +57,77 @@
 
 #define SLICE_INITIALIZER {NULL, 0, 0}
 
-GEN_SLICE_HDR(int8, int8_t);
-GEN_SLICE_HDR(uint8, uint8_t);
+/* Generates non-growable "array" type and utility func declarations. */
+#define GEN_ARRAY_HDR(name, typ) \
+  struct name##_array { \
+    typ *ptr; \
+    size_t count; \
+    size_t limit; \
+  }; \
+  struct name##_array name##_array_make(typ *ptr, size_t count); \
+  struct name##_array name##_array_malloc(size_t count); \
+  void name##_array_init_copy(struct name##_array *a, \
+                              struct name##_array *c, \
+                              void (*copier)(typ *, typ *)); \
+  void name##_array_init_copy_prim(struct name##_array *a, \
+                                   struct name##_array *c); \
+  void name##_array_destroy(struct name##_array *arr, void (*destructor)(typ *)); \
+  void name##_array_destroy_prim(struct name##_array *arr); \
+  typedef int GEN_ARRAY_HDR_##name##_force_semicolon
+
+/* Generates utility func implementations for a corresponding GEN_ARRAY_HDR. */
+#define GEN_ARRAY_IMPL(name, typ) \
+  struct name##_array name##_array_make(typ *ptr, size_t count) { \
+    struct name##_array ret; \
+    ret.ptr = ptr; \
+    ret.count = count; \
+    return ret; \
+  } \
+  struct name##_array name##_array_malloc(size_t count) { \
+    return name##_array_make(malloc_mul(sizeof(typ), count), count);  \
+  } \
+  void name##_array_init_copy(struct name##_array *a, \
+                              struct name##_array *c, \
+                              void (*copier)(typ *, typ *)) { \
+    SLICE_INIT_COPY(a->ptr, a->count, c->ptr, c->count, copier); \
+  } \
+  void name##_array_init_copy_prim(struct name##_array *a, \
+                                   struct name##_array *c) { \
+    SLICE_INIT_COPY_PRIM(a->ptr, a->count, c->ptr, c->count); \
+  } \
+  void name##_array_destroy(struct name##_array *arr, void (*destructor)(typ *)) { \
+    SLICE_FREE(arr->ptr, arr->count, destructor); \
+  } \
+  void name##_array_destroy_prim(struct name##_array *arr) { \
+    free(arr->ptr); \
+    arr->ptr = NULL; \
+    arr->count = 0; \
+  } \
+  typedef int GEN_ARRAY_IMPL_##name##_force_semicolon
+
+/* For types for which we use both slices, define both with a conversion. */
+#define GEN_SLICE_AND_ARRAY_HDR(name, typ) \
+  GEN_SLICE_HDR(name, typ); \
+  GEN_ARRAY_HDR(name, typ); \
+  struct name##_array name##_array_from_slice(struct name##_slice *slice); \
+  typedef int GEN_SLICE_AND_ARRAY_HDR_##name##_force_semicolon
+
+#define GEN_SLICE_AND_ARRAY_IMPL(name, typ) \
+  GEN_SLICE_IMPL(name, typ); \
+  GEN_ARRAY_IMPL(name, typ); \
+  struct name##_array name##_array_from_slice(struct name##_slice *slice) { \
+    struct name##_array ret = name##_array_make(slice->ptr, slice->count); \
+    slice->ptr = NULL; \
+    slice->count = 0; \
+    slice->limit = 0; \
+    return ret; \
+  } \
+  typedef int GEN_SLICE_AND_ARRAY_IMPL_##name##_force_semicolon
+
+
+GEN_SLICE_AND_ARRAY_HDR(int8, int8_t);
+GEN_SLICE_AND_ARRAY_HDR(uint8, uint8_t);
+
 
 #define SLICE_FREE(ptr, count, destructor) do { \
     for (size_t SLICE_FREE_i = (count); SLICE_FREE_i-- > 0; ) { \

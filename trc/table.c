@@ -323,7 +323,7 @@ void name_table_destroy(struct name_table *t) {
 int generics_has_arity(struct ast_generics *generics,
                        struct generics_arity arity) {
   return generics->has_type_params
-    ? generics->params_count == arity.value
+    ? generics->params.count == arity.value
     : arity_no_paramlist(arity);
 }
 
@@ -638,13 +638,13 @@ int combine_partial_types(struct identmap *im,
   } break;
   case AST_TYPEEXPR_APP: {
     if (a->u.app.name.value != b->u.app.name.value
-        || a->u.app.params_count != b->u.app.params_count) {
+        || a->u.app.params.count != b->u.app.params.count) {
       return 0;
     }
-    size_t params_count = a->u.app.params_count;
+    size_t params_count = a->u.app.params.count;
     struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
     for (size_t i = 0; i < params_count; i++) {
-      if (!combine_partial_types(im, &a->u.app.params[i], &b->u.app.params[i],
+      if (!combine_partial_types(im, &a->u.app.params.ptr[i], &b->u.app.params.ptr[i],
                                  &params[i])) {
         SLICE_FREE(params, i, ast_typeexpr_destroy);
         return 0;
@@ -653,7 +653,7 @@ int combine_partial_types(struct identmap *im,
     out->tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
                      make_ast_ident(a->u.app.name.value),
-                     params, params_count);
+                     ast_typeexpr_array_make(params, params_count));
     return 1;
   } break;
   case AST_TYPEEXPR_STRUCTE: {
@@ -778,13 +778,13 @@ int learn_materializations(struct identmap *im,
     return type->u.name.value == partial_type->u.name.value;
   case AST_TYPEEXPR_APP: {
     if (type->u.app.name.value != partial_type->u.app.name.value
-        || type->u.app.params_count != partial_type->u.app.params_count) {
+        || type->u.app.params.count != partial_type->u.app.params.count) {
       return 0;
     }
-    for (size_t i = 0, e = type->u.app.params_count; i < e; i++) {
+    for (size_t i = 0, e = type->u.app.params.count; i < e; i++) {
       if (!learn_materializations(im, g, materialized,
-                                  &type->u.app.params[i],
-                                  &partial_type->u.app.params[i])) {
+                                  &type->u.app.params.ptr[i],
+                                  &partial_type->u.app.params.ptr[i])) {
         return 0;
       }
     }
@@ -835,8 +835,8 @@ int is_complete(struct ast_typeexpr *type) {
   case AST_TYPEEXPR_NAME:
     return 1;
   case AST_TYPEEXPR_APP: {
-    for (size_t i = 0, e = type->u.app.params_count; i < e; i++) {
-      if (!is_complete(&type->u.app.params[i])) {
+    for (size_t i = 0, e = type->u.app.params.count; i < e; i++) {
+      if (!is_complete(&type->u.app.params.ptr[i])) {
         return 0;
       }
     }
@@ -869,7 +869,7 @@ enum match_result unify_with_parameterized_type(
     struct ast_typeexpr *concrete_type_out) {
   enum match_result fail_ret;
   CHECK(g->has_type_params);
-  size_t materialized_count = g->params_count;
+  size_t materialized_count = g->params.count;
   struct ast_typeexpr *materialized = malloc_mul(sizeof(*materialized),
                                                  materialized_count);
   for (size_t i = 0; i < materialized_count; i++) {
@@ -921,7 +921,7 @@ struct def_instantiation *def_entry_insert_instantiation(
     size_t materialized_count,
     struct ast_typeexpr *concrete_type) {
   CHECK(materialized_count == (ent->generics.has_type_params ?
-                               ent->generics.params_count : 0));
+                               ent->generics.params.count : 0));
   for (size_t i = 0, e = ent->instantiations.count; i < e; i++) {
     struct def_instantiation *inst = ent->instantiations.ptr[i];
     if (typelists_equal(im, inst->substitutions, inst->substitutions_count,
@@ -972,7 +972,7 @@ enum match_result def_entry_matches(
   }
 
   if (generics_or_null) {
-    if (ent->generics.params_count != generics_count) {
+    if (ent->generics.params.count != generics_count) {
       return MATCH_NONE;
     }
 

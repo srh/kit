@@ -31,7 +31,7 @@ void ast_ident_init(struct ast_ident *a, struct ast_meta meta,
 void ast_ident_init_copy(struct ast_ident *a, struct ast_ident *c);
 void ast_ident_destroy(struct ast_ident *a);
 
-GEN_SLICE_HDR(ast_ident, struct ast_ident);
+GEN_SLICE_AND_ARRAY_HDR(ast_ident, struct ast_ident);
 
 enum ast_numeric_literal_tag {
   AST_NUMERIC_LITERAL_DEC,
@@ -41,15 +41,13 @@ enum ast_numeric_literal_tag {
 struct ast_numeric_literal {
   struct ast_meta meta;
   enum ast_numeric_literal_tag tag;
-  int8_t *digits;
-  size_t digits_count;
+  struct int8_array digits;
 };
 
 void ast_numeric_literal_init(struct ast_numeric_literal *a,
                               struct ast_meta meta,
                               enum ast_numeric_literal_tag tag,
-                              int8_t *digits,
-                              size_t digits_count);
+                              struct int8_array digits);
 void ast_numeric_literal_init_copy(struct ast_numeric_literal *a,
                                    struct ast_numeric_literal *c);
 void ast_numeric_literal_destroy(struct ast_numeric_literal *a);
@@ -97,39 +95,39 @@ void ast_char_literal_init_copy(struct ast_char_literal *a,
 
 struct ast_string_literal {
   struct ast_meta meta;
-  uint8_t *values;
-  size_t values_count;
+  struct uint8_array values;
 };
 
 void ast_string_literal_init(struct ast_string_literal *a,
                              struct ast_meta meta,
-                             uint8_t *values, size_t values_count);
+                             struct uint8_array values);
 void ast_string_literal_init_copy(struct ast_string_literal *a,
                                   struct ast_string_literal *c);
+
+GEN_SLICE_AND_ARRAY_HDR(ast_exprcall, struct ast_exprcall);
 
 struct ast_funcall {
   struct ast_meta meta;
   struct ast_exprcall *func;
-  struct ast_exprcall *args;
-  size_t args_count;
+  struct ast_exprcall_array args;
 };
 
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
                       struct ast_exprcall func,
-                      struct ast_exprcall *args, size_t args_count);
+                      struct ast_exprcall_array args);
 
 struct ast_typeexpr;
+GEN_SLICE_AND_ARRAY_HDR(ast_typeexpr, struct ast_typeexpr);
 
 struct ast_typeapp {
   struct ast_meta meta;
   struct ast_ident name;
-  struct ast_typeexpr *params;
-  size_t params_count;
+  struct ast_typeexpr_array params;
 };
 
 void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
-                      struct ast_ident name, struct ast_typeexpr *params,
-                      size_t params_count);
+                      struct ast_ident name,
+                      struct ast_typeexpr_array params);
 
 struct ast_structe {
   struct ast_meta meta;
@@ -198,8 +196,6 @@ struct ast_meta *ast_typeexpr_meta(struct ast_typeexpr *a);
 
 struct ast_typeexpr ast_unknown_garbage(void);
 struct ast_typeexpr ast_numeric_garbage(void);
-
-GEN_SLICE_HDR(ast_typeexpr, struct ast_typeexpr);
 
 struct ast_var_info {
   int info_valid;
@@ -613,8 +609,7 @@ struct ast_name_expr {
   struct ast_ident ident;
 
   int has_params;
-  struct ast_typeexpr *params;
-  size_t params_count;
+  struct ast_typeexpr_array params;
 };
 
 void ast_name_expr_init(struct ast_name_expr *a,
@@ -622,8 +617,7 @@ void ast_name_expr_init(struct ast_name_expr *a,
 void ast_name_expr_init_with_params(struct ast_name_expr *a,
                                     struct ast_meta meta,
                                     struct ast_ident ident,
-                                    struct ast_typeexpr *params,
-                                    size_t params_count);
+                                    struct ast_typeexpr_array params);
 void ast_name_expr_init_copy(struct ast_name_expr *a,
                              struct ast_name_expr *c);
 void ast_name_expr_destroy(struct ast_name_expr *a);
@@ -831,20 +825,16 @@ void ast_exprcall_alloc_move(struct ast_exprcall a,
 void ast_exprcall_alloc_init_copy(struct ast_exprcall *c,
                                   struct ast_exprcall **out);
 
-GEN_SLICE_HDR(ast_exprcall, struct ast_exprcall);
-
 struct ast_generics {
   int has_type_params;  /* 0 or 1 -- meta & params is uninitialized if 0. */
   struct ast_meta meta;
-  struct ast_ident *params;
-  size_t params_count;
+  struct ast_ident_array params;
 };
 
 void ast_generics_init_no_params(struct ast_generics *a);
 void ast_generics_init_has_params(struct ast_generics *a,
                                   struct ast_meta meta,
-                                  struct ast_ident *params,
-                                  size_t params_count);
+                                  struct ast_ident_array params);
 void ast_generics_init_copy(struct ast_generics *a,
                             struct ast_generics *c);
 

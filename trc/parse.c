@@ -1457,7 +1457,7 @@ enum tri triparse_numeric_literal(struct ps *p, struct ast_numeric_literal *out)
   }
 
   ast_numeric_literal_init(out, ast_meta_make(pos_start, ps_pos(p)),
-                           tag, digits.ptr, digits.count);
+                           tag, int8_array_from_slice(&digits));
   ps_count_leaf(p);
   return TRI_SUCCESS;
 
@@ -1469,8 +1469,7 @@ enum tri triparse_numeric_literal(struct ps *p, struct ast_numeric_literal *out)
 }
 
 int parse_rest_of_arglist(struct ps *p,
-                          struct ast_exprcall **args_out,
-                          size_t *args_count_out) {
+                          struct ast_exprcall_array *args_out) {
   struct ast_exprcall_slice args = SLICE_INITIALIZER;
 
   for (;;) {
@@ -1478,8 +1477,7 @@ int parse_rest_of_arglist(struct ps *p,
       goto fail;
     }
     if (try_skip_char(p, ')')) {
-      *args_out = args.ptr;
-      *args_count_out = args.count;
+      *args_out = ast_exprcall_array_from_slice(&args);
       return 1;
     }
     if (args.count != 0) {
@@ -1515,13 +1513,13 @@ void build_nonmagic_unop_expr(struct ast_meta meta,
   ast_expr_partial_init(&func, AST_EXPR_NAME, ast_expr_info_default());
   ast_name_expr_init(&func.u.name, unop_name);
 
-  struct ast_exprcall *args = malloc_mul(sizeof(*args), 1);
-  ast_exprcall_init(&args[0], rhs);
+  struct ast_exprcall_array args = ast_exprcall_array_malloc(1);
+  ast_exprcall_init(&args.ptr[0], rhs);
 
   ast_expr_partial_init(out, AST_EXPR_FUNCALL, ast_expr_info_default());
 
   ast_funcall_init(&out->u.funcall, meta,
-                   ast_exprcall_make(func), args, 1);
+                   ast_exprcall_make(func), args);
 }
 
 void build_unop_expr(struct ast_meta meta,
@@ -1554,13 +1552,13 @@ void build_binop_expr(struct ast_meta meta,
     ast_expr_partial_init(&func, AST_EXPR_NAME, ast_expr_info_default());
     ast_name_expr_init(&func.u.name, binop_name);
 
-    struct ast_exprcall *args = malloc_mul(sizeof(*args), 2);
-    ast_exprcall_init(&args[0], old_lhs);
-    ast_exprcall_init(&args[1], rhs);
+    struct ast_exprcall_array args = ast_exprcall_array_malloc(2);
+    ast_exprcall_init(&args.ptr[0], old_lhs);
+    ast_exprcall_init(&args.ptr[1], rhs);
 
     ast_expr_partial_init(out, AST_EXPR_FUNCALL, ast_expr_info_default());
     ast_funcall_init(&out->u.funcall, meta,
-                     ast_exprcall_make(func), args, 2);
+                     ast_exprcall_make(func), args);
   }
 }
 
@@ -1689,7 +1687,7 @@ int parse_rest_of_string_literal(struct ps *p, struct pos pos_start,
   }
 
   ast_string_literal_init(out, ast_meta_make(pos_start, pos_end),
-                          values.ptr, values.count);
+                          uint8_array_from_slice(&values));
   return 1;
 }
 
@@ -1730,8 +1728,8 @@ int parse_rest_of_strinit(struct ps *p, struct pos pos_start,
   return 0;
 }
 
-int parse_rest_of_type_param_list(struct ps *p, enum allow_blanks allow_blanks, struct ast_typeexpr **params_out,
-                                  size_t *params_count_out);
+int parse_rest_of_type_param_list(struct ps *p, enum allow_blanks allow_blanks,
+                                  struct ast_typeexpr_array *params_out);
 
 int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
   struct pos pos_start = ps_pos(p);
@@ -1827,15 +1825,14 @@ int parse_atomic_expr(struct ps *p, struct ast_expr *out) {
       return 1;
     }
 
-    struct ast_typeexpr *params;
-    size_t params_count;
+    struct ast_typeexpr_array params;
     if (!(try_skip_char(p, '[')
-          && parse_rest_of_type_param_list(p, ALLOW_BLANKS_NO, &params, &params_count))) {
+          && parse_rest_of_type_param_list(p, ALLOW_BLANKS_NO, &params))) {
       goto fail_ident;
     }
 
     ast_name_expr_init_with_params(&out->u.name, ast_meta_make(pos_start, ps_pos(p)),
-                                   ident, params, params_count);
+                                   ident, params);
     return 1;
 
   fail_ident:
@@ -1914,9 +1911,8 @@ int parse_after_atomic(struct ps *p, struct pos pos_start, struct ast_expr lhs,
     struct pos pos_fieldname = ps_pos(p);
     if (try_skip_char(p, '(')) {
       PARSE_DBG("parse_expr saw paren\n");
-      struct ast_exprcall *args;
-      size_t args_count;
-      if (!parse_rest_of_arglist(p, &args, &args_count)) {
+      struct ast_exprcall_array args;
+      if (!parse_rest_of_arglist(p, &args)) {
         goto fail;
       }
       struct ast_expr old_lhs = lhs;
@@ -1924,8 +1920,7 @@ int parse_after_atomic(struct ps *p, struct pos pos_start, struct ast_expr lhs,
       ast_funcall_init(&lhs.u.funcall,
                        ast_meta_make(pos_start, ps_pos(p)),
                        ast_exprcall_make(old_lhs),
-                       args,
-                       args_count);
+                       args);
     } else if (try_skip_char(p, '[')) {
       PARSE_DBG("parse_expr saw bracket\n");
       struct ast_expr arg;
@@ -2125,12 +2120,12 @@ int parse_rest_of_pointer(struct ps *p, struct ast_meta star_operator_meta,
   struct ast_ident star_name;
   ast_ident_init(&star_name, star_operator_meta, p->ptr_ident);
 
-  struct ast_typeexpr *params = malloc_mul(sizeof(*params), 1);
-  params[0] = param;
+  struct ast_typeexpr_array params = ast_typeexpr_array_malloc(1);
+  params.ptr[0] = param;
 
   out->tag = AST_TYPEEXPR_APP;
   ast_typeapp_init(&out->u.app, ast_meta_make(pos_start, param_pos_end),
-                   star_name, params, 1);
+                   star_name, params);
   *pos_end_out = param_pos_end;
   return 1;
 
@@ -2141,8 +2136,7 @@ int parse_rest_of_pointer(struct ps *p, struct ast_meta star_operator_meta,
 
 int parse_rest_of_type_param_list(struct ps *p,
                                   enum allow_blanks allow_blanks,
-                                  struct ast_typeexpr **params_out,
-                                  size_t *params_count_out) {
+                                  struct ast_typeexpr_array *params_out) {
   struct ast_typeexpr_slice params = SLICE_INITIALIZER;
 
   for (;;) {
@@ -2150,8 +2144,7 @@ int parse_rest_of_type_param_list(struct ps *p,
       goto fail;
     }
     if (try_skip_char(p, ']')) {
-      *params_out = params.ptr;
-      *params_count_out = params.count;
+      *params_out = ast_typeexpr_array_from_slice(&params);
       return 1;
     }
 
@@ -2192,9 +2185,8 @@ int continue_ident_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
     return 1;
   }
 
-  struct ast_typeexpr *params = NULL;
-  size_t params_count = 0;
-  if (!parse_rest_of_type_param_list(p, allow_blanks, &params, &params_count)) {
+  struct ast_typeexpr_array params;
+  if (!parse_rest_of_type_param_list(p, allow_blanks, &params)) {
     goto fail_ident;
   }
 
@@ -2202,7 +2194,7 @@ int continue_ident_typeexpr(struct ps *p, enum allow_blanks allow_blanks,
   *pos_end_out = pos_end;
   out->tag = AST_TYPEEXPR_APP;
   ast_typeapp_init(&out->u.app, ast_meta_make(name.meta.pos_start, pos_end),
-                   name, params, params_count);
+                   name, params);
   return 1;
  fail_ident:
   ast_ident_destroy(&name);
@@ -2280,7 +2272,7 @@ int parse_type_params_if_present(struct ps *p,
     if (try_skip_char(p, ']')) {
       ast_generics_init_has_params(out,
                                    ast_meta_make(pos_start, ps_pos(p)),
-                                   params.ptr, params.count);
+                                   ast_ident_array_from_slice(&params));
       return 1;
     }
 

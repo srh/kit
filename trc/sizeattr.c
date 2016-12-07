@@ -130,11 +130,11 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
   case AST_TYPEEXPR_APP: {
     struct deftype_entry *ent;
     if (!name_table_lookup_deftype(nt, type->u.app.name.value,
-                                   param_list_arity(type->u.app.params_count),
+                                   param_list_arity(type->u.app.params.count),
                                    &ent)) {
       CRASH("Type app name should be found, it was not.");
     }
-    CHECK(ent->arity.value == type->u.app.params_count);
+    CHECK(ent->arity.value == type->u.app.params.count);
     if (ent->is_primitive) {
       CHECK(fieldstop == IDENT_VALUE_INVALID);
       *offsetof_out = 0;
@@ -145,11 +145,11 @@ void help_sizealignof(struct name_table *nt, struct ast_typeexpr *type,
     } else {
       struct ast_deftype *deftype = ent->deftype;
       CHECK(deftype->generics.has_type_params
-            && deftype->generics.params_count == type->u.app.params_count);
+            && deftype->generics.params.count == type->u.app.params.count);
       struct ast_deftype_rhs substituted;
       do_replace_rhs_generics(&deftype->generics,
-                              type->u.app.params,
-                              type->u.app.params_count,
+                              type->u.app.params.ptr,
+                              type->u.app.params.count,
                               &deftype->rhs,
                               &substituted);
       help_rhs_sizealignof(nt, &substituted, fieldstop,

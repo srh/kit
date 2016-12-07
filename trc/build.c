@@ -3631,7 +3631,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
   size_t args_count;
   struct ast_typeexpr *return_type;
   expose_func_type_parts(&cs->cm, func_type, &args, &args_count, &return_type);
-  CHECK(args_count == a->u.funcall.args_count);
+  CHECK(args_count == a->u.funcall.args.count);
 
   struct funcall_arglist_info arglist_info;
   get_funcall_arglist_info(cs, return_type, args, args_count, &arglist_info);
@@ -3666,7 +3666,7 @@ int gen_funcall_expr(struct checkstate *cs, struct objfile *f,
     temporary in arg_loc. */
     /* (Right now, EXPR_RETURN_DEMANDED is known to work this way only
     when it encounters another funcall.) */
-    struct ast_expr *arg = &a->u.funcall.args[i].expr;
+    struct ast_expr *arg = &a->u.funcall.args.ptr[i].expr;
     struct expr_return arg_er = demand_expr_return(arg_loc);
     if (!gen_expr(cs, f, h, arg, &arg_er)) {
       ret = 0;
@@ -4414,9 +4414,9 @@ int gen_strinit_expr(struct checkstate *cs, struct objfile *f,
 int gen_string_literal(struct checkstate *cs, struct objfile *f,
                        struct frame *h, struct ast_expr *a,
                        struct expr_return *er) {
-  uint32_t size = size_to_uint32(a->u.string_literal.values_count);
+  uint32_t size = size_to_uint32(a->u.string_literal.values.count);
   struct sti symbol_table_index
-    = add_data_string(cs, f, a->u.string_literal.values, size);
+    = add_data_string(cs, f, a->u.string_literal.values.ptr, size);
 
   struct loc loc = global_loc(size, size, symbol_table_index);
   expr_return_set(cs, f, h, er, loc, ast_expr_type(a), temp_none());

@@ -330,13 +330,13 @@ void checkstate_import_primitive_types(struct checkstate *cs) {
 void init_func_type(struct ast_typeexpr *a, struct common_idents *cm,
                     ident_value *args, size_t args_count) {
   a->tag = AST_TYPEEXPR_APP;
-  struct ast_typeexpr *params = malloc_mul(sizeof(*params), args_count);
+  struct ast_typeexpr_array params = ast_typeexpr_array_malloc(args_count);
   for (size_t i = 0; i < args_count; i++) {
-    params[i].tag = AST_TYPEEXPR_NAME;
-    params[i].u.name = make_ast_ident(args[i]);
+    params.ptr[i].tag = AST_TYPEEXPR_NAME;
+    params.ptr[i].u.name = make_ast_ident(args[i]);
   }
   ast_typeapp_init(&a->u.app, ast_meta_make_garbage(),
-                   make_ast_ident(cm->func), params, args_count);
+                   make_ast_ident(cm->func), params);
 }
 
 void init_name_type(struct ast_typeexpr *a, ident_value name) {
@@ -351,10 +351,10 @@ void expose_func_type_parts(struct common_idents *cm,
                             struct ast_typeexpr **return_type_out) {
   CHECK(func->tag == AST_TYPEEXPR_APP);
   CHECK(func->u.app.name.value == cm->func);
-  *args_out = func->u.app.params;
-  size_t args_count = size_sub(func->u.app.params_count, 1);
+  *args_out = func->u.app.params.ptr;
+  size_t args_count = size_sub(func->u.app.params.count, 1);
   *args_count_out = args_count;
-  *return_type_out = &func->u.app.params[args_count];
+  *return_type_out = &func->u.app.params.ptr[args_count];
 }
 
 struct ast_typeexpr *expose_func_return_type(struct common_idents *cm,
@@ -592,11 +592,11 @@ void import_unop(struct checkstate *cs,
 }
 
 struct ast_generics one_param_generics(struct checkstate *cs, const char *name) {
-  struct ast_ident *param = malloc_mul(sizeof(*param), 1);
-  param[0] = make_ast_ident(identmap_intern_c_str(cs->im, name));
+  struct ast_ident_array param = ast_ident_array_malloc(1);
+  param.ptr[0] = make_ast_ident(identmap_intern_c_str(cs->im, name));
 
   struct ast_generics generics;
-  ast_generics_init_has_params(&generics, ast_meta_make_garbage(), param, 1);
+  ast_generics_init_has_params(&generics, ast_meta_make_garbage(), param);
   return generics;
 }
 
@@ -628,16 +628,16 @@ void import_sizeof_alignof(struct checkstate *cs) {
 void make_ptr_func_type(struct checkstate *cs, struct ast_typeexpr *target, size_t count,
                         const char *return_type_name, struct ast_typeexpr *out) {
   size_t params_count = size_add(count, 1);
-  struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
+  struct ast_typeexpr_array params = ast_typeexpr_array_malloc(params_count);
   for (size_t i = 0; i < count; i++) {
-    wrap_in_ptr(&cs->cm, target, &params[i]);
+    wrap_in_ptr(&cs->cm, target, &params.ptr[i]);
   }
 
-  init_name_type(&params[count], identmap_intern_c_str(cs->im, return_type_name));
+  init_name_type(&params.ptr[count], identmap_intern_c_str(cs->im, return_type_name));
 
   out->tag = AST_TYPEEXPR_APP;
   ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
-                   make_ast_ident(cs->cm.func), params, params_count);
+                   make_ast_ident(cs->cm.func), params);
 }
 
 void import_ptr_binops(struct checkstate *cs) {
@@ -665,9 +665,9 @@ void import_constructors(struct checkstate *cs) {
   ident_value t_ident = identmap_intern_c_str(cs->im, "T");
   struct ast_generics generics;
   {
-    struct ast_ident *param = malloc_mul(sizeof(*param), 1);
-    param[0] = make_ast_ident(t_ident);
-    ast_generics_init_has_params(&generics, ast_meta_make_garbage(), param, 1);
+    struct ast_ident_array param = ast_ident_array_malloc(1);
+    param.ptr[0] = make_ast_ident(t_ident);
+    ast_generics_init_has_params(&generics, ast_meta_make_garbage(), param);
   }
 
   struct ast_typeexpr target;
@@ -837,13 +837,13 @@ void copy_make_unary_func_type(struct checkstate *cs,
                                struct ast_typeexpr *arg_type,
                                struct ast_typeexpr *return_type,
                                struct ast_typeexpr *out) {
-  struct ast_typeexpr *params = malloc_mul(sizeof(*params), 2);
-  ast_typeexpr_init_copy(&params[0], arg_type);
-  ast_typeexpr_init_copy(&params[1], return_type);
+  struct ast_typeexpr_array params = ast_typeexpr_array_malloc(2);
+  ast_typeexpr_init_copy(&params.ptr[0], arg_type);
+  ast_typeexpr_init_copy(&params.ptr[1], return_type);
 
   out->tag = AST_TYPEEXPR_APP;
   ast_typeapp_init(&out->u.app, ast_meta_make_garbage(), make_ast_ident(cs->cm.func),
-                   params, 2);
+                   params);
 }
 
 int add_enum_constructors(struct checkstate *cs,
@@ -867,29 +867,29 @@ int add_enum_constructors(struct checkstate *cs,
       }
     }
 
-    struct ast_typeexpr *params = malloc_mul(sizeof(*params), 2);
-    ast_typeexpr_init_copy(&params[0], &f->type);
+    struct ast_typeexpr_array params = ast_typeexpr_array_malloc(2);
+    ast_typeexpr_init_copy(&params.ptr[0], &f->type);
 
     if (!generics->has_type_params) {
-      params[1].tag = AST_TYPEEXPR_NAME;
-      ast_ident_init_copy(&params[1].u.name, name);
+      params.ptr[1].tag = AST_TYPEEXPR_NAME;
+      ast_ident_init_copy(&params.ptr[1].u.name, name);
     } else {
-      struct ast_typeexpr *app_params = malloc_mul(sizeof(*app_params), generics->params_count);
-      for (size_t j = 0, je = generics->params_count; j < je; j++) {
-        app_params[j].tag = AST_TYPEEXPR_NAME;
-        ast_ident_init_copy(&app_params[j].u.name, &generics->params[j]);
+      struct ast_typeexpr_array app_params = ast_typeexpr_array_malloc(generics->params.count);
+      for (size_t j = 0, je = generics->params.count; j < je; j++) {
+        app_params.ptr[j].tag = AST_TYPEEXPR_NAME;
+        ast_ident_init_copy(&app_params.ptr[j].u.name, &generics->params.ptr[j]);
       }
       struct ast_ident name_copy;
       ast_ident_init_copy(&name_copy, name);
-      params[1].tag = AST_TYPEEXPR_APP;
-      ast_typeapp_init(&params[1].u.app, ast_meta_make_garbage(),
-                       name_copy, app_params, generics->params_count);
+      params.ptr[1].tag = AST_TYPEEXPR_APP;
+      ast_typeapp_init(&params.ptr[1].u.app, ast_meta_make_garbage(),
+                       name_copy, app_params);
     }
 
     struct ast_typeexpr func_type;
     func_type.tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&func_type.u.app, ast_meta_make_garbage(),
-                     make_ast_ident(cs->cm.func), params, 2);
+                     make_ast_ident(cs->cm.func), params);
 
     if (!name_table_add_primitive_def(
             cs->im,
@@ -909,7 +909,7 @@ int add_enum_constructors(struct checkstate *cs,
               f->name.value,
               make_enumvoid_op(i),
               generics,
-              &func_type.u.app.params[1])) {
+              &func_type.u.app.params.ptr[1])) {
         ast_typeexpr_destroy(&func_type);
         return 0;
       }
@@ -927,15 +927,15 @@ int make_complete_lambda_typeexpr(struct common_idents *cm, struct ast_expr *a, 
     struct ast_lambda *lam = &a->u.lambda;
 
     size_t args_count = size_add(lam->params_count, 1);
-    struct ast_typeexpr *args = malloc_mul(sizeof(*args), args_count);
+    struct ast_typeexpr_array args = ast_typeexpr_array_malloc(args_count);
     for (size_t i = 0, e = lam->params_count; i < e; i++) {
-      ast_typeexpr_init_copy(&args[i], &lam->params[i].type);
+      ast_typeexpr_init_copy(&args.ptr[i], &lam->params[i].type);
     }
-    ast_typeexpr_init_copy(&args[lam->params_count], &lam->return_type);
+    ast_typeexpr_init_copy(&args.ptr[lam->params_count], &lam->return_type);
 
     out->tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&out->u.app, ast_meta_make_garbage(),
-                     make_ast_ident(cm->func), args, args_count);
+                     make_ast_ident(cm->func), args);
     return 1;
   } break;
   default:
@@ -1091,8 +1091,8 @@ int generics_lookup_name(struct ast_generics *a,
   if (!a->has_type_params) {
     return 0;
   }
-  for (size_t i = 0, e = a->params_count; i < e; i++) {
-    if (a->params[i].value == name) {
+  for (size_t i = 0, e = a->params.count; i < e; i++) {
+    if (a->params.ptr[i].value == name) {
       *index_out = i;
       return 1;
     }
@@ -1143,10 +1143,10 @@ int check_typeexpr_app(struct checkstate *cs,
   CHECK_DBG("check_typeexpr_app\n");
   struct deftype_entry *ent;
   if (!name_table_lookup_deftype(&cs->nt, a->name.value,
-                                 param_list_arity(a->params_count),
+                                 param_list_arity(a->params.count),
                                  &ent)) {
     METERR(cs, a->meta, "Type lookup fail for %.*s, arity %"PRIz"\n",
-           IM_P(cs->im, a->name.value), a->params_count);
+           IM_P(cs->im, a->name.value), a->params.count);
     return 0;
   }
 
@@ -1156,9 +1156,9 @@ int check_typeexpr_app(struct checkstate *cs,
     }
   }
 
-  for (size_t i = 0, e = a->params_count; i < e; i++) {
+  for (size_t i = 0, e = a->params.count; i < e; i++) {
     int f = deftype_entry_param_is_flatly_held(ent, i);
-    if (!check_typeexpr(cs, generics, &a->params[i],
+    if (!check_typeexpr(cs, generics, &a->params.ptr[i],
                         f ? flat_typeexpr : NULL)) {
       return 0;
     }
@@ -1282,18 +1282,18 @@ void make_pointee_func_lookup_type(struct checkstate *cs,
                                    size_t count,
                                    struct ast_typeexpr *out) {
   size_t params_count = size_add(count, 1);
-  struct ast_typeexpr *params = malloc_mul(sizeof(*params), params_count);
+  struct ast_typeexpr_array params = ast_typeexpr_array_malloc(params_count);
   for (size_t i = 0; i < count; i++) {
-    wrap_in_ptr(&cs->cm, a, &params[i]);
+    wrap_in_ptr(&cs->cm, a, &params.ptr[i]);
   }
   /* Unknown return type -- we'll match anything named
   "copy"/"move"/"destroy" with any return type. */
-  params[count] = ast_unknown_garbage();
+  params.ptr[count] = ast_unknown_garbage();
 
   struct ast_ident func_name = make_ast_ident(cs->cm.func);
 
   out->tag = AST_TYPEEXPR_APP;
-  ast_typeapp_init(&out->u.app, ast_meta_make_garbage(), func_name, params, params_count);
+  ast_typeapp_init(&out->u.app, ast_meta_make_garbage(), func_name, params);
 }
 
 /* Returns false if multiple matching definitions. */
@@ -1571,8 +1571,8 @@ int check_typeexpr_app_traits(struct checkstate *cs,
   struct deftype_entry *ent;
   struct deftype_instantiation *inst;
   if (!name_table_lookup_deftype_inst(cs->im, &cs->nt, a->u.app.name.value,
-                                      a->u.app.params,
-                                      a->u.app.params_count,
+                                      a->u.app.params.ptr,
+                                      a->u.app.params.count,
                                       &ent, &inst)) {
     METERR(cs, *ast_typeexpr_meta(a), "An invalid generic type '%.*s'\n",
            IM_P(cs->im, a->u.app.name.value));
@@ -1604,12 +1604,12 @@ int check_typeexpr_app_traits(struct checkstate *cs,
     struct ast_deftype *deftype = ent->deftype;
 
     CHECK(deftype->generics.has_type_params
-          && deftype->generics.params_count == a->u.app.params_count);
+          && deftype->generics.params.count == a->u.app.params.count);
 
     struct ast_deftype_rhs concrete_deftype_rhs;
     do_replace_rhs_generics(&deftype->generics,
-                            a->u.app.params,
-                            a->u.app.params_count,
+                            a->u.app.params.ptr,
+                            a->u.app.params.count,
                             &deftype->rhs,
                             &concrete_deftype_rhs);
 
@@ -1781,10 +1781,10 @@ int check_generics_shadowing(struct checkstate *cs,
     return 1;
   }
 
-  for (size_t i = 0, e = a->params_count; i < e; i++) {
-    ident_value name = a->params[i].value;
+  for (size_t i = 0, e = a->params.count; i < e; i++) {
+    ident_value name = a->params.ptr[i].value;
     for (size_t j = 0; j < i; j++) {
-      if (name == a->params[j].value) {
+      if (name == a->params.ptr[j].value) {
         METERR(cs, a->meta, "duplicate param names %.*s within same generics list.\n",
                IM_P(cs->im, name));
         return 0;
@@ -1897,7 +1897,7 @@ void exprscope_init(struct exprscope *es,
                     size_t accessible_count,
                     enum static_computation computation,
                     struct def_entry *entry_or_null) {
-  CHECK(generics->params_count == (generics->has_type_params ?
+  CHECK(generics->params.count == (generics->has_type_params ?
                                    generics_substitutions_count : 0));
   es->cs = cs;
   es->generics = generics;
@@ -2027,11 +2027,11 @@ int help_unify_directionally(struct identmap *im,
     struct ast_typeapp *p_app = &partial_type->u.app;
     struct ast_typeapp *c_app = &complete_type->u.app;
     if (p_app->name.value != c_app->name.value
-        || p_app->params_count != c_app->params_count) {
+        || p_app->params.count != c_app->params.count) {
       return 0;
     }
-    for (size_t i = 0, e = p_app->params_count; i < e; i++) {
-      if (!help_unify_directionally(im, exact, &p_app->params[i], &c_app->params[i])) {
+    for (size_t i = 0, e = p_app->params.count; i < e; i++) {
+      if (!help_unify_directionally(im, exact, &p_app->params.ptr[i], &c_app->params.ptr[i])) {
         return 0;
       }
     }
@@ -2121,8 +2121,8 @@ int lookup_global_maybe_typecheck(
       cs,
       &cs->nt,
       &name->ident,
-      name->has_params ? name->params : NULL,
-      name->has_params ? name->params_count : 0,
+      name->has_params ? name->params.ptr : NULL,
+      name->has_params ? name->params.count : 0,
       partial_type,
       report_mode,
       &unified,
@@ -2163,10 +2163,10 @@ int lookup_global_maybe_typecheck(
         || name->ident.value == cs->cm.destroy
         || name->ident.value == cs->cm.init) {
       CHECK(unified.tag == AST_TYPEEXPR_APP
-            && (unified.u.app.params_count == 2
-                || unified.u.app.params_count == 3));
+            && (unified.u.app.params.count == 2
+                || unified.u.app.params.count == 3));
       struct ast_typeexpr *optype;
-      if (!view_ptr_target(&cs->cm, &unified.u.app.params[0], &optype)) {
+      if (!view_ptr_target(&cs->cm, &unified.u.app.params.ptr[0], &optype)) {
         CRASH("Expected copy/move/init/destroy lookup to match pointer type.\n");
       }
 
@@ -2317,7 +2317,7 @@ void do_replace_generics(struct ast_generics *generics,
                          struct ast_typeexpr *a,
                          struct ast_typeexpr *out) {
   CHECK(generics->has_type_params);
-  CHECK(generics->params_count == generics_substitutions_count);
+  CHECK(generics->params.count == generics_substitutions_count);
   switch (a->tag) {
   case AST_TYPEEXPR_NAME: {
     size_t which_generic;
@@ -2329,14 +2329,13 @@ void do_replace_generics(struct ast_generics *generics,
   } break;
   case AST_TYPEEXPR_APP: {
     struct ast_typeapp *app = &a->u.app;
-    size_t params_count = app->params_count;
-    struct ast_typeexpr *params = malloc_mul(sizeof(*params),
-                                             params_count);
+    size_t params_count = app->params.count;
+    struct ast_typeexpr_array params = ast_typeexpr_array_malloc(params_count);
 
     for (size_t i = 0, e = params_count; i < e; i++) {
       do_replace_generics(generics, generics_substitutions,
                           generics_substitutions_count,
-                          &app->params[i], &params[i]);
+                          &app->params.ptr[i], &params.ptr[i]);
     }
 
     struct ast_ident name;
@@ -2344,7 +2343,7 @@ void do_replace_generics(struct ast_generics *generics,
 
     out->tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&out->u.app, ast_meta_make_copy(&a->u.app.meta),
-                     name, params, params_count);
+                     name, params);
   } break;
   case AST_TYPEEXPR_STRUCTE: {
     struct ast_vardecl *fields;
@@ -2409,7 +2408,7 @@ void do_replace_enumspec_generics(struct ast_generics *generics,
                                   struct ast_enumspec *a,
                                   struct ast_enumspec *out) {
   CHECK(generics->has_type_params);
-  CHECK(generics->params_count == generics_substitutions_count);
+  CHECK(generics->params.count == generics_substitutions_count);
   struct ast_vardecl *enumfields;
   size_t enumfields_count;
   do_replace_generics_in_fields(generics, generics_substitutions,
@@ -2535,10 +2534,10 @@ int check_funcall_args_secondcheck(struct exprscope *es,
                                    struct ast_exprcall *args,
                                    size_t args_count) {
   CHECK(typeexpr_is_func_type(es->cs->im, func_type));
-  CHECK(func_type->u.app.params_count == size_add(args_count, 1));
+  CHECK(func_type->u.app.params.count == size_add(args_count, 1));
 
   for (size_t i = 0; i < args_count; i++) {
-    if (!check_expr(es, &args[i].expr, &func_type->u.app.params[i])) {
+    if (!check_expr(es, &args[i].expr, &func_type->u.app.params.ptr[i])) {
       return 0;
     }
   }
@@ -2555,18 +2554,17 @@ int check_funcall_funcexpr_ai(struct exprscope *es,
   struct ast_typeexpr funcexpr;
   {
     size_t args_types_count = size_add(args_count, 1);
-    struct ast_typeexpr *args_types = malloc_mul(sizeof(*args_types),
-                                                 args_types_count);
+    struct ast_typeexpr_array args_types = ast_typeexpr_array_malloc(args_types_count);
 
     for (size_t i = 0; i < args_count; i++) {
-      ast_typeexpr_init_copy(&args_types[i], ast_expr_partial_type(&args[i].expr));
+      ast_typeexpr_init_copy(&args_types.ptr[i], ast_expr_partial_type(&args[i].expr));
     }
-    ast_typeexpr_init_copy(&args_types[args_count], partial_type);
+    ast_typeexpr_init_copy(&args_types.ptr[args_count], partial_type);
 
     funcexpr.tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
                      make_ast_ident(es->cs->cm.func),
-                     args_types, args_types_count);
+                     args_types);
   }
 
   int ret = check_expr_ai(es, ai, &func->expr, &funcexpr);
@@ -2579,15 +2577,15 @@ int check_expr_funcall(struct exprscope *es,
                        struct ast_expr *y,
                        struct ast_typeexpr *partial_type) {
   struct ast_funcall *x = &y->u.funcall;
-  size_t args_count = x->args_count;
+  size_t args_count = x->args.count;
   int an_arg_incomplete;
-  if (!check_funcall_args_firstcheck(es, x->args, args_count, &an_arg_incomplete)) {
+  if (!check_funcall_args_firstcheck(es, x->args.ptr, args_count, &an_arg_incomplete)) {
     goto fail;
   }
 
   if (!check_funcall_funcexpr_ai(
           es, an_arg_incomplete ? ALLOW_INCOMPLETE_NO : ai,
-          x->args, args_count, partial_type, x->func)) {
+          x->args.ptr, args_count, partial_type, x->func)) {
     goto fail;
   }
 
@@ -2599,18 +2597,18 @@ int check_expr_funcall(struct exprscope *es,
 
   if (an_arg_incomplete) {
     struct ast_typeexpr *func_type = ast_expr_type(&x->func->expr);
-    if (!check_funcall_args_secondcheck(es, func_type, x->args, args_count)) {
+    if (!check_funcall_args_secondcheck(es, func_type, x->args.ptr, args_count)) {
       goto fail;
     }
   }
 
   for (size_t i = 0; i < args_count; i++) {
     struct ast_exprcatch arg_exprcatch;
-    if (!compute_and_check_exprcatch(es, &x->args[i].expr, &arg_exprcatch)) {
+    if (!compute_and_check_exprcatch(es, &x->args.ptr[i].expr, &arg_exprcatch)) {
       goto fail;
     }
 
-    ast_exprcall_annotate(&x->args[i], arg_exprcatch);
+    ast_exprcall_annotate(&x->args.ptr[i], arg_exprcatch);
   }
 
   struct ast_exprcatch func_exprcatch;
@@ -2726,7 +2724,7 @@ int is_enum_type(struct checkstate *cs,
   case AST_TYPEEXPR_APP: {
     struct deftype_entry *ent;
     if (!name_table_lookup_deftype(&cs->nt, concrete_type->u.app.name.value,
-                                   param_list_arity(concrete_type->u.app.params_count),
+                                   param_list_arity(concrete_type->u.app.params.count),
                                    &ent)) {
       return 0;
     }
@@ -2742,8 +2740,8 @@ int is_enum_type(struct checkstate *cs,
       return 0;
     case AST_DEFTYPE_RHS_ENUMSPEC: {
       do_replace_enumspec_generics(&deftype->generics,
-                                   concrete_type->u.app.params,
-                                   concrete_type->u.app.params_count,
+                                   concrete_type->u.app.params.ptr,
+                                   concrete_type->u.app.params.count,
                                    &deftype->rhs.u.enumspec,
                                    concrete_enumspec_out);
       return 1;
@@ -3412,7 +3410,8 @@ int check_expr_lambda(struct exprscope *es,
 
     funcexpr.tag = AST_TYPEEXPR_APP;
     ast_typeapp_init(&funcexpr.u.app, ast_meta_make_garbage(),
-                     make_ast_ident(es->cs->cm.func), args, args_count);
+                     make_ast_ident(es->cs->cm.func),
+                     ast_typeexpr_array_make(args, args_count));
   }
 
   if (!unify_directionally(es->cs->im, partial_type, &funcexpr)) {
@@ -3428,7 +3427,7 @@ int check_expr_lambda(struct exprscope *es,
 
   for (size_t i = 0; i < func_params_count; i++) {
     struct ast_typeexpr type;
-    ast_typeexpr_init_copy(&type, &funcexpr.u.app.params[i]);
+    ast_typeexpr_init_copy(&type, &funcexpr.u.app.params.ptr[i]);
     struct ast_ident name_copy;
     ast_ident_init_copy(&name_copy, &x->params[i].name);
     ast_vardecl_init(&replaced_vardecls[i],
@@ -3456,7 +3455,7 @@ int check_expr_lambda(struct exprscope *es,
   if (!check_expr_funcbody(
           &bb_es,
           &x->body,
-          &funcexpr.u.app.params[size_sub(funcexpr.u.app.params_count, 1)],
+          &funcexpr.u.app.params.ptr[size_sub(funcexpr.u.app.params.count, 1)],
           &computed_return_type)) {
     CHECK_DBG("check_expr_funcbody fails\n");
     goto fail_bb_es;
@@ -3468,7 +3467,7 @@ int check_expr_lambda(struct exprscope *es,
 
   for (size_t i = 0, e = x->params_count; i < e; i++) {
     struct ast_typeexpr concrete_param_type;
-    ast_typeexpr_init_copy(&concrete_param_type, &funcexpr.u.app.params[i]);
+    ast_typeexpr_init_copy(&concrete_param_type, &funcexpr.u.app.params.ptr[i]);
     ast_var_info_specify(&x->params[i].var_info, concrete_param_type);
   }
 
@@ -3585,11 +3584,11 @@ int view_ptr_target(struct common_idents *cm,
     return 0;
   }
 
-  if (ptr_type->u.app.params_count != 1) {
+  if (ptr_type->u.app.params.count != 1) {
     return 0;
   }
 
-  *target_out = &ptr_type->u.app.params[0];
+  *target_out = &ptr_type->u.app.params.ptr[0];
   return 1;
 }
 
@@ -3600,7 +3599,7 @@ void wrap_in_ptr(struct common_idents *cm,
   struct ast_typeexpr *params = malloc_mul(sizeof(*params), 1);
   ast_typeexpr_init_copy(&params[0], target);
   ast_typeapp_init(&ptr_out->u.app, ast_meta_make_garbage(),
-                   make_ast_ident(cm->ptr), params, 1);
+                   make_ast_ident(cm->ptr), ast_typeexpr_array_make(params, 1));
 }
 
 int check_expr_magic_unop(struct exprscope *es,
@@ -3740,7 +3739,7 @@ int lookup_field_type(struct exprscope *es,
   case AST_TYPEEXPR_APP: {
     struct deftype_entry *ent;
     if (!name_table_lookup_deftype(&es->cs->nt, type->u.app.name.value,
-                                   param_list_arity(type->u.app.params_count),
+                                   param_list_arity(type->u.app.params.count),
                                    &ent)) {
       CRASH("lookup_field_type sees an invalid generic type.");
     }
@@ -3751,7 +3750,7 @@ int lookup_field_type(struct exprscope *es,
 
     struct ast_deftype *deftype = ent->deftype;
     CHECK(deftype->generics.has_type_params
-          && deftype->generics.params_count == type->u.app.params_count);
+          && deftype->generics.params.count == type->u.app.params.count);
     if (!deftype_is_accessible(es, deftype)) {
       METERR(es->cs, fieldname->meta, "Looking up field on inaccessible type '%.*s'.",
              IM_P(es->cs->im, type->u.app.name.value));
@@ -3762,8 +3761,8 @@ int lookup_field_type(struct exprscope *es,
     case AST_DEFTYPE_RHS_TYPE: {
       struct ast_typeexpr concrete_deftype_type;
       do_replace_generics(&deftype->generics,
-                          type->u.app.params,
-                          type->u.app.params_count,
+                          type->u.app.params.ptr,
+                          type->u.app.params.count,
                           &deftype->rhs.u.type,
                           &concrete_deftype_type);
 
@@ -4022,7 +4021,7 @@ int chase_struct_field_types(struct checkstate *cs,
   case AST_TYPEEXPR_APP: {
     struct deftype_entry *ent;
     if (!name_table_lookup_deftype(&cs->nt, type->u.app.name.value,
-                                   param_list_arity(type->u.app.params_count),
+                                   param_list_arity(type->u.app.params.count),
                                    &ent)) {
       METERR(cs, *meta, "ICE?  Type '%.*s[...]' not found when checking for struct fields.\n",
              IM_P(cs->im, type->u.app.name.value));
@@ -4045,8 +4044,8 @@ int chase_struct_field_types(struct checkstate *cs,
       case AST_DEFTYPE_RHS_TYPE: {
         struct ast_typeexpr replaced_type;
         do_replace_generics(&deftype->generics,
-                            type->u.app.params,
-                            type->u.app.params_count,
+                            type->u.app.params.ptr,
+                            type->u.app.params.count,
                             &deftype->rhs.u.type,
                             &replaced_type);
 
@@ -4172,11 +4171,11 @@ void replace_name_expr_params(struct exprscope *es,
   ast_name_expr_init_copy(&copy, x);
 
   if (copy.has_params) {
-    for (size_t i = 0, e = copy.params_count; i < e; i++) {
+    for (size_t i = 0, e = copy.params.count; i < e; i++) {
       struct ast_typeexpr replaced;
-      replace_generics(es, &copy.params[i], &replaced);
-      ast_typeexpr_destroy(&copy.params[i]);
-      copy.params[i] = replaced;
+      replace_generics(es, &copy.params.ptr[i], &replaced);
+      ast_typeexpr_destroy(&copy.params.ptr[i]);
+      copy.params.ptr[i] = replaced;
     }
   }
 
@@ -4202,7 +4201,7 @@ struct ast_numeric_literal numeric_literal_from_u32(uint32_t value) {
   }
   struct ast_numeric_literal ret;
   ast_numeric_literal_init(&ret, ast_meta_make_garbage(), AST_NUMERIC_LITERAL_DEC,
-                           digits.ptr, digits.count);
+                           int8_array_make(digits.ptr, digits.count));
   return ret;
 }
 
@@ -4345,7 +4344,7 @@ int check_expr_ai(struct exprscope *es,
       METERR(es->cs, *ast_expr_ast_meta(x), "String literals disallowed in static computation.%s", "\n");
       return 0;
     }
-    uint32_t array_size = size_to_uint32(x->u.string_literal.values_count);
+    uint32_t array_size = size_to_uint32(x->u.string_literal.values.count);
     struct ast_typeexpr array_type;
     {
       struct ast_typeexpr char_type;
@@ -4617,7 +4616,7 @@ uint32_t unsafe_numeric_literal_u32(struct ast_numeric_literal *a) {
 #define NUMERIC_LITERAL_OOR "Numeric literal out of range.\n"
 
 int numeric_literal_to_u32(struct ast_numeric_literal *a, uint32_t *out) {
-  CHECK(a->digits_count > 0);
+  CHECK(a->digits.count > 0);
   uint32_t base;
   switch (a->tag) {
   case AST_NUMERIC_LITERAL_DEC:
@@ -4631,12 +4630,12 @@ int numeric_literal_to_u32(struct ast_numeric_literal *a, uint32_t *out) {
   }
 
   uint32_t built_value = 0;
-  for (size_t i = 0, e = a->digits_count; i < e; i++) {
+  for (size_t i = 0, e = a->digits.count; i < e; i++) {
     if (!try_uint32_mul(built_value, base, &built_value)) {
       ERR_DBG(NUMERIC_LITERAL_OOR);
       return 0;
     }
-    if (!try_uint32_add(built_value, a->digits[i], &built_value)) {
+    if (!try_uint32_add(built_value, a->digits.ptr[i], &built_value)) {
       ERR_DBG(NUMERIC_LITERAL_OOR);
       return 0;
     }
@@ -5161,11 +5160,11 @@ int eval_static_funcall(struct checkstate *cs,
     goto cleanup;
   }
 
-  size_t params_count = funcall->args_count;
+  size_t params_count = funcall->args.count;
   struct static_value *params = malloc_mul(sizeof(*params), params_count);
   size_t i = 0;
   for (; i < params_count; i++) {
-    if (!eval_static_value(cs, &funcall->args[i].expr, &params[i])) {
+    if (!eval_static_value(cs, &funcall->args.ptr[i].expr, &params[i])) {
       goto cleanup_params;
     }
   }

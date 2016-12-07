@@ -41,33 +41,29 @@ void ast_ident_destroy(struct ast_ident *a) {
   a->value = IDENT_VALUE_INVALID;
 }
 
-GEN_SLICE_IMPL(ast_ident, struct ast_ident);
+GEN_SLICE_AND_ARRAY_IMPL(ast_ident, struct ast_ident);
 
 
 void ast_numeric_literal_init(struct ast_numeric_literal *a,
                               struct ast_meta meta,
                               enum ast_numeric_literal_tag tag,
-                              int8_t *digits,
-                              size_t digits_count) {
+                              struct int8_array digits) {
   a->meta = meta;
   a->tag = tag;
   a->digits = digits;
-  a->digits_count = digits_count;
 }
 
 void ast_numeric_literal_init_copy(struct ast_numeric_literal *a,
                                    struct ast_numeric_literal *c) {
   a->meta = ast_meta_make_copy(&c->meta);
   a->tag = c->tag;
-  SLICE_INIT_COPY_PRIM(a->digits, a->digits_count, c->digits, c->digits_count);
+  int8_array_init_copy_prim(&a->digits, &c->digits);
 }
 
 void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
   ast_meta_destroy(&a->meta);
   a->tag = (enum ast_numeric_literal_tag)-1;
-  free(a->digits);
-  a->digits = NULL;
-  a->digits_count = 0;
+  int8_array_destroy_prim(&a->digits);
 }
 
 void ast_bool_literal_init(struct ast_bool_literal *a,
@@ -135,39 +131,34 @@ void ast_char_literal_destroy(struct ast_char_literal *a) {
 
 void ast_string_literal_init(struct ast_string_literal *a,
                              struct ast_meta meta,
-                             uint8_t *values, size_t values_count) {
+                             struct uint8_array values) {
   a->meta = meta;
   a->values = values;
-  a->values_count = values_count;
 }
 
 void ast_string_literal_init_copy(struct ast_string_literal *a,
                                   struct ast_string_literal *c) {
   a->meta = ast_meta_make_copy(&c->meta);
-  SLICE_INIT_COPY_PRIM(a->values, a->values_count, c->values, c->values_count);
+  uint8_array_init_copy_prim(&a->values, &c->values);
 }
 
 void ast_string_literal_destroy(struct ast_string_literal *a) {
   ast_meta_destroy(&a->meta);
-  free(a->values);
-  a->values = NULL;
-  a->values_count = 0;
+  uint8_array_destroy_prim(&a->values);
 }
 
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
                       struct ast_exprcall func,
-                      struct ast_exprcall *args, size_t args_count) {
+                      struct ast_exprcall_array args) {
   a->meta = meta;
   ast_exprcall_alloc_move(func, &a->func);
   a->args = args;
-  a->args_count = args_count;
 }
 
 void ast_funcall_init_copy(struct ast_funcall *a, struct ast_funcall *c) {
   a->meta = ast_meta_make_copy(&c->meta);
   ast_exprcall_alloc_init_copy(c->func, &a->func);
-
-  SLICE_INIT_COPY(a->args, a->args_count, c->args, c->args_count, ast_exprcall_init_copy);
+  ast_exprcall_array_init_copy(&a->args, &c->args, ast_exprcall_init_copy);
 }
 
 void ast_funcall_destroy(struct ast_funcall *a) {
@@ -175,7 +166,7 @@ void ast_funcall_destroy(struct ast_funcall *a) {
   ast_exprcall_destroy(a->func);
   free(a->func);
   a->func = NULL;
-  SLICE_FREE(a->args, a->args_count, ast_exprcall_destroy);
+  ast_exprcall_array_destroy(&a->args, ast_exprcall_destroy);
 }
 
 void ast_var_info_init(struct ast_var_info *a) {
@@ -978,14 +969,12 @@ void ast_name_expr_init(struct ast_name_expr *a,
 void ast_name_expr_init_with_params(struct ast_name_expr *a,
                                     struct ast_meta meta,
                                     struct ast_ident ident,
-                                    struct ast_typeexpr *params,
-                                    size_t params_count) {
+                                    struct ast_typeexpr_array params) {
   a->meta = meta;
   ast_name_expr_info_init(&a->info);
   a->ident = ident;
   a->has_params = 1;
   a->params = params;
-  a->params_count = params_count;
 }
 
 void ast_name_expr_init_copy(struct ast_name_expr *a,
@@ -995,8 +984,7 @@ void ast_name_expr_init_copy(struct ast_name_expr *a,
   ast_ident_init_copy(&a->ident, &c->ident);
   a->has_params = c->has_params;
   if (c->has_params) {
-    SLICE_INIT_COPY(a->params, a->params_count, c->params, c->params_count,
-                    ast_typeexpr_init_copy);
+    ast_typeexpr_array_init_copy(&a->params, &c->params, ast_typeexpr_init_copy);
   }
 }
 
@@ -1006,7 +994,7 @@ void ast_name_expr_destroy(struct ast_name_expr *a) {
   ast_ident_destroy(&a->ident);
   if (a->has_params) {
     a->has_params = 0;
-    SLICE_FREE(a->params, a->params_count, ast_typeexpr_destroy);
+    ast_typeexpr_array_destroy(&a->params, ast_typeexpr_destroy);
   }
 }
 
@@ -1497,28 +1485,26 @@ void ast_exprcall_alloc_init_copy(struct ast_exprcall *c,
   *out = a;
 }
 
-GEN_SLICE_IMPL(ast_exprcall, struct ast_exprcall);
+GEN_SLICE_AND_ARRAY_IMPL(ast_exprcall, struct ast_exprcall);
 
 void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
-                      struct ast_ident name, struct ast_typeexpr *params,
-                      size_t params_count) {
+                      struct ast_ident name,
+                      struct ast_typeexpr_array params) {
   a->meta = meta;
   a->name = name;
   a->params = params;
-  a->params_count = params_count;
 }
 
 void ast_typeapp_init_copy(struct ast_typeapp *a, struct ast_typeapp *c) {
   a->meta = ast_meta_make_copy(&c->meta);
   ast_ident_init_copy(&a->name, &c->name);
-  SLICE_INIT_COPY(a->params, a->params_count, c->params, c->params_count,
-                  ast_typeexpr_init_copy);
+  ast_typeexpr_array_init_copy(&a->params, &c->params, ast_typeexpr_init_copy);
 }
 
 void ast_typeapp_destroy(struct ast_typeapp *a) {
   ast_meta_destroy(&a->meta);
   ast_ident_destroy(&a->name);
-  SLICE_FREE(a->params, a->params_count, ast_typeexpr_destroy);
+  ast_typeexpr_array_destroy(&a->params, ast_typeexpr_destroy);
 }
 
 void ast_structe_init(struct ast_structe *a, struct ast_meta meta,
@@ -1681,24 +1667,21 @@ struct ast_typeexpr ast_numeric_garbage(void) {
   return ret;
 }
 
-GEN_SLICE_IMPL(ast_typeexpr, struct ast_typeexpr);
+GEN_SLICE_AND_ARRAY_IMPL(ast_typeexpr, struct ast_typeexpr);
 
 void ast_generics_init_no_params(struct ast_generics *a) {
   a->has_type_params = 0;
   /* Dummy values for irrelevant fields. */
   a->meta = ast_meta_make_garbage();
   ast_meta_destroy(&a->meta);
-  a->params = NULL;
-  a->params_count = 0;
+  a->params = ast_ident_array_make(NULL, 0);
 }
 void ast_generics_init_has_params(struct ast_generics *a,
                                   struct ast_meta meta,
-                                  struct ast_ident *params,
-                                  size_t params_count) {
+                                  struct ast_ident_array params) {
   a->has_type_params = 1;
   a->meta = meta;
   a->params = params;
-  a->params_count = params_count;
 }
 
 void ast_generics_init_copy(struct ast_generics *a,
@@ -1708,8 +1691,7 @@ void ast_generics_init_copy(struct ast_generics *a,
   } else {
     a->has_type_params = 1;
     a->meta = ast_meta_make_copy(&c->meta);
-    SLICE_INIT_COPY(a->params, a->params_count, c->params, c->params_count,
-                    ast_ident_init_copy);
+    ast_ident_array_init_copy(&a->params, &c->params, ast_ident_init_copy);
   }
 }
 
@@ -1717,7 +1699,7 @@ void ast_generics_destroy(struct ast_generics *a) {
   if (a->has_type_params) {
     a->has_type_params = 0;
     ast_meta_destroy(&a->meta);
-    SLICE_FREE(a->params, a->params_count, ast_ident_destroy);
+    ast_ident_array_destroy(&a->params, ast_ident_destroy);
   }
 }
 
