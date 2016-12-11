@@ -19,9 +19,10 @@ void import_destroy(struct import *imp) {
   imp->buf_count = 0;
 }
 
-GEN_SLICE_IMPL(import, struct import);
-GEN_SLICE_IMPL(sti, struct sti);
-GEN_SLICE_IMPL(typetrav_symbol_info_ptr, struct typetrav_symbol_info *);
+GEN_SLICE_IMPL(import, struct import, import_destroy);
+GEN_SLICE_IMPL_PRIM(sti, struct sti);
+GEN_SLICE_IMPL(typetrav_symbol_info_ptr, struct typetrav_symbol_info *,
+               typetrav_symbol_info_ptr_destroy);
 
 struct common_idents compute_common_idents(struct identmap *im) {
   struct common_idents ret;
@@ -53,18 +54,17 @@ struct common_idents compute_common_idents(struct identmap *im) {
 
 void checkstate_destroy(struct checkstate *cs) {
   cs->typetrav_symbol_infos_first_ungenerated = 0;
-  typetrav_symbol_info_ptr_slice_destroy(&cs->typetrav_symbol_infos,
-                                         typetrav_symbol_info_ptr_destroy);
+  typetrav_symbol_info_ptr_slice_destroy(&cs->typetrav_symbol_infos);
   identmap_destroy(&cs->typetrav_values);
 
-  sti_slice_destroy_prim(&cs->sli_symbol_table_indexes);
+  sti_slice_destroy(&cs->sli_symbol_table_indexes);
   identmap_destroy(&cs->sli_values);
 
   name_table_destroy(&cs->nt);
   cs->kit_name_counter = 0;
   CHECK(cs->template_instantiation_recursion_depth == 0);
   cs->total_filesize = 0;
-  import_slice_destroy(&cs->imports, import_destroy);
+  import_slice_destroy(&cs->imports);
   cs->arch = (enum target_arch)-1;
   cs->platform = (enum target_platform)-1;
   cs->loader = NULL;

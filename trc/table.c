@@ -7,13 +7,6 @@
 #include "print.h"
 #include "typecheck.h"
 
-GEN_SLICE_IMPL(def_entry_ptr, struct def_entry *);
-GEN_SLICE_IMPL(def_entry_nonowning_ptr, struct def_entry *);
-GEN_SLICE_IMPL(deftype_entry_ptr, struct deftype_entry *);
-GEN_SLICE_IMPL(def_instantiation_ptr, struct def_instantiation *);
-GEN_SLICE_IMPL(deftype_instantiation_ptr, struct deftype_instantiation *);
-GEN_SLICE_IMPL(defclass_ident, struct defclass_ident);
-
 struct defs_by_name_node {
   struct def_entry *ent;
   struct defs_by_name_node *next;
@@ -152,10 +145,9 @@ void def_entry_destroy(struct def_entry *e) {
   e->is_extern = 0;
   e->def = NULL;
 
-  def_instantiation_ptr_slice_destroy(&e->instantiations,
-                                      def_instantiation_free);
+  def_instantiation_ptr_slice_destroy(&e->instantiations);
 
-  def_entry_nonowning_ptr_slice_destroy_prim(&e->static_references);
+  def_entry_nonowning_ptr_slice_destroy(&e->static_references);
 
   e->known_acyclic = 0;
   e->acyclicity_being_chased = 0;
@@ -275,8 +267,7 @@ void deftype_entry_destroy(struct deftype_entry *e) {
   e->flatly_held = NULL;
   e->flatly_held_count = 0;
 
-  deftype_instantiation_ptr_slice_destroy(&e->instantiations,
-                                          deftype_instantiation_free);
+  deftype_instantiation_ptr_slice_destroy(&e->instantiations);
 
   e->has_been_checked = 0;
   e->is_being_checked = 0;
@@ -310,11 +301,11 @@ void name_table_destroy(struct name_table *t) {
 
   identmap_destroy(&t->deftypes_by_name);
 
-  deftype_entry_ptr_slice_destroy(&t->deftypes, deftype_entry_ptr_destroy);
+  deftype_entry_ptr_slice_destroy(&t->deftypes);
 
   identmap_destroy(&t->defs_by_name);
 
-  def_entry_ptr_slice_destroy(&t->defs, def_entry_ptr_destroy);
+  def_entry_ptr_slice_destroy(&t->defs);
 
   arena_destroy(&t->arena);
 }
@@ -1236,3 +1227,14 @@ void deftype_entry_mark_generic_flatly_held(struct deftype_entry *ent,
   CHECK(which_generic < ent->flatly_held_count);
   ent->flatly_held[which_generic] = 1;
 }
+
+GEN_SLICE_IMPL(def_entry_ptr, struct def_entry *, def_entry_ptr_destroy);
+GEN_SLICE_IMPL_PRIM(def_entry_nonowning_ptr, struct def_entry *);
+GEN_SLICE_IMPL(deftype_entry_ptr, struct deftype_entry *,
+               deftype_entry_ptr_destroy);
+GEN_SLICE_IMPL(def_instantiation_ptr, struct def_instantiation *,
+               def_instantiation_free);
+GEN_SLICE_IMPL(deftype_instantiation_ptr, struct deftype_instantiation *,
+               deftype_instantiation_free);
+GEN_SLICE_IMPL_PRIM(defclass_ident, struct defclass_ident);
+

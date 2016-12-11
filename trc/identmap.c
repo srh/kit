@@ -10,7 +10,7 @@
 
 #define IDENTMAP_DBG(...) do { } while (0)
 
-GEN_SLICE_IMPL(ident_value, ident_value);
+GEN_SLICE_IMPL_PRIM(ident_value, ident_value);
 
 struct identmap_data {
   void *data;

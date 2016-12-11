@@ -750,7 +750,7 @@ int parse_params_list(struct ps *p,
   }
 
  fail:
-  ast_vardecl_slice_destroy(&params, ast_vardecl_destroy);
+  ast_vardecl_slice_destroy(&params);
   return 0;
 }
 
@@ -1087,7 +1087,7 @@ int parse_cased_statement(struct ps *p, struct ast_cased_statement *out) {
       }
     }
   fail_statements:
-    ast_statement_slice_destroy(&statements, ast_statement_destroy);
+    ast_statement_slice_destroy(&statements);
     goto fail_pattern;
   }
 
@@ -1132,7 +1132,7 @@ int parse_rest_of_switch_statement(struct ps *p, struct pos pos_start,
   }
 
  fail_cases:
-  ast_cased_statement_slice_destroy(&cases, ast_cased_statement_destroy);
+  ast_cased_statement_slice_destroy(&cases);
  fail_swartch:
   ast_expr_destroy(&swartch);
  fail:
@@ -1337,7 +1337,7 @@ int parse_rest_of_bracebody(struct ps *p, struct pos pos_start, struct ast_brace
   }
 
  fail:
-  ast_statement_slice_destroy(&statements, ast_statement_destroy);
+  ast_statement_slice_destroy(&statements);
   return 0;
 }
 
@@ -1462,7 +1462,7 @@ enum tri triparse_numeric_literal(struct ps *p, struct ast_numeric_literal *out)
   return TRI_SUCCESS;
 
  fail:
-  int8_slice_destroy_prim(&digits);
+  int8_slice_destroy(&digits);
   return TRI_ERROR;
  quickfail:
   return TRI_QUICKFAIL;
@@ -1501,7 +1501,7 @@ int parse_rest_of_arglist(struct ps *p,
   }
 
  fail:
-  ast_exprcall_slice_destroy(&args, ast_exprcall_destroy);
+  ast_exprcall_slice_destroy(&args);
   return 0;
 }
 
@@ -1724,7 +1724,7 @@ int parse_rest_of_strinit(struct ps *p, struct pos pos_start,
   }
 
  fail:
-  ast_expr_slice_destroy(&args, ast_expr_destroy);
+  ast_expr_slice_destroy(&args);
   return 0;
 }
 
@@ -2048,7 +2048,7 @@ int parse_braced_fields(struct ps *p,
   }
 
  fail:
-  ast_vardecl_slice_destroy(&fields, ast_vardecl_destroy);
+  ast_vardecl_slice_destroy(&fields);
   return 0;
 }
 
@@ -2166,7 +2166,7 @@ int parse_rest_of_type_param_list(struct ps *p,
   }
 
  fail:
-  ast_typeexpr_slice_destroy(&params, ast_typeexpr_destroy);
+  ast_typeexpr_slice_destroy(&params);
   return 0;
 }
 
@@ -2292,7 +2292,7 @@ int parse_type_params_if_present(struct ps *p,
   }
 
  fail:
-  ast_ident_slice_destroy(&params, ast_ident_destroy);
+  ast_ident_slice_destroy(&params);
   return 0;
 }
 
@@ -2567,7 +2567,7 @@ int parse_toplevels(struct ps *p, int32_t until_ch,
     ast_toplevel_slice_push(&toplevels, toplevel);
   }
  fail:
-  ast_toplevel_slice_destroy(&toplevels, ast_toplevel_destroy);
+  ast_toplevel_slice_destroy(&toplevels);
   return 0;
 }
 

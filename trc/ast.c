@@ -41,7 +41,7 @@ void ast_ident_destroy(struct ast_ident *a) {
   a->value = IDENT_VALUE_INVALID;
 }
 
-GEN_SLICE_AND_ARRAY_IMPL(ast_ident, struct ast_ident);
+GEN_SLICE_AND_ARRAY_IMPL(ast_ident, struct ast_ident, ast_ident_destroy);
 
 
 void ast_numeric_literal_init(struct ast_numeric_literal *a,
@@ -63,7 +63,7 @@ void ast_numeric_literal_init_copy(struct ast_numeric_literal *a,
 void ast_numeric_literal_destroy(struct ast_numeric_literal *a) {
   ast_meta_destroy(&a->meta);
   a->tag = (enum ast_numeric_literal_tag)-1;
-  int8_array_destroy_prim(&a->digits);
+  int8_array_destroy(&a->digits);
 }
 
 void ast_bool_literal_init(struct ast_bool_literal *a,
@@ -144,7 +144,7 @@ void ast_string_literal_init_copy(struct ast_string_literal *a,
 
 void ast_string_literal_destroy(struct ast_string_literal *a) {
   ast_meta_destroy(&a->meta);
-  uint8_array_destroy_prim(&a->values);
+  uint8_array_destroy(&a->values);
 }
 
 void ast_funcall_init(struct ast_funcall *a, struct ast_meta meta,
@@ -166,7 +166,7 @@ void ast_funcall_destroy(struct ast_funcall *a) {
   ast_exprcall_destroy(a->func);
   free(a->func);
   a->func = NULL;
-  ast_exprcall_array_destroy(&a->args, ast_exprcall_destroy);
+  ast_exprcall_array_destroy(&a->args);
 }
 
 void ast_var_info_init(struct ast_var_info *a) {
@@ -221,8 +221,14 @@ void ast_vardecl_destroy(struct ast_vardecl *a) {
   ast_typeexpr_destroy(&a->type);
 }
 
-GEN_SLICE_IMPL(ast_vardecl_ptr, struct ast_vardecl *);
-GEN_SLICE_IMPL(ast_vardecl, struct ast_vardecl);
+void free_ast_vardecl(struct ast_vardecl **p) {
+  ast_vardecl_destroy(*p);
+  free(*p);
+  *p = NULL;
+}
+
+GEN_SLICE_IMPL(ast_vardecl_ptr, struct ast_vardecl *, free_ast_vardecl);
+GEN_SLICE_IMPL(ast_vardecl, struct ast_vardecl, ast_vardecl_destroy);
 
 void ast_bracebody_init(struct ast_bracebody *a,
                         struct ast_meta meta,
@@ -623,7 +629,7 @@ void ast_statement_alloc_move(struct ast_statement movee,
   *out = p;
 }
 
-GEN_SLICE_IMPL(ast_statement, struct ast_statement);
+GEN_SLICE_IMPL(ast_statement, struct ast_statement, ast_statement_destroy);
 
 void ast_case_pattern_info_init(struct ast_case_pattern_info *a) {
   a->info_valid = 0;
@@ -777,7 +783,8 @@ void ast_cased_statement_destroy(struct ast_cased_statement *a) {
   ast_bracebody_destroy(&a->body);
 }
 
-GEN_SLICE_IMPL(ast_cased_statement, struct ast_cased_statement);
+GEN_SLICE_IMPL(ast_cased_statement, struct ast_cased_statement,
+               ast_cased_statement_destroy);
 
 int is_magic_unop(enum ast_unop unop) {
   return unop == AST_UNOP_DEREFERENCE || unop == AST_UNOP_ADDRESSOF;
@@ -994,7 +1001,7 @@ void ast_name_expr_destroy(struct ast_name_expr *a) {
   ast_ident_destroy(&a->ident);
   if (a->has_params) {
     a->has_params = 0;
-    ast_typeexpr_array_destroy(&a->params, ast_typeexpr_destroy);
+    ast_typeexpr_array_destroy(&a->params);
   }
 }
 
@@ -1412,7 +1419,7 @@ void ast_expr_alloc_init_copy(struct ast_expr *c, struct ast_expr **out) {
   *out = a;
 }
 
-GEN_SLICE_IMPL(ast_expr, struct ast_expr);
+GEN_SLICE_IMPL(ast_expr, struct ast_expr, ast_expr_destroy);
 
 void ast_exprcatch_init(struct ast_exprcatch *a) {
   a->info_valid = 0;
@@ -1485,7 +1492,8 @@ void ast_exprcall_alloc_init_copy(struct ast_exprcall *c,
   *out = a;
 }
 
-GEN_SLICE_AND_ARRAY_IMPL(ast_exprcall, struct ast_exprcall);
+GEN_SLICE_AND_ARRAY_IMPL(ast_exprcall, struct ast_exprcall,
+                         ast_exprcall_destroy);
 
 void ast_typeapp_init(struct ast_typeapp *a, struct ast_meta meta,
                       struct ast_ident name,
@@ -1504,7 +1512,7 @@ void ast_typeapp_init_copy(struct ast_typeapp *a, struct ast_typeapp *c) {
 void ast_typeapp_destroy(struct ast_typeapp *a) {
   ast_meta_destroy(&a->meta);
   ast_ident_destroy(&a->name);
-  ast_typeexpr_array_destroy(&a->params, ast_typeexpr_destroy);
+  ast_typeexpr_array_destroy(&a->params);
 }
 
 void ast_structe_init(struct ast_structe *a, struct ast_meta meta,
@@ -1667,7 +1675,8 @@ struct ast_typeexpr ast_numeric_garbage(void) {
   return ret;
 }
 
-GEN_SLICE_AND_ARRAY_IMPL(ast_typeexpr, struct ast_typeexpr);
+GEN_SLICE_AND_ARRAY_IMPL(ast_typeexpr, struct ast_typeexpr,
+                         ast_typeexpr_destroy);
 
 void ast_generics_init_no_params(struct ast_generics *a) {
   a->has_type_params = 0;
@@ -1699,7 +1708,7 @@ void ast_generics_destroy(struct ast_generics *a) {
   if (a->has_type_params) {
     a->has_type_params = 0;
     ast_meta_destroy(&a->meta);
-    ast_ident_array_destroy(&a->params, ast_ident_destroy);
+    ast_ident_array_destroy(&a->params);
   }
 }
 
@@ -1902,7 +1911,7 @@ void ast_toplevel_destroy(struct ast_toplevel *a) {
   a->tag = (enum ast_toplevel_tag)-1;
 }
 
-GEN_SLICE_IMPL(ast_toplevel, struct ast_toplevel);
+GEN_SLICE_IMPL(ast_toplevel, struct ast_toplevel, ast_toplevel_destroy);
 
 void ast_file_destroy(struct ast_file *a) {
   SLICE_FREE(a->toplevels, a->toplevels_count, ast_toplevel_destroy);

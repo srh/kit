@@ -427,7 +427,7 @@ void vardata_destroy(struct vardata *vd) {
 }
 
 GEN_SLICE_HDR(vardata, struct vardata);
-GEN_SLICE_IMPL(vardata, struct vardata);
+GEN_SLICE_IMPL(vardata, struct vardata, vardata_destroy);
 
 struct targetdata {
   int target_known;
@@ -435,7 +435,7 @@ struct targetdata {
 };
 
 GEN_SLICE_HDR(targetdata, struct targetdata);
-GEN_SLICE_IMPL(targetdata, struct targetdata);
+GEN_SLICE_IMPL_PRIM(targetdata, struct targetdata);
 
 struct jmpdata {
   size_t target_number;
@@ -443,7 +443,7 @@ struct jmpdata {
 };
 
 GEN_SLICE_HDR(jmpdata, struct jmpdata);
-GEN_SLICE_IMPL(jmpdata, struct jmpdata);
+GEN_SLICE_IMPL_PRIM(jmpdata, struct jmpdata);
 
 struct reset_esp_data {
   /* The .text offset where we need to place an addend. */
@@ -457,7 +457,7 @@ struct reset_esp_data {
 };
 
 GEN_SLICE_HDR(reset_esp_data, struct reset_esp_data);
-GEN_SLICE_IMPL(reset_esp_data, struct reset_esp_data);
+GEN_SLICE_IMPL_PRIM(reset_esp_data, struct reset_esp_data);
 
 struct frame {
   /* Contains all the variables declared within the function. */
@@ -524,10 +524,10 @@ void frame_init(struct frame *h, enum target_platform platform) {
 }
 
 void frame_destroy(struct frame *h) {
-  vardata_slice_destroy(&h->vardata, vardata_destroy);
-  targetdata_slice_destroy_prim(&h->targetdata);
-  jmpdata_slice_destroy_prim(&h->jmpdata);
-  reset_esp_data_slice_destroy_prim(&h->espdata);
+  vardata_slice_destroy(&h->vardata);
+  targetdata_slice_destroy(&h->targetdata);
+  jmpdata_slice_destroy(&h->jmpdata);
+  reset_esp_data_slice_destroy(&h->espdata);
   h->platform = (enum target_platform)-1;
   h->arch = (enum target_arch)-1;
 }
@@ -1758,7 +1758,7 @@ void gen_function_exit(struct checkstate *cs, struct objfile *f, struct frame *h
     if (vd->destroy_when_unwound) {
       gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
     }
-    vardata_slice_pop(&h->vardata, vardata_destroy);
+    vardata_slice_pop(&h->vardata);
   }
 
   int hidden_return_param = frame_hidden_return_param(h);
@@ -4613,7 +4613,7 @@ int gen_casebody(struct checkstate *cs, struct objfile *f,
   }
 
   if (constructor->has_decl) {
-    vardata_slice_pop(&h->vardata, vardata_destroy);
+    vardata_slice_pop(&h->vardata);
   }
   return 1;
 }
@@ -4666,7 +4666,7 @@ void pop_cstate_vardata(struct frame *h, struct condition_state *cstate) {
     /* No vardata. */
   } break;
   case AST_CONDITION_PATTERN: {
-    vardata_slice_pop(&h->vardata, vardata_destroy);
+    vardata_slice_pop(&h->vardata);
   } break;
   }
 }
@@ -4913,7 +4913,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
       struct vardata *vd = &h->vardata.ptr[size_sub(h->vardata.count, 1)];
       gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
       frame_pop(h, vd->loc.size);
-      vardata_slice_pop(&h->vardata, vardata_destroy);
+      vardata_slice_pop(&h->vardata);
     }
   } break;
   case AST_STATEMENT_SWITCH: {
@@ -4987,7 +4987,7 @@ int gen_statement(struct checkstate *cs, struct objfile *f,
     ungen_swartch(cs, f, h, &facts);
 
     /* Pop swartch vardata. */
-    vardata_slice_pop(&h->vardata, vardata_destroy);
+    vardata_slice_pop(&h->vardata);
     frame_restore_offset(h, saved_offset);
   } break;
   default:
@@ -5013,7 +5013,7 @@ int gen_bracebody(struct checkstate *cs, struct objfile *f,
     struct vardata *vd = &h->vardata.ptr[size_sub(h->vardata.count, 1)];
     gen_destroy(cs, f, h, vd->loc, vd->concrete_type);
     frame_pop(h, vd->loc.size);
-    vardata_slice_pop(&h->vardata, vardata_destroy);
+    vardata_slice_pop(&h->vardata);
   }
 
   CHECK(h->stack_offset == initial_stack_offset);

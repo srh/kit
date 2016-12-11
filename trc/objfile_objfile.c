@@ -26,7 +26,7 @@ void objfile_section_init(struct objfile_section *s) {
 void objfile_section_destroy(struct objfile_section *s) {
   databuf_destroy(&s->raw);
   s->max_requested_alignment = 0;
-  objfile_relocation_slice_destroy_prim(&s->relocs);
+  objfile_relocation_slice_destroy(&s->relocs);
 }
 
 void objfile_init(struct objfile *f, enum target_platform platform) {
@@ -45,7 +45,7 @@ void objfile_destroy(struct objfile *f) {
   objfile_section_destroy(&f->rdata);
   objfile_section_destroy(&f->text);
 
-  objfile_symbol_record_slice_destroy_prim(&f->symbol_table);
+  objfile_symbol_record_slice_destroy(&f->symbol_table);
 
   f->platform = (enum target_platform)-1;
   f->arch = (enum target_arch)-1;

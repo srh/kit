@@ -217,6 +217,7 @@ void ast_vardecl_init(struct ast_vardecl *a, struct ast_meta meta,
                       struct ast_ident name, struct ast_typeexpr type);
 void ast_vardecl_init_copy(struct ast_vardecl *a, struct ast_vardecl *c);
 void ast_vardecl_destroy(struct ast_vardecl *a);
+void free_ast_vardecl(struct ast_vardecl **p);
 
 GEN_SLICE_HDR(ast_vardecl_ptr, struct ast_vardecl *);
 GEN_SLICE_HDR(ast_vardecl, struct ast_vardecl);

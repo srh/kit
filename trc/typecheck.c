@@ -828,11 +828,6 @@ struct import_chase_state {
   struct defclass_ident_slice accessible;
 };
 
-void defclass_ident_destroy(struct defclass_ident *dci) {
-  (void)dci;
-  /* Do nothing. */
-}
-
 void copy_make_unary_func_type(struct checkstate *cs,
                                struct ast_typeexpr *arg_type,
                                struct ast_typeexpr *return_type,
@@ -1009,7 +1004,7 @@ int chase_through_toplevels(struct checkstate *cs,
       int success = chase_through_toplevels(cs, ics,
                                             toplevel->u.access.toplevels,
                                             toplevel->u.access.toplevels_count);
-      defclass_ident_slice_pop(&ics->accessible, defclass_ident_destroy);
+      defclass_ident_slice_pop(&ics->accessible);
       if (!success) {
         return 0;
       }
@@ -1069,8 +1064,8 @@ int chase_imports(struct checkstate *cs, ident_value name) {
 
   ret = 1;
  cleanup:
-  ident_value_slice_destroy_prim(&ics.names);
-  defclass_ident_slice_destroy_prim(&ics.accessible);
+  ident_value_slice_destroy(&ics.names);
+  defclass_ident_slice_destroy(&ics.accessible);
   return ret;
 }
 
@@ -1860,7 +1855,7 @@ void varpair_destroy(struct varpair *v) {
 }
 
 GEN_SLICE_HDR(varpair, struct varpair);
-GEN_SLICE_IMPL(varpair, struct varpair);
+GEN_SLICE_IMPL(varpair, struct varpair, varpair_destroy);
 
 struct exprscope {
   struct checkstate *cs;
@@ -1919,7 +1914,7 @@ void exprscope_destroy(struct exprscope *es) {
   es->accessible = NULL;
   es->accessible_count = 0;
   es->computation = STATIC_COMPUTATION_YES;
-  varpair_slice_destroy_prim(&es->vars);
+  varpair_slice_destroy(&es->vars);
   es->temp_counter = SIZE_MAX;
 }
 
@@ -1970,7 +1965,7 @@ int exprscope_push_var(struct exprscope *es, struct ast_vardecl *var) {
 }
 
 void exprscope_pop_var(struct exprscope *es) {
-  varpair_slice_pop(&es->vars, varpair_destroy);
+  varpair_slice_pop(&es->vars);
 }
 
 int help_unify_directionally(struct identmap *im,
@@ -2666,12 +2661,6 @@ void bodystate_destroy(struct bodystate *bs) {
   }
 }
 
-void free_ast_vardecl(struct ast_vardecl **p) {
-  ast_vardecl_destroy(*p);
-  free(*p);
-  *p = NULL;
-}
-
 /* Tells how a bracebody or statement falls through. */
 enum fallthrough {
   /* Says a statement/bracebody never exits "out the bottom" -- it
@@ -3310,7 +3299,7 @@ int check_expr_bracebody(struct bodystate *bs,
   for (size_t i = 0; i < vardecls_pushed.count; i++) {
     exprscope_pop_var(bs->es);
   }
-  ast_vardecl_ptr_slice_destroy(&vardecls_pushed, free_ast_vardecl);
+  ast_vardecl_ptr_slice_destroy(&vardecls_pushed);
   return ret;
 }
 

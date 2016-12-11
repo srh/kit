@@ -12,5 +12,5 @@ uint16_t objfile_section_small_relocations_count(struct objfile_section *s) {
   return (uint16_t)s->relocs.count;
 }
 
-GEN_SLICE_IMPL(objfile_relocation, struct objfile_relocation);
-GEN_SLICE_IMPL(objfile_symbol_record, struct objfile_symbol_record);
+GEN_SLICE_IMPL_PRIM(objfile_relocation, struct objfile_relocation);
+GEN_SLICE_IMPL_PRIM(objfile_symbol_record, struct objfile_symbol_record);

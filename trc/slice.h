@@ -15,13 +15,12 @@
   }; \
   struct name##_slice name##_slice_initializer(void); \
   void name##_slice_push(struct name##_slice *slice, typ value); \
-  void name##_slice_pop(struct name##_slice *slice, void (*destructor)(typ *)); \
-  void name##_slice_destroy(struct name##_slice *slice, void (*destructor)(typ *)); \
-  void name##_slice_destroy_prim(struct name##_slice *slice); \
+  void name##_slice_pop(struct name##_slice *slice); \
+  void name##_slice_destroy(struct name##_slice *slice); \
   typedef int GEN_SLICE_HDR_##name##_force_semicolon
 
 /* Generates utility func implementations for a corresponding GEN_SLICE_HDR. */
-#define GEN_SLICE_IMPL(name, typ) \
+#define GEN_SLICE_IMPL_COMMON(name, typ) \
   struct name##_slice name##_slice_initializer(void) { \
     struct name##_slice ret = SLICE_INITIALIZER; \
     return ret; \
@@ -39,18 +38,30 @@
     slice->ptr[count] = value; \
     slice->count = count + 1; \
   } \
-  void name##_slice_pop(struct name##_slice *slice, void (*destructor)(typ *)) { \
+  typedef int GEN_SLICE_IMPL_COMMON_##name##_force_semicolon
+
+#define GEN_SLICE_IMPL_PRIM(name, typ) \
+  GEN_SLICE_IMPL_COMMON(name, typ); \
+  void name##_slice_pop(struct name##_slice *slice) { \
     CHECK(slice->count > 0); \
-    (*destructor)(&slice->ptr[--slice->count]); \
+    --slice->count; \
   } \
-  void name##_slice_destroy(struct name##_slice *slice, void (*destructor)(typ *)) { \
-    SLICE_FREE(slice->ptr, slice->count, *destructor); \
-    slice->limit = 0; \
-  } \
-  void name##_slice_destroy_prim(struct name##_slice *slice) { \
+  void name##_slice_destroy(struct name##_slice *slice) { \
     free(slice->ptr); \
     slice->ptr = NULL; \
     slice->count = 0; \
+    slice->limit = 0; \
+  } \
+  typedef int GEN_SLICE_IMPL_##name##_force_semicolon
+
+#define GEN_SLICE_IMPL(name, typ, dtor) \
+  GEN_SLICE_IMPL_COMMON(name, typ); \
+  void name##_slice_pop(struct name##_slice *slice) { \
+    CHECK(slice->count > 0); \
+    dtor(&slice->ptr[--slice->count]); \
+  } \
+  void name##_slice_destroy(struct name##_slice *slice) { \
+    SLICE_FREE(slice->ptr, slice->count, dtor); \
     slice->limit = 0; \
   } \
   typedef int GEN_SLICE_IMPL_##name##_force_semicolon
@@ -71,12 +82,12 @@
                               void (*copier)(typ *, typ *)); \
   void name##_array_init_copy_prim(struct name##_array *a, \
                                    struct name##_array *c); \
-  void name##_array_destroy(struct name##_array *arr, void (*destructor)(typ *)); \
+  void name##_array_destroy(struct name##_array *arr); \
   void name##_array_destroy_prim(struct name##_array *arr); \
   typedef int GEN_ARRAY_HDR_##name##_force_semicolon
 
 /* Generates utility func implementations for a corresponding GEN_ARRAY_HDR. */
-#define GEN_ARRAY_IMPL(name, typ) \
+#define GEN_ARRAY_IMPL_COMMON(name, typ) \
   struct name##_array name##_array_make(typ *ptr, size_t count) { \
     struct name##_array ret; \
     ret.ptr = ptr; \
@@ -95,10 +106,18 @@
                                    struct name##_array *c) { \
     SLICE_INIT_COPY_PRIM(a->ptr, a->count, c->ptr, c->count); \
   } \
-  void name##_array_destroy(struct name##_array *arr, void (*destructor)(typ *)) { \
-    SLICE_FREE(arr->ptr, arr->count, destructor); \
+  typedef int GEN_ARRAY_IMPL_##name##_force_semicolon
+
+#define GEN_ARRAY_IMPL(name, typ, dtor)  \
+  GEN_ARRAY_IMPL_COMMON(name, typ); \
+  void name##_array_destroy(struct name##_array *arr) { \
+    SLICE_FREE(arr->ptr, arr->count, dtor); \
   } \
-  void name##_array_destroy_prim(struct name##_array *arr) { \
+  typedef int GEN_ARRAY_IMPL_##name##_force_semicolon
+
+#define GEN_ARRAY_IMPL_PRIM(name, typ) \
+  GEN_ARRAY_IMPL_COMMON(name, typ); \
+  void name##_array_destroy(struct name##_array *arr) { \
     free(arr->ptr); \
     arr->ptr = NULL; \
     arr->count = 0; \
@@ -112,9 +131,21 @@
   struct name##_array name##_array_from_slice(struct name##_slice *slice); \
   typedef int GEN_SLICE_AND_ARRAY_HDR_##name##_force_semicolon
 
-#define GEN_SLICE_AND_ARRAY_IMPL(name, typ) \
-  GEN_SLICE_IMPL(name, typ); \
-  GEN_ARRAY_IMPL(name, typ); \
+#define GEN_SLICE_AND_ARRAY_IMPL_PRIM(name, typ) \
+  GEN_SLICE_IMPL_PRIM(name, typ); \
+  GEN_ARRAY_IMPL_PRIM(name, typ); \
+  struct name##_array name##_array_from_slice(struct name##_slice *slice) { \
+    struct name##_array ret = name##_array_make(slice->ptr, slice->count); \
+    slice->ptr = NULL; \
+    slice->count = 0; \
+    slice->limit = 0; \
+    return ret; \
+  } \
+  typedef int GEN_SLICE_AND_ARRAY_IMPL_##name##_force_semicolon
+
+#define GEN_SLICE_AND_ARRAY_IMPL(name, typ, dtor) \
+  GEN_SLICE_IMPL(name, typ, dtor); \
+  GEN_ARRAY_IMPL(name, typ, dtor); \
   struct name##_array name##_array_from_slice(struct name##_slice *slice) { \
     struct name##_array ret = name##_array_make(slice->ptr, slice->count); \
     slice->ptr = NULL; \
