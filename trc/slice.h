@@ -78,10 +78,7 @@
   struct name##_array name##_array_make(typ *ptr, size_t count); \
   struct name##_array name##_array_malloc(size_t count); \
   void name##_array_init_copy(struct name##_array *a, \
-                              struct name##_array *c, \
-                              void (*copier)(typ *, typ *)); \
-  void name##_array_init_copy_prim(struct name##_array *a, \
-                                   struct name##_array *c); \
+                              struct name##_array *c); \
   void name##_array_destroy(struct name##_array *arr); \
   void name##_array_destroy_prim(struct name##_array *arr); \
   typedef int GEN_ARRAY_HDR_##name##_force_semicolon
@@ -97,18 +94,9 @@
   struct name##_array name##_array_malloc(size_t count) { \
     return name##_array_make(malloc_mul(sizeof(typ), count), count);  \
   } \
-  void name##_array_init_copy(struct name##_array *a, \
-                              struct name##_array *c, \
-                              void (*copier)(typ *, typ *)) { \
-    SLICE_INIT_COPY(a->ptr, a->count, c->ptr, c->count, copier); \
-  } \
-  void name##_array_init_copy_prim(struct name##_array *a, \
-                                   struct name##_array *c) { \
-    SLICE_INIT_COPY_PRIM(a->ptr, a->count, c->ptr, c->count); \
-  } \
   typedef int GEN_ARRAY_IMPL_##name##_force_semicolon
 
-#define GEN_ARRAY_IMPL(name, typ, dtor)  \
+#define GEN_ARRAY_IMPL(name, typ, dtor) \
   GEN_ARRAY_IMPL_COMMON(name, typ); \
   void name##_array_destroy(struct name##_array *arr) { \
     SLICE_FREE(arr->ptr, arr->count, dtor); \
