@@ -54,6 +54,7 @@ struct defclass_ident {
 GEN_SLICE_HDR(defclass_ident, struct defclass_ident);
 
 struct def_entry;
+GEN_SLICE_HDR(def_entry_nonowning_ptr, struct def_entry *);
 GEN_SLICE_HDR(def_entry_ptr, struct def_entry *);
 
 struct def_entry {
@@ -81,7 +82,7 @@ struct def_entry {
   evaluation.  We could do this per-instantiation but right now that's
   irrelevant because there's no specialization.  These references must
   form an acyclic graph -- or the user's program is invalid. */
-  struct def_entry_ptr_slice static_references;
+  struct def_entry_nonowning_ptr_slice static_references;
 
   int known_acyclic;
   int acyclicity_being_chased;

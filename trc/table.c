@@ -8,6 +8,7 @@
 #include "typecheck.h"
 
 GEN_SLICE_IMPL(def_entry_ptr, struct def_entry *);
+GEN_SLICE_IMPL(def_entry_nonowning_ptr, struct def_entry *);
 GEN_SLICE_IMPL(deftype_entry_ptr, struct deftype_entry *);
 GEN_SLICE_IMPL(def_instantiation_ptr, struct def_instantiation *);
 GEN_SLICE_IMPL(deftype_instantiation_ptr, struct deftype_instantiation *);
@@ -127,7 +128,7 @@ void def_entry_init(struct def_entry *e, ident_value name,
 
   e->instantiations = def_instantiation_ptr_slice_initializer();
 
-  e->static_references = def_entry_ptr_slice_initializer();
+  e->static_references = def_entry_nonowning_ptr_slice_initializer();
 
   e->known_acyclic = 0;
   e->acyclicity_being_chased = 0;
@@ -154,9 +155,7 @@ void def_entry_destroy(struct def_entry *e) {
   def_instantiation_ptr_slice_destroy(&e->instantiations,
                                       def_instantiation_free);
 
-  /* These are unowned pointers, unlike another def_entry_ptr slice,
-  which passes def_entry_ptr_destroy to its slice destructor. */
-  def_entry_ptr_slice_destroy_prim(&e->static_references);
+  def_entry_nonowning_ptr_slice_destroy_prim(&e->static_references);
 
   e->known_acyclic = 0;
   e->acyclicity_being_chased = 0;
@@ -175,7 +174,7 @@ void def_entry_note_static_reference(struct def_entry *ent,
       return;
     }
   }
-  def_entry_ptr_slice_push(&ent->static_references, reference);
+  def_entry_nonowning_ptr_slice_push(&ent->static_references, reference);
 }
 
 void deftype_instantiation_init(struct deftype_instantiation *inst,
