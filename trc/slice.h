@@ -94,7 +94,7 @@
   struct name##_array name##_array_malloc(size_t count) { \
     return name##_array_make(malloc_mul(sizeof(typ), count), count);  \
   } \
-  typedef int GEN_ARRAY_IMPL_##name##_force_semicolon
+  typedef int GEN_ARRAY_IMPL_COMMON_##name##_force_semicolon
 
 #define GEN_ARRAY_IMPL(name, typ, dtor) \
   GEN_ARRAY_IMPL_COMMON(name, typ); \
