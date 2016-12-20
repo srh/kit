@@ -1,3 +1,3 @@
 #!/bin/sh
 
-clang -Wall -Wextra -Wno-tautological-constant-out-of-range-compare -Werror -std=c99 -g -Itrc trc/*.c -o s1
+clang -Wall -Wextra -Wno-tautological-constant-out-of-range-compare -Werror -std=c99 -g -Iphase1 phase1/*.c -o s1

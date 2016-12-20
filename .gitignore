@@ -5,12 +5,12 @@ a.out
 s1
 *.dSYM/
 s2
-/urc/s2b
+/phase2/s2b
 s3
-/vrc/s3b
+/phase3/s3b
 s4
-/wrc/s4b
+/phase4/s4b
 s5
-/xrc/s5b
+/phase5/s5b
 s6
 /src/s6b

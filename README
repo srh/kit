@@ -51,11 +51,11 @@ or  (on OS X, with XCode tools (i.e. clang) installed)
 
 The current directory structure is:
 
-   trc - s1, implemented in C.  Compiles s2.
-   urc - s2, implemented in proto-Kit.  Compiles s2 and s3.
-   vrc - s3, implemented in proto-Kit.  Compiles s3 and s4.
-   wrc - s4, implemented in proto-Kit.  Compiles s4 and s5.
-   xrc - s5, implemented in proto-Kit.  Compiles s5 and s6.
+   phase1 - s1, implemented in C.  Compiles s2.
+   phase2 - s2, implemented in proto-Kit.  Compiles s2 and s3.
+   phase3 - s3, implemented in proto-Kit.  Compiles s3 and s4.
+   phase4 - s4, implemented in proto-Kit.  Compiles s4 and s5.
+   phase5 - s5, implemented in proto-Kit.  Compiles s5 and s6.
    src - s6, implemented in proto-Kit.  Compiles s6.
    examples - examples to run, disorganized junk
 
