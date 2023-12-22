@@ -87,3 +87,6 @@ s1 can target x86 and, on Linux, amd64.  Use --linux64 to target
 amd64.
 
 s2, s3, s4, and s5 can only target x86.
+
+These only compile object files.  Try `gcc -no-pie` when linking,
+which is (for now) necessary on amd64.
