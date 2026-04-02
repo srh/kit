@@ -102,6 +102,7 @@ def kSHN_UNDEF u32 = 0;
 def kLinux32DataSectionNumber u32 = 5;
 def kLinux32RodataSectionNumber u32 = 7;
 def kLinux32TextSectionNumber u32 = 9;
+def kLinux32NoteGnuStackSectionNumber u32 = 11;
 def kSHF_WRITE u32 = 1;
 def kSHF_ALLOC u32 = 2;
 def kSHF_EXEC u32 = 4;
@@ -111,7 +112,7 @@ def kR_386_PC32 u32 = 2;
 func linux32_flatten(im *identmap, f *objfile) array[u8] {
   d array[u8];
   section_header_offset u32 = ~sizeof@[elf32_Header];
-  kNumSectionHeaders u32 = 10;
+  kNumSectionHeaders u32 = 11;
   end_of_section_headers u32 = section_header_offset + kNumSectionHeaders * ~sizeof@[elf32_Section_Header];
 
   sh_strtab_offset u32 = end_of_section_headers;
@@ -127,6 +128,7 @@ func linux32_flatten(im *identmap, f *objfile) array[u8] {
   dot_rodata_index u32 = strtab_add(&sh_strtab, _u8(".rodata"));
   dot_rel_text_index u32 = strtab_add(&sh_strtab, _u8(".rel.text"));
   dot_text_index u32 = strtab_add(&sh_strtab, _u8(".text"));
+  dot_note_gnu_stack_index u32 = strtab_add(&sh_strtab, _u8(".note.GNU-stack"));
   ign = strtab_add(&sh_strtab, _u8(""));
 
   sym_strtab_offset u32 = sh_strtab_offset + ~count(&sh_strtab);
@@ -160,6 +162,8 @@ func linux32_flatten(im *identmap, f *objfile) array[u8] {
   sh_text elf32_Section_Header;
   text_end u32;
   linux32_section_headers(rodata_end, kLinux32TextSectionNumber, &f->text, dot_rel_text_index, dot_text_index, kSHF_EXEC, &sh_rel_text, &sh_text, &text_end);
+
+  note_gnustack_offset u32 = text_end;
 
   if true {
     h elf32_Header;
@@ -272,6 +276,24 @@ func linux32_flatten(im *identmap, f *objfile) array[u8] {
   append_reinterpret(&d, &sh_rel_text);
   append_reinterpret(&d, &sh_text);
 
+  if true {
+    check(kLinux32NoteGnuStackSectionNumber == 11);
+    // .note.GNU-stack section header -- index 11.
+    sh elf32_Section_Header;
+    sh.sh_name = ~dot_note_gnu_stack_index;
+    sh.sh_type = ~kSHT_PROGBITS;
+    // sh_flags being set to zero, without kSHF_EXEC, is the purpose of this header.
+    sh.sh_flags = ~ @[u32] 0;
+    sh.sh_addr = ~ @[u32] 0;
+    sh.sh_offset = ~note_gnustack_offset;
+    sh.sh_size = ~ @[u32] 0;
+    sh.sh_link = ~ @[u32] 0;
+    sh.sh_info = ~ @[u32] 0;
+    sh.sh_addralign = ~ @[u32] 0;
+    sh.sh_entsize = ~ @[u32] 0;
+    append_reinterpret(&d, &sh);
+  }
+
   // Section headers done -- append string table.
   check(~count(&d) == sh_strtab_offset);
   append(&d, &sh_strtab);
@@ -304,6 +326,7 @@ func linux32_flatten(im *identmap, f *objfile) array[u8] {
   append_to_alignment(&d, ~f->text.max_requested_alignment, 0);
   check(~count(&d) == ~sh_text.sh_offset);
   append(&d, &f->text.raw);
+  check(~count(&d) == note_gnustack_offset);
 
   return d;
 }
