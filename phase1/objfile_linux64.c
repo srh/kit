@@ -123,6 +123,7 @@ enum {
   kLinux64DataSectionNumber = 5,
   kLinux64RodataSectionNumber = 7,
   kLinux64TextSectionNumber = 9,
+  kLinux64NoteGnuStackSectionNumber = 11,
   kSHF_WRITE = 1,
   kSHF_ALLOC = 2,
   kSHF_EXEC = 4,
@@ -313,7 +314,7 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   databuf_init(d);
 
   const uint32_t section_header_offset = sizeof(struct elf64_Header);
-  const uint16_t kNumSectionHeaders = 10;
+  const uint16_t kNumSectionHeaders = 11;
   const uint32_t end_of_section_headers
     = uint32_add(section_header_offset,
                  kNumSectionHeaders * sizeof(struct elf64_Section_Header));
@@ -340,6 +341,8 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
     = strtab_append_c_str(&sh_strtab, ".rela.text");
   const uint32_t dot_text_index
     = strtab_append_c_str(&sh_strtab, ".text");
+  const uint32_t dot_note_gnustack_index
+    = strtab_append_c_str(&sh_strtab, ".note.GNU-stack");
   strtab_append_c_str(&sh_strtab, "");
 
   const uint32_t sym_strtab_offset
@@ -390,6 +393,8 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
                           kSHF_EXEC,
                           &sh_rela_text, &sh_text,
                           &text_end);
+
+  const uint32_t note_gnustack_offset = text_end;
 
   {
     struct elf64_Header h;
@@ -499,6 +504,25 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   databuf_append(d, &sh_rela_text, sizeof(sh_rela_text));
   databuf_append(d, &sh_text, sizeof(sh_text));
 
+  {
+    STATIC_CHECK(kLinux64NoteGnuStackSectionNumber == 11);
+    /* .note.GNU-stack section header -- index 11. */
+    struct elf64_Section_Header sh;
+    sh.sh_name = to_le_u32(dot_note_gnustack_index);
+    sh.sh_type = to_le_u32(kSHT_PROGBITS);
+    /* Notably, sh_flags doesn't have kSHF_EXEC, making the stack
+    non-executable. */
+    sh.sh_flags = to_le_u64(0);
+    sh.sh_addr = to_le_u64(0);
+    sh.sh_offset = up_to_le_u64(note_gnustack_offset);
+    sh.sh_size = up_to_le_u64(0);
+    sh.sh_link = to_le_u32(0);
+    sh.sh_info = to_le_u32(0);
+    sh.sh_addralign = to_le_u64(0);
+    sh.sh_entsize = to_le_u64(0);
+    databuf_append(d, &sh, sizeof(sh));
+  }
+
   /* Section headers done -- append string table. */
   CHECK(d->count == sh_strtab_offset);
   databuf_append(d, sh_strtab.buf, sh_strtab.count);
@@ -538,6 +562,8 @@ void linux64_flatten(struct identmap *im, struct objfile *f, struct databuf **ou
   append_zeros_to_align(d, f->text.max_requested_alignment);
   CHECK(d->count == from_le_u64(sh_text.sh_offset));
   databuf_append(d, f->text.raw.buf, f->text.raw.count);
+
+  CHECK(d->count == uint32_to_size(note_gnustack_offset));
 
   *out = d;
   free(sti_map);
