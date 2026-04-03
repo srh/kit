@@ -19,7 +19,7 @@ enum gp_reg {
   GP_C,
   GP_D,
 
-  /* 5 callee-save registers, we don't use any but SP and BP */
+  /* 5 callee-save registers */
   GP_B,
   /* stack pointer */
   GP_SP,

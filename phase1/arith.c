@@ -292,3 +292,21 @@ size_t uint64_to_size(uint64_t x) {
   CHECK(x <= SIZE_MAX);
   return (size_t)x;
 }
+
+int try_uint64_mul(uint64_t x, uint64_t y, uint64_t *out) {
+  if (y == 0 || x <= UINT64_MAX / y) {
+    *out = x * y;
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+int try_uint64_add(uint64_t x, uint64_t y, uint64_t *out) {
+  if (x <= UINT64_MAX - y) {
+    *out = x + y;
+    return 1;
+  } else {
+    return 0;
+  }
+}

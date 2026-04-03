@@ -237,6 +237,50 @@ static const enum primitive_op_tag binop_i32_primitive_ops[] = {
   [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
 };
 
+static const enum primitive_op_tag binop_u64_primitive_ops[] = {
+  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_U64,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_U64,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_U64,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_U64,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_U64,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_U64,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_U64,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_U64,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_U64,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_U64,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_U64,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_U64,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_U64,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_U64,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_U64,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_U64,
+  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
+};
+
+static const enum primitive_op_tag binop_i64_primitive_ops[] = {
+  [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_I64,
+  [AST_BINOP_SUB] = PRIMITIVE_OP_SUB_I64,
+  [AST_BINOP_MUL] = PRIMITIVE_OP_MUL_I64,
+  [AST_BINOP_DIV] = PRIMITIVE_OP_DIV_I64,
+  [AST_BINOP_MOD] = PRIMITIVE_OP_MOD_I64,
+  [AST_BINOP_LT] = PRIMITIVE_OP_LT_I64,
+  [AST_BINOP_LE] = PRIMITIVE_OP_LE_I64,
+  [AST_BINOP_GT] = PRIMITIVE_OP_GT_I64,
+  [AST_BINOP_GE] = PRIMITIVE_OP_GE_I64,
+  [AST_BINOP_EQ] = PRIMITIVE_OP_EQ_I64,
+  [AST_BINOP_NE] = PRIMITIVE_OP_NE_I64,
+  [AST_BINOP_BIT_XOR] = PRIMITIVE_OP_BIT_XOR_I64,
+  [AST_BINOP_BIT_OR] = PRIMITIVE_OP_BIT_OR_I64,
+  [AST_BINOP_BIT_AND] = PRIMITIVE_OP_BIT_AND_I64,
+  [AST_BINOP_BIT_LEFTSHIFT] = PRIMITIVE_OP_BIT_LEFTSHIFT_I64,
+  [AST_BINOP_BIT_RIGHTSHIFT] = PRIMITIVE_OP_BIT_RIGHTSHIFT_I64,
+  [AST_BINOP_LOGICAL_OR] = PRIMITIVE_OP_INVALID,
+  [AST_BINOP_LOGICAL_AND] = PRIMITIVE_OP_INVALID,
+};
+
 static const enum primitive_op_tag binop_size_primitive_ops[] = {
   [AST_BINOP_ASSIGN] = PRIMITIVE_OP_INVALID,
   [AST_BINOP_ADD] = PRIMITIVE_OP_ADD_SIZE,
@@ -316,6 +360,8 @@ void checkstate_import_primitive_types(struct checkstate *cs) {
   intern_primitive_type(cs, I16_TYPE_NAME, NULL, 0, 2, 2);
   intern_primitive_type(cs, U32_TYPE_NAME, NULL, 0, 4, 4);
   intern_primitive_type(cs, I32_TYPE_NAME, NULL, 0, 4, 4);
+  intern_primitive_type(cs, U64_TYPE_NAME, NULL, 0, 8, 8);
+  intern_primitive_type(cs, I64_TYPE_NAME, NULL, 0, 8, 8);
   uint32_t psize = ptr_size(cs->arch);
   intern_primitive_type(cs, SIZE_TYPE_NAME, NULL, 0, psize, psize);
   intern_primitive_type(cs, OSIZE_TYPE_NAME, NULL, 0, psize, psize);
@@ -438,26 +484,42 @@ void import_bool_binops(struct checkstate *cs) {
 struct fake_limit { int low, high; };
 
 void import_integer_conversions(struct checkstate *cs) {
-  const size_t num_types = 8;
-  ident_value types[8];
+  const size_t num_types = 10;
+  ident_value types[10];
   types[0] = cs->cm.u8_type_name;
   types[1] = cs->cm.i8_type_name;
   types[2] = cs->cm.u16_type_name;
   types[3] = cs->cm.i16_type_name;
   types[4] = cs->cm.u32_type_name;
   types[5] = cs->cm.i32_type_name;
-  types[6] = cs->cm.size_type_name;
-  types[7] = cs->cm.osize_type_name;
+  types[6] = cs->cm.u64_type_name;
+  types[7] = cs->cm.i64_type_name;
+  types[8] = cs->cm.size_type_name;
+  types[9] = cs->cm.osize_type_name;
 
-  struct fake_limit fake_limits[8] = {
+  int size_fake_limit;
+  switch (cs->arch) {
+  case TARGET_ARCH_X86:
+    size_fake_limit = 12;
+    break;
+  case TARGET_ARCH_X64:
+    size_fake_limit = 16;
+    break;
+  default:
+    UNREACHABLE();
+  }
+
+  struct fake_limit fake_limits[10] = {
     {0, 4},
     {-3, 3},
     {0, 8},
     {-7, 7},
     {0, 12},
     {-11, 11},
-    {0, 12},
-    {0, 12},
+    {0, 16},
+    {-15, 15},
+    {0, size_fake_limit},
+    {0, size_fake_limit},
   };
 
   ident_value convert = identmap_intern_c_str(cs->im, CONVERT_FUNCTION_NAME);
@@ -466,7 +528,7 @@ void import_integer_conversions(struct checkstate *cs) {
   struct ast_generics generics;
   ast_generics_init_no_params(&generics);
 
-  enum primitive_op_tag conversions[8][8] = {
+  enum primitive_op_tag conversions[10][10] = {
     {
       PRIMITIVE_OP_CONVERT_U8_TO_U8,
       PRIMITIVE_OP_CONVERT_U8_TO_I8,
@@ -474,6 +536,8 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_U8_TO_I16,
       PRIMITIVE_OP_CONVERT_U8_TO_U32,
       PRIMITIVE_OP_CONVERT_U8_TO_I32,
+      PRIMITIVE_OP_CONVERT_U8_TO_U64,
+      PRIMITIVE_OP_CONVERT_U8_TO_I64,
       PRIMITIVE_OP_CONVERT_U8_TO_SIZE,
       PRIMITIVE_OP_CONVERT_U8_TO_OSIZE,
     }, {
@@ -483,6 +547,8 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_I8_TO_I16,
       PRIMITIVE_OP_CONVERT_I8_TO_U32,
       PRIMITIVE_OP_CONVERT_I8_TO_I32,
+      PRIMITIVE_OP_CONVERT_I8_TO_U64,
+      PRIMITIVE_OP_CONVERT_I8_TO_I64,
       PRIMITIVE_OP_CONVERT_I8_TO_SIZE,
       PRIMITIVE_OP_CONVERT_I8_TO_OSIZE,
     }, {
@@ -492,6 +558,8 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_U16_TO_I16,
       PRIMITIVE_OP_CONVERT_U16_TO_U32,
       PRIMITIVE_OP_CONVERT_U16_TO_I32,
+      PRIMITIVE_OP_CONVERT_U16_TO_U64,
+      PRIMITIVE_OP_CONVERT_U16_TO_I64,
       PRIMITIVE_OP_CONVERT_U16_TO_SIZE,
       PRIMITIVE_OP_CONVERT_U16_TO_OSIZE,
     }, {
@@ -501,6 +569,8 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_I16_TO_I16,
       PRIMITIVE_OP_CONVERT_I16_TO_U32,
       PRIMITIVE_OP_CONVERT_I16_TO_I32,
+      PRIMITIVE_OP_CONVERT_I16_TO_U64,
+      PRIMITIVE_OP_CONVERT_I16_TO_I64,
       PRIMITIVE_OP_CONVERT_I16_TO_SIZE,
       PRIMITIVE_OP_CONVERT_I16_TO_OSIZE,
     }, {
@@ -510,6 +580,8 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_U32_TO_I16,
       PRIMITIVE_OP_CONVERT_U32_TO_U32,
       PRIMITIVE_OP_CONVERT_U32_TO_I32,
+      PRIMITIVE_OP_CONVERT_U32_TO_U64,
+      PRIMITIVE_OP_CONVERT_U32_TO_I64,
       PRIMITIVE_OP_CONVERT_U32_TO_SIZE,
       PRIMITIVE_OP_CONVERT_U32_TO_OSIZE,
     }, {
@@ -519,8 +591,32 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_I32_TO_I16,
       PRIMITIVE_OP_CONVERT_I32_TO_U32,
       PRIMITIVE_OP_CONVERT_I32_TO_I32,
+      PRIMITIVE_OP_CONVERT_I32_TO_U64,
+      PRIMITIVE_OP_CONVERT_I32_TO_I64,
       PRIMITIVE_OP_CONVERT_I32_TO_SIZE,
       PRIMITIVE_OP_CONVERT_I32_TO_OSIZE,
+    }, {
+      PRIMITIVE_OP_CONVERT_U64_TO_U8,
+      PRIMITIVE_OP_CONVERT_U64_TO_I8,
+      PRIMITIVE_OP_CONVERT_U64_TO_U16,
+      PRIMITIVE_OP_CONVERT_U64_TO_I16,
+      PRIMITIVE_OP_CONVERT_U64_TO_U32,
+      PRIMITIVE_OP_CONVERT_U64_TO_I32,
+      PRIMITIVE_OP_CONVERT_U64_TO_U64,
+      PRIMITIVE_OP_CONVERT_U64_TO_I64,
+      PRIMITIVE_OP_CONVERT_U64_TO_SIZE,
+      PRIMITIVE_OP_CONVERT_U64_TO_OSIZE,
+    }, {
+      PRIMITIVE_OP_CONVERT_I64_TO_U8,
+      PRIMITIVE_OP_CONVERT_I64_TO_I8,
+      PRIMITIVE_OP_CONVERT_I64_TO_U16,
+      PRIMITIVE_OP_CONVERT_I64_TO_I16,
+      PRIMITIVE_OP_CONVERT_I64_TO_U32,
+      PRIMITIVE_OP_CONVERT_I64_TO_I32,
+      PRIMITIVE_OP_CONVERT_I64_TO_U64,
+      PRIMITIVE_OP_CONVERT_I64_TO_I64,
+      PRIMITIVE_OP_CONVERT_I64_TO_SIZE,
+      PRIMITIVE_OP_CONVERT_I64_TO_OSIZE,
     }, {
       PRIMITIVE_OP_CONVERT_SIZE_TO_U8,
       PRIMITIVE_OP_CONVERT_SIZE_TO_I8,
@@ -528,6 +624,8 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_SIZE_TO_I16,
       PRIMITIVE_OP_CONVERT_SIZE_TO_U32,
       PRIMITIVE_OP_CONVERT_SIZE_TO_I32,
+      PRIMITIVE_OP_CONVERT_SIZE_TO_U64,
+      PRIMITIVE_OP_CONVERT_SIZE_TO_I64,
       PRIMITIVE_OP_CONVERT_SIZE_TO_SIZE,
       PRIMITIVE_OP_CONVERT_SIZE_TO_OSIZE,
     }, {
@@ -537,6 +635,8 @@ void import_integer_conversions(struct checkstate *cs) {
       PRIMITIVE_OP_CONVERT_OSIZE_TO_I16,
       PRIMITIVE_OP_CONVERT_OSIZE_TO_U32,
       PRIMITIVE_OP_CONVERT_OSIZE_TO_I32,
+      PRIMITIVE_OP_CONVERT_OSIZE_TO_U64,
+      PRIMITIVE_OP_CONVERT_OSIZE_TO_I64,
       PRIMITIVE_OP_CONVERT_OSIZE_TO_SIZE,
       PRIMITIVE_OP_CONVERT_OSIZE_TO_OSIZE,
     },
@@ -725,6 +825,8 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
   import_integer_binops(cs, binop_i16_primitive_ops, I16_TYPE_NAME);
   import_integer_binops(cs, binop_u32_primitive_ops, U32_TYPE_NAME);
   import_integer_binops(cs, binop_i32_primitive_ops, I32_TYPE_NAME);
+  import_integer_binops(cs, binop_u64_primitive_ops, U64_TYPE_NAME);
+  import_integer_binops(cs, binop_i64_primitive_ops, I64_TYPE_NAME);
   import_integer_binops(cs, binop_size_primitive_ops, SIZE_TYPE_NAME);
   import_integer_binops(cs, binop_osize_primitive_ops, OSIZE_TYPE_NAME);
   import_bool_binops(cs);
@@ -736,6 +838,7 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
     import_unop(cs, PRIMITIVE_OP_NEGATE_I8, "-", I8_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_NEGATE_I16, "-", I16_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_NEGATE_I32, "-", I32_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_NEGATE_I64, "-", I64_TYPE_NAME);
 
     import_unop(cs, PRIMITIVE_OP_LOGICAL_NOT, "!", BOOL_TYPE_NAME);
 
@@ -745,6 +848,8 @@ void checkstate_import_primitive_defs(struct checkstate *cs) {
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_U16, "^", U16_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_I32, "^", I32_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_U32, "^", U32_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_BIT_NOT_I64, "^", I64_TYPE_NAME);
+    import_unop(cs, PRIMITIVE_OP_BIT_NOT_U64, "^", U64_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_SIZE, "^", SIZE_TYPE_NAME);
     import_unop(cs, PRIMITIVE_OP_BIT_NOT_OSIZE, "^", OSIZE_TYPE_NAME);
   }
@@ -4604,9 +4709,9 @@ uint32_t unsafe_numeric_literal_u32(struct ast_numeric_literal *a) {
 
 #define NUMERIC_LITERAL_OOR "Numeric literal out of range.\n"
 
-int numeric_literal_to_u32(struct ast_numeric_literal *a, uint32_t *out) {
+int numeric_literal_to_u64(struct ast_numeric_literal *a, uint64_t *out) {
   CHECK(a->digits.count > 0);
-  uint32_t base;
+  uint64_t base;
   switch (a->tag) {
   case AST_NUMERIC_LITERAL_DEC:
     base = 10;
@@ -4618,13 +4723,13 @@ int numeric_literal_to_u32(struct ast_numeric_literal *a, uint32_t *out) {
     UNREACHABLE();
   }
 
-  uint32_t built_value = 0;
+  uint64_t built_value = 0;
   for (size_t i = 0, e = a->digits.count; i < e; i++) {
-    if (!try_uint32_mul(built_value, base, &built_value)) {
+    if (!try_uint64_mul(built_value, base, &built_value)) {
       ERR_DBG(NUMERIC_LITERAL_OOR);
       return 0;
     }
-    if (!try_uint32_add(built_value, a->digits.ptr[i], &built_value)) {
+    if (!try_uint64_add(built_value, a->digits.ptr[i], &built_value)) {
       ERR_DBG(NUMERIC_LITERAL_OOR);
       return 0;
     }
@@ -4634,8 +4739,66 @@ int numeric_literal_to_u32(struct ast_numeric_literal *a, uint32_t *out) {
   return 1;
 }
 
-int squash_u32_to_i32(uint32_t value, int32_t *out) {
-  if (value > 0x7FFFFFFFul) {
+int numeric_literal_to_u32(struct ast_numeric_literal *a, uint32_t *out) {
+  uint64_t value;
+  if (!numeric_literal_to_u64(a, &value)) {
+    return 0;
+  }
+  return squash_u64_to_u32(value, out);
+}
+
+int numeric_literal_to_i32(struct ast_numeric_literal *a, int32_t *out) {
+  /* TODO: There's no way to plainly represent INT32_MIN.  (Or maybe,
+  INT64_MIN now.)  We should get static evaluation of "arbitrary
+  numeric constants" implemented. */
+  uint64_t value;
+  if (!numeric_literal_to_u64(a, &value)) {
+    return 0;
+  }
+  return squash_u32_to_i32(value, out);
+}
+
+int squash_u64_to_u32(uint64_t value, uint32_t *out) {
+  if (value > 0xFFFFFFFFull) {
+    ERR_DBG(NUMERIC_LITERAL_OOR);
+    return 0;
+  }
+  CHECK(value <= UINT32_MAX);
+  *out = (uint32_t)value;
+  return 1;
+}
+
+int squash_u64_to_size(enum target_arch arch, uint64_t value, uint64_t *out) {
+  switch (arch) {
+  case TARGET_ARCH_X86: {
+    uint32_t out32;
+    if (!squash_u64_to_u32(value, &out32)) {
+      return 0;
+    }
+    *out = (uint64_t)out32;
+    return 1;
+  } break;
+  case TARGET_ARCH_X64: {
+    *out = value;
+    return 1;
+  } break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+int squash_u64_to_i64(uint64_t value, int64_t *out) {
+  if (value > 0x7FFFFFFFFFFFFFFFull) {
+    ERR_DBG(NUMERIC_LITERAL_OOR);
+    return 0;
+  }
+  CHECK(value <= INT64_MAX);
+  *out = (int64_t)value;
+  return 1;
+}
+
+int squash_u64_to_i32(uint64_t value, int32_t *out) {
+  if (value > 0x7FFFFFFFull) {
     ERR_DBG(NUMERIC_LITERAL_OOR);
     return 0;
   }
@@ -4644,18 +4807,12 @@ int squash_u32_to_i32(uint32_t value, int32_t *out) {
   return 1;
 }
 
-int numeric_literal_to_i32(struct ast_numeric_literal *a, int32_t *out) {
-  /* TODO: There's no way to plainly represent INT32_MIN.  We should
-  get static evaluation of "arbitrary numeric constants"
-  implemented. */
-  uint32_t value;
-  if (!numeric_literal_to_u32(a, &value)) {
-    return 0;
-  }
-  return squash_u32_to_i32(value, out);
+int squash_u32_to_i32(uint32_t value, int32_t *out) {
+  uint64_t val64 = (uint64_t)value;
+  return squash_u64_to_i32(val64, out);
 }
 
-int squash_u32_to_u8(uint32_t value, uint8_t *out) {
+int squash_u64_to_u8(uint64_t value, uint8_t *out) {
   if (value > 0xFF) {
     ERR_DBG(NUMERIC_LITERAL_OOR);
     return 0;
@@ -4665,15 +4822,20 @@ int squash_u32_to_u8(uint32_t value, uint8_t *out) {
   return 1;
 }
 
-int numeric_literal_to_u8(struct ast_numeric_literal *a, uint8_t *out) {
-  uint32_t value;
-  if (!numeric_literal_to_u32(a, &value)) {
-    return 0;
-  }
-  return squash_u32_to_u8(value, out);
+int squash_u32_to_u8(uint32_t value, uint8_t *out) {
+  uint64_t val64 = (uint64_t)value;
+  return squash_u64_to_u8(val64, out);
 }
 
-int squash_u32_to_i8(uint32_t value, int8_t *out) {
+int numeric_literal_to_u8(struct ast_numeric_literal *a, uint8_t *out) {
+  uint64_t value;
+  if (!numeric_literal_to_u64(a, &value)) {
+    return 0;
+  }
+  return squash_u64_to_u8(value, out);
+}
+
+int squash_u64_to_i8(uint64_t value, int8_t *out) {
   if (value > 0x7F) {
     ERR_DBG(NUMERIC_LITERAL_OOR);
     return 0;
@@ -4683,12 +4845,17 @@ int squash_u32_to_i8(uint32_t value, int8_t *out) {
   return 1;
 }
 
+int squash_u32_to_i8(uint32_t value, int8_t *out) {
+  uint64_t val64 = (uint64_t)value;
+  return squash_u64_to_i8(val64, out);
+}
+
 int numeric_literal_to_i8(struct ast_numeric_literal *a, int8_t *out) {
-  uint32_t value;
-  if (!numeric_literal_to_u32(a, &value)) {
+  uint64_t value;
+  if (!numeric_literal_to_u64(a, &value)) {
     return 0;
   }
-  return squash_u32_to_i8(value, out);
+  return squash_u64_to_i8(value, out);
 }
 
 int eval_static_numeric_literal(struct checkstate *cs,

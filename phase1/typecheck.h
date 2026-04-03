@@ -21,6 +21,8 @@ struct ast_numeric_literal;
 #define I16_TYPE_NAME "i16"
 #define U32_TYPE_NAME "u32"
 #define I32_TYPE_NAME "i32"
+#define U64_TYPE_NAME "u64"
+#define I64_TYPE_NAME "i64"
 #define SIZE_TYPE_NAME "size"
 /* osize arithmetic doesn't check overflow. */
 #define OSIZE_TYPE_NAME "osize"
@@ -81,6 +83,13 @@ struct ast_typeexpr *expose_func_return_type(struct common_idents *cm,
                                              size_t expected_params_count);
 uint32_t unsafe_numeric_literal_u32(struct ast_numeric_literal *a);
 int numeric_literal_to_u32(struct ast_numeric_literal *a, uint32_t *out);
+int numeric_literal_to_u64(struct ast_numeric_literal *a, uint64_t *out);
+int squash_u64_to_i64(uint64_t value, int64_t *out);
+int squash_u64_to_i32(uint64_t value, int32_t *out);
+int squash_u64_to_u32(uint64_t value, uint32_t *out);
+int squash_u64_to_size(enum target_arch arch, uint64_t value, uint64_t *out);
+int squash_u64_to_u8(uint64_t value, uint8_t *out);
+int squash_u64_to_i8(uint64_t value, int8_t *out);
 int squash_u32_to_i32(uint32_t value, int32_t *out);
 int squash_u32_to_u8(uint32_t value, uint8_t *out);
 int squash_u32_to_i8(uint32_t value, int8_t *out);

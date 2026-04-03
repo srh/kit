@@ -46,9 +46,16 @@ struct common_idents compute_common_idents(struct identmap *im) {
   ret.i16_type_name = identmap_intern_c_str(im, I16_TYPE_NAME);
   ret.u32_type_name = identmap_intern_c_str(im, U32_TYPE_NAME);
   ret.i32_type_name = identmap_intern_c_str(im, I32_TYPE_NAME);
+  ret.u64_type_name = identmap_intern_c_str(im, U64_TYPE_NAME);
+  ret.i64_type_name = identmap_intern_c_str(im, I64_TYPE_NAME);
   ret.size_type_name = identmap_intern_c_str(im, SIZE_TYPE_NAME);
   ret.osize_type_name = identmap_intern_c_str(im, OSIZE_TYPE_NAME);
   ret.char_standin_type_name = identmap_intern_c_str(im, CHAR_STANDIN_TYPE_NAME);
+  ret.x86_i64_mul_func_name = identmap_intern_c_str(im, "__kit_x86_i64_mul");
+  ret.x86_i64_div_func_name = identmap_intern_c_str(im, "__kit_x86_i64_div");
+  ret.x86_i64_mod_func_name = identmap_intern_c_str(im, "__kit_x86_i64_mod");
+  ret.x86_u64_div_func_name = identmap_intern_c_str(im, "__kit_x86_u64_div");
+  ret.x86_u64_mod_func_name = identmap_intern_c_str(im, "__kit_x86_u64_mod");
   return ret;
 }
 

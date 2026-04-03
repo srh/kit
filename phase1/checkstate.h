@@ -35,6 +35,8 @@ struct common_idents {
   ident_value do_move;
   ident_value do_copy;
   ident_value array_length_fieldname;
+  ident_value u64_type_name;
+  ident_value i64_type_name;
   ident_value u32_type_name;
   ident_value i32_type_name;
   ident_value u16_type_name;
@@ -44,6 +46,13 @@ struct common_idents {
   ident_value size_type_name;
   ident_value osize_type_name;
   ident_value char_standin_type_name;
+
+  /* x86-specific */
+  ident_value x86_i64_mul_func_name;
+  ident_value x86_i64_div_func_name;
+  ident_value x86_i64_mod_func_name;
+  ident_value x86_u64_div_func_name;
+  ident_value x86_u64_mod_func_name;
 };
 
 typedef int module_loader(void *ctx,

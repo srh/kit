@@ -51,4 +51,7 @@ uint32_t int32_to_uint32(int32_t x);
 
 size_t uint64_to_size(uint64_t x);
 
+int try_uint64_mul(uint64_t x, uint64_t y, uint64_t *out);
+int try_uint64_add(uint64_t x, uint64_t y, uint64_t *out);
+
 #endif /* KIT_ARITH_H_ */

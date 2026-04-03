@@ -66,6 +66,19 @@ struct objfile_symbol_record {
 
 GEN_SLICE_HDR(objfile_symbol_record, struct objfile_symbol_record);
 
+struct special_stis_func {
+  int has;
+  struct sti sti;
+};
+
+struct special_stis_state {
+  struct special_stis_func x86_i64_mul;
+  struct special_stis_func x86_i64_div;
+  struct special_stis_func x86_i64_mod;
+  struct special_stis_func x86_u64_div;
+  struct special_stis_func x86_u64_mod;
+};
+
 struct objfile {
   struct objfile_section data;
   struct objfile_section rdata;
@@ -76,6 +89,9 @@ struct objfile {
   /* Nothing in objfile code (besides objfile_platform and objfile_arch) should use these. */
   enum target_platform platform;
   enum target_arch arch;
+
+  /* x86-specific (and hackish) right now */
+  struct special_stis_state special_stis;
 };
 
 size_t objfile_section_raw_size(struct objfile_section *s);

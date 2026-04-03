@@ -571,10 +571,12 @@ int is_numeric_type(struct identmap *im, struct ast_typeexpr *a) {
     return 0;
   }
 
+  // TODO: Use common_idents.
   ident_value val = a->u.name.value;
-  const char *names[8] = { U8_TYPE_NAME, I8_TYPE_NAME, U16_TYPE_NAME,
-                           I16_TYPE_NAME, U32_TYPE_NAME, I32_TYPE_NAME,
-                           SIZE_TYPE_NAME, OSIZE_TYPE_NAME };
+  const char *names[10] = { U8_TYPE_NAME, I8_TYPE_NAME, U16_TYPE_NAME,
+                            I16_TYPE_NAME, U32_TYPE_NAME, I32_TYPE_NAME,
+                            U64_TYPE_NAME, I64_TYPE_NAME,
+                            SIZE_TYPE_NAME, OSIZE_TYPE_NAME };
   for (size_t i = 0; i < (sizeof(names) / sizeof(names[0])); i++) {
     if (val == identmap_intern_c_str(im, names[i])) {
       return 1;

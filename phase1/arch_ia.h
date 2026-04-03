@@ -125,14 +125,20 @@ void ia_gen_mov_mem_imm8(struct objfile *f,
                          int32_t dest_disp,
                          int8_t imm);
 void ia_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src);
+void ia_gen_test_imm(struct objfile *f, enum gp_reg reg1, int32_t imm, enum oz oz);
 void ia_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2, enum oz oz);
+void ia_gen_xor_imm(struct objfile *f, enum gp_reg dest, int32_t imm, enum oz oz);
 void ia_gen_xor(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz);
+void ia_gen_shld(struct objfile *f, enum gp_reg dest_hi, enum gp_reg src_lo, enum oz oz);
 void ia_gen_shl_cl(struct objfile *f, enum gp_reg dest, enum oz oz);
 void x64_gen_shl_imm(struct objfile *f, enum x64_reg dest, int8_t imm, enum oz oz);
 void x64_gen_shr_imm(struct objfile *f, enum x64_reg dest, int8_t imm, enum oz oz);
+void ia_gen_shrd(struct objfile *f, enum gp_reg dest_lo, enum gp_reg src_hi, enum oz oz);
 void ia_gen_shr_cl(struct objfile *f, enum gp_reg dest, enum oz oz);
 void ia_gen_sar_cl(struct objfile *f, enum gp_reg dest, enum oz oz);
 void x86_gen_add_esp_i32(struct objfile *f, int32_t x);
+void ia_gen_adc(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz);
+void ia_gen_adc_imm(struct objfile *f, enum gp_reg dest, int32_t imm, enum oz oz);
 void ia_gen_add(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz);
 void ia_gen_azdz_mul(struct objfile *f, enum gp_reg src, enum oz oz);
 void ia_gen_alah_mul_w8(struct objfile *f, enum x86_reg8 src);
@@ -151,6 +157,7 @@ void ia_gen_and(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz
 void ia_gen_not(struct objfile *f, enum gp_reg dest, enum oz oz);
 void ia_gen_neg(struct objfile *f, enum gp_reg dest, enum oz oz);
 void ia_gen_sub(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz);
+void ia_gen_sbb(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz);
 void x64_gen_sub_w64_imm32(struct objfile *f, enum x64_reg dest, int32_t imm);
 void ia_gen_setcc_b8(struct objfile *f, enum x86_reg8 dest,
                      enum ia_setcc code);

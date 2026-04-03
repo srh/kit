@@ -79,6 +79,30 @@ func[H] build_u8str(help H, r *array[u8], x *i32) void {
   }
 }
 
+func[H] build_u8str(help H, r *array[u8], x *u64) void {
+  append(r, unsigned_as_dec(*x));
+}
+
+func[H] build_u8str(help H, r *array[u8], x *i64) void {
+  if *x >= 0 {
+    y u64 = ~ *x;
+    build_u8str(help, r, &y);
+  } else {
+    push(r, '-');
+    // We avoid the overflow we'd get from negating -2^63.
+    y u64 = 1 + @[u64] ~ ^ *x;
+    build_u8str(help, r, &y);
+  }
+}
+
+// Silly.
+func[H] build_u8str(help H, r *array[u8], x *^[3]u8) void {
+  append_raw(r, ixcast(&x[0]), 3);
+}
+func[H] build_u8str(help H, r *array[u8], x *^[4]u8) void {
+  append_raw(r, ixcast(&x[0]), 4);
+}
+
 func[H] build_u8str(help H, r *array[u8], x *size) void {
   append(r, unsigned_as_dec(*x));
 }

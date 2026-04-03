@@ -6,15 +6,23 @@ import parse;
 import stdlib;
 import string;
 import test_check;
+import test_64_bits;
 
 func run_tests(verbose bool, build bool) bool {
+  test_64_bits_passed bool = test_64_bits(verbose);
+  if test_64_bits_passed {
+    print(Stdout(), _u8("64_bits_test passes\n"));
+  } else {
+    print(Stdout(), _u8("64_bits_test FAIL\n"));
+  }
+  ign var = fflush(Stdout());
   test_parse_passed bool = test_parse(verbose);
   if test_parse_passed {
     print(Stdout(), _u8("parse_test passes\n"));
   } else {
     print(Stdout(), _u8("parse_test FAIL\n"));
   }
-  ign var = fflush(Stdout());
+  ign = fflush(Stdout());
   test_check_res tup[bool, u32] = test_check(verbose, build);
   if test_check_res.car {
     print(Stdout(), _u8("check_test passes\n"));
@@ -29,7 +37,8 @@ func run_tests(verbose bool, build bool) bool {
     print(Stdout(), _u8("check_bigint FAIL\n"));
   }
   ign = fflush(Stdout());
-  all_success bool = test_parse_passed && test_check_res.car && test_bigint_passed;
+  all_success bool = test_parse_passed && test_check_res.car &&
+      test_bigint_passed && test_64_bits_passed;
   if all_success {
     print(Stdout(), _u8("All tests PASS!\n"));
   } else {

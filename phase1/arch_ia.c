@@ -63,6 +63,29 @@ void ia_prefix(struct objfile *f, uint8_t opnum, enum oz oz) {
   ia_prefix_no_oz8(f, opnum, oz);
 }
 
+void ia_0f_prefix_no_oz8(struct objfile *f, uint8_t opnum, enum oz oz) {
+  if (oz == OZ_16) {
+    pushtext(f, 0x66);
+  } else if (oz == OZ_64) {
+    CHECK(objfile_arch(f) == TARGET_ARCH_X64);
+    pushtext(f, kREXW);
+  } else {
+    CHECK(oz == OZ_32);
+  }
+  pushtext(f, 0x0F);
+  pushtext(f, opnum);
+}
+
+void ia_0f_prefix(struct objfile *f, uint8_t opnum, enum oz oz) {
+  CHECK(opnum & 1);
+  if (oz == OZ_8) {
+    pushtext(f, 0x0F);
+    pushtext(f, opnum ^ 1);
+    return;
+  }
+  ia_0f_prefix_no_oz8(f, opnum, oz);
+}
+
 /* "reg" specifies the reg field of a modr/m byte, i.e. REX.R. */
 /* "base" specifies the r/m field or SIB base or what-have-you.
 Beware that oz is assumed to refer to both register sizes!  (But one
@@ -309,6 +332,12 @@ void ia_gen_mov_reg8(struct objfile *f, enum x86_reg8 dest, enum x86_reg8 src) {
   apptext(f, b, 2);
 }
 
+void ia_gen_test_imm(struct objfile *f, enum gp_reg reg1, int32_t imm, enum oz oz) {
+  ia_prefix(f, 0xF7, oz);
+  pushtext(f, mod_reg_rm(MOD11, 0, reg1));
+  ia_imm(f, imm, oz);
+}
+
 void ia_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2, enum oz oz) {
   ia_prefix(f, 0x85, oz);
   pushtext(f, mod_reg_rm(MOD11, reg2, reg1));
@@ -317,6 +346,17 @@ void ia_gen_test_regs(struct objfile *f, enum gp_reg reg1, enum gp_reg reg2, enu
 void ia_gen_xor(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
   ia_prefix(f, 0x31, oz);
   pushtext(f, mod_reg_rm(MOD11, src, dest));
+}
+
+void ia_gen_xor_imm(struct objfile *f, enum gp_reg dest, int32_t imm, enum oz oz) {
+  ia_prefix(f, 0x81, oz);
+  pushtext(f, mod_reg_rm(MOD11, 6, dest));
+  ia_imm(f, imm, oz);
+}
+
+void ia_gen_shld(struct objfile *f, enum gp_reg dest_hi, enum gp_reg src_lo, enum oz oz) {
+  ia_0f_prefix_no_oz8(f, 0xA5, oz);
+  pushtext(f, mod_reg_rm(MOD11, src_lo, dest_hi));
 }
 
 void ia_gen_shl_cl(struct objfile *f, enum gp_reg dest, enum oz oz) {
@@ -343,6 +383,11 @@ void x64_gen_shl_imm(struct objfile *f, enum x64_reg dest, int8_t imm, enum oz o
   pushtext(f, (uint8_t)imm);
 }
 
+void ia_gen_shrd(struct objfile *f, enum gp_reg dest_lo, enum gp_reg src_hi, enum oz oz) {
+  ia_0f_prefix_no_oz8(f, 0xAD, oz);
+  pushtext(f, mod_reg_rm(MOD11, src_hi, dest_lo));
+}
+
 void ia_gen_shr_cl(struct objfile *f, enum gp_reg dest, enum oz oz) {
   ia_prefix(f, 0xD3, oz);
   /* SHL, SHR, SAR have different reg/opcode fields. */
@@ -361,6 +406,17 @@ void x86_gen_add_esp_i32(struct objfile *f, int32_t x) {
   b[1] = mod_reg_rm(MOD11, 0, X86_ESP);
   write_le_i32(b + 2, x);
   apptext(f, b, 6);
+}
+
+void ia_gen_adc(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
+  ia_prefix(f, 0x11, oz);
+  pushtext(f, mod_reg_rm(MOD11, src, dest));
+}
+
+void ia_gen_adc_imm(struct objfile *f, enum gp_reg dest, int32_t imm, enum oz oz) {
+  ia_prefix(f, 0x81, oz);
+  pushtext(f, mod_reg_rm(MOD11, 2, dest));
+  ia_imm(f, imm, oz);
 }
 
 void ia_gen_add(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
@@ -467,6 +523,11 @@ void ia_gen_neg(struct objfile *f, enum gp_reg dest, enum oz oz) {
 
 void ia_gen_sub(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
   ia_prefix(f, 0x29, oz);
+  pushtext(f, mod_reg_rm(MOD11, src, dest));
+}
+
+void ia_gen_sbb(struct objfile *f, enum gp_reg dest, enum gp_reg src, enum oz oz) {
+  ia_prefix(f, 0x19, oz);
   pushtext(f, mod_reg_rm(MOD11, src, dest));
 }
 

@@ -12,6 +12,14 @@
 #include "slice.h"
 #include "util.h"
 
+void special_stis_state_init(struct special_stis_state *s) {
+  memset(s, 0, sizeof(*s));
+}
+
+void special_stis_state_destroy(struct special_stis_state *s) {
+  memset(s, 0, sizeof(*s));
+}
+
 void objfile_section_init(struct objfile_section *s) {
   databuf_init(&s->raw);
 
@@ -38,6 +46,8 @@ void objfile_init(struct objfile *f, enum target_platform platform) {
 
   f->platform = platform;
   f->arch = platform_arch(platform);
+
+  special_stis_state_init(&f->special_stis);
 }
 
 void objfile_destroy(struct objfile *f) {
@@ -49,6 +59,8 @@ void objfile_destroy(struct objfile *f) {
 
   f->platform = (enum target_platform)-1;
   f->arch = (enum target_arch)-1;
+
+  special_stis_state_destroy(&f->special_stis);
 }
 
 void objfile_alloc(struct objfile **p_out, enum target_platform platform) {

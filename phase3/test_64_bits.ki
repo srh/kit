@@ -1,0 +1,241 @@
+import build;
+import check;
+import eval;
+import test_check;  // for print_test_announce
+
+struct check_64_ctx {
+  verbose bool;
+  failures u32;
+}
+
+func check64_u8(pred bool, ctx *check_64_ctx, name array[u8]) void {
+  if ctx->verbose {
+    print_test_announce(false, name);
+  }
+  if !pred {
+    ctx->failures = ctx->failures + 1;
+    if !ctx->verbose {
+      print_test_announce(false, name);
+    }
+    print(Stdout(), _u8("FAIL\n"));
+    ign var = fflush(Stdout());
+  } else {
+    if ctx->verbose {
+      print(Stdout(), _u8("PASS\n"));
+      ign var = fflush(Stdout());
+    }
+  }
+}
+
+func[T] check64(pred bool, ctx *check_64_ctx, name T) void {
+  check64_u8(pred, ctx, _u8(name));
+}
+
+func test_64_bits_i64_comparison(ctx *check_64_ctx) void {
+  x i64 = 3;
+  y i64 = -1;
+  z i64 = 2;
+
+  check64(y < x, ctx, "-1 < 3");
+  check64(!(x < y), ctx, "3 < -1");
+  check64(!(x < x), ctx, "3 < 3");
+  check64(!(x < z), ctx, "3 < 2");
+  check64(z < x, ctx, "2 < 3");
+}
+
+func test_64_bits_u64_less(a u64, b u64, ctx *check_64_ctx) void {
+  // We used to have `pa i32 = ~(a & 0xFFFFFFFF)` before div/mod was working.
+  pa u64 = a;
+  pb u64 = a;
+
+  check64_u8(a < b, ctx, to_u8str(cons(pa, cons(" < ", pb))));
+  check64_u8(a <= b, ctx, to_u8str(cons(pa, cons(" <= ", pb))));
+  check64_u8(!(a > b), ctx, to_u8str(cons("not ", cons(pa, cons(" > ", pb)))));
+  check64_u8(!(a >= b), ctx, to_u8str(cons("not ", cons(pa, cons(" >= ", pb)))));
+  check64_u8(a != b, ctx, to_u8str(cons(pa, cons(" != ", pb))));
+  check64_u8(!(a == b), ctx, to_u8str(cons("not ", cons(pa, cons(" == ", pb)))));
+
+  check64_u8(!(b < a), ctx, to_u8str(cons("not ", cons(pb, cons(" < ", pa)))));
+  check64_u8(!(b <= a), ctx, to_u8str(cons("not ", cons(pb, cons(" <= ", pa)))));
+  check64_u8(b > a, ctx, to_u8str(cons(pb, cons(" > ", pa))));
+  check64_u8(b >= a, ctx, to_u8str(cons(pb, cons(" >= ", pa))));
+  check64_u8(b != a, ctx, to_u8str(cons(pb, cons(" != ", pa))));
+  check64_u8(!(b == a), ctx, to_u8str(cons("not ", cons(pb, cons(" == ", pa)))));
+}
+
+func test_64_bits_u64_equal(a u64, ctx *check_64_ctx) void {
+  pa u64 = a;
+  b u64 = a;
+  pb u64 = pa;
+
+  check64_u8(!(a < b), ctx, to_u8str(cons("not ", cons(pa, cons(" < ", pb)))));
+  check64_u8(!(a > b), ctx, to_u8str(cons("not ", cons(pa, cons(" > ", pb)))));
+  check64_u8(!(a != b), ctx, to_u8str(cons("not ", cons(pa, cons(" < ", pb)))));
+  check64_u8(a <= b, ctx, to_u8str(cons(pa, cons(" <= ", pb))));
+  check64_u8(a >= b, ctx, to_u8str(cons(pa, cons(" >= ", pb))));
+  check64_u8(a == b, ctx, to_u8str(cons(pa, cons(" == ", pb))));
+}
+
+func test_64_bits_i64_less(a i64, b i64, ctx *check_64_ctx) void {
+  pa i64 = a;
+  pb i64 = b;
+
+  check64_u8(a < b, ctx, to_u8str(cons(pa, cons(" < ", pb))));
+  check64_u8(a <= b, ctx, to_u8str(cons(pa, cons(" <= ", pb))));
+  check64_u8(!(a > b), ctx, to_u8str(cons("not ", cons(pa, cons(" > ", pb)))));
+  check64_u8(!(a >= b), ctx, to_u8str(cons("not ", cons(pa, cons(" >= ", pb)))));
+  check64_u8(a != b, ctx, to_u8str(cons(pa, cons(" != ", pb))));
+  check64_u8(!(a == b), ctx, to_u8str(cons("not ", cons(pa, cons(" == ", pb)))));
+
+  check64_u8(!(b < a), ctx, to_u8str(cons("not ", cons(pb, cons(" < ", pa)))));
+  check64_u8(!(b <= a), ctx, to_u8str(cons("not ", cons(pb, cons(" <= ", pa)))));
+  check64_u8(b > a, ctx, to_u8str(cons(pb, cons(" > ", pa))));
+  check64_u8(b >= a, ctx, to_u8str(cons(pb, cons(" >= ", pa))));
+  check64_u8(b != a, ctx, to_u8str(cons(pb, cons(" != ", pa))));
+  check64_u8(!(b == a), ctx, to_u8str(cons("not ", cons(pb, cons(" == ", pa)))));
+}
+
+func test_64_bits_i64_equal(a i64, ctx *check_64_ctx) void {
+  pa i64 = a;
+  b i64 = a;
+  pb i64 = pa;
+
+  check64_u8(!(a < b), ctx, to_u8str(cons("not ", cons(pa, cons(" < ", pb)))));
+  check64_u8(!(a > b), ctx, to_u8str(cons("not ", cons(pa, cons(" > ", pb)))));
+  check64_u8(!(a != b), ctx, to_u8str(cons("not ", cons(pa, cons(" < ", pb)))));
+  check64_u8(a <= b, ctx, to_u8str(cons(pa, cons(" <= ", pb))));
+  check64_u8(a >= b, ctx, to_u8str(cons(pa, cons(" >= ", pb))));
+  check64_u8(a == b, ctx, to_u8str(cons(pa, cons(" == ", pb))));
+}
+
+func test_64_bits_exhaustive_unsigned_comparison(ctx *check_64_ctx) void {
+  x0 u64 = 0;
+  x1 u64 = 1;
+  x4 u64 = 4;
+  x5 u64 = 5;
+  max32 u64 = 0xFFFFFFFF;
+  min33 u64 = 0x100000000;
+  max u64 = 0xFFFFFFFFFFFFFFFF;
+
+  v ^[7]u64 = {x0, x1, x4, x5, max32, min33, max};
+
+  for i size = 0; i < 7; i = i + 1 {
+    test_64_bits_u64_equal(v[i], ctx);
+    for j size = i + 1; j < 7; j = j + 1 {
+      test_64_bits_u64_less(v[i], v[j], ctx);
+    }
+  }
+}
+
+func test_64_bits_exhaustive_signed_comparison(ctx *check_64_ctx) void {
+  x0 i64 = 0;
+  x1 i64 = 1;
+  x4 i64 = 4;
+  x5 i64 = 5;
+  max31 i64 = 0x7FFFFFFF;
+  min32 i64 = 0x80000000;
+  max32 i64 = 0xFFFFFFFF;
+  min33 i64 = 0x100000000;
+  max i64 = 0x7FFFFFFFFFFFFFFF;
+  // TODO: "Numeric literal out of range"
+  // min i64 = -0x8000000000000000;
+  min i64 = -max - 1;
+  n1 i64 = -1;
+  n3 i64 = -3;
+  n4 i64 = -4;
+  nmax31 i64 = -0x80000000;
+  nmin32 i64 = -0x80000001;
+  nmax32 i64 = -0x100000000;
+  nmin33 i64 = -0x100000001;
+
+  v ^[17]i64 = {min, nmin33, nmax32, nmin32, nmax31,
+    n4, n3, n1, x0, x1, x4, x5, max31, min32, max32, min33, max};
+
+  for i size = 0; i < 17; i = i + 1 {
+    test_64_bits_i64_equal(v[i], ctx);
+    for j size = i + 1; j < 17; j = j + 1 {
+      test_64_bits_i64_less(v[i], v[j], ctx);
+    }
+  }
+}
+
+
+func test_64_bits_comparison(ctx *check_64_ctx) void {
+  test_64_bits_exhaustive_unsigned_comparison(ctx);
+  test_64_bits_exhaustive_signed_comparison(ctx);
+}
+
+func test_64_bits_addition(ctx *check_64_ctx) void {
+  /* TODO: Make a way to test OF/SF cases */
+
+  x0 u64 = 0x3a0000123;
+  x1 u64 = 0x5b0000003;
+
+  x2 u64 = x0 + x1;
+  check64(x0 == 0x3a0000123, ctx, "eq 0x3a0000123");
+  check64(x1 == 0x5b0000003, ctx, "eq 0x5b0000003");
+  check64(x2 == 0x950000126, ctx, "eq 0x950000126");
+
+  y0 i64 = 0x3a0000123;
+  y1 i64 = -0x5b0000003;
+  y2 i64 = y0 + y1;
+  check64(y2 == - @[i64] 0x20ffffee0, ctx, "eq -0x20ffffee0");
+}
+
+func test_64_bits_multiplication(ctx *check_64_ctx) void {
+  x0 u64 = 0xa0000123;
+  x1 u64 = 0xb0000003;
+  x2 u64 = 7926336211487032169;
+  x3 u64 = x0 * x1;
+
+  check64(x3 == x2, ctx, "u64 multiply");
+
+  // Test inputs with upper dword
+  x4 u64 = 0x5a0000123;
+  x5 u64 = 0x1123496;
+  x6 u64 = 434148544114443906;
+  x7 u64 = x4 * x5;
+  x8 u64 = x5 * x4;
+
+  check64(x6 == x7, ctx, "u64 multiply ii");
+  check64(x6 == x8, ctx, "u64 multiply iii");
+
+  // More inputs with upper dword
+  y0 u64 = 0x100000001;
+  y1 u64 = 2;
+  y2 u64 = y0 * y1;
+  y3 u64 = y1 * y0;
+
+  check64(y2 == 0x200000002, ctx, "u64 0x100000001 * 2");
+  check64(y3 == 0x200000002, ctx, "u64 2 * 0x100000001");
+}
+
+func test_64_bits_bigu64(ctx *check_64_ctx) void {
+  // Tests operations used in bigu64
+  u0 u64 = 3;
+  check64(u0 == 3, ctx, "equals 1");
+  simple_shift u64 = u0 >> 1;
+  check64(simple_shift == 1, ctx, "right shift 1");
+  hi_part u64 = u0 >> 32;
+  check64(hi_part == 0, ctx, "right shift 32");
+  lo_part u64 = u0 & 0xFFFFFFFF;
+  check64(lo_part == 3, ctx, "bit_and");
+
+
+  x0 bigint = bigu64(0);
+  x1 bigint = bigu64(1);
+  x11 bigint = bigu64(0xFFFFFFFF);
+  x2 bigint = bigu64(0x100000000);
+  x3 bigint = bigu64(0xFFFFFFFFFFFFFFFF);
+}
+
+func test_64_bits(verbose bool) bool {
+  ctx check_64_ctx = {verbose, 0};
+  check64(true, &ctx, "dummy check64");
+  test_64_bits_comparison(&ctx);
+  test_64_bits_i64_comparison(&ctx);
+  test_64_bits_addition(&ctx);
+  test_64_bits_multiplication(&ctx);
+  test_64_bits_bigu64(&ctx);
+  return ctx.failures == 0;
+}
