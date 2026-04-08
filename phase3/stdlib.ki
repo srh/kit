@@ -70,12 +70,12 @@ func[H] build_u8str(help H, r *array[u8], x *u32) void {
 func[H] build_u8str(help H, r *array[u8], x *i32) void {
   if *x >= 0 {
     y u32 = ~ *x;
-    build_u8str(r, &y);
+    build_u8str(help, r, &y);
   } else {
     push(r, '-');
     // We avoid the overflow we'd get from negating -2^31.
     y u32 = 1 + @[u32] ~ ^ *x;
-    build_u8str(r, &y);
+    build_u8str(help, r, &y);
   }
 }
 
