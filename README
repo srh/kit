@@ -10,12 +10,11 @@ Current status:  "This is a test!  Ignore!!!"
 
 or  (on 32-bit Linux, or 64-bit with gcc-multilib)
 
-   ./mk/build_linux.sh
+   ./mk/build_linux32.sh
 
 or  (on OS X, with XCode tools (i.e. clang) installed)
 
    ./mk/build_osx.sh
-
 
 2. RUN INSTRUCTIONS
 
@@ -83,8 +82,8 @@ s1 will never support.  See FEATURES for more information.
 
   ABOUT THE IMPLEMENTATIONS
 
-s1 can target x86 and, on Linux, amd64.  Use --linux64 to target
-amd64.
+s1 can target x86 and, on Linux, amd64.  Use `--linux32` to target x86
+(look inside `mk/linux32` for examples) and use `--linux` to target amd64.
 
 s2, s3, s4, and s5 can only target x86.
 
