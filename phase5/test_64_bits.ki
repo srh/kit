@@ -43,6 +43,11 @@ func test_64_bits_i64_comparison(ctx *check_64_ctx) void {
   check64(z < x, ctx, "2 < 3");
 }
 
+// TODO: We got rid of cons (before porting test_64_bits_u64_less from phase3).
+inline func[S, T] cons(s S, t T) tup[S, T] {
+  return {s, t};
+}
+
 func test_64_bits_u64_less(a u64, b u64, ctx *check_64_ctx) void {
   // We used to have `pa i32 = ~(a & 0xFFFFFFFF)` before div/mod was working.
   pa u64 = a;

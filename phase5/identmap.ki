@@ -69,6 +69,9 @@ struct common_syms {
   i32sym sym;
   u32sym sym;
   o32sym sym;
+  i64sym sym;
+  u64sym sym;
+  o64sym sym;
   diffsym sym;
   sizesym sym;
   osizesym sym;
@@ -112,6 +115,11 @@ struct common_syms {
   do_iter_again sym;
   do_iter_access sym;
   target sym;
+  x86_i64_mul_func_name sym;
+  x86_i64_div_func_name sym;
+  x86_i64_mod_func_name sym;
+  x86_u64_div_func_name sym;
+  x86_u64_mod_func_name sym;
 }
 
 struct identmap {
@@ -134,6 +142,9 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.i32sym = intern(im, _s("i32"));
   ret.u32sym = intern(im, _s("u32"));
   ret.o32sym = intern(im, _s("o32"));
+  ret.i64sym = intern(im, _s("i64"));
+  ret.u64sym = intern(im, _s("u64"));
+  ret.o64sym = intern(im, _s("o64"));
   ret.diffsym = intern(im, _s("diff"));
   ret.sizesym = intern(im, _s("size"));
   ret.osizesym = intern(im, _s("osize"));
@@ -177,6 +188,11 @@ func make_common_syms(im *symmap[string]) common_syms {
   ret.do_iter_again = intern(im, _s!"do_iter_again");
   ret.do_iter_access = intern(im, _s!"do_iter_access");
   ret.target = intern(im, _s!"target");
+  ret.x86_i64_mul_func_name = intern(im, _s("__kit_x86_i64_mul"));
+  ret.x86_i64_div_func_name = intern(im, _s("__kit_x86_i64_div"));
+  ret.x86_i64_mod_func_name = intern(im, _s("__kit_x86_i64_mod"));
+  ret.x86_u64_div_func_name = intern(im, _s("__kit_x86_u64_div"));
+  ret.x86_u64_mod_func_name = intern(im, _s("__kit_x86_u64_mod"));
   return ret;
 }
 

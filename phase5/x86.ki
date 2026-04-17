@@ -169,6 +169,10 @@ func x86_test_regs8(f *objfile, r1 u8, r2 u8) void {
   appendtext(f, 0x84, mrr(MOD11, r2, r1));
 }
 
+func x86_test_imm8(f *objfile, r1 u8, imm u8) void {
+  appendtext(f, 0xF6, mrr(MOD11, 0, r1), @[u8]imm);
+}
+
 func x86_mov_imm32(f *objfile, dest u8, x i32) void {
   if x == 0 {
     x86_xor_w32(f, dest, dest);
@@ -227,6 +231,10 @@ func x86_shr_imm_w32(f *objfile, dest u8, imm u8) void {
   appendtext(f, 0xC1, mrr(MOD11, 5, dest), imm);
 }
 
+func x86_shld_w32(f *objfile, dest_hi u8, src_lo u8) void {
+  appendtext(f, 0x0F, @[u8]0xA5, mrr(MOD11, src_lo, dest_hi));
+}
+
 func x86_shl_cl_w32(f *objfile, dest u8) void {
   // SHL, SHR, SAR have different reg/opcode fields.
   appendtext(f, 0xD3, mrr(MOD11, 4, dest));
@@ -240,6 +248,11 @@ func x86_shl_cl_w16(f *objfile, dest u8) void {
 func x86_shl_cl_w8(f *objfile, dest u8) void {
   // SHL, SHR, SAR have different reg/opcode fields.
   appendtext(f, 0xD2, mrr(MOD11, 4, dest));
+}
+
+func x86_shrd_w32(f *objfile, dest_lo u8, src_hi u8) void {
+  // TODO: Double-check this register order is not backwards of what it should be.  (Same in phase1.)
+  appendtext(f, 0x0F, @[u8]0xAD, mrr(MOD11, src_hi, dest_lo));
 }
 
 func x86_shr_cl_w32(f *objfile, dest u8) void {
@@ -284,6 +297,18 @@ enum oz {
   OZ_8 void;
   OZ_16 void;
   OZ_32 void;
+}
+
+func x86_adc_w32(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x11, mrr(MOD11, src, dest));
+}
+
+func x86_adc_imm32(f *objfile, dest u8, imm i32) void {
+  x86_math81_imm32(f, 2, dest, imm);
+}
+
+func x86_add_imm32(f *objfile, dest u8, imm i32) void {
+  x86_math81_imm32(f, 0, dest, imm);
 }
 
 func x86_prefix(f *objfile, opnum u8, oz oz) void {
@@ -420,8 +445,16 @@ func x86_or_w32(f *objfile, dest u8, src u8) void {
   appendtext(f, 0x09, mrr(MOD11, src, dest));
 }
 
+func x86_or_w8(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x08, mrr(MOD11, src, dest));
+}
+
 func x86_and_w32(f *objfile, dest u8, src u8) void {
   appendtext(f, 0x21, mrr(MOD11, src, dest));
+}
+
+func x86_and_w8(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x20, mrr(MOD11, src, dest));
 }
 
 func x86_not(f *objfile, dest u8, oz oz) void {
@@ -431,6 +464,10 @@ func x86_not(f *objfile, dest u8, oz oz) void {
 
 func x86_neg_w32(f *objfile, dest u8) void {
   appendtext(f, 0xF7, mrr(MOD11, 3, dest));
+}
+
+func x86_sbb_w32(f *objfile, dest u8, src u8) void {
+  appendtext(f, 0x19, mrr(MOD11, src, dest));
 }
 
 func x86_sub(f *objfile, dest u8, src u8, oz oz) void {
@@ -464,6 +501,52 @@ func x86_load32_zeroextend(f *objfile, dest u8, src_addr u8, src_disp i32, size 
   }
 }
 
+func x86_load64_for_primop(f *objfile, dest_lo u8, dest_hi u8, src cell_loc, size u32) void {
+  if size != 8 {
+    x86_load32_for_primop(f, dest_lo, src, size);
+    x86_mov_imm32(f, dest_hi, @[u32] 0);
+    return;
+  }
+  switch x86_prep_loc_or_const(f, src, dest_hi) {
+  case Const(b bigint):
+    // TODO: Support 64-bit value here.
+    // TODO: We are on relatively thin ice here -- we should just have an st_value at this point.
+    value u32;
+    if !as_non_negative_u32(&b, &value) {
+      ice(_u8("x86_load64_for_primop has invalid bigint of value "), b);
+    } else {
+      x86_mov_imm32(f, dest_lo, value);
+    }
+    x86_mov_imm32(f, dest_hi, @[u32] 0);
+  case Regdisp(rd regdisp):
+    x86_load32(f, dest_lo, rd.addr, rd.disp);
+    x86_load32(f, dest_hi, rd.addr, rd.disp + 4);
+  }
+}
+
+func x86_load32_dword_of_64bit(f *objfile, dest u8, src cell_loc, which_dword size) void {
+  check(which_dword < 2);
+  switch x86_prep_loc_or_const(f, src, dest) {
+  case Const(b bigint):
+    // TODO: See comments about st_value in other versions of this function.
+    // Check fits in 64 bits:
+    check(bigdigit_count(&b) <= 2);
+    value u32 = getbigdigit(&b, which_dword);
+    x86_mov_imm32(f, dest, value);
+  case Regdisp(rd regdisp):
+    x86_load32(f, dest, rd.addr, rd.disp + 4 * @[i32] ~which_dword);
+  }
+}
+
+// doq = dword of qword
+func x86_load32_lo_doq(f *objfile, dest u8, src cell_loc) void {
+  x86_load32_dword_of_64bit(f, dest, src, 0);
+}
+
+func x86_load32_hi_doq(f *objfile, dest u8, src cell_loc) void {
+  x86_load32_dword_of_64bit(f, dest, src, 1);
+}
+
 func x86_load32_for_primop(f *objfile, dest u8, src cell_loc, size u32) void {
   switch x86_prep_loc_or_const(f, src, dest) {
   case Const(b bigint):
@@ -495,7 +578,7 @@ func x86_store32_partial_destructively(f *objfile, dest_addr u8, dest_disp i32, 
     x86_shr_imm_w32(f, src, 16);
     x86_store(f, dest_addr, dest_disp + 2, src, OZ_8);
   } else {
-    ice(_u8("x86_store32_partial_destructively with bad size"));
+    ice(_u8("x86_store32_partial_destructively with bad size: "), size);
   }
 }
 
@@ -504,6 +587,14 @@ func x86_store32_partial_destructively(f *objfile, dest cell_loc, src u8, size u
   dest_disp i32;
   x86_prep_loc_use(f, dest, scratch, &dest_addr, &dest_disp);
   x86_store32_partial_destructively(f, dest_addr, dest_disp, src, size);
+}
+
+func x86_store64_destructively(f *objfile, dest cell_loc, src_lo u8, src_hi u8, scratch u8) void {
+  dest_addr u8;
+  dest_disp i32;
+  x86_prep_loc_use(f, dest, scratch, &dest_addr, &dest_disp);
+  x86_store(f, dest_addr, dest_disp, src_lo, OZ_32);
+  x86_store(f, dest_addr, dest_disp + 4, src_hi, OZ_32);
 }
 
 func x86_load32_signextend(f *objfile, dest u8, src_addr u8, src_disp i32, size u32) void {
@@ -534,6 +625,29 @@ func x86_load32_signextend_for_primop(f *objfile, dest u8, src cell_loc, size u3
     }
   case Regdisp(rd regdisp):
     x86_load32_signextend(f, dest, rd.addr, rd.disp, size);
+  }
+}
+
+func x86_load64_signextend_for_primop(f *objfile, dest_lo u8, dest_hi u8, src cell_loc, size u32) void {
+  check(dest_lo == X86_EAX && dest_hi == X86_EDX);
+  if size != 8 {
+    x86_load32_signextend_for_primop(f, dest_lo, src, size);
+    x86_cdq_w32(f);
+    return;
+  }
+  switch x86_prep_loc_or_const(f, src, dest_hi) {
+  case Const(b bigint):
+    // TODO: We are on relatively thin ice here -- we should just have an st_value at this point.
+    value u32;
+    if !as_non_negative_u32(&b, &value) {
+      ice(_u8("x86_load64_for_primop has invalid bigint of value "), b);
+    } else {
+      x86_mov_imm32(f, dest_lo, value);
+    }
+    x86_mov_imm32(f, dest_hi, @[u32] 0);
+  case Regdisp(rd regdisp):
+    x86_load32(f, dest_lo, rd.addr, rd.disp);
+    x86_load32(f, dest_hi, rd.addr, rd.disp + 4);
   }
 }
 
@@ -613,6 +727,10 @@ func x86_movzx16(f *objfile, dest u8, src_addr u8, src_disp i32) void {
 
 func x86_and_imm32(f *objfile, dest u8, x i32) void {
   x86_math81_imm32(f, 4, dest, x);
+}
+
+func x86_xor_imm32(f *objfile, dest u8, x i32) void {
+  x86_math81_imm32(f, 6, dest, x);
 }
 
 func x86_movsx8(f *objfile, dest u8, src_addr u8, src_disp i32) void {

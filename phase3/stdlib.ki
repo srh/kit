@@ -146,7 +146,7 @@ func[T] printerr(x array[u8], y T) void {
   print(Stderr(), x);
   print(Stderr(), to_u8str(y));
   print(Stderr(), make("\n"));
-  fflush(Stderr());
+  ign var = fflush(Stderr());
 }
 
 func[T] to_u8str(x T) array[u8] {
@@ -159,6 +159,10 @@ func[H, T] to_u8str(help H, x T) array[u8] {
   ret array[u8];
   build_u8str(help, &ret, &x);
   return ret;
+}
+
+inline func[H, T] onto_u8str(help H, r *array[u8], x T) void {
+  build_u8str(help, r, &x);
 }
 
 func checkmalloc(n size) *void {
@@ -297,7 +301,7 @@ func check(x bool) void {
 }
 
 func crash() void {
-  debugstr("ICE: no message");
+  debugstr("ICE: no message\n");
   abort();
 }
 
@@ -358,6 +362,13 @@ func try_add(x u32, y u32, out *u32) bool {
   return true;
 }
 
+func ceil_aligned(x u64, y u64) u64 {
+  if x % y == 0 {
+    return x;
+  }
+  return x + (y - x % y);
+}
+
 func ceil_aligned(x u32, y u32) u32 {
   if x % y == 0 {
     return x;
@@ -391,6 +402,10 @@ func ceil_divide(x size, y size) size {
   } else {
     return x / y + 1;
   }
+}
+
+func is_pow2(x u32) bool {
+  return (x != 0) & ((x & (x - 1)) == 0);
 }
 
 // TODO: This is... platform-specific.

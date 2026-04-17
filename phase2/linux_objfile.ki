@@ -79,7 +79,7 @@ struct elf32_Rel {
 }
 
 /* Seems like a good idea. */
-// These are all def'd to be u32's because I don't know what to define them as.
+// These are mostly def'd to be u32's because I don't know what to define them as.
 
 def kRel_Section_Alignment u32 = 8;
 
@@ -421,7 +421,7 @@ func linux32_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *ar
   for i size = 0; i < n_symbol_table; i = i + 1 {
     rec *objfile_symbol_record = ref(&f->symbol_table, i);
     if case IsStaticYes = rec->is_static {
-      push_symbol(im, rec, &symbols, &strings);
+      linux32_push_symbol(im, rec, &symbols, &strings);
       *ref(&sti_map, i) = symbols_count;
       symbols_count = symbols_count + 1;
     }
@@ -432,7 +432,7 @@ func linux32_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *ar
   for i size = 0; i < n_symbol_table; i = i + 1 {
     rec *objfile_symbol_record = ref(&f->symbol_table, i);
     if case IsStaticNo = rec->is_static {
-      push_symbol(im, rec, &symbols, &strings);
+      linux32_push_symbol(im, rec, &symbols, &strings);
       *ref(&sti_map, i) = symbols_count;
       symbols_count = symbols_count + 1;
     }
@@ -446,7 +446,7 @@ func linux32_write_symbols_and_strings(im *identmap, f *objfile, symbols_out *ar
   *end_locals_out = end_locals;
 }
 
-func push_symbol(im *identmap, symbol *objfile_symbol_record, symbols *array[u8], strings *array[u8]) void {
+func linux32_push_symbol(im *identmap, symbol *objfile_symbol_record, symbols *array[u8], strings *array[u8]) void {
   // TODO: (Also in s1:) This and the for loop below is just a copy/paste job.
   ent elf32_Symtab_Entry;
   name sym = symbol->name;

@@ -130,7 +130,8 @@ func align_dword(s *objfile_section) void {
   }
 }
 
-func fillercode_align_double_quadword(f *objfile) void {
+func fillercode_align_to_fn_body(f *objfile) void {
+  // TODO(x64): Is DQWORD_SIZE (16 bytes) correct for x64?
   s *objfile_section = &f->text;
   append_to_alignment(&s->raw, ~DQWORD_SIZE, x86_fillercode_byte);
 }

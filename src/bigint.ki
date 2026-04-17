@@ -21,6 +21,20 @@ access bigint {
     return ret;
   }
 
+  func `~`(x u64) bigint {
+    ret bigint;
+    if x != 0 {
+      hi_part u64 = x >> 32;
+      lo_part u64 = x & 0xFFFFFFFF;
+      if (hi_part != 0) {
+        ret.parts = mk_shray(~lo_part, ~hi_part);
+      } else {
+        ret.parts = mk_shray(~lo_part);
+      }
+    }
+    return ret;
+  }
+
   func `~`(x u32) bigint {
     ret bigint;
     if x != 0 {
@@ -105,6 +119,28 @@ access bigint {
     }
   }
 
+  func as_non_negative_u64(x *bigint, out *u64) bool {
+    if x->negative {
+      return false;
+    }
+    n size = count(&x->parts);
+    if n == 0 {
+      *out = 0;
+      return true;
+    } else if n == 1 {
+      *out = ~get(&x->parts, 0);
+      return true;
+    } else if n == 2 {
+      out64 u64 = ~get(&x->parts, 0);
+      out64 = out64 | ((@[u64] ~get(&x->parts, 1)) << 32);
+      *out = out64;
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  // TODO: Eventually check if we use this, and remove.
   func as_non_negative_u32(x *bigint, out *u32) bool {
     if x->negative {
       return false;
@@ -143,9 +179,57 @@ access bigint {
         *out = 0;
         return true;
       } else if n == 1 {
-        k u32 = get(&x->parts, 1);
-        if 0 == (k & 0x8000000) {
+        k u32 = get(&x->parts, 0);
+        if 0 == (k & 0x80000000) {
           *out = ~k;
+          return true;
+        } else {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
+  }
+
+  func as_i64(x *bigint, out *i64) bool {
+    n size = count(&x->parts);
+    if x->negative {
+      if n == 0 {
+        *out = -1;
+        return true;
+      } else if n == 1 {
+        k u32 = get(&x->parts, 0);
+        z i64 = ~k;
+        *out = z | ((@[i64] -1) << 32);
+        return true;
+      } else if n == 2 {
+        k u32 = get(&x->parts, 0);
+        z i64 = ~k;
+        k = get(&x->parts, 1);
+        if 0 != (k & 0x80000000) {
+          *out = z | ((@[i64] ~k) << 32);
+          return true;
+        } else {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    } else {
+      if n == 0 {
+        *out = 0;
+        return true;
+      } else if n == 1 {
+        k u32 = get(&x->parts, 0);
+        *out = ~k;
+        return true;
+      } else if n == 2 {
+        k u32 = get(&x->parts, 0);
+        z i64 = ~k;
+        k = get(&x->parts, 1);
+        if 0 == (k & 0x80000000) {
+          *out = z | ((@[i64] ~k) << 32);
           return true;
         } else {
           return false;
@@ -525,7 +609,9 @@ func convert_to_bigint(base u32, digits *shray[i8]) bigint {
   return acc;
 }
 
+// TODO: Have just bigu(x u64) -- only a few uses in graph.ki
 func bigu(x u32) bigint { return ~x; }
+func bigu64(x u64) bigint { return ~x; }
 
 func[T] big(arr T) bigint {
   b array[i8];

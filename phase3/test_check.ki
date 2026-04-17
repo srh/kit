@@ -16,6 +16,7 @@ func test_loader(cs *checkstate, name sym, out *array[u8]) bool {
 }
 
 func x86_32_platform(opsys platform_os) platform_info {
+  // TODO: Check alignment of 64-bit ints.  Also in s1.
   jrr shift_behavior = JustRangecheckRhs;
   ret platform_info = {
     LittleEndian,
@@ -33,11 +34,55 @@ func x86_32_platform(opsys platform_os) platform_info {
     {{4, 4}, {SignedTwos, jrr, true, -bigu(2147483648), bigu(2147483647)}},
     {{4, 4}, {Unsigned, jrr, true, bigu(0), bigu(4294967295)}},
     {{4, 4}, {Unsigned, jrr, false, bigu(0), bigu(4294967295)}},
+    {{8, 4}, {SignedTwos, jrr, true, -bigu64(9223372036854775808), bigu64(9223372036854775807)}},
+    {{8, 4}, {Unsigned, jrr, true, bigu(0), bigu64(18446744073709551615)}},
+    {{8, 4}, {Unsigned, jrr, false, bigu(0), bigu64(18446744073709551615)}},
     {{4, 4}, {SignedTwos, jrr, true, -bigu(2147483648), bigu(2147483647)}},
     {{4, 4}, {Unsigned, jrr, true, bigu(0), bigu(4294967295)}},
     {{4, 4}, {Unsigned, jrr, false, bigu(0), bigu(4294967295)}},
     {4, 4},
     {4, 4},
+    X86,
+    opsys,
+    UniversalCdeclConvention
+  };
+  return ret;
+}
+
+func x86_64_platform(opsys platform_os) platform_info {
+  // The differences with x86_32_platform are:
+  // - min_stackvar_alignment is 8, not 4 (TODO: Is this for any reason?)
+  // - difftraits, sizetraits, osizetraits 64 bits
+  // - 64-bit types have 8-byte alignment, not 4
+  // - ptrtraits, fntraits have 8-byte size and alignment, not 4
+  // - arch being X64 instead of X86
+
+  jrr shift_behavior = JustRangecheckRhs;
+  ret platform_info = {
+    LittleEndian,
+    8,
+    8,
+    4,
+    {0, 1},
+    {1, 1},
+    {{1, 1}, {SignedTwos, jrr, true, -bigu(128), bigu(127)}},
+    {{1, 1}, {Unsigned, jrr, true, bigu(0), bigu(255)}},
+    {{1, 1}, {Unsigned, jrr, false, bigu(0), bigu(255)}},
+    {{2, 2}, {SignedTwos, jrr, true, -bigu(32768), bigu(32767)}},
+    {{2, 2}, {Unsigned, jrr, true, bigu(0), bigu(65535)}},
+    {{2, 2}, {Unsigned, jrr, false, bigu(0), bigu(65535)}},
+    {{4, 4}, {SignedTwos, jrr, true, -bigu(2147483648), bigu(2147483647)}},
+    {{4, 4}, {Unsigned, jrr, true, bigu(0), bigu(4294967295)}},
+    {{4, 4}, {Unsigned, jrr, false, bigu(0), bigu(4294967295)}},
+    {{8, 8}, {SignedTwos, jrr, true, -bigu64(9223372036854775808), bigu64(9223372036854775807)}},
+    {{8, 8}, {Unsigned, jrr, true, bigu(0), bigu64(18446744073709551615)}},
+    {{8, 8}, {Unsigned, jrr, false, bigu(0), bigu64(18446744073709551615)}},
+    {{8, 8}, {SignedTwos, jrr, true, -bigu64(9223372036854775808), bigu64(9223372036854775807)}},
+    {{8, 8}, {Unsigned, jrr, true, bigu(0), bigu64(18446744073709551615)}},
+    {{8, 8}, {Unsigned, jrr, false, bigu(0), bigu64(18446744073709551615)}},
+    {8, 8},
+    {8, 8},
+    X64,
     opsys,
     UniversalCdeclConvention
   };
@@ -46,6 +91,10 @@ func x86_32_platform(opsys platform_os) platform_info {
 
 func x86_linux32_platform() platform_info {
   return x86_32_platform(Linux32);
+}
+
+func x64_linux64_platform() platform_info {
+  return x86_64_platform(Linux64);
 }
 
 func x86_win32_platform() platform_info {

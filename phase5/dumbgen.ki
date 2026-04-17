@@ -118,6 +118,22 @@ func get_size_loc(h *frame, c cell_num) cell_loc {
   return get_loc(h, c);
 }
 
+func[H] build_u8str(help H, r *array[u8], loc *cell_loc) void {
+  switch loc {
+    case &DirectLoc(x i32):
+      wrap_u8str(help, r, _u8("DirectLoc"), &x);
+    case &IndirectLoc(x i32):
+      wrap_u8str(help, r, _u8("IndirectLoc"), &x);
+    case &ConstFuncellLoc(fnid fn_body_id):
+      wrap_u8str(help, r, _u8("ConstFuncellLoc"), &fnid.x);
+    case &ConstIntCellLoc(b bigint):
+      wrap_u8str(help, r, _u8("ConstIntCellLoc"), &b);
+   case &UnusedLoc:
+      append(r, _u8("UnusedLoc"));
+  }
+}
+
+
 // Some Hungarian notation:  The "dumbly_" prefix means the code's really dumb.
 
 func dumbly_gen_graphed_fn_body(cs *checkstate, f *objfile, g *graphed_fn_body) np {
@@ -188,6 +204,17 @@ func set(dest *tmp_offsets_val, c cell_loc) void {
   }
 }
 
+func[H] build_u8str(help H, r *array[u8], x *tmp_offsets_val) void {
+  switch x {
+  case &Nope:
+    append(r, _u8("Nope"));
+  case &Has(c cell_loc):
+    build_u8str(help, r, &c);
+  case &StaticSubcell(t tup[cell_num, u32]):
+    wrap_u8str(help, r, _u8("StaticSubcell"), &t);
+  }
+}
+
 func isNope(p *tmp_offsets_val) bool {
   if case &Nope = p {
     return true;
@@ -207,33 +234,55 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
   low_offset i32 = 0;
 
   // 0. Layout arg cells, return cell.
+  params_layout paramlist_layout = layout_relative_paramlist(h, data(&h->argcells), count(&h->argcells), h->return_cell);
+
+  frame_callsite_offset i32;
   switch h->cs->plat.callconv {
   case UniversalCdeclConvention:
-    // It's OK to hard-code numbers here, because we're under the bullshit
-    // "UniversalCDeclConvention".
-    upward_offset i32 = 8;
-    ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
-    if for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props) {
-      set(ref(&offsets, h->return_cell.x), IndirectLoc(upward_offset));
-      upward_offset = upward_offset + 4;
-    } else {
-      // Put its cell below the frame pointer.
-      offset cell_loc = next_stack_offset(h->cs, low_offset, ret_ci, &low_offset);
-      set(ref(&offsets, h->return_cell.x), offset);
+    // ret pointer and we push the frame pointer
+    frame_callsite_offset = 8;
+    if params_layout.uses_hidden_return_param {
+      // Return value cell is somewhere pointed at by the hrp.
+      set(ref(&offsets, h->return_cell.x), IndirectLoc(frame_callsite_offset));
     }
-
-    nargcells size = count(&h->argcells);
-    for i size = 0; i < nargcells; i = i + 1 {
-      c cell_num = get(&h->argcells, i);
-      ci *cell_info = ref_cell(h->gr, c);
-      if ci->location != LocationStatic {
-        ice(_u8("Non-static arglist cell"));
-      }
-      offset i32 = upward_offset;
-      upward_offset = ceil_aligned(offset + ~ci->props.flat_size, 4);
-      set(ref(&offsets, c.x), DirectLoc(offset));
+  case UniversalX64Convention:
+    // ret pointer and we push the frame pointer
+    frame_callsite_offset = 16;
+    if params_layout.uses_hidden_return_param {
+      // The hrp is passed in %RAX.  Put its cell below the frame pointer.
+      // TODO: I forget.  Is there a "good" way to do this?
+      low_offset = low_offset - 8;
+      set(ref(&offsets, h->return_cell.x), IndirectLoc(low_offset));
     }
   }
+
+  if !params_layout.uses_hidden_return_param {
+    // Both x86 and x64 happen to do the same thing.
+    // Return value cell is below the frame pointer (and will be copied into regs)
+    ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
+    offset cell_loc = next_stack_offset(h->cs, low_offset, ret_ci, &low_offset);
+    set(ref(&offsets, h->return_cell.x), offset);
+  }
+
+  switch h->cs->plat.callconv {
+  case UniversalCdeclConvention:
+    nargcells size = count(&h->argcells);
+    for j size = 0; j < nargcells; j = j + 1 {
+      c cell_num = get(&h->argcells, j);
+      if !isNope(ref(&offsets, c.x)) {
+        ice(_u8("cell is in arglist, but already processed"));
+      }
+
+      offset i32 = frame_callsite_offset + ref(&params_layout.callsite_offsets_and_regnum, j)->car;
+      set(ref(&offsets, c.x), DirectLoc(offset));
+    }
+  case UniversalX64Convention:
+    // Register params will be need to be re-laid-out.  (Or no?  That is not explicitly needed?  But we will need the instructions copying register params to their layout locations.)
+    // TODO: Implement this once x86_32 is working again.
+    ice(_u8("UniversalX64Convention not implemented for incoming arglist layout (wrt register params)"));
+  }
+
+  // 0.5. Paramlist layouts are going to be all wrong for x64 here.
 
   ncalls size = count(&paramlist_ordering);
   for i size = 0; i < ncalls; i = i + 1 {
@@ -269,18 +318,17 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
       duck_conflicting_cells(h, get(pcells, j), &bumpline, &offsets);
     }
 
-    bumpline = adjust_for_callsite_alignment(bumpline, funcall_arglist_size(h, pcells, paramlist_retcell(h->gr, sn)));
+    playout paramlist_layout = layout_relative_paramlist(h, data(pcells), npcells, paramlist_retcell(h->gr, sn));
+    bumpline = bump_to_aligned_callsite(h, bumpline, playout.paramlist_stacksize);
 
-    for j size = npcells; j > 0; {
-      j = j - 1;
+    for j size = 0; j < npcells; j = j + 1 {
       c cell_num = get(pcells, j);
       if !isNope(ref(&offsets, c.x)) {
         ice(_u8("cell is in paramlist, but already processed"));
       }
 
-      ci *cell_info = ref_cell(h->gr, c);
-      offset cell_loc = next_stack_offset(h->cs, bumpline, ci, &bumpline);
-      set(ref(&offsets, c.x), offset);
+      offset i32 = bumpline + ref(&playout.callsite_offsets_and_regnum, j)->car;
+      set(ref(&offsets, c.x), DirectLoc(offset));
     }
 
     annotate(&annot->paramlist_bottom_frame_offset, bumpline);
@@ -307,38 +355,25 @@ func dumbly_layout_frame_cells(g *graphed_fn_body, h *frame) np {
 
   noopt_offsets array[cell_loc] = flatten_offsets(h, &offsets);
   annotate(&h->offsets, noopt_offsets);
-  // We subtract 4 because we haven't accounted for the possible need to make a hidden
-  // return pointer for the x86 callconv.
-  annotate(&h->low_offset, low_offset - 4);
+  annotate(&h->low_offset, low_offset);
   return NoFail;
 }
 
-func funcall_arglist_size(h *frame, pcells *shray[cell_num], retcell cell_num) u32 {
-  /* X86 -- 16-byte inital alignment. */
-  offset u32 = 0;
-  ret_ci *cell_info = ref_cell(h->gr, retcell);
-  if for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props) {
-    offset = offset + 4;
-  }
-
-  n size = count(pcells);
-  for i size = 0; i < n; i = i + 1 {
-    ci *cell_info = ref_cell(h->gr, get(pcells, i));
-    check(LocationStatic == ci->location);
-    alignment u32 = max(h->cs->plat.min_stackvar_alignment, ci->props.flat_alignment);
-    offset = ceil_aligned(offset, alignment);
-    offset = offset + ci->props.flat_size;
-  }
-  offset = ceil_aligned(offset, h->cs->plat.min_stackvar_alignment);
-  return offset;
-}
-
-func adjust_for_callsite_alignment(bumpline i32, arglist_size u32) i32 {
-  // X86
-  // When bumpline is 0 we're at 8-mod-16 alignment (beneath ret and frame pointer).
+func bump_to_aligned_callsite(h *frame, bumpline i32, arglist_size u32) i32 {
+  // On x86 we want to align to 8-mod-16 alignment, so that we're 0-mod-16 beneath the ret and frame pointer.
+  // On x64 we go for 0-mod-16 alignment for the same reason; now the pointers are 8 bytes each.
 
   provisional_line i32 = bumpline - ~arglist_size;
-  return bumpline - ((provisional_line + 8) & 15);
+
+  addend i32 = 0;
+  switch h->cs->plat.callconv {
+  case UniversalCdeclConvention:
+    addend = 8;
+  case UniversalX64Convention:
+    addend = 0;
+  }
+
+  return ((provisional_line + addend) & @[i32] ^15) - addend;
 }
 
 func duck_conflicting_cells(h *frame, c cell_num, bumpline *i32, offsets *array[tmp_offsets_val]) void {
@@ -400,6 +435,135 @@ func flatten_offsets(h *frame, a *array[tmp_offsets_val]) array[cell_loc] {
     }
   }
   return ret;
+}
+
+// Layout results of a parameter list (for our naive stack layout implementation).  On x86, which uses the cdecl calling convention, parameters simply get pushed onto the stack _in order_, and the return cell is somewhere above.  On x64, the order is changed because some parameters are passed in registers -- the non-register parameters are on contiguous stack locations above the callsite, and the register parameters are assigned stack locations above that.
+struct paramlist_layout {
+  // Offsets of the cell relative to the "callsite" (all non-negative values), and the register number if applicable.  On x86 if there is an hrp the min offset is >= 4.  The "register number" in the cdr slot is in order specific to paramlists, i.e. X64_RDI, X64_RSI, X64_RDX, X64_RCX, X64_R8, X64_R9 order.  Is -1 if the param is not passed in registers.  (Thus is always -1 on x86.)
+  callsite_offsets_and_regnum array[tup[i32, i32]];
+
+  // The total size of the param list, including on x64 the stack locations used for register params.  Does not include any return cell.  This should be equal to the highest offset element in callsite_offsets_and_regnum plus its (padded) size.
+  paramlist_stacksize u32;
+
+  uses_hidden_return_param bool;
+}
+
+// Specifies layout of funcall params relative to the stack.  return_cell is not laid out, but its type information tells us whether we have a hidden return param.  The cells do not actually get formally laid out -- h is not mutated.  The results are calculated and returned in the paramlist_layout.
+func layout_relative_paramlist(h *frame, argcells * ^[0]cell_num, nargcells size, return_cell cell_num) paramlist_layout {
+  switch h->cs->plat.callconv {
+  case UniversalCdeclConvention:
+    upward_offset i32 = 0;
+    ret_ci *cell_info = ref_cell(h->gr, return_cell);
+    uses_hidden_return_param bool = for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props);
+    if uses_hidden_return_param {
+      upward_offset = upward_offset + 4;
+    } else {
+      // TODO: Don't forget this callee-side logic.
+      // // Put its cell below the frame pointer.
+      // offset cell_loc = next_stack_offset(h->cs, low_offset, ret_ci, &low_offset);
+      // set(ref(&offsets, return_cell.x), offset);
+    }
+
+    callsite_offsets_and_regnum array[tup[i32, i32]];
+
+    for i size = 0; i < nargcells; i = i + 1 {
+      c cell_num = argcells[i];
+      ci *cell_info = ref_cell(h->gr, c);
+      if ci->location != LocationStatic {
+        ice(_u8("Non-static arglist cell"));
+      }
+      offset i32 = upward_offset;
+      upward_offset = ceil_aligned(offset + ~ci->props.flat_size, 4);
+      push(&callsite_offsets_and_regnum, {offset, @[i32] -1});
+      // TODO: Don't forget this callee-side logic.
+      // set(ref(&offsets, c.x), DirectLoc(offset));
+    }
+
+    layout paramlist_layout = {
+      callsite_offsets_and_regnum,
+      ~upward_offset,
+      uses_hidden_return_param
+    };
+    return layout;
+  case UniversalX64Convention:
+    upward_offset i32 = 0;
+    ret_ci *cell_info = ref_cell(h->gr, h->return_cell);
+    // TODO: Directly call x64_sysv_memory_param?  After cleaning up callconv structs.
+    uses_hidden_return_param bool = for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props);
+    registers_used i32;
+    if uses_hidden_return_param {
+      // Put its pointer cell below the frame pointer.
+      // TODO: Don't forget this callee-side logic.
+      // low_offset = low_offset - 8;
+      // set(ref(&offsets, h->return_cell.x), IndirectLoc(low_offset));
+      registers_used = 1;
+    } else {
+      // Put its cell below the frame pointer.
+      // TODO: Don't forget this callee-side logic.
+      // offset cell_loc = next_stack_offset(h->cs, low_offset, ret_ci, &low_offset);
+      // set(ref(&offsets, h->return_cell.x), offset);
+      registers_used = 0;
+    }
+
+    callsite_offsets_and_regnum array[tup[i32, i32]];
+
+    for i size = 0; i < nargcells; i = i + 1 {
+      c cell_num = argcells[i];
+      ci *cell_info = ref_cell(h->gr, c);
+      if ci->location != LocationStatic {
+        ice(_u8("Non-static arglist cell"));
+      }
+
+      memory_param bool = x64_sysv_memory_param(&ci->props);
+
+      next_registers_used i32;
+      if ci->props.flat_size > 8 {
+        next_registers_used = registers_used + 2;
+      } else {
+        next_registers_used = registers_used + 1;
+      }
+
+      if memory_param || next_registers_used > 6 {
+        offset i32 = upward_offset;
+        upward_offset = ceil_aligned(offset + ~ci->props.flat_size, 8);
+        push(&callsite_offsets_and_regnum, {upward_offset, @[i32] -1});
+
+        // TODO: Don't forget this callee-side logic.
+        // set(ref(&offsets, c.x), DirectLoc(offset));
+      } else {
+        // TODO: Don't forget this callee-side logic.
+        // offset cell_loc = next_stack_offset(h->cs, low_offset, ci, &low_offset);
+        // set(ref(&offsets, c.x), offset);
+
+        // We'll update offset in second pass.
+        push(&callsite_offsets_and_regnum, {@[i32] -1, registers_used});
+        registers_used = next_registers_used;
+      }
+    }
+
+    // Second-pass: for callers, layout register params into stack locations above the calling convention's param list.
+    for i size = 0; i < nargcells; i = i + 1 {
+      elem var = ref(&callsite_offsets_and_regnum, i);
+      if elem->cdr != @[i32] -1 {
+        check(elem->car == @[i32] -1);
+        c cell_num = argcells[i];
+        ci *cell_info = ref_cell(h->gr, c);
+
+        offset i32 = upward_offset;
+        // Note instead of using parameter list alignment (8, which may be bogus for higher-alignment types) we use normal stack alignment defined in next_stack_offset.
+        // TODO: This duplicates the logic in next_stack_offset.
+        upward_offset = ceil_aligned(upward_offset + ~ci->props.flat_size, max(h->cs->plat.min_stackvar_alignment, ci->props.flat_alignment));
+        elem->car = offset;
+      }
+    }
+
+    layout paramlist_layout = {
+      callsite_offsets_and_regnum,
+      ~upward_offset,
+      uses_hidden_return_param
+    };
+    return layout;
+  }
 }
 
 func layout_individual_cell(h *frame, cell cell_num, low_offset_ref *i32, offsets_ref *array[tmp_offsets_val]) void {
@@ -519,6 +683,19 @@ func for_universal_cc_size_based_exists_hrp(props *type_properties) bool {
   }
 }
 
+func x64_sysv_memory_param(props *type_properties) bool {
+  if props->flat_size <= 16 {
+    if case &DerivedMethodTrivial = &props->move_behavior {
+      return false;
+    } else {
+      return true;
+    }
+  } else {
+    return true;
+  }
+}
+
+// TODO: Rename to ...universal_cc_x86_or_x64...
 // Props is the type properties of the return type.
 func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *type_properties) bool {
   switch callconv_style(plat).reg_style {
@@ -528,13 +705,16 @@ func for_universal_cc_exists_hidden_return_param(plat *platform_info, props *typ
     } else {
       return false;
     }
-  case RecursiveSizeBased:
+  case X64SizeBased:
+    return x64_sysv_memory_param(props);
+  case RecursiveSizeBased: {
     if !for_universal_cc_size_based_exists_hrp(props) {
       if case IsPow2AllTheWayDown = props->is_pow2 {
         return false;
       }
     }
     return true;
+  }
   case SizeBased:
     return for_universal_cc_size_based_exists_hrp(props);
   }
@@ -645,7 +825,8 @@ func dumbly_gen_function_exit(f *objfile, h *frame) void {
       if retsize <= 4 {
         x86_load32_zeroextend(f, X86_EAX, X86_EBP, loc, retsize);
       } else if retsize <= 8 {
-        check(h->cs->plat.opsys != Linux32);
+        // TODO: This should not even be theoretically reachable on Linux32.  (TODO: Except u64?)
+        // check(h->cs->plat.opsys != Linux32);
         x86_load32(f, X86_EAX, X86_EBP, loc);
         x86_load32_zeroextend(f, X86_EDX, X86_EBP, loc + 4, retsize - 4);
       } else {
@@ -695,7 +876,8 @@ func universal_cc_write_to_retcell(f *objfile, h *frame, c cell_num) void {
   if retsize <= 4 {
     x86_store32_partial_destructively(f, dest_addr, dest_disp, X86_EAX, retsize);
   } else if retsize <= 8 {
-    check(h->cs->plat.opsys != Linux32);
+    // TODO: This should not even be theoretically reachable on Linux32.  (TODO: Except u64?)
+    // check(h->cs->plat.opsys != Linux32);
     x86_store(f, dest_addr, dest_disp, X86_EAX, OZ_32);
     x86_store32_partial_destructively(f, dest_addr, dest_disp + 4, X86_EDX, retsize - 4);
   } else {
@@ -716,16 +898,10 @@ func dumbly_gen_xnode(f *objfile, h *frame, sn sq_num, xn *gr_xnode) void {
     case UniversalCdeclConvention:
       ret_ci *cell_info = ref_cell(h->gr, a.retcell);
       hrp bool = for_universal_cc_exists_hidden_return_param(&h->cs->plat, &ret_ci->props);
-      framelist_bottom i32 = *un(&ref_annot(h, sn)->paramlist_bottom_frame_offset);
-
-      callsite_bottom i32;
+      callsite_bottom i32 = *un(&ref_annot(h, sn)->paramlist_bottom_frame_offset);
       if hrp {
-        hrp_bottom i32 = framelist_bottom - 4;
         x86_load_cell_address(f, h, X86_EAX, a.retcell);
-        x86_store(f, X86_EBP, hrp_bottom, X86_EAX, OZ_32);
-        callsite_bottom = hrp_bottom;
-      } else {
-        callsite_bottom = framelist_bottom;
+        x86_store(f, X86_EBP, callsite_bottom, X86_EAX, OZ_32);
       }
 
       switch get_loc(h, a.funcell) {
@@ -1030,14 +1206,15 @@ func x86_gen_write_data(f *objfile, h *frame, dest_addr u8, dest_disp i32, words
   check(i == end);
 }
 
+// TODO: Rename
 func x86_simple_symbolref(cs *checkstate, val *st_value, id_out *fn_body_id) np {
-  if count(&val->symbolrefs) != 1 || val->length != 4 {
+  if count(&val->symbolrefs) != 1 || val->length != cs->plat.ptrtraits.size {
     return ERR(_u8("Value isn't simple function pointer"));
   }
   srefpair tup[u32, st_symbolref] = get(&val->symbolrefs, 0);
   check(srefpair.car == 0);
   sref st_symbolref = srefpair.cdr;
-  check(st_symbolref_size(&cs->plat, &sref) == 4);
+  check(st_symbolref_size(&cs->plat, &sref) == cs->plat.ptrtraits.size);
   *id_out = sref.fnid;
   return NoFail;
 }
@@ -1069,9 +1246,364 @@ func `<`(x tup[u32, st_symbolref], y tup[u32, st_symbolref]) bool {
   return x.car < y.car;
 }
 
+func x86_dumbly_gen_u64_mul(f *objfile, h *frame, loc0 cell_loc, loc1 cell_loc) void {
+  // ESP ought to be in some acceptable location...
+  x86_push32(f, X86_EBX);
+  x86_push32(f, X86_ESI);
+  x86_push32(f, X86_EDI);
+
+  /* ebx: upper register sum */
+  /* esi: overflow spillway, test for zero at finish */
+  /* edi: holds carry bits, bitwise ored into verflow spillway at finish */
+  x86_mov_imm32(f, X86_EDI, @[u32] 0);
+
+  // multiply high dwords
+  x86_load32_hi_doq(f, X86_EAX, loc0);
+  x86_load32_hi_doq(f, X86_ECX, loc1);
+  x86_eaxedx_mul_w32(f, X86_ECX);
+
+  // any result produces overflow
+  x86_mov_reg32(f, X86_ESI, X86_EDX);
+  x86_or_w32(f, X86_ESI, X86_EAX);
+
+  // multiply high x low dwords (1)
+  x86_load32_lo_doq(f, X86_EAX, loc0);
+  x86_eaxedx_mul_w32(f, X86_ECX);
+  x86_mov_reg32(f, X86_EBX, X86_EAX);
+  x86_or_w32(f, X86_ESI, X86_EDX);
+
+  // multiply high x low dwords (2)
+  x86_load32_hi_doq(f, X86_EAX, loc0);
+  x86_load32_lo_doq(f, X86_ECX, loc1);
+  x86_eaxedx_mul_w32(f, X86_ECX);
+  x86_add(f, X86_EBX, X86_EAX, OZ_32);
+  x86_adc_imm32(f, X86_EDI, 0);
+  x86_or_w32(f, X86_ESI, X86_EDX);
+
+  // multiply low x low dword
+  x86_load32_lo_doq(f, X86_EAX, loc0);
+  x86_eaxedx_mul_w32(f, X86_ECX);
+  x86_add(f, X86_EBX, X86_EDX, OZ_32);
+  x86_adc_imm32(f, X86_EDI, 0);
+
+  // last bitwise or and check for non-zero
+  x86_or_w32(f, X86_ESI, X86_EDI);
+  x86_gen_crash_jcc(f, h, X86_JCC_NE);
+
+  // add carry bits into ebx
+  x86_add(f, X86_EBX, X86_EDI, OZ_32);
+  x86_gen_crash_jcc(f, h, X86_JCC_C);
+
+  // move upper 32 to return register edx
+  x86_mov_reg32(f, X86_EDX, X86_EBX);
+
+  x86_pop32(f, X86_EDI);
+  x86_pop32(f, X86_ESI);
+  x86_pop32(f, X86_EBX);
+}
+
+func x86_dumbly_gen_call_i64_mul(f *objfile, h *frame, loc0 cell_loc, loc1 cell_loc) void {
+  // The signature is:
+  // int32_t __kit_x86_i64_mul(int64_t x, int64_t y, int64_t *out)
+
+  x86_add_imm32(f, X86_ESP, @[i32] -4);
+  x86_mov_reg32(f, X86_ECX, X86_ESP);
+  // TODO: Probably we can push X86_ESP directly.
+  x86_push32(f, X86_ECX);
+  x86_push64_from_loc_using_eaxedx(f, loc1);
+  x86_push64_from_loc_using_eaxedx(f, loc0);
+
+  symbol_table_index sti = x86_stis(h->cs)->x86_i64_mul_func_sti;
+  x86_call(f, symbol_table_index);
+  x86_add_imm32(f, X86_ESP, 20);
+}
+
+func x86_push64_from_loc_using_eaxedx(f *objfile, loc cell_loc) void {
+  x86_load64_for_primop(f, X86_EAX, X86_EDX, loc, 8);
+  x86_push32(f, X86_EDX);
+  x86_push32(f, X86_EAX);
+}
+
+func x86_dumbly_gen_call_binop64_sti(f *objfile, h *frame, loc0 cell_loc, loc1 cell_loc, symbol_table_index sti) void {
+  // TODO: We should probably bother with stack alignment, cleanly do this with param layout/funcall alignment (due to implementations compiling to funny stack checks).
+
+  x86_push64_from_loc_using_eaxedx(f, loc1);
+  x86_push64_from_loc_using_eaxedx(f, loc0);
+  x86_call(f, symbol_table_index);
+  x86_add_imm32(f, X86_ESP, 16);
+}
+
+func x86_dumbly_gen_call_u64_div(f *objfile, h *frame, loc0 cell_loc, loc1 cell_loc) void {
+  x86_dumbly_gen_call_binop64_sti(f, h, loc0, loc1, x86_stis(h->cs)->x86_u64_div_func_sti);
+}
+
+func x86_dumbly_gen_call_i64_div(f *objfile, h *frame, loc0 cell_loc, loc1 cell_loc) void {
+  x86_dumbly_gen_call_binop64_sti(f, h, loc0, loc1, x86_stis(h->cs)->x86_i64_div_func_sti);
+}
+
+func x86_dumbly_gen_call_u64_mod(f *objfile, h *frame, loc0 cell_loc, loc1 cell_loc) void {
+  x86_dumbly_gen_call_binop64_sti(f, h, loc0, loc1, x86_stis(h->cs)->x86_u64_mod_func_sti);
+}
+
+func x86_dumbly_gen_call_i64_mod(f *objfile, h *frame, loc0 cell_loc, loc1 cell_loc) void {
+  x86_dumbly_gen_call_binop64_sti(f, h, loc0, loc1, x86_stis(h->cs)->x86_i64_mod_func_sti);
+}
+
+// Loads into eax:edx and the shift ecx (range-checking the shift's 64-bit value)
+func x86_dumbly_shift64_checked_load(f *objfile, h *frame, loc0 cell_loc, loc1 cell_loc) void {
+  x86_load32_lo_doq(f, X86_ECX, loc1);
+  x86_load32_hi_doq(f, X86_EDX, loc1);
+  x86_test_regs32(f, X86_EDX, X86_EDX);
+  x86_gen_crash_jcc(f, h, X86_JCC_NE);
+
+  x86_load32_lo_doq(f, X86_EAX, loc0);
+  x86_load32_hi_doq(f, X86_EDX, loc0);
+
+  x86_cmp_imm32(f, X86_ECX, @[u32]63);
+  x86_gen_crash_jcc(f, h, X86_JCC_A);
+}
+
+func x86_dumbly_gen_primitive_numeric_op_64bit(f *objfile, h *frame, a *gr_prim_apply, b *primitive_numeric_op) void {
+  check(b->op_size == 8);
+  op_size_8 u32 = 8;  // constant
+
+  arity u32 = op_arity(b->op_action);
+  check(count(&a->params) == ~arity);
+
+  loc0 cell_loc = get_loc(h, get(&a->params, 0));
+  loc1 cell_loc;
+  if arity > 1 {
+    loc1 = get_loc(h, get(&a->params, 1));
+  }
+
+  switch b->op_action {
+  case NumAdd:
+    x86_load64_for_primop(f, X86_EAX, X86_EDX, loc0, op_size_8);
+    x86_load32_lo_doq(f, X86_ECX, loc1);
+    x86_add(f, X86_EAX, X86_ECX, OZ_32);
+    x86_load32_hi_doq(f, X86_ECX, loc1);
+    x86_adc_w32(f, X86_EDX, X86_ECX);
+    if b->op_numtraits.trap_overflow {
+      x86_gen_crash_jcc(f, h, x86_repr_overflow_code(b->op_numtraits.repr));
+    }
+  case NumSub:
+    x86_load64_for_primop(f, X86_EAX, X86_EDX, loc0, op_size_8);
+    x86_load32_lo_doq(f, X86_ECX, loc1);
+    x86_sub(f, X86_EAX, X86_ECX, OZ_32);
+    x86_load32_hi_doq(f, X86_ECX, loc1);
+    x86_sbb_w32(f, X86_EDX, X86_ECX);
+    if b->op_numtraits.trap_overflow {
+      x86_gen_crash_jcc(f, h, x86_repr_overflow_code(b->op_numtraits.repr));
+    }
+  case NumMul:
+    switch b->op_numtraits.repr {
+    case Unsigned:
+      x86_dumbly_gen_u64_mul(f, h, loc0, loc1);
+    case SignedTwos:
+      x86_dumbly_gen_call_i64_mul(f, h, loc0, loc1);
+    }
+  case NumDiv:
+    switch b->op_numtraits.repr {
+    case Unsigned:
+      x86_dumbly_gen_call_u64_div(f, h, loc0, loc1);
+    case SignedTwos:
+      x86_dumbly_gen_call_i64_div(f, h, loc0, loc1);
+    }
+  case NumMod:
+    switch b->op_numtraits.repr {
+    case Unsigned:
+      x86_dumbly_gen_call_u64_mod(f, h, loc0, loc1);
+    case SignedTwos:
+      x86_dumbly_gen_call_i64_mod(f, h, loc0, loc1);
+    }
+  case NumNegate:
+    x86_load32_lo_doq(f, X86_EAX, loc0);
+    x86_load32_hi_doq(f, X86_EDX, loc0);
+
+    switch b->op_numtraits.repr {
+    case Unsigned:
+      check(!b->op_numtraits.trap_overflow);
+    case SignedTwos:
+      // Crashes if the value is INT64_MIN.
+      x86_mov_reg32(f, X86_ECX, X86_EDX);
+      x86_xor_imm32(f, X86_ECX, @[i32] ~ -(@[i64] 0x80000000));
+      x86_or_w32(f, X86_ECX, X86_EAX);
+      x86_gen_crash_jcc(f, h, X86_JCC_Z);
+    }
+
+    // Perform negation.
+    x86_neg_w32(f, X86_EAX);
+    x86_adc_imm32(f, X86_EDX, 0);
+    x86_neg_w32(f, X86_EDX);
+  case NumBitAnd:
+    x86_load64_for_primop(f, X86_EAX, X86_EDX, loc0, op_size_8);
+    x86_load32_lo_doq(f, X86_ECX, loc1);
+    x86_and_w32(f, X86_EAX, X86_ECX);
+    x86_load32_hi_doq(f, X86_ECX, loc1);
+    x86_and_w32(f, X86_EDX, X86_ECX);
+  case NumBitOr:
+    x86_load64_for_primop(f, X86_EAX, X86_EDX, loc0, op_size_8);
+    x86_load32_lo_doq(f, X86_ECX, loc1);
+    x86_or_w32(f, X86_EAX, X86_ECX);
+    x86_load32_hi_doq(f, X86_ECX, loc1);
+    x86_or_w32(f, X86_EDX, X86_ECX);
+  case NumBitXor:
+    x86_load64_for_primop(f, X86_EAX, X86_EDX, loc0, op_size_8);
+    x86_load32_lo_doq(f, X86_ECX, loc1);
+    x86_xor_w32(f, X86_EAX, X86_ECX);
+    x86_load32_hi_doq(f, X86_ECX, loc1);
+    x86_xor_w32(f, X86_EDX, X86_ECX);
+  case NumBitNot:
+    x86_load64_for_primop(f, X86_EAX, X86_EDX, loc0, op_size_8);
+    x86_not(f, X86_EAX, OZ_32);
+    x86_not(f, X86_EDX, OZ_32);
+  case NumShiftLeft:
+    // We handle out-of-range rhs, that's all.  Even for i64 case.
+    x86_dumbly_shift64_checked_load(f, h, loc0, loc1);
+
+    // Now do the shift.
+    x86_shld_w32(f, X86_EDX, X86_EAX);
+    x86_shl_cl_w32(f, X86_EAX);
+
+    x86_test_imm8(f, X86_ECX, 32);
+
+    // This could be done with cmov instructions; it isn't.
+
+    target jmp_targetnum = frame_create_target(h);
+    x86_gen_placeholder_jcc(f, h, X86_JCC_Z, target);
+
+    x86_mov_reg32(f, X86_EDX, X86_EAX);
+    x86_mov_imm32(f, X86_EAX, @[u32]0);
+
+    frame_define_target(h, target, secsize(&f->text));
+  case NumShiftRight:
+    x86_dumbly_shift64_checked_load(f, h, loc0, loc1);
+
+    do_sar bool;
+    switch b->op_numtraits.repr {
+    case Unsigned:
+      do_sar = false;
+    case SignedTwos:
+      do_sar = true;
+    }
+
+
+    // Now do the shift.
+    x86_shrd_w32(f, X86_EAX, X86_EDX);
+    if do_sar {
+      x86_sar_cl_w32(f, X86_EDX);
+    } else {
+      x86_shr_cl_w32(f, X86_EDX);
+    }
+
+    x86_test_imm8(f, X86_ECX, 32);
+
+    // This could be done with cmov instructions; it isn't.
+
+    target jmp_targetnum = frame_create_target(h);
+    x86_gen_placeholder_jcc(f, h, X86_JCC_Z, target);
+
+    x86_mov_reg32(f, X86_EAX, X86_EDX);
+
+    if do_sar {
+      x86_mov_imm32(f, X86_ECX, @[u32]31);
+      x86_sar_cl_w32(f, X86_EDX);
+    } else {
+      x86_mov_imm32(f, X86_EDX, @[u32]0);
+    }
+
+    frame_define_target(h, target, secsize(&f->text));
+  }
+
+  x86_store64_destructively(f, get_loc(h, a->retcell), X86_EAX, X86_EDX, X86_ECX);
+}
+
+func x86_dumbly_gen_primitive_numeric_comparison_op_64bit_equality(f *objfile, h *frame, a *gr_prim_apply, param0 cell_loc, param1 cell_loc, setcc_code u8) void {
+  x86_load32_dword_of_64bit(f, X86_EDX, param0, 0);
+  x86_load32_dword_of_64bit(f, X86_ECX, param1, 0);
+  // Seems unnecessary.
+  x86_mov_imm32(f, X86_EAX, @[u32] 0);
+
+  x86_cmp(f, X86_EDX, X86_ECX, OZ_32);
+  x86_setcc_b8(f, X86_AL, setcc_code);
+
+  x86_load32_dword_of_64bit(f, X86_EDX, param0, 1);
+  x86_load32_dword_of_64bit(f, X86_ECX, param1, 1);
+
+  x86_cmp(f, X86_EDX, X86_ECX, OZ_32);
+  x86_setcc_b8(f, X86_CL, setcc_code);
+  if setcc_code == X86_SETCC_NE {
+    x86_or_w8(f, X86_AL, X86_CL);
+  } else {
+    x86_and_w8(f, X86_AL, X86_CL);
+  }
+
+  x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
+}
+
+func x86_dumbly_gen_primitive_numeric_comparison_op_64bit_inequality(f *objfile, h *frame, a *gr_prim_apply, param0 cell_loc, param1 cell_loc, setcc_code u8) void {
+  x86_load32_dword_of_64bit(f, X86_EDX, param0, 0);
+  x86_load32_dword_of_64bit(f, X86_ECX, param1, 0);
+  x86_cmp(f, X86_EDX, X86_ECX, OZ_32);
+  x86_load32_dword_of_64bit(f, X86_EDX, param0, 1);
+  x86_load32_dword_of_64bit(f, X86_ECX, param1, 1);
+  x86_sbb_w32(f, X86_EDX, X86_ECX);
+  x86_setcc_b8(f, X86_AL, setcc_code);
+  // Seems unnecessary.
+  x86_movzx8_reg8(f, X86_EAX, X86_AL);
+  x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, 1, X86_EDX);
+}
+
+func x86_dumbly_gen_primitive_numeric_comparison_op_64bit(f *objfile, h *frame, a *gr_prim_apply, b *primitive_numeric_comparison_op) void {
+  check(count(&a->params) == 2);
+
+  param0 cell_loc = get_loc(h, get(&a->params, 0));
+  param1 cell_loc = get_loc(h, get(&a->params, 1));
+
+  /* Note that in the unequal cases, we take care (by swapping
+  parameter order) to use only those setcc codes that work correctly
+  with the implementation's use of the SBB instruction. */
+
+  switch b->op_numtraits.repr {
+  case Unsigned:
+    switch b->op_action {
+    case CmpEq:
+      x86_dumbly_gen_primitive_numeric_comparison_op_64bit_equality(f, h, a, param0, param1, X86_SETCC_E);
+    case CmpNe:
+      x86_dumbly_gen_primitive_numeric_comparison_op_64bit_equality(f, h, a, param0, param1, X86_SETCC_NE);
+    case CmpLt:
+      x86_dumbly_gen_primitive_numeric_comparison_op_64bit_inequality(f, h, a, param0, param1, X86_SETCC_B);
+    case CmpGt:
+      x86_dumbly_gen_primitive_numeric_comparison_op_64bit_inequality(f, h, a, param1, param0, X86_SETCC_B);
+    case CmpLe:
+      x86_dumbly_gen_primitive_numeric_comparison_op_64bit_inequality(f, h, a, param1, param0, X86_SETCC_AE);
+    case CmpGe:
+      x86_dumbly_gen_primitive_numeric_comparison_op_64bit_inequality(f, h, a, param0, param1, X86_SETCC_AE);
+    }
+  case SignedTwos:
+    switch b->op_action {
+    case CmpEq:
+      x86_dumbly_gen_primitive_numeric_comparison_op_64bit_equality(f, h, a, param0, param1, X86_SETCC_E);
+    case CmpNe:
+      x86_dumbly_gen_primitive_numeric_comparison_op_64bit_equality(f, h, a, param0, param1, X86_SETCC_NE);
+    case CmpLt:
+      x86_dumbly_gen_primitive_numeric_comparison_op_64bit_inequality(f, h, a, param0, param1, X86_SETCC_L);
+    case CmpGt:
+      x86_dumbly_gen_primitive_numeric_comparison_op_64bit_inequality(f, h, a, param1, param0, X86_SETCC_L);
+    case CmpLe:
+      x86_dumbly_gen_primitive_numeric_comparison_op_64bit_inequality(f, h, a, param1, param0, X86_SETCC_GE);
+    case CmpGe:
+      x86_dumbly_gen_primitive_numeric_comparison_op_64bit_inequality(f, h, a, param0, param1, X86_SETCC_GE);
+    }
+  }
+}
+
 func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
   switch &a->primop {
   case &PrimNum(b primitive_numeric_op):
+    if b.op_size == 8 {
+      return x86_dumbly_gen_primitive_numeric_op_64bit(f, h, a, &b);
+    }
     arity u32 = op_arity(b.op_action);
     check(count(&a->params) == ~arity);
     x86_load32_for_primop(f, X86_EAX, get_loc(h, get(&a->params, 0)), b.op_size);
@@ -1330,6 +1862,9 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
 
     x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.op_size, X86_EDX);
   case &PrimNumCompare(b primitive_numeric_comparison_op):
+    if b.op_size == 8 {
+      return x86_dumbly_gen_primitive_numeric_comparison_op_64bit(f, h, a, &b);
+    }
     check(count(&a->params) == 2);
     x86_load32_for_primop(f, X86_EAX, get_loc(h, get(&a->params, 0)), b.op_size);
     x86_load32_for_primop(f, X86_ECX, get_loc(h, get(&a->params, 1)), b.op_size);
@@ -1407,69 +1942,143 @@ func x86_dumbly_prim_apply(f *objfile, h *frame, a *gr_prim_apply) void {
     param0 cell_num = get(&a->params, 0);
     paramloc cell_loc = get_loc(h, param0);
     retloc cell_loc = get_loc(h, a->retcell);
+    trap_overflow bool = b.to_numtraits.trap_overflow & b.from_numtraits.trap_overflow;
+
+    // After these assertions we will simply use "== 8" or "!= 8" to check if the size is 64-bit vs. 32/16/8-bit.
+    check(b.from_size <= 8 && is_pow2(b.from_size));
+    check(b.to_size <= 8 && is_pow2(b.to_size));
+
     switch b.from_numtraits.repr {
     case Unsigned:
       check(b.from_numtraits.minval == bigu(0));
       check(b.from_numtraits.maxval == (bigu(1) << (b.from_size * 8)) - bigu(1));
-      x86_load32_for_primop(f, X86_EAX, paramloc, b.from_size);
+      if b.to_size == 8 || (b.from_size == 8 && trap_overflow) {
+        x86_load64_for_primop(f, X86_EAX, X86_EDX, paramloc, b.from_size);
+      } else {
+        x86_load32_for_primop(f, X86_EAX, paramloc, b.from_size);
+      }
       switch b.to_numtraits.repr {
       case Unsigned:
         check(b.to_numtraits.minval == bigu(0));
         check(b.from_numtraits.maxval == (bigu(1) << (b.from_size * 8)) - bigu(1));
       case SignedTwos:
-        check(b.to_numtraits.minval < bigu(0));
+        check(is_negative(&b.to_numtraits.minval));
       }
-      if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow &&
-          b.to_numtraits.maxval < b.from_numtraits.maxval {
-        to_maxval u32;
-        if !as_non_negative_u32(&b.to_numtraits.maxval, &to_maxval) {
-          ice(_u8("conversion unsigned maxval outside u32 range"));
+      if trap_overflow && b.to_numtraits.maxval < b.from_numtraits.maxval {
+        to_maxval u64;
+        if !as_non_negative_u64(&b.to_numtraits.maxval, &to_maxval) {
+          ice(_u8("conversion unsigned maxval outside u64 range"));
         }
-        x86_cmp_imm32(f, X86_EAX, to_maxval);
-        x86_gen_crash_jcc(f, h, X86_JCC_A);
+        if b.to_size != 8 {
+          x86_cmp_imm32(f, X86_EAX, @[u32] ~to_maxval);
+          x86_gen_crash_jcc(f, h, X86_JCC_A);
+          if b.from_size == 8 {
+            x86_test_regs32(f, X86_EDX, X86_EDX);
+            x86_gen_crash_jcc(f, h, X86_JCC_NE);
+          }
+        } else {
+          // Sanity check: we only need to test the high dword.
+          check(getbigdigit(&b.to_numtraits.maxval, 0) == 0xFFFFFFFF);
+          x86_cmp_imm32(f, X86_EDX, @[u32] ~(to_maxval >> 32));
+          x86_gen_crash_jcc(f, h, X86_JCC_A);
+        }
       }
-      x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
+      if b.to_size != 8 {
+        x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_ECX);
+      } else {
+        x86_store64_destructively(f, get_loc(h, a->retcell), X86_EAX, X86_EDX, X86_ECX);
+      }
     case SignedTwos:
-      check(b.from_numtraits.minval < bigu(0));
-      x86_load32_signextend_for_primop(f, X86_EAX, paramloc, b.from_size);
+      check(is_negative(&b.from_numtraits.minval));
+      if b.to_size == 8 || (b.from_size == 8 && trap_overflow) {
+        x86_load64_signextend_for_primop(f, X86_EAX, X86_EDX, paramloc, b.from_size);
+      } else {
+        x86_load32_signextend_for_primop(f, X86_EAX, paramloc, b.from_size);
+      }
       switch b.to_numtraits.repr {
       case Unsigned:
         check(b.to_numtraits.minval == bigu(0));
-        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow &&
-            b.to_numtraits.maxval >= b.from_numtraits.maxval {
+        if trap_overflow && b.to_numtraits.maxval >= b.from_numtraits.maxval {
           // Just check for negativity.
-          x86_test_regs32(f, X86_EAX, X86_EAX);
+          if b.from_size == 8 {
+            x86_test_regs32(f, X86_EDX, X86_EDX);
+          } else {
+            x86_test_regs32(f, X86_EAX, X86_EAX);
+          }
           x86_gen_crash_jcc(f, h, X86_JCC_S);
         } else {
           // Check unsigned above maxval.
-          to_maxval u32;
-          if !as_non_negative_u32(&b.to_numtraits.maxval, &to_maxval) {
-            ice(_u8("conversion unsigned maxval outside u32 range"));
+          // TODO: This is a copy/paste of the unsigned block above.
+          to_maxval u64;
+          if !as_non_negative_u64(&b.to_numtraits.maxval, &to_maxval) {
+            ice(_u8("conversion unsigned maxval outside u64 range"));
           }
-          x86_cmp_imm32(f, X86_EAX, to_maxval);
-          x86_gen_crash_jcc(f, h, X86_JCC_A);
+          if b.to_size != 8 {
+            x86_cmp_imm32(f, X86_EAX, @[u32] ~to_maxval);
+            x86_gen_crash_jcc(f, h, X86_JCC_A);
+            if b.from_size == 8 {
+              x86_test_regs32(f, X86_EDX, X86_EDX);
+              x86_gen_crash_jcc(f, h, X86_JCC_NE);
+            }
+          } else {
+            // Sanity check: we only need to test the high dword.
+            check(getbigdigit(&b.to_numtraits.maxval, 0) == 0xFFFFFFFF);
+            x86_cmp_imm32(f, X86_EDX, @[u32] ~(to_maxval >> 32));
+            x86_gen_crash_jcc(f, h, X86_JCC_A);
+          }
         }
-        x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
+        if b.to_size != 8 {
+          x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_ECX);
+        } else {
+          x86_store64_destructively(f, get_loc(h, a->retcell), X86_EAX, X86_EDX, X86_ECX);
+        }
       case SignedTwos:
-        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow &&
-            b.to_numtraits.maxval < b.from_numtraits.maxval {
-          to_maxval u32;
-          if !as_non_negative_u32(&b.to_numtraits.maxval, &to_maxval) {
-            ice(_u8("conversion unsigned maxval outside u32 range"));
+        if trap_overflow && b.to_numtraits.maxval < b.from_numtraits.maxval {
+          to_maxval u64;
+          if !as_non_negative_u64(&b.to_numtraits.maxval, &to_maxval) {
+            ice(_u8("conversion unsigned maxval outside u64 range"));
           }
-          x86_cmp_imm32(f, X86_EAX, to_maxval);
-          x86_gen_crash_jcc(f, h, X86_JCC_G);
-        }
-        if b.to_numtraits.trap_overflow && b.from_numtraits.trap_overflow &&
-            b.to_numtraits.minval > b.from_numtraits.minval {
-          to_minval i32;
-          if !as_i32(&b.to_numtraits.minval, &to_minval) {
-            ice(_u8("conversion signed minval outside i32 range"));
+          if b.to_size != 8 && b.from_size != 8 {
+            x86_cmp_imm32(f, X86_EAX, @[u32] ~to_maxval);
+            x86_gen_crash_jcc(f, h, X86_JCC_G);
+          } else {
+            // Note sbb needs to use L or GE, so we swap the parameter order
+            // compared to the other branch, in the cmp and sbb instructions.
+
+            check(b.from_size == 8);  // because b.from_numtraits.maxval is greater.
+            x86_mov_imm32(f, X86_ECX, @[u32] ~(to_maxval & 0xFFFFFFFF));
+            x86_cmp(f, X86_ECX, X86_EAX, OZ_32);
+            x86_mov_imm32(f, X86_ECX, @[u32] ~(to_maxval >> 32));
+            x86_sbb_w32(f, X86_ECX, X86_EDX);
+            x86_gen_crash_jcc(f, h, X86_JCC_L);
           }
-          x86_cmp_imm32(f, X86_EAX, to_minval);
-          x86_gen_crash_jcc(f, h, X86_JCC_L);
         }
-        x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
+        if trap_overflow && b.to_numtraits.minval > b.from_numtraits.minval {
+          to_minval i64;
+          if !as_i64(&b.to_numtraits.minval, &to_minval) {
+            ice(_u8("conversion signed minval outside i64 range"));
+          }
+          if b.to_size != 8 && b.from_size != 8 {
+            x86_cmp_imm32(f, X86_EAX, @[i32] ~to_minval);
+            x86_gen_crash_jcc(f, h, X86_JCC_L);
+          } else {
+            check(b.from_size == 8);  // because b.from_numtrains.minval is lesser.
+            x86_mov_imm32(f, X86_ECX, @[u32] ~(to_minval & 0xFFFFFFFF));
+            x86_cmp(f, X86_EAX, X86_ECX, OZ_32);
+            x86_mov_imm32(f, X86_ECX, @[u32] ~((to_minval >> 32) & 0xFFFFFFFF));
+            x86_sbb_w32(f, X86_EDX, X86_ECX);
+            x86_gen_crash_jcc(f, h, X86_JCC_L);
+            if b.to_size == 8 {
+              // Reload EDX, which we overwrote with sbb.  (TODO: We could spill a callee-save register or flip the comparison/jmp instead.)
+              x86_load32_dword_of_64bit(f, X86_EDX, paramloc, 1);
+            }
+          }
+        }
+        if b.to_size != 8 {
+          x86_store32_partial_destructively(f, get_loc(h, a->retcell), X86_EAX, b.to_size, X86_EDX);
+        } else {
+          x86_store64_destructively(f, get_loc(h, a->retcell), X86_EAX, X86_EDX, X86_ECX);
+        }
       }
     }
   }

@@ -54,6 +54,8 @@ struct checkstate {
   defs array[shp[def_entry]];
   defs_by_name hash[sym, array[def_entry_id]];
 
+  special_defs special_stis;
+
   fn_bodies array[shp[fn_body_entry]];
 
   access_blocks array[shp[access_entry]];
@@ -61,6 +63,30 @@ struct checkstate {
   kit_name_counter u32;
 
   prims cs_primitives;
+}
+
+struct x86_special_stis {
+  x86_i64_mul_func_sti sti;
+  x86_i64_div_func_sti sti;
+  x86_i64_mod_func_sti sti;
+  x86_u64_div_func_sti sti;
+  x86_u64_mod_func_sti sti;
+}
+
+enum special_stis {
+  NoSpecialStis void;
+  X86SpecialStis x86_special_stis;
+}
+
+func x86_stis(cs *checkstate) *x86_special_stis {
+  p *x86_special_stis;
+  switch &cs->special_defs {
+  case &X86SpecialStis(x x86_special_stis):
+    p = &x;
+  default:
+    crash(_u8("Expecting X86SpecialStis"));
+  }
+  return p;
 }
 
 func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader fn[*checkstate, sym, *array[u8], bool]) checkstate {
@@ -79,6 +105,7 @@ func make_checkstate(im *identmap, plat platform_info, loader_ctx *void, loader 
     mk_hash(),
     mk_array(),
     mk_hash(),
+    NoSpecialStis,
     mk_array(),
     mk_array(),
     0,

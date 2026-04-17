@@ -2717,7 +2717,13 @@ void gen_i64_to_smaller_conversion(struct checkstate *cs,
 
   switch (cs->arch) {
   case TARGET_ARCH_X86: {
-    gen_x86_mov_eaxedx(f, off0);
+    /* eax/eCx, not the normal eax/edx */
+    gp_gen_movzx(f, GP_A, GP_BP, off0, OZ_32);
+    gp_gen_movzx(f, GP_C, GP_BP, int32_add(off0, 4), OZ_32);
+
+    /* cdq for later cmp */
+    ia_gen_cwdqo(f, OZ_32);
+
     if (maxval != INT32_MAX) {
       ia_gen_cmp_imm(f, GP_A, maxval, OZ_32);
       gen_crash_jcc(f, h, IA_JCC_G);
@@ -2727,7 +2733,7 @@ void gen_i64_to_smaller_conversion(struct checkstate *cs,
       gen_crash_jcc(f, h, IA_JCC_L);
     }
 
-    gp_gen_test_regs(f, GP_D, GP_D, OZ_32);
+    ia_gen_cmp(f, GP_D, GP_C, OZ_32);
     gen_crash_jcc(f, h, IA_JCC_NE);
   } break;
   case TARGET_ARCH_X64: {

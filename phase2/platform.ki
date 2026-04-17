@@ -54,14 +54,22 @@ func check_littleendian(plat *platform_info) void {
   }
 }
 
+enum platform_arch {
+  X86 void;
+  X64 void;
+}
+
+// TODO: Avoid 64-bit/32-bit distinction in platform_os -- because we have platform_arch for that.
 enum platform_os {
   Linux32 void;
+  Linux64 void;
   Win32 void;
   Osx32 void;
 }
 
 enum universal_calling_convention {
   UniversalCdeclConvention void;
+  UniversalX64Convention void;
 }
 
 struct platform_info {
@@ -82,14 +90,20 @@ struct platform_info {
   i32traits integral_traits;
   u32traits integral_traits;
   o32traits integral_traits;
+  i64traits integral_traits;
+  u64traits integral_traits;
+  o64traits integral_traits;
   difftraits integral_traits;
   sizetraits integral_traits;
   osizetraits integral_traits;
   ptrtraits flat_traits;
   fntraits flat_traits;
 
+  arch platform_arch;
   opsys platform_os;
-  // There's no such thing as a universal calling convention, and as soon as this fiction goes away we'll remove/change this.
+
+  // We'll take this to mean the "standard" calling convention for the platform... but the real purpose of this type, as we use it, is that whenever we branch on its values, we have platform-specific code (x86-specific for UniversalCdeclConvention and x64-specific for UniversalX64Convention).
+  // TODO: Get rid of this type and branch on arch/opsys.
   callconv universal_calling_convention;
 }
 
@@ -97,6 +111,8 @@ enum callconv_reg_style {
   // Size based, uses eax:edx for 0, 1, 2, 4, 8.
   // TODO: This (on Windows) might be like RecursiveSizeBased, only arrays are treated as individual elements.
   SizeBased void;
+  // X64: size based (<= 16)
+  X64SizeBased void;
   // Size based, uses eax:edx, but elems must be reg-style too, where an array "char x[3]" counts as a single elem (thus size 3 implies we must use HRP).
   RecursiveSizeBased void;
   // Uses HRP for any non-primitive type.
@@ -115,7 +131,10 @@ struct callconv {
 }
 
 func callconv_style(p *platform_info) callconv {
+  // It's questionable how x86, x64 go through similar code paths use the same callconv type at all
   switch p->opsys {
+  case Linux64: return {X64SizeBased, RetStyle};
+
   case Linux32: return {PrimitiveBased, Ret4Style};
   case Win32: return {SizeBased, RetStyle};
   case Osx32: return {RecursiveSizeBased, Ret4Style};

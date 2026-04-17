@@ -1,3 +1,39 @@
+struct le_u64 {
+  buf ^[8]u8;
+}
+
+func `~`(x u64) le_u64 {
+  ret le_u64;
+  write_le_u64(ixcast(&ret.buf[0]), x);
+  return ret;
+}
+
+func write_le_u64(dest * ^[0]u8, x u64) void {
+  write_le_u32(dest, @[u32] ~(x & 0xFFFFFFFF));
+  write_le_u32(ixcast(&dest[4]), @[u32] ~(x >> 32));
+}
+
+func `~`(x le_u64) u64 {
+  w0 u64 = ~read_le_u32(ixcast(&x.buf[0]));
+  w1 u64 = ~read_le_u32(ixcast(&x.buf[4]));
+  return w0 | (w1 << 32);
+}
+
+struct le_i64 {
+  buf ^[8]u8;
+}
+
+func `~`(x i64) le_i64 {
+  ret le_i64;
+  write_le_i64(ixcast(&ret.buf[0]), x);
+  return ret;
+}
+
+func write_le_i64(dest * ^[0]u8, x i64) void {
+  write_le_u32(dest, @[u32] ~(x & 0xFFFFFFFF));
+  write_le_u32(dest, @[u32] ~((x >> 32) & 0xFFFFFFFF));
+}
+
 struct le_u32 {
   buf ^[4]u8;
 }
@@ -15,9 +51,13 @@ func write_le_u32(dest * ^[0]u8, x u32) void {
   dest[3] = ~ ((x >> 24) & 0xFF);
 }
 
-func `~`(x le_u32) u32 {
-  ret u32 = ((~x.buf[0] | (@[u32]~x.buf[1] << 8)) | (@[u32]~x.buf[2] << 16)) | (@[u32]~x.buf[3] << 24);
+func read_le_u32(buf * ^[0]u8) u32 {
+  ret u32 = ((~buf[0] | (@[u32]~buf[1] << 8)) | (@[u32]~buf[2] << 16)) | (@[u32]~buf[3] << 24);
   return ret;
+}
+
+func `~`(x le_u32) u32 {
+  return read_le_u32(ixcast(&x.buf[0]));
 }
 
 struct le_i32 {

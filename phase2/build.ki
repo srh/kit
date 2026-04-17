@@ -2,7 +2,9 @@ import basicanal;
 import check;
 import dumbgen;
 import io;
+// TODO: Rename to linux32_objfile.
 import linux_objfile;
+import linux64_objfile;
 import win_objfile;
 import osx_objfile;
 import objfile;
@@ -13,6 +15,8 @@ func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u
   }
 
   f objfile = mk_objfile();
+
+  add_platform_primitive_symbols(cs, &f);
 
   add_fn_body_symbols(cs, &f);
 
@@ -27,6 +31,8 @@ func build_nowrite_module(cs *checkstate, modulename sym, flattened_out *array[u
   switch cs->plat.opsys {
   case Linux32:
     *flattened_out = linux32_flatten(cs->im, &f);
+  case Linux64:
+    *flattened_out = linux64_flatten(cs->im, &f);
   case Win32:
     *flattened_out = win_flatten(cs->im, &f);
   case Osx32:
@@ -45,6 +51,8 @@ func build_module(cs *checkstate, modulename sym) np {
   path array[u8] = to_u8str(lookup(cs->im, modulename));
   switch cs->plat.opsys {
   case Linux32:
+    append(&path, _u8(".o"));
+  case Linux64:
     append(&path, _u8(".o"));
   case Win32:
     append(&path, _u8(".obj"));
@@ -78,7 +86,7 @@ func build_fn_body(cs *checkstate, f *objfile, ent *fn_body_entry) np {
       return Printed(pm);
     }
 
-    fillercode_align_double_quadword(f);
+    fillercode_align_to_fn_body(f);
     text_offset u32 = secsize(&f->text);
     set_symbol_value(f, *un(&ent->symbol_table_index), text_offset);
     annotate(&ent->body_text_offset, text_offset);
@@ -114,6 +122,7 @@ func add_export_symbols(cs *checkstate, f *objfile, modulename sym) np {
           name string = lookup(cs->im, ent->def_name);
           switch cs->plat.opsys {
           case Linux32: { }
+          case Linux64: { }
           case Win32:
             name = _s("_") + name;
           case Osx32:
@@ -141,6 +150,20 @@ func def_is_export(ent *def_entry) bool {
     }
   }
   return false;
+}
+
+func add_platform_primitive_symbols(cs *checkstate, f *objfile) void {
+  switch cs->plat.arch {
+  case X86:
+    stis x86_special_stis;
+    stis.x86_i64_mul_func_sti = add_remote_symbol(f, c_symbol_name(cs, cs->im->cym.x86_i64_mul_func_name), IsFunctionYes);
+    stis.x86_i64_div_func_sti = add_remote_symbol(f, c_symbol_name(cs, cs->im->cym.x86_i64_div_func_name), IsFunctionYes);
+    stis.x86_i64_mod_func_sti = add_remote_symbol(f, c_symbol_name(cs, cs->im->cym.x86_i64_mod_func_name), IsFunctionYes);
+    stis.x86_u64_div_func_sti = add_remote_symbol(f, c_symbol_name(cs, cs->im->cym.x86_u64_div_func_name), IsFunctionYes);
+    stis.x86_u64_mod_func_sti = add_remote_symbol(f, c_symbol_name(cs, cs->im->cym.x86_u64_mod_func_name), IsFunctionYes);
+    cs->special_defs = X86SpecialStis(stis);
+  case X64: { }
+  }
 }
 
 func add_fn_body_symbols(cs *checkstate, f *objfile) void {
@@ -200,6 +223,8 @@ func generate_kit_name(cs *checkstate, informal_name sym, arg_types shray[cu_typ
 func c_symbol_name(cs *checkstate, name sym) sym {
   switch cs->plat.opsys {
   case Linux32:
+    return name;
+  case Linux64:
     return name;
   case Win32:
     namestr string = lookup(cs->im, name);

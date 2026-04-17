@@ -34,6 +34,24 @@ func op_arity(act primitive_numeric_op_action) u32 {
   }
 }
 
+func[H] build_u8str(help H, r *array[u8], x *primitive_numeric_op_action) void {
+  // TODO: Don't alloc the _u8.
+  switch *x {
+  case NumAdd: onto_u8str(help, r, _u8("NumAdd"));
+  case NumSub: onto_u8str(help, r, _u8("NumSub"));
+  case NumMul: onto_u8str(help, r, _u8("NumMul"));
+  case NumDiv: onto_u8str(help, r, _u8("NumDiv"));
+  case NumMod: onto_u8str(help, r, _u8("NumMod"));
+  case NumNegate: onto_u8str(help, r, _u8("NumNegate"));
+  case NumBitAnd: onto_u8str(help, r, _u8("NumBitAnd"));
+  case NumBitOr: onto_u8str(help, r, _u8("NumBitOr"));
+  case NumBitXor: onto_u8str(help, r, _u8("NumBitXor"));
+  case NumBitNot: onto_u8str(help, r, _u8("NumBitNot"));
+  case NumShiftLeft: onto_u8str(help, r, _u8("NumShiftLeft"));
+  case NumShiftRight: onto_u8str(help, r, _u8("NumShiftRight"));
+  }
+}
+
 enum primitive_logical_op {
   LogicalNot void;
   BoolEq void;
@@ -169,7 +187,7 @@ func add_nonlossy_conversion(cs *checkstate, from tup[sym, integral_traits], to 
 
 func add_integral_primitives(cs *checkstate) void {
   // See also is_numeric_type.
-  nt ^[12]tup[sym, integral_traits] = {
+  nt ^[15]tup[sym, integral_traits] = {
       {cs->im->cym.i8sym, cs->plat.i8traits},
       {cs->im->cym.u8sym, cs->plat.u8traits},
       {cs->im->cym.o8sym, cs->plat.o8traits},
@@ -179,6 +197,9 @@ func add_integral_primitives(cs *checkstate) void {
       {cs->im->cym.i32sym, cs->plat.i32traits},
       {cs->im->cym.u32sym, cs->plat.u32traits},
       {cs->im->cym.o32sym, cs->plat.o32traits},
+      {cs->im->cym.i64sym, cs->plat.i64traits},
+      {cs->im->cym.u64sym, cs->plat.u64traits},
+      {cs->im->cym.o64sym, cs->plat.o64traits},
       {cs->im->cym.diffsym, cs->plat.difftraits},
       {cs->im->cym.sizesym, cs->plat.sizetraits},
       {cs->im->cym.osizesym, cs->plat.osizetraits}
@@ -226,6 +247,12 @@ func is_numeric_type(cs *checkstate, pt *te_typeexpr, out *numeric_traits) bool 
       *out = cs->plat.u32traits.numeric;
     } else if a.value == cs->im->cym.o32sym {
       *out = cs->plat.o32traits.numeric;
+    } else if a.value == cs->im->cym.i64sym {
+      *out = cs->plat.i64traits.numeric;
+    } else if a.value == cs->im->cym.u64sym {
+      *out = cs->plat.u64traits.numeric;
+    } else if a.value == cs->im->cym.o64sym {
+      *out = cs->plat.o64traits.numeric;
     } else if a.value == cs->im->cym.sizesym {
       *out = cs->plat.sizetraits.numeric;
     } else if a.value == cs->im->cym.osizesym {
